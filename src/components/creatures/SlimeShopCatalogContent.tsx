@@ -22,6 +22,7 @@ import {
   type SlimeShopItemCardContext,
 } from "./SlimeShopItemLists";
 import { SlimeShopSlimeList } from "./SlimeShopSlimeList";
+import { SlimeWardrobeAllCategories } from "./SlimeWardrobeAllCategories";
 import { SlimeWardrobeTitleList } from "./SlimeWardrobeTitleList";
 
 type ShopNavigationItem = {
@@ -37,7 +38,7 @@ type SlimeShopCatalogContentProps = {
   ownedKeys: SlimeColor[];
   ownedItemKeys: string[];
   equippedItemsByColor: EquippedItemsByColor;
-  growthByColor?: Partial<Record<SlimeColor, { stage?: number }>>;
+  growthByColor: Partial<Record<SlimeColor, { stage?: number }>>;
   claimedTitles: ClaimedTitle[];
   equippedTitleByColor: Partial<Record<SlimeColor, string>>;
   wardrobe: boolean;
@@ -65,6 +66,7 @@ export function SlimeShopCatalogContent({
   ownedKeys,
   ownedItemKeys,
   equippedItemsByColor,
+  growthByColor,
   claimedTitles,
   equippedTitleByColor,
   wardrobe,
@@ -78,14 +80,43 @@ export function SlimeShopCatalogContent({
   busyTitleColor,
   cardContext,
   onFilterChange,
+  onWardrobeFilterChange,
   onPurchaseSlime,
   onEquipTitle,
 }: SlimeShopCatalogContentProps) {
+  const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
+
+  if (wardrobe && wardrobeFilter === "all") {
+    if (!wardrobeColor) return null;
+    const items = shopCatalog.filter(
+      (item) =>
+        ownedItemKeys.includes(item.key) &&
+        (item.category as string) !== "food" &&
+        (item.category as string) !== "level-up",
+    );
+    return (
+      <SlimeWardrobeAllCategories
+        items={items}
+        navigationItems={navigationItems}
+        searchQuery={searchQuery}
+        wardrobeColor={wardrobeColor}
+        equippedItemsByColor={equippedItemsByColor}
+        cardContext={cardContext}
+        onFilterChange={(filter) => onWardrobeFilterChange?.(filter)}
+      />
+    );
+  }
+
   if (wardrobe && wardrobeFilter === "title") {
+    const visibleTitles = claimedTitles.filter(
+      (title) =>
+        !normalizedQuery ||
+        title.label.toLocaleLowerCase().includes(normalizedQuery),
+    );
     return wardrobeColor ? (
       <SlimeWardrobeTitleList
         wardrobeColor={wardrobeColor}
-        claimedTitles={claimedTitles}
+        claimedTitles={visibleTitles}
         equippedTitleKey={equippedTitleByColor[wardrobeColor] ?? null}
         busyTitleColor={busyTitleColor}
         busyItemKey={busyItemKey}
@@ -100,6 +131,7 @@ export function SlimeShopCatalogContent({
         catalog={catalog}
         searchQuery={searchQuery}
         ownedKeys={ownedKeys}
+        growthByColor={growthByColor}
         busyColor={busyColor}
         unitLabel={unitLabel}
         onPurchaseSlime={onPurchaseSlime}
@@ -115,6 +147,7 @@ export function SlimeShopCatalogContent({
         navigationItems={navigationItems}
         searchQuery={searchQuery}
         ownedKeys={ownedKeys}
+        growthByColor={growthByColor}
         busyColor={busyColor}
         unitLabel={unitLabel}
         cardContext={cardContext}
@@ -134,7 +167,9 @@ export function SlimeShopCatalogContent({
           ownedItemKeys.includes(item.key) &&
           (item.category as string) !== "food" &&
           (item.category as string) !== "level-up" &&
-          wardrobeFilterForItem(item) === wardrobeFilter,
+          wardrobeFilterForItem(item) === wardrobeFilter &&
+          (!normalizedQuery ||
+            item.labelKo.toLocaleLowerCase().includes(normalizedQuery)),
       ),
       equippedKeys,
     );

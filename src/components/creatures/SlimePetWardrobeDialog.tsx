@@ -38,6 +38,8 @@ export function SlimePetWardrobeDialog({
       busyItemKey={status.busyItemKey}
       busyTitleColor={status.busyTitleColor}
       notice={shop.notice}
+      searchQuery={wardrobe.searchQuery}
+      onSearchQueryChange={wardrobe.setSearchQuery}
       closeButtonRef={wardrobe.closeButtonRef}
       onClose={wardrobe.close}
       onFilterChange={shop.setFilter}

@@ -2,13 +2,14 @@
 
 import { Ban } from "lucide-react";
 
-import { formatBpsPercent } from "@/lib/pets/math";
+import { formatBpsPercent, slimeBuffBpsForStage } from "@/lib/pets/math";
 import { SLIME_HOME_HERO_RENDERER_SCALE } from "@/lib/pets/slime-sprite-geometry";
 import type { SlimeColor, SlimeDefinition } from "@/lib/pets/types";
 
 import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
 import { SlimeBuffTierChip } from "./SlimeBuffTierChip";
 import styles from "./SlimePetPage.module.css";
+import { EFFECT_LABELS } from "./SlimePetModel";
 
 const SHOP_PREVIEW_SLOT_PX = 192;
 
@@ -17,6 +18,7 @@ type SlimeShopSlimeListProps = {
   listKey?: string;
   searchQuery: string;
   ownedKeys: readonly SlimeColor[];
+  growthByColor: Partial<Record<SlimeColor, { stage?: number }>>;
   busyColor: SlimeColor | null;
   unitLabel: string;
   onPurchaseSlime: (color: SlimeColor) => void;
@@ -28,6 +30,7 @@ export function SlimeShopSlimeList({
   listKey,
   searchQuery,
   ownedKeys,
+  growthByColor,
   busyColor,
   unitLabel,
   onPurchaseSlime,
@@ -47,6 +50,11 @@ export function SlimeShopSlimeList({
         .map((slime) => {
           const owned = ownedKeys.includes(slime.color);
           const busy = busyColor === slime.color;
+          const buffBps = slimeBuffBpsForStage(
+            slime.baseBuffBps,
+            growthByColor[slime.color]?.stage,
+          );
+          const buffLabel = `${EFFECT_LABELS[slime.effectKey]} +${formatBpsPercent(buffBps)}`;
           return (
             <li
               key={slime.key}
@@ -89,10 +97,7 @@ export function SlimeShopSlimeList({
                 <div className={styles.shopCardCopy}>
                   <div className={styles.shopCardTitleRow}>
                     <h3>{slime.nameKo}</h3>
-                    <SlimeBuffTierChip
-                      label={`기본 효과 +${formatBpsPercent(slime.baseBuffBps)}`}
-                      bps={slime.baseBuffBps}
-                    />
+                    <SlimeBuffTierChip label={buffLabel} bps={buffBps} />
                   </div>
                   <p className={styles.shopPrice}>
                     {slime.price.toLocaleString("ko-KR")}

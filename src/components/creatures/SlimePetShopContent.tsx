@@ -26,6 +26,7 @@ export function SlimePetShopContent({
       equippedItemKeys={data.equippedItemKeys}
       equippedItemsByColor={data.equippedItemsByColor}
       hiddenItemsByColor={data.hiddenItemsByColor}
+      growthByColor={data.growthByColor}
       wardrobeColor={null}
       shopFilter={shop.filter}
       unitLabel={data.unitLabel}

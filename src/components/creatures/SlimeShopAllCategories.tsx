@@ -14,7 +14,7 @@ import { shopFilterForItem, type ShopFilter } from "./SlimePetModel";
 import { SlimeShopFlatItemList, type SlimeShopItemCardContext } from "./SlimeShopItemLists";
 import { SlimeShopSlimeList } from "./SlimeShopSlimeList";
 
-const SHOP_CAROUSEL_VISIBLE_COUNT = 5;
+export const SHOP_CAROUSEL_VISIBLE_COUNT = 5;
 
 type ShopNavigationItem = {
   key: string;
@@ -27,6 +27,7 @@ type SlimeShopAllCategoriesProps = {
   navigationItems: readonly ShopNavigationItem[];
   searchQuery: string;
   ownedKeys: SlimeColor[];
+  growthByColor: Partial<Record<SlimeColor, { stage?: number }>>;
   busyColor: SlimeColor | null;
   unitLabel: string;
   cardContext: SlimeShopItemCardContext;
@@ -41,6 +42,7 @@ export function SlimeShopAllCategories({
   navigationItems,
   searchQuery,
   ownedKeys,
+  growthByColor,
   busyColor,
   unitLabel,
   cardContext,
@@ -108,6 +110,7 @@ export function SlimeShopAllCategories({
             listKey={`character-${characterPage}`}
             searchQuery={searchQuery}
             ownedKeys={ownedKeys}
+            growthByColor={growthByColor}
             busyColor={busyColor}
             unitLabel={unitLabel}
             onPurchaseSlime={onPurchaseSlime}
@@ -185,7 +188,7 @@ export function SlimeShopAllCategories({
   );
 }
 
-function CategoryHeader({
+export function CategoryHeader({
   id,
   label,
   showMore,
@@ -215,7 +218,7 @@ function CategoryHeader({
   );
 }
 
-function CarouselArrow({
+export function CarouselArrow({
   label,
   previous = false,
   onClick,

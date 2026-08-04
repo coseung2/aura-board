@@ -182,7 +182,8 @@ it("renders deterministic stage growth percentages as accessible progress bars",
     expect(
       characterPreview.closest("[class*='shopMedia'], [class*='shopImageFrame']"),
     ).toBeTruthy();
-    expect(within(drawer).getAllByText(/기본 효과 \+2%/).length).toBeGreaterThan(0);
+    expect(within(drawer).getByText("독서 보상 +2%")).toBeTruthy();
+    expect(within(drawer).queryByText(/기본 효과/)).toBeNull();
 
     fireEvent.click(within(filters).getByRole("tab", { name: "바닥" }));
     expect(within(drawer).getByText("잔디 바닥")).toBeTruthy();
@@ -215,6 +216,26 @@ it("renders deterministic stage growth percentages as accessible progress bars",
       "/creatures/slimes/shop/shooting-star-night-sky.gif",
     );
     expect(nightSky.getAttribute("data-renderer-scale")).toBe("2");
+  });
+
+  it("shows each owned slime's stage-adjusted effect in the shop", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        json(
+          home({
+            ownedColors: ["blue"],
+            growthByColor: { blue: { stage: 2 } },
+          }),
+        ),
+      ),
+    );
+    render(<SlimePetPage initialSection="shop" />);
+
+    const shop = await screen.findByRole("region", { name: "슬라임 상점" });
+    fireEvent.click(within(shop).getByRole("tab", { name: "캐릭터" }));
+    expect(within(shop).getByText("성장 속도 +4%")).toBeTruthy();
+    expect(within(shop).queryByText(/기본 효과/)).toBeNull();
   });
 
   it("dims owned non-food products in the shop", async () => {
@@ -1069,9 +1090,18 @@ it("applies and removes an owned shop item through the equip route", async () =>
       name: "블루 슬라임 꾸미기",
     });
     const tabs = within(modal).getByRole("tablist", { name: "꾸미기 분류" });
-    for (const label of ["바닥", "탈것", "음료", "소품", "착장", "칭호"]) {
+    for (const label of ["전체", "바닥", "탈것", "소품", "착장", "칭호"]) {
       expect(within(tabs).getByRole("tab", { name: label })).toBeTruthy();
     }
+
+    fireEvent.click(within(tabs).getByRole("tab", { name: "전체" }));
+    const search = within(modal).getByRole("searchbox", { name: "상품 검색" });
+    fireEvent.change(search, { target: { value: ownedFloor.labelKo } });
+    expect(within(modal).getByText(ownedFloor.labelKo)).toBeTruthy();
+    expect(within(modal).queryByText(otherFloor.labelKo)).toBeNull();
+    fireEvent.change(search, { target: { value: "" } });
+    fireEvent.click(within(tabs).getByRole("tab", { name: "바닥" }));
+
     const list = within(modal).getByRole("list", { name: "보유 아이템 목록" });
     const cards = within(list).getAllByRole("listitem");
     expect(cards[0]?.textContent).toContain(otherFloor.labelKo);

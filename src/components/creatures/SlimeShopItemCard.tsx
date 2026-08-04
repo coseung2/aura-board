@@ -98,7 +98,7 @@ export function SlimeShopItemCard({
   const busy = busyItemKey === item.key;
   const preview = slimeShopPreviewState(item);
   const previewColor =
-    wardrobe && (wardrobeFilter === "prop" || wardrobeFilter === "drink")
+    wardrobe && wardrobeFilter === "prop"
       ? (wardrobeColor ?? "blue")
       : slimeShopPreviewColor(item, wardrobeColor ?? "blue");
   const isDrink = item.category === "drink";
@@ -138,7 +138,6 @@ export function SlimeShopItemCard({
         className={[
           styles.shopItem,
           styles.shopProductCard,
-          hasScene ? styles.wardrobeItemScene : "",
           equipped ? styles.wardrobeItemEquipped : "",
           wornByOther ? styles.wardrobeItemWornByOther : "",
         ]
@@ -167,49 +166,54 @@ export function SlimeShopItemCard({
               .filter(Boolean)
               .join(" ")}
           >
-            <OfficialSlimeSprite
-              slimeColor={previewColor}
-              evolution="base"
-              action={preview.action}
-              equippedFloor={preview.equippedFloor}
-              itemSpritePath={sceneBackground ? undefined : itemSpritePath}
-              backgroundSpritePath={
-                sceneBackground
-                  ? selectSceneBackgroundSpritePath(item)
-                  : undefined
-              }
-              expandSceneSurfaces={sceneBackground}
-              vehicleSpritePath={
-                renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath
-              }
-              vehicleGroundedSpritePath={
-                renderedVehicle?.vehicleGroundedSpritePath
-              }
-              vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}
-              vehicleFrameCount={renderedVehicle?.vehicleFrameCount}
-              vehicleGroundedFrameCount={
-                renderedVehicle?.vehicleGroundedFrameCount
-              }
-              vehicleGroundedFrameDurationMs={
-                renderedVehicle?.vehicleGroundedFrameDurationMs
-              }
-              vehicleCanvasHeight={renderedVehicle?.vehicleCanvasHeight}
-              vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
-              vehicleBobY={renderedVehicle?.vehicleBobY}
-              vehicleRiseY={renderedVehicle?.vehicleRiseY}
-              vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
-              wearables={previewWearables}
-              drinkFlavor={previewDrinkFlavor}
-              repeat={preview.action === "drink" || isBall}
-              scale={1}
-              alt={`${item.labelKo} 미리보기`}
-            />
-            {buffLabel ? (
-              <SlimeBuffTierChip
-                label={buffLabel}
-                bps={item.effectBps ?? 0}
+            {isFood ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={item.spritePath}
+                alt={`${item.labelKo} 미리보기`}
+                className={styles.shopFoodPreview}
+                draggable={false}
               />
-            ) : null}
+            ) : (
+              <OfficialSlimeSprite
+                slimeColor={previewColor}
+                evolution="base"
+                action={preview.action}
+                equippedFloor={preview.equippedFloor}
+                itemSpritePath={sceneBackground ? undefined : itemSpritePath}
+                backgroundSpritePath={
+                  sceneBackground
+                    ? selectSceneBackgroundSpritePath(item)
+                    : undefined
+                }
+                featherBackground={false}
+                expandSceneSurfaces={sceneBackground}
+                vehicleSpritePath={
+                  renderedVehicle?.vehicleSheetPath ?? renderedVehicle?.spritePath
+                }
+                vehicleGroundedSpritePath={
+                  renderedVehicle?.vehicleGroundedSpritePath
+                }
+                vehicleEffectSpritePaths={renderedVehicle?.vehicleEffectSpritePaths}
+                vehicleFrameCount={renderedVehicle?.vehicleFrameCount}
+                vehicleGroundedFrameCount={
+                  renderedVehicle?.vehicleGroundedFrameCount
+                }
+                vehicleGroundedFrameDurationMs={
+                  renderedVehicle?.vehicleGroundedFrameDurationMs
+                }
+                vehicleCanvasHeight={renderedVehicle?.vehicleCanvasHeight}
+                vehicleCharacterOffsetY={renderedVehicle?.vehicleCharacterOffsetY}
+                vehicleBobY={renderedVehicle?.vehicleBobY}
+                vehicleRiseY={renderedVehicle?.vehicleRiseY}
+                vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
+                wearables={previewWearables}
+                drinkFlavor={previewDrinkFlavor}
+                repeat={preview.action === "drink" || isBall}
+                scale={SLIME_HOME_HERO_RENDERER_SCALE}
+                alt={`${item.labelKo} 미리보기`}
+              />
+            )}
           </div>
           {wornByOther ? (
             <div className={styles.wardrobeWornOverlay} aria-hidden="true">
@@ -246,7 +250,11 @@ export function SlimeShopItemCard({
             {hidden ? <p>외형 숨김 · 버프는 유지</p> : null}
           </div>
           <div className={styles.wardrobeItemActions}>
-            {equipped ? (
+            {isFood ? (
+              <span className={styles.wardrobeInventoryCount}>
+                {Math.max(ownedQuantity, owned ? 1 : 0).toLocaleString("ko-KR")}개 보유
+              </span>
+            ) : equipped ? (
               <>
                 <button
                   type="button"
@@ -384,6 +392,12 @@ export function SlimeShopItemCard({
         <div className={styles.shopCardCopy}>
           <div className={styles.shopCardTitleRow}>
             <h3>{item.labelKo}</h3>
+            {buffLabel ? (
+              <SlimeBuffTierChip
+                label={buffLabel}
+                bps={item.effectBps ?? 0}
+              />
+            ) : null}
           </div>
           <p className={styles.shopPrice}>
             {item.price.toLocaleString("ko-KR")}

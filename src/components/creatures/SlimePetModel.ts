@@ -53,10 +53,10 @@ export const SHOP_NAV_ITEMS: readonly { key: ShopFilter; label: string }[] = [
 ];
 
 export type WardrobeFilter =
+  | "all"
   | "background"
   | "floor"
   | "vehicle"
-  | "drink"
   | "prop"
   | "outfit"
   | "title";
@@ -65,9 +65,9 @@ export const WARDROBE_NAV_ITEMS: readonly {
   key: WardrobeFilter;
   label: string;
 }[] = [
+  { key: "all", label: "전체" },
   { key: "floor", label: "바닥" },
   { key: "vehicle", label: "탈것" },
-  { key: "drink", label: "음료" },
   { key: "prop", label: "소품" },
   { key: "outfit", label: "착장" },
   { key: "title", label: "칭호" },
@@ -116,7 +116,11 @@ export function slimeWardrobeNavItems(
 ): readonly { key: WardrobeFilter; label: string }[] {
   const hasBackground = catalog.some((item) => isSlimeSceneBackground(item));
   if (!hasBackground) return WARDROBE_NAV_ITEMS;
-  return [{ key: "background", label: "배경" }, ...WARDROBE_NAV_ITEMS];
+  return [
+    WARDROBE_NAV_ITEMS[0]!,
+    { key: "background", label: "배경" },
+    ...WARDROBE_NAV_ITEMS.slice(1),
+  ];
 }
 
 /** Map API/catalog categories to the semantic top-level shop tab. */
@@ -147,11 +151,10 @@ export function shopFilterForItem(
 
 export function wardrobeFilterForItem(
   item: Pick<SlimeShopItem, "category" | "floor">,
-): Exclude<WardrobeFilter, "title"> {
+): Exclude<WardrobeFilter, "all" | "title"> {
   if (isSlimeSceneBackground(item)) return "background";
   if (item.floor || item.category === "background") return "floor";
   if (item.category === "vehicle" || item.category === "ride") return "vehicle";
-  if (item.category === "drink") return "drink";
   if (item.category === "wearable") return "outfit";
   return "prop";
 }

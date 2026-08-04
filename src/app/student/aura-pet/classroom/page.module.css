@@ -81,11 +81,11 @@
 .spriteSlot {
   position: relative;
   display: grid;
-  /* Match the shared logical scene (64x64 * scale 2 => 128) and expanded
-     scene width (96 * 2 => 192). Never force a square host taller than the
-     sprite; vehicle art is authored on a 64x81 canvas and must keep that ratio. */
+  /* Use the tallest supported 2x scene canvas for every representative pet.
+     230px covers scene inset, the largest vehicle rise, and static floor rise,
+     so equipment never shifts names or titles between classmates. */
   width: 192px;
-  min-height: 128px;
+  min-height: 230px;
   place-items: center;
   overflow: hidden;
   background: transparent;
@@ -94,9 +94,7 @@
 .spriteSlotScene {
   width: 100%;
   max-width: 192px;
-  /* Expanded scene at scale 2 is 192 wide; height follows the sprite
-     (background scene or 64x81 vehicle canvas), not a square holder. */
-  min-height: 0;
+  min-height: 230px;
   border-bottom: 1px solid rgba(24, 74, 92, 0.1);
   background-color: transparent;
   background-image: none;
@@ -104,12 +102,12 @@
 }
 
 .classroomSprite {
-  /* Let OfficialSlimeSprite own integer pixel size. Stretching to a square
-     host was turning the 64x81 vehicle scene into a 1:1 card. */
+  /* Keep renderer pixels unscaled while centering every loadout inside the
+     same tallest-scene canvas. */
   width: max-content;
   max-width: 100%;
   height: auto;
-  min-height: 0;
+  min-height: 230px;
 }
 
 .placeholder {

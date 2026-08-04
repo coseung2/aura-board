@@ -8,6 +8,7 @@ import type { SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
 import styles from "./SlimePetPage.module.css";
 import {
   shopFilterForItem,
+  wardrobeFilterForItem,
   type ShopFilter,
   type WardrobeFilter,
 } from "./SlimePetModel";
@@ -64,7 +65,9 @@ export function SlimeShopNavigation({
     }
     const candidates = shopCatalog.filter((item) => {
       if (key === "all") return true;
-      return shopFilterForItem(item) === key;
+      return wardrobe
+        ? wardrobeFilterForItem(item) === key
+        : shopFilterForItem(item) === key;
     });
     const representative = [...candidates].sort((a, b) => b.price - a.price)[0];
     return representative ? representativeAssetPath(representative) : null;
@@ -115,7 +118,7 @@ export function SlimeShopNavigation({
         {items.map(({ key, label }, index) => {
           const selected = activeKey === key;
           const iconPath = navIconPath(key);
-          const iconIsSheet = key === "prop" || key === "outfit";
+          const iconIsSheet = key === "outfit" || key === "prop";
           const iconScaleClass =
             key === "character"
               ? styles.filterButtonIconCharacter
@@ -170,7 +173,7 @@ export function SlimeShopNavigation({
           );
         })}
       </div>
-      {!wardrobe && onSearchQueryChange ? (
+      {onSearchQueryChange ? (
         <label className={styles.shopSearchField}>
           <Search size={16} aria-hidden="true" />
           <input

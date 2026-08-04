@@ -184,6 +184,7 @@ export function SlimeCollectionCard({
           equippedFloor={floor}
           scale={2}
           hostBackground={Boolean(background)}
+          className={styles.collectionSprite}
           onComplete={manualAction ? () => setManualAction(null) : undefined}
         />
       </div>

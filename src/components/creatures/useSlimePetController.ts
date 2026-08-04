@@ -165,6 +165,7 @@ export function useSlimePetController() {
   const [shopSearchQuery, setShopSearchQuery] = useState("");
   const [wardrobeFilter, setWardrobeFilter] =
     useState<WardrobeFilter>("floor");
+  const [wardrobeSearchQuery, setWardrobeSearchQuery] = useState("");
 
   const slimeRetryKeys = useRef(new Map<SlimeColor, string>());
   const itemRetryKeys = useRef(new Map<string, string>());
@@ -223,7 +224,8 @@ export function useSlimePetController() {
       shopCatalog.filter(
         (item) =>
           ownedItemKeys.includes(item.key) &&
-          (item.category as string) !== "food",
+          (item.category as string) !== "food" &&
+          (item.category as string) !== "level-up",
       ),
     [ownedItemKeys, shopCatalog],
   );
@@ -931,6 +933,7 @@ export function useSlimePetController() {
       wardrobeTriggerRef.current = trigger;
       setShopNotice(null);
       setWardrobeFilter("floor");
+      setWardrobeSearchQuery("");
       setWardrobeColor(color);
       setWardrobeOpen(true);
     },
@@ -1050,6 +1053,8 @@ export function useSlimePetController() {
       items: wardrobeItems,
       filter: wardrobeFilter,
       setFilter: setWardrobeFilter,
+      searchQuery: wardrobeSearchQuery,
+      setSearchQuery: setWardrobeSearchQuery,
       closeButtonRef: wardrobeCloseRef,
       openFor: openWardrobeFor,
       close: closeWardrobe,

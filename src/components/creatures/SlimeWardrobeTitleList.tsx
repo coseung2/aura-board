@@ -13,6 +13,7 @@ type SlimeWardrobeTitleListProps = {
   equippedTitleKey: string | null;
   busyTitleColor: SlimeColor | null;
   busyItemKey: string | null;
+  listKey?: string;
   onEquipTitle?: (color: SlimeColor, titleKey: string | null) => void;
 };
 
@@ -23,11 +24,15 @@ export function SlimeWardrobeTitleList({
   equippedTitleKey,
   busyTitleColor,
   busyItemKey,
+  listKey,
   onEquipTitle,
 }: SlimeWardrobeTitleListProps) {
   if (claimedTitles.length === 0) {
     return (
-      <ul className={styles.wardrobeList} aria-label="칭호 목록">
+      <ul
+        className={`${styles.wardrobeList} ${styles.shopList}`.trim()}
+        aria-label="칭호 목록"
+      >
         <li className={styles.emptyState}>
           걷기와 독서 미션에서 칭호를 받아 오세요.
         </li>
@@ -40,7 +45,17 @@ export function SlimeWardrobeTitleList({
     equippedTitleKey ? [equippedTitleKey] : [],
   );
   return (
-    <ul className={styles.wardrobeList} aria-label="칭호 목록">
+    <ul
+      key={listKey}
+      className={[
+        styles.wardrobeList,
+        styles.shopList,
+        listKey ? styles.shopCarouselPage : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      aria-label="칭호 목록"
+    >
       {orderedTitles.map((title) => {
         const equipped = equippedTitleKey === title.key;
         const busy =
@@ -49,7 +64,8 @@ export function SlimeWardrobeTitleList({
           <li
             key={title.key}
             className={[
-              styles.wardrobeItem,
+              styles.shopItem,
+              styles.shopProductCard,
               equipped ? styles.wardrobeItemEquipped : "",
             ]
               .filter(Boolean)
@@ -57,7 +73,9 @@ export function SlimeWardrobeTitleList({
             aria-selected={equipped}
             data-equipped={equipped ? "true" : "false"}
           >
-            <div className={styles.wardrobePreview}>
+            <div
+              className={`${styles.shopImageFrame} ${styles.shopMedia}`.trim()}
+            >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={title.imagePath}
@@ -66,9 +84,15 @@ export function SlimeWardrobeTitleList({
                 className={styles.titlePreviewImage}
               />
             </div>
-            <div className={styles.wardrobeCardBody}>
-              <div className={styles.wardrobeItemCopy}>
-                <h3>{title.label}</h3>
+            <div
+              className={`${styles.shopItemCopy} ${styles.shopCardBody} ${styles.wardrobeCardBody}`.trim()}
+            >
+              <div
+                className={`${styles.shopCardCopy} ${styles.wardrobeItemCopy}`.trim()}
+              >
+                <div className={styles.shopCardTitleRow}>
+                  <h3>{title.label}</h3>
+                </div>
                 <p>+{formatBpsPercent(title.buffBps)}</p>
               </div>
               <div className={styles.wardrobeItemActions}>

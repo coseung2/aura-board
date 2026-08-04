@@ -442,13 +442,22 @@
 .spriteFrame {
   position: relative;
   width: 128px;
-  min-height: 128px;
+  min-height: 230px;
   margin-inline: auto;
+}
+
+/*
+ * Keep every pet card on the tallest supported scene canvas.
+ * 230px covers a 2x sprite, the 1.5x scene inset, the largest vehicle rise,
+ * and a static floor rise, so equipment never changes the card row height.
+ */
+.spriteFrame .collectionSprite {
+  min-height: 230px;
 }
 
 .spriteFrameScene {
   width: 100%;
-  min-height: 0;
+  min-height: 230px;
   margin-inline: 0;
   overflow: hidden;
   border-bottom: 1px solid rgba(24, 74, 92, 0.1);
@@ -917,7 +926,8 @@
   gap: 0;
 }
 
-.inlineShop .filterButton {
+.inlineShop .filterButton,
+.wardrobeModal .filterButton {
   min-width: 76px;
   border: 0;
   border-radius: 0;
@@ -944,6 +954,7 @@
 }
 
 .wardrobeModal {
+  --wardrobe-content-inset: clamp(18px, 2.4vw, 28px);
   position: relative;
   z-index: 1;
   display: flex;
@@ -951,7 +962,7 @@
   width: min(1080px, 100%);
   height: min(860px, 100%);
   max-height: calc(100vh - 24px);
-  padding: clamp(18px, 2.4vw, 28px);
+  padding: 0;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: calc(var(--radius-card) + 4px);
@@ -964,6 +975,10 @@
   flex: 0 0 auto;
   gap: 12px;
   min-width: 0;
+}
+
+.wardrobeModal .modalHeader {
+  padding: var(--wardrobe-content-inset) var(--wardrobe-content-inset) 0;
 }
 
 .modalHeader > div {
@@ -984,21 +999,20 @@
   align-items: flex-start;
 }
 
+.wardrobeModal .shopNavigation {
+  box-sizing: border-box;
+  width: 100%;
+  padding-inline: var(--wardrobe-content-inset);
+}
+
 .wardrobeModal .shopPanel {
+  box-sizing: border-box;
   flex: 1 1 auto;
   min-height: 0;
+  padding: 0 var(--wardrobe-content-inset) var(--wardrobe-content-inset);
   overflow: auto;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
-}
-
-.wardrobeModal .filterButtonContent {
-  flex-direction: row;
-  gap: 0;
-}
-
-.wardrobeModal .shopFilters {
-  gap: 4px;
 }
 
 .closeButton {
@@ -1617,11 +1631,11 @@
 
   .spriteFrame {
     width: 128px;
-    min-height: 128px;
+    min-height: 230px;
   }
 
   .spriteFrameScene {
-    min-height: 192px;
+    min-height: 230px;
   }
 
   .modalLayer {
@@ -1679,11 +1693,11 @@
 @media (max-width: 380px) {
   .spriteFrame {
     width: 128px;
-    min-height: 128px;
+    min-height: 230px;
   }
 
   .spriteFrameScene {
-    min-height: 192px;
+    min-height: 230px;
   }
 }
 
@@ -1721,8 +1735,8 @@
 
 .titlePreviewImage {
   display: block;
-  width: 64px;
-  height: 40px;
+  width: min(128px, 78%);
+  height: 80px;
   object-fit: contain;
   image-rendering: pixelated;
   image-rendering: crisp-edges;
@@ -1897,14 +1911,14 @@
   gap: 0;
 }
 
-.wardrobeItemEquipped {
-  border-color: var(--color-accent);
-  background: var(--color-accent-tinted-bg);
+.wardrobeItemEquipped,
+.wardrobeItemWornByOther {
+  background: transparent;
 }
 
-.wardrobeItemWornByOther {
-  border-color: var(--color-border-hover);
-  background: var(--color-surface-alt);
+.wardrobeItemEquipped .shopImageFrame,
+.wardrobeItemEquipped .shopMedia {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
 }
 
 .wardrobePreview {
@@ -1964,12 +1978,20 @@
   text-align: center;
 }
 
+.wardrobeModal .shopProductCard {
+  gap: 0;
+}
+
 .wardrobeCardBody {
   display: grid;
   gap: 8px;
   width: 100%;
   min-width: 0;
-  padding: 10px 0 12px;
+  padding: 8px 0 0;
+}
+
+.wardrobeCardBody .shopCardCopy {
+  min-height: 0;
 }
 
 .wardrobeItemCopy {
@@ -1994,24 +2016,27 @@
 
 .wardrobeItemActions {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 6px;
   width: 100%;
+  min-height: 44px;
 }
 
 .wardrobeInlineAction {
   display: inline-flex;
+  flex: 1 1 0;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
   align-items: center;
   justify-content: center;
-  min-width: 64px;
-  min-height: 44px;
-  padding: 6px 10px;
-  border: 0;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-btn);
   color: var(--color-text-muted);
-  background: transparent;
+  background: var(--color-surface);
   cursor: pointer;
   font: inherit;
   font-size: 12px;
@@ -2029,12 +2054,28 @@
   outline-offset: 2px;
 }
 
+.wardrobeInlineAction:hover {
+  border-color: var(--color-accent);
+}
+
 .wardrobeInlineActionPrimary {
+  border-color: color-mix(in srgb, var(--color-accent) 48%, var(--color-border));
   color: var(--color-accent-tinted-text);
 }
 
 .wardrobeInlineActionDanger {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
   color: var(--color-danger);
+}
+
+.wardrobeInventoryCount {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .itemPreviewBuff {
@@ -2078,7 +2119,8 @@
 
 @media (max-width: 560px) {
   .wardrobeList {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
   }
 }
 
