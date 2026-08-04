@@ -1125,6 +1125,13 @@
   height: 38px;
 }
 
+.filterButtonIconTitle img {
+  width: 46px;
+  height: 20px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
 .filterButtonSpriteFrame img {
   position: absolute;
   top: -13px;

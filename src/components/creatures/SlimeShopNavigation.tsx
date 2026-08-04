@@ -59,6 +59,9 @@ export function SlimeShopNavigation({
     if (key === "food") {
       return "/creatures/slimes/official/shared/cookie-shop-icon-256.png";
     }
+    if (key === "title") {
+      return "/creatures/slimes/ui/titles/yaho.png";
+    }
     const candidates = shopCatalog.filter((item) => {
       if (key === "all") return true;
       return shopFilterForItem(item) === key;
@@ -122,7 +125,9 @@ export function SlimeShopNavigation({
                   ? styles.filterButtonIconFood
                   : key === "background"
                     ? styles.filterButtonIconBackground
-                    : "";
+                    : key === "title"
+                      ? styles.filterButtonIconTitle
+                      : "";
           return (
             <button
               key={key}

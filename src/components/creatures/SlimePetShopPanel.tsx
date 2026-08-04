@@ -20,7 +20,6 @@ import { SlimeShopCatalogContent } from "./SlimeShopCatalogContent";
 import type { SlimeShopItemCardContext } from "./SlimeShopItemLists";
 import { SlimeShopNavigation } from "./SlimeShopNavigation";
 import { SlimeShopPanelShell } from "./SlimeShopPanelShell";
-import titleCategoryStyles from "./SlimeTitleCategoryBanner.module.css";
 
 export type SlimePetShopPanelProps = {
   presentation?: "modal" | "inline";
@@ -163,16 +162,6 @@ export function SlimePetShopPanel({
         tabIndex={0}
         className={styles.shopPanel}
       >
-        {wardrobe && wardrobeFilter === "title" ? (
-          <div className={titleCategoryStyles.banner} aria-hidden="true">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/creatures/slimes/ui/titles/yaho.png"
-              alt=""
-              className={titleCategoryStyles.image}
-            />
-          </div>
-        ) : null}
         <SlimeShopCatalogContent
           catalog={catalog}
           shopCatalog={shopCatalog}

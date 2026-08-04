@@ -37,6 +37,7 @@ type SlimeShopCatalogContentProps = {
   ownedKeys: SlimeColor[];
   ownedItemKeys: string[];
   equippedItemsByColor: EquippedItemsByColor;
+  growthByColor?: Partial<Record<SlimeColor, { stage?: number }>>;
   claimedTitles: ClaimedTitle[];
   equippedTitleByColor: Partial<Record<SlimeColor, string>>;
   wardrobe: boolean;
@@ -50,6 +51,7 @@ type SlimeShopCatalogContentProps = {
   busyTitleColor: SlimeColor | null;
   cardContext: SlimeShopItemCardContext;
   onFilterChange: (filter: ShopFilter) => void;
+  onWardrobeFilterChange?: (filter: WardrobeFilter) => void;
   onPurchaseSlime: (color: SlimeColor) => void;
   onEquipTitle?: (color: SlimeColor, titleKey: string | null) => void;
 };
