@@ -36,7 +36,7 @@ runuser -u aura-app -- env HOME=/var/lib/aura-app bash -c '
   . /etc/aura-board/build.env
   set +a
   cd "$1"
-  npm ci --no-audit --no-fund
+  npm ci --include=dev --no-audit --no-fund
   npm run typecheck
   npx prisma validate
   npm run build
