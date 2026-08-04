@@ -34,8 +34,8 @@ import {
 } from "../../lib/use-board-realtime";
 import {
   borders,
+  colors,
   radii,
-  songGuessTokens,
   spacing,
   tapMin,
   typography,
@@ -123,7 +123,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
           );
           await clearPendingSongGuessCommand(boardId).catch(() => undefined);
           setHasPending(false);
-          setNotice("다른 화면에서 상태가 먼저 바뀌어 최신 게임으로 맞췄어요.");
+          setNotice("최신 상태로 맞췄어요.");
         } else {
           if (cause instanceof ApiError && cause.status < 500 && cause.status !== 408) {
             await clearPendingSongGuessCommand(boardId).catch(() => undefined);
@@ -164,8 +164,11 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const clip = snapshot?.phase === "guessing" ? snapshot.currentRound.currentClip : null;
   useEffect(() => {
     let active = true;
-    player.pause();
-    player.replace(null);
+    try {
+      player.pause();
+    } catch {
+      // ignore pause failures while the player is empty
+    }
     setAudioError(null);
     if (!snapshot || !clip) {
       setAudioPreparing(false);
@@ -176,18 +179,22 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     setAudioPreparing(true);
     void loadSongGuessAudioSource(snapshot.sessionId, clip.assetId)
       .then((source) => {
-        if (!active) return;
+        if (!active || !source) return;
         player.replace(source);
       })
       .catch(() => {
-        if (active) setAudioError("음원 인증 또는 다운로드에 실패했어요. 다시 시도해 주세요.");
+        if (active) setAudioError("음원을 불러오지 못했어요.");
       })
       .finally(() => {
         if (active) setAudioPreparing(false);
       });
     return () => {
       active = false;
-      player.pause();
+      try {
+        player.pause();
+      } catch {
+        // ignore
+      }
     };
   }, [clip?.assetId, player, snapshot?.sessionId]);
 
@@ -209,7 +216,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       player.play();
       setAudioError(null);
     } catch {
-      setAudioError("재생을 시작하지 못했어요. 잠시 후 다시 눌러 주세요.");
+      setAudioError("재생을 시작하지 못했어요.");
     }
   }, [audioPreparing, clip, player, playerStatus.currentTime, playerStatus.duration, playerStatus.isLoaded]);
 
@@ -217,24 +224,19 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     return (
       <View style={styles.center} accessibilityLiveRegion="polite">
         <ActivityIndicator />
-        <Text style={styles.muted}>음악 퀴즈 상태를 불러오는 중이에요…</Text>
       </View>
     );
   }
 
   if (!snapshot || snapshot.phase === "draft") {
     return (
-      <ScrollView contentContainerStyle={styles.emptyContainer}>
-        <EmptyState
-          icon={<Text style={styles.emptyIcon}>🎧</Text>}
-          title="음악 퀴즈 준비 중"
-          description="교사가 로비를 열면 이 화면에 자동으로 퀴즈가 나타나요."
-        />
+      <View style={styles.emptyContainer}>
+        <EmptyState title="준비 중" description="로비가 열리면 시작돼요." />
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         <AppButton variant="secondary" onPress={() => void refresh()}>
-          최신 상태 확인
+          다시 확인
         </AppButton>
-      </ScrollView>
+      </View>
     );
   }
 
@@ -251,31 +253,17 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       contentContainerStyle={styles.container}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
+      style={styles.scroll}
     >
-      <View style={styles.hero}>
-        <View style={styles.heroCopy}>
-          <Text style={styles.eyebrow}>SONG GUESS</Text>
-          <Text style={styles.title}>{data.board.title || "초단위 음악 퀴즈"}</Text>
-        </View>
-        <View style={styles.roundBadge} accessibilityLabel={`${snapshot.currentRound.order + 1}라운드`}>
-          <Text style={styles.roundNumber}>{snapshot.currentRound.order + 1}</Text>
-          <Text style={styles.roundLabel}>ROUND</Text>
-        </View>
-      </View>
-
-      <View style={styles.phaseCard} accessibilityLiveRegion="polite">
+      <View style={styles.phaseRow} accessibilityLiveRegion="polite">
         <Text style={styles.phaseLabel}>{phaseLabel(snapshot.phase)}</Text>
-        <Text style={styles.phaseHint}>{phaseHint(snapshot)}</Text>
-        <Text style={styles.syncText}>v{snapshot.version} · {syncing ? "동기화 중" : "동기화됨"}</Text>
+        <Text style={styles.roundText}>{snapshot.currentRound.order + 1}라운드</Text>
       </View>
 
       {snapshot.phase === "guessing" && clip ? (
         <View style={styles.playerCard}>
           <View style={styles.playerTopRow}>
-            <View>
-              <Text style={styles.playerLabel}>현재 공개된 구간</Text>
-              <Text style={styles.playerDuration}>{formatTier(clip.tierMs)}</Text>
-            </View>
+            <Text style={styles.playerDuration}>{formatTier(clip.tierMs)}</Text>
             <Text style={styles.playerTime}>
               {formatSeconds(playerStatus.currentTime)} / {formatSeconds(clip.durationMs / 1000)}
             </Text>
@@ -290,7 +278,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
               disabled={!playerStatus.isLoaded || !!audioError}
               onPress={() => void playClip()}
             >
-              {playerStatus.playing ? "다시 듣기" : "클립 듣기"}
+              {playerStatus.playing ? "다시 듣기" : "듣기"}
             </AppButton>
             {playerStatus.playing ? (
               <AppButton style={styles.playerButton} variant="secondary" onPress={() => player.pause()}>
@@ -303,22 +291,15 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       ) : null}
 
       {snapshot.currentRound.accessibilityClue ? (
-        <View style={styles.clueCard}>
-          <Text style={styles.clueLabel}>접근성 힌트</Text>
-          <Text style={styles.clueText}>{snapshot.currentRound.accessibilityClue}</Text>
-        </View>
+        <Text style={styles.clueText}>{snapshot.currentRound.accessibilityClue}</Text>
       ) : null}
 
       {snapshot.phase === "guessing" ? (
         <View style={styles.guessCard}>
-          <Text style={styles.sectionTitle}>정답 입력</Text>
-          <Text style={styles.sectionDescription}>
-            공개된 길이에 따라 서버가 1000점, 700점, 400점을 판정해요.
-          </Text>
           <TextField
             value={guess}
             onChangeText={setGuess}
-            placeholder="곡 제목을 입력하세요"
+            placeholder="정답"
             returnKeyType="send"
             editable={canGuess && !busy}
             maxLength={200}
@@ -331,41 +312,33 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
             disabled={!canGuess || !guess.trim() || syncing}
             onPress={submitGuess}
           >
-            {snapshot.viewer.scoredCurrentRound ? "이번 라운드 점수 획득 완료" : "정답 제출"}
+            {snapshot.viewer.scoredCurrentRound ? "완료" : "제출"}
           </AppButton>
         </View>
       ) : null}
 
       {lastResult ? (
-        <View
-          style={[styles.resultCard, lastResult.correct ? styles.resultSuccess : styles.resultMiss]}
-          accessibilityLiveRegion="assertive"
-        >
-          <Text style={[styles.resultTitle, lastResult.correct ? styles.successText : styles.missText]}>
-            {lastResult.correct ? (lastResult.alreadyScored ? "이미 점수를 받았어요" : "정답이에요!") : "아쉽지만 오답이에요"}
-          </Text>
-          <Text style={[styles.resultBody, lastResult.correct ? styles.successText : styles.missText]}>
-            {lastResult.correct ? `+${lastResult.score}점` : "다시 듣고 도전해 보세요."}
-          </Text>
-        </View>
+        <Text style={[styles.resultText, lastResult.correct ? styles.successText : styles.missText]}>
+          {lastResult.correct
+            ? lastResult.alreadyScored
+              ? "이미 점수를 받았어요"
+              : `정답 +${lastResult.score}`
+            : "오답"}
+        </Text>
       ) : null}
 
       {(snapshot.phase === "reveal" || snapshot.phase === "finished") && snapshot.currentRound.revealedAnswer ? (
-        <View style={styles.answerCard} accessibilityLiveRegion="polite">
-          <Text style={styles.answerLabel}>정답</Text>
-          <Text style={styles.answerText}>{snapshot.currentRound.revealedAnswer}</Text>
-        </View>
+        <Text style={styles.answerText}>{snapshot.currentRound.revealedAnswer}</Text>
       ) : null}
 
       <View style={styles.scoreCard}>
-        <Text style={styles.sectionTitle}>누적 점수</Text>
         {ranked.length ? ranked.map((participant, index) => (
           <View style={styles.scoreRow} key={`${participant.displayName}-${index}`}>
             <Text style={styles.rank}>{index + 1}</Text>
             <Text style={styles.playerName} numberOfLines={1}>{participant.displayName}</Text>
-            <Text style={styles.score}>{participant.score}점</Text>
+            <Text style={styles.score}>{participant.score}</Text>
           </View>
-        )) : <Text style={styles.muted}>참가자 점수를 기다리고 있어요.</Text>}
+        )) : <Text style={styles.muted}>점수 없음</Text>}
       </View>
 
       <View style={styles.actions}>
@@ -379,38 +352,26 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
               });
             }}
           >
-            미확인 정답 다시 보내기
+            다시 보내기
           </AppButton>
         ) : null}
         <AppButton variant="secondary" disabled={busy || syncing} onPress={() => void refresh()}>
-          최신 상태 확인
+          새로고침
         </AppButton>
       </View>
 
-      {notice ? <Text style={styles.noticeText} accessibilityLiveRegion="polite">{notice}</Text> : null}
+      {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
       {error ? <Text style={styles.errorText} accessibilityRole="alert">{error}</Text> : null}
     </ScrollView>
   );
 }
 
 function phaseLabel(phase: SongGuessSnapshot["phase"]): string {
-  if (phase === "lobby") return "참가 대기 중";
-  if (phase === "guessing") return "노래를 듣고 맞혀 보세요";
-  if (phase === "reveal") return "정답 공개";
-  if (phase === "finished") return "게임 종료";
-  return "세션 준비 중";
-}
-
-function phaseHint(snapshot: SongGuessSnapshot): string {
-  if (snapshot.phase === "lobby") return "교사가 첫 클립을 열면 자동으로 시작해요.";
-  if (snapshot.phase === "guessing") {
-    return snapshot.viewer.scoredCurrentRound
-      ? "이번 라운드 점수를 획득했어요. 정답 공개를 기다려 주세요."
-      : "짧게 맞힐수록 더 높은 점수를 받아요.";
-  }
-  if (snapshot.phase === "reveal") return "다음 라운드가 열리면 화면이 자동으로 바뀌어요.";
-  if (snapshot.phase === "finished") return "최종 순위를 확인해 보세요.";
-  return "교사가 게임을 준비하고 있어요.";
+  if (phase === "lobby") return "대기";
+  if (phase === "guessing") return "진행";
+  if (phase === "reveal") return "정답";
+  if (phase === "finished") return "종료";
+  return "준비";
 }
 
 function formatTier(tierMs: number): string {
@@ -425,102 +386,100 @@ function messageForError(error: unknown): string {
   const body = songGuessApiError(error);
   switch (body?.error) {
     case "invalid_phase":
-      return "지금은 정답을 제출할 수 없어요. 최신 상태를 확인해 주세요.";
+      return "지금은 제출할 수 없어요.";
     case "domain_rejected":
-      return "정답을 처리하지 못했어요. 입력 내용을 확인해 주세요.";
+      return "정답을 처리하지 못했어요.";
     case "forbidden":
-      return "이 음악 퀴즈에 참여할 권한이 없어요.";
+      return "참여 권한이 없어요.";
     case "unauthorized":
-      return "로그인이 만료됐어요. 다시 로그인해 주세요.";
+      return "다시 로그인해 주세요.";
     case "play_engine_unavailable":
-      return "게임 서버 연결이 불안정해요. 같은 정답을 안전하게 다시 보낼 수 있어요.";
+      return "게임 서버 연결이 불안정해요.";
     default:
-      return "연결을 확인해 주세요. 미확인 정답은 같은 요청으로 다시 보낼 수 있어요.";
+      return "연결을 확인해 주세요.";
   }
 }
 
 const styles = StyleSheet.create({
+  scroll: { flex: 1, backgroundColor: colors.bg },
   container: {
+    flexGrow: 1,
     padding: spacing.md,
     paddingBottom: spacing.xxxl,
     gap: spacing.md,
-    backgroundColor: songGuessTokens.pageBg,
+    backgroundColor: colors.bg,
   },
   center: {
     flex: 1,
-    minHeight: songGuessTokens.loadingMinHeight,
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
-    backgroundColor: songGuessTokens.pageBg,
+    backgroundColor: colors.bg,
   },
   emptyContainer: {
-    flexGrow: 1,
-    minHeight: songGuessTokens.emptyMinHeight,
+    flex: 1,
     justifyContent: "center",
     gap: spacing.md,
     padding: spacing.xl,
-    backgroundColor: songGuessTokens.pageBg,
+    backgroundColor: colors.bg,
   },
-  emptyIcon: { fontSize: songGuessTokens.emptyIconSize },
-  hero: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing.md },
-  heroCopy: { flex: 1, gap: spacing.xs },
-  eyebrow: { ...typography.micro, color: songGuessTokens.eyebrow, letterSpacing: songGuessTokens.eyebrowLetterSpacing },
-  title: { ...typography.title, color: songGuessTokens.text },
-  roundBadge: {
-    width: songGuessTokens.roundBadgeSize,
-    height: songGuessTokens.roundBadgeSize,
-    borderRadius: radii.pill,
+  phaseRow: {
+    flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: songGuessTokens.accentSurface,
+    justifyContent: "space-between",
+    gap: spacing.md,
   },
-  roundNumber: { ...typography.title, color: songGuessTokens.accentText },
-  roundLabel: { ...typography.micro, color: songGuessTokens.accentText },
-  phaseCard: {
-    padding: spacing.lg,
-    gap: spacing.xs,
-    borderWidth: borders.hairline,
-    borderColor: songGuessTokens.panelBorder,
-    borderRadius: radii.card,
-    backgroundColor: songGuessTokens.panelSurface,
+  phaseLabel: { ...typography.subtitle, color: colors.text },
+  roundText: { ...typography.label, color: colors.textMuted },
+  playerCard: {
+    gap: spacing.md,
+    paddingVertical: spacing.md,
+    borderTopWidth: borders.hairline,
+    borderBottomWidth: borders.hairline,
+    borderColor: colors.border,
   },
-  phaseLabel: { ...typography.subtitle, color: songGuessTokens.text },
-  phaseHint: { ...typography.body, color: songGuessTokens.mutedText },
-  syncText: { ...typography.micro, color: songGuessTokens.eyebrow },
-  playerCard: { padding: spacing.lg, gap: spacing.md, borderRadius: radii.card, backgroundColor: songGuessTokens.playerSurface },
-  playerTopRow: { flexDirection: "row", alignItems: "flex-end", justifyContent: "space-between", gap: spacing.md },
-  playerLabel: { ...typography.badge, color: songGuessTokens.playerText },
-  playerDuration: { ...typography.display, color: songGuessTokens.playerText },
-  playerTime: { ...typography.badge, color: songGuessTokens.playerText },
-  progressTrack: { height: songGuessTokens.progressHeight, overflow: "hidden", borderRadius: radii.pill, backgroundColor: songGuessTokens.progressTrack },
-  progressFill: { height: songGuessTokens.progressHeight, borderRadius: radii.pill, backgroundColor: songGuessTokens.progressFill },
+  playerTopRow: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  playerDuration: { ...typography.display, color: colors.text },
+  playerTime: { ...typography.badge, color: colors.textMuted },
+  progressTrack: {
+    height: spacing.sm,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceAlt,
+  },
+  progressFill: {
+    height: spacing.sm,
+    backgroundColor: colors.accent,
+  },
   playerActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
   playerButton: { flexGrow: 1, minWidth: tapMin * 2 },
-  playerError: { ...typography.badge, color: songGuessTokens.playerText },
-  clueCard: { padding: spacing.lg, gap: spacing.xs, borderWidth: borders.hairline, borderColor: songGuessTokens.clueBorder, borderRadius: radii.card, backgroundColor: songGuessTokens.clueSurface },
-  clueLabel: { ...typography.badge, color: songGuessTokens.clueText },
-  clueText: { ...typography.body, color: songGuessTokens.clueText },
-  guessCard: { padding: spacing.lg, gap: spacing.md, borderWidth: borders.hairline, borderColor: songGuessTokens.panelBorder, borderRadius: radii.card, backgroundColor: songGuessTokens.panelSurface },
-  sectionTitle: { ...typography.subtitle, color: songGuessTokens.text },
-  sectionDescription: { ...typography.body, color: songGuessTokens.mutedText },
-  resultCard: { padding: spacing.lg, gap: spacing.xs, borderRadius: radii.card },
-  resultSuccess: { backgroundColor: songGuessTokens.successSurface },
-  resultMiss: { backgroundColor: songGuessTokens.errorSurface },
-  resultTitle: { ...typography.subtitle },
-  resultBody: { ...typography.body },
-  successText: { color: songGuessTokens.successText },
-  missText: { color: songGuessTokens.errorText },
-  answerCard: { padding: spacing.xl, gap: spacing.xs, alignItems: "center", borderRadius: radii.card, backgroundColor: songGuessTokens.accentSurface },
-  answerLabel: { ...typography.badge, color: songGuessTokens.accentText },
-  answerText: { ...typography.display, color: songGuessTokens.text, textAlign: "center" },
-  scoreCard: { padding: spacing.lg, gap: spacing.sm, borderWidth: borders.hairline, borderColor: songGuessTokens.panelBorder, borderRadius: radii.card, backgroundColor: songGuessTokens.panelSurface },
-  scoreRow: { minHeight: tapMin, flexDirection: "row", alignItems: "center", gap: spacing.sm, borderTopWidth: borders.hairline, borderTopColor: songGuessTokens.scoreDivider },
-  rank: { ...typography.subtitle, width: spacing.xxl, color: songGuessTokens.accentText },
-  playerName: { ...typography.body, flex: 1, color: songGuessTokens.text },
-  score: { ...typography.subtitle, color: songGuessTokens.text },
+  playerError: { ...typography.badge, color: colors.danger },
+  clueText: { ...typography.body, color: colors.textMuted },
+  guessCard: { gap: spacing.md },
+  resultText: { ...typography.subtitle },
+  successText: { color: colors.plantActive },
+  missText: { color: colors.danger },
+  answerText: { ...typography.display, color: colors.text },
+  scoreCard: {
+    gap: spacing.sm,
+    borderTopWidth: borders.hairline,
+    borderColor: colors.border,
+    paddingTop: spacing.md,
+  },
+  scoreRow: {
+    minHeight: tapMin,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+  },
+  rank: { ...typography.subtitle, width: spacing.xxl, color: colors.textMuted },
+  playerName: { ...typography.body, flex: 1, color: colors.text },
+  score: { ...typography.subtitle, color: colors.text },
   actions: { gap: spacing.sm },
-  muted: { ...typography.body, color: songGuessTokens.mutedText, textAlign: "center" },
-  noticeText: { ...typography.body, padding: spacing.md, borderRadius: radii.control, color: songGuessTokens.successText, backgroundColor: songGuessTokens.successSurface },
-  errorText: { ...typography.body, padding: spacing.md, borderRadius: radii.control, color: songGuessTokens.errorText, backgroundColor: songGuessTokens.errorSurface },
+  muted: { ...typography.body, color: colors.textMuted },
+  noticeText: { ...typography.body, color: colors.plantActive },
+  errorText: { ...typography.body, color: colors.danger },
 });

@@ -3,8 +3,10 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { ChevronRight, CircleCheck, MessageCircle } from "lucide-react";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 import { formatBpsPercent } from "@/lib/pets/math";
+import { studentHomeHeroRendererScale } from "@/lib/pets/slime-sprite-geometry";
 import type {
   SlimeColor,
   SlimeEffectKey,
@@ -14,6 +16,7 @@ import type {
 import { SlimeCharacterSprite } from "@/components/creatures/SlimeCharacterSprite";
 import type {
   StudentAssignmentTodo,
+  StudentDailyRewardProgress,
   StudentHomeBoard as BoardItem,
   StudentHomeBreakout as StudentBreakout,
 } from "@/lib/student-home-types";
@@ -91,6 +94,7 @@ type Props = {
   boards: BoardItem[];
   duties: Duty[];
   assignments?: StudentAssignmentTodo[];
+  dailyRewards?: { comment: StudentDailyRewardProgress };
 };
 
 const SLIME_COLOR_LABELS: Record<SlimeColor, string> = {
@@ -113,8 +117,8 @@ export function StudentDashboard({
   studentName,
   classroomName,
   classroomId,
-  boards,
   assignments = [],
+  dailyRewards,
 }: Props) {
   const [wallet, setWallet] = useState<WalletSummary | null>(null);
   const [walletLoading, setWalletLoading] = useState(true);
@@ -199,19 +203,21 @@ export function StudentDashboard({
 
   return (
     <>
-      <header className="student-page-header">
-        <p className="student-page-eyebrow">
-          {classroomName} · {studentName}님
-        </p>
-        <h1 className="student-page-title">홈</h1>
-      </header>
-
-      <StudentSlimeCard
-        snapshot={slimeHome}
-        loading={slimeLoading}
-        error={slimeError}
-        onRetry={loadSlimeHome}
-      />
+      <div className="student-daily-game-panel">
+        <div className="student-daily-game-header">
+          <h2>대표 펫</h2>
+          <h2>오늘 보상</h2>
+        </div>
+        <div className="student-daily-game-body">
+          <StudentSlimeCard
+            snapshot={slimeHome}
+            loading={slimeLoading}
+            error={slimeError}
+            onRetry={loadSlimeHome}
+          />
+          <StudentDailyRewardPanel dailyRewards={dailyRewards} />
+        </div>
+      </div>
 
       <div className="student-overview-row">
         <section
@@ -226,6 +232,7 @@ export function StudentDashboard({
               </div>
               <Link href="/my/wallet" className="student-wallet-link">
                 자세히
+                <ChevronRight size={16} aria-hidden="true" strokeWidth={1.6} />
               </Link>
             </div>
 
@@ -298,8 +305,39 @@ export function StudentDashboard({
         <StudentAssignmentTodos assignments={assignments} />
       </div>
 
-      <StudentBoardHighlights boards={boards} />
     </>
+  );
+}
+
+function StudentDailyRewardPanel({
+  dailyRewards,
+}: {
+  dailyRewards?: { comment: StudentDailyRewardProgress };
+}) {
+  const comment = dailyRewards?.comment;
+  const status = !comment
+    ? "확인 중"
+    : !comment.enabled
+      ? "보상 없음"
+      : comment.complete
+        ? "오늘 완료"
+        : `${comment.earnedCount}/${comment.dailyCap} 받음`;
+
+  return (
+    <section className="student-daily-reward-panel" aria-label="오늘 보상">
+      <Link href="/student/boards" className="student-daily-reward-row">
+        <MessageCircle size={18} aria-hidden="true" className="student-daily-reward-icon" />
+        <span className="student-daily-reward-label">댓글</span>
+        <span className={`student-daily-reward-status${comment?.complete ? " is-complete" : ""}`}>
+          {status}
+        </span>
+        {comment?.complete ? (
+          <CircleCheck size={18} aria-hidden="true" className="student-daily-reward-complete" />
+        ) : (
+          <ChevronRight size={18} aria-hidden="true" className="student-daily-reward-chevron" />
+        )}
+      </Link>
+    </section>
   );
 }
 
@@ -328,11 +366,6 @@ function StudentSlimeCard({
       item.category === "background" ||
       item.category === "vehicle" ||
       item.category === "ride",
-  );
-  const slimeSceneBackground = assignedItems.reduce<SlimeShopItem | null>(
-    (background, item) =>
-      item.category === "background" && item.floor === null ? item : background,
-    null,
   );
   const activeBuffBps = slime
     ? snapshot?.effects?.totals?.[slime.effectKey] ?? slime.baseBuffBps
@@ -372,11 +405,14 @@ function StudentSlimeCard({
         >
           <div
             className={`student-slime-sprite ${hasSlimeScene ? "student-slime-sprite-scene" : ""}`.trim()}
-            style={slimeSceneBackground
-              ? { backgroundImage: `url("${slimeSceneBackground.spritePath}")` }
-              : undefined}
+            data-renderer-scale={studentHomeHeroRendererScale(hasSlimeScene)}
           >
-            <SlimeCharacterSprite slime={slime} items={assignedItems} />
+            <SlimeCharacterSprite
+              slime={slime}
+              items={assignedItems}
+              scale={studentHomeHeroRendererScale(hasSlimeScene)}
+              hostBackground
+            />
           </div>
           <div className="student-slime-copy">
             <strong className="student-slime-name">{slime.nameKo}</strong>
@@ -404,6 +440,7 @@ function StudentAssignmentTodos({
   const [filter, setFilter] = useState<"missing" | "completed">(
     missingCount > 0 ? "missing" : "completed",
   );
+  const [showAll, setShowAll] = useState(false);
   if (assignments.length === 0) return null;
 
   const ordered = [...assignments].sort((a, b) => {
@@ -413,7 +450,10 @@ function StudentAssignmentTodos({
   const filtered = ordered.filter((item) =>
     filter === "missing" ? !item.submitted : item.submitted,
   );
-  const visibleItems = filtered.slice(0, STUDENT_ASSIGNMENT_VISIBLE_LIMIT);
+  const visibleItems = showAll
+    ? filtered
+    : filtered.slice(0, STUDENT_ASSIGNMENT_VISIBLE_LIMIT);
+  const hiddenCount = Math.max(filtered.length - visibleItems.length, 0);
   const emptyMessage =
     filter === "missing"
       ? "미제출 과제가 없어요."
@@ -463,9 +503,6 @@ function StudentAssignmentTodos({
           const reminded = isStudentAssignmentReminded(item);
           const content = (
             <>
-              <span className="student-assignment-check" aria-hidden="true">
-                {submitted ? "✓" : ""}
-              </span>
               <span className="student-assignment-main">
                 <strong>{item.sectionTitle}</strong>
                 <span>{item.boardTitle}</span>
@@ -505,6 +542,18 @@ function StudentAssignmentTodos({
           );
         })}
       </div>
+      {filtered.length > STUDENT_ASSIGNMENT_VISIBLE_LIMIT ? (
+        <button
+          type="button"
+          className="student-assignment-expand"
+          onClick={() => setShowAll((current) => !current)}
+          aria-expanded={showAll}
+        >
+          {showAll
+            ? "접기 ↑"
+            : `${filter === "missing" ? "미제출" : "완료"} 과제 ${hiddenCount}개 더 보기 ↓`}
+        </button>
+      ) : null}
     </section>
   );
 }

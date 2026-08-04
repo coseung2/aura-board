@@ -31,28 +31,23 @@ export function GameAreaShell({
         <div className={styles.playfield}>
           {hostControls ? (
             <section className={styles.hostZone} aria-label="진행자 조작">
-              <p className={styles.zoneLabel}>진행자 조작</p>
               {hostControls}
             </section>
           ) : null}
           {participantActions ? (
             <section className={styles.participantZone} aria-label="참가자 조작">
-              <p className={styles.zoneLabel}>참가자 조작</p>
               {participantActions}
             </section>
           ) : null}
           {children}
           {locked ? (
             <div className={styles.reconnectOverlay} role="status" aria-live="polite">
-              <div className={styles.reconnectCard}>
-                <strong>
-                  {connection === "offline" ? "연결이 끊겼어요" : "최신 상태를 확인 중이에요"}
-                </strong>
-                <p>
-                  {statusMessage ??
-                    "입력은 잠시 잠겨요. 연결이 복구되면 서버의 최신 게임 상태를 다시 불러옵니다."}
-                </p>
-              </div>
+              <p>
+                {statusMessage ??
+                  (connection === "offline"
+                    ? "연결이 끊겼어요"
+                    : "최신 상태를 확인 중이에요")}
+              </p>
             </div>
           ) : null}
         </div>

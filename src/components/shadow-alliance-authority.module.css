@@ -34,6 +34,46 @@
   gap: var(--sa-space-2);
 }
 
+.waitingRoom {
+  min-height: 420px;
+  align-content: center;
+  justify-items: start;
+  gap: var(--sa-space-3);
+  background:
+    linear-gradient(145deg, rgba(107, 89, 42, 0.18), transparent 38%),
+    var(--sa-black);
+}
+
+.waitingEyebrow {
+  margin: 0;
+  color: var(--sa-gold);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.waitingTitle {
+  margin: 0;
+  font-size: clamp(28px, 5vw, 40px);
+  line-height: 1.15;
+}
+
+.waitingCopy,
+.waitingMeta {
+  margin: 0;
+  max-width: 36rem;
+  line-height: 1.6;
+}
+
+.waitingCopy {
+  color: var(--sa-text);
+}
+
+.waitingMeta {
+  color: var(--sa-muted);
+}
+
 .notice,
 .error,
 .submitted {

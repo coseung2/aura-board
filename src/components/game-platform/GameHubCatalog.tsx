@@ -1,19 +1,14 @@
 "use client";
 
-import Image, { type StaticImageData } from "next/image";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CirclePlay, Radio, Trophy } from "lucide-react";
-import { useState } from "react";
+import { AlertCircle, CirclePlay, Trophy } from "lucide-react";
+import { useEffect, useState } from "react";
 import type { OfficialGameKind } from "@/lib/game-platform/contracts";
 import {
   GAME_HUB_ORDER,
   OFFICIAL_GAME_CATALOG,
 } from "@/lib/game-platform/catalog";
-import kordleArtwork from "../../../.ai-bridge/generated-game-hub-assets/kordle.png";
-import omokArtwork from "../../../.ai-bridge/generated-game-hub-assets/omok.png";
-import shadowAllianceArtwork from "../../../.ai-bridge/generated-game-hub-assets/shadow-alliance.png";
-import songGuessArtwork from "../../../.ai-bridge/generated-game-hub-assets/song-guess.png";
-import speedGameArtwork from "../../../.ai-bridge/generated-game-hub-assets/speed-game.png";
 import styles from "./game-hub.module.css";
 
 type EntryResponse = {
@@ -23,12 +18,12 @@ type EntryResponse = {
   href: string;
 };
 
-const ARTWORK: Record<OfficialGameKind, StaticImageData> = {
-  kordle: kordleArtwork,
-  "speed-game": speedGameArtwork,
-  "shadow-alliance": shadowAllianceArtwork,
-  omok: omokArtwork,
-  "song-guess": songGuessArtwork,
+const ARTWORK: Record<OfficialGameKind, string> = {
+  kordle: "/game-hub/kordle.png",
+  "speed-game": "/game-hub/speed-game.png",
+  "shadow-alliance": "/game-hub/shadow-alliance.png",
+  omok: "/game-hub/omok.png",
+  "song-guess": "/game-hub/song-guess.png",
 };
 
 export function GameHubCatalog() {
@@ -37,6 +32,10 @@ export function GameHubCatalog() {
   const [errors, setErrors] = useState<
     Partial<Record<OfficialGameKind, string>>
   >({});
+
+  useEffect(() => {
+    setPendingKind(null);
+  }, []);
 
   async function enterGame(gameKind: OfficialGameKind) {
     if (pendingKind) return;
@@ -60,8 +59,9 @@ export function GameHubCatalog() {
     } catch {
       setErrors((current) => ({
         ...current,
-        [gameKind]: "게임 방을 열지 못했어요. 잠시 후 다시 시도해 주세요.",
+        [gameKind]: "입장에 실패했어요.",
       }));
+    } finally {
       setPendingKind(null);
     }
   }
@@ -69,17 +69,9 @@ export function GameHubCatalog() {
   return (
     <section className={styles.hub} aria-labelledby="game-hub-title">
       <header className={styles.heading}>
-        <div className={styles.headingCopy}>
-          <p className={styles.eyebrow}>Game hub</p>
-          <h2 className={styles.title} id="game-hub-title">
-            바로 입장하는 게임
-          </h2>
-          <p className={styles.intro}>
-            선생님이 별도 보드를 만들지 않아도 다섯 게임을 항상 확인하고 입장할
-            수 있어요. 진행에 필요한 문제나 참가자는 게임 안에서 안전하게
-            안내합니다.
-          </p>
-        </div>
+        <h2 className={styles.title} id="game-hub-title">
+          게임
+        </h2>
         <a
           className={styles.recordsLink}
           href="/student/boards?category=play&playTab=records"
@@ -103,18 +95,11 @@ export function GameHubCatalog() {
                   alt={`${game.label} 게임 대표 아트`}
                   fill
                   priority={index < 2}
-                  sizes="(max-width: 680px) 100vw, (max-width: 1159px) 50vw, 33vw"
+                  sizes="(max-width: 680px) 50vw, 33vw"
                 />
               </div>
               <div className={styles.body}>
-                <div className={styles.cardHeader}>
-                  <h3 className={styles.cardTitle}>{game.label}</h3>
-                  <span className={styles.status}>
-                    <Radio aria-hidden size={14} strokeWidth={2.4} />
-                    {game.statusLabel}
-                  </span>
-                </div>
-                <p className={styles.description}>{game.description}</p>
+                <h3 className={styles.cardTitle}>{game.label}</h3>
                 <button
                   type="button"
                   className={styles.entryButton}
@@ -123,7 +108,7 @@ export function GameHubCatalog() {
                   onClick={() => void enterGame(kind)}
                 >
                   <CirclePlay aria-hidden size={19} strokeWidth={2.3} />
-                  {pending ? "게임 방 여는 중…" : "입장하기"}
+                  {pending ? "여는 중" : "입장"}
                 </button>
                 {error ? (
                   <p

@@ -57,7 +57,7 @@ creating overlapping testing-notes documents.
 - Confirm `/api/student/boards` and the student-home loader exclude rows with `systemGameKind`, while direct game entry can still fetch the canonical room detail.
 - Inspect `20260802160000_game_ui_platform/migration.sql` and confirm `Board.systemGameKind` is null for normal boards, equals an official PLAY layout when present, requires a classroom, and is unique by `(classroomId, systemGameKind)`. Do not apply the migration outside disposable/staging approval.
 - Enter the same game concurrently from web and Expo for one classroom and confirm both clients receive the same room. Enter from another classroom and confirm a different room. Confirm the classroom teacher is the server-created owner and the client cannot choose the teacher, classroom, room ID, score, duration, participant, or host.
-- Run the root production build and `npx expo export --platform android`. Confirm the web bundle includes all five `.ai-bridge/generated-game-hub-assets/*.png` imports and Expo resolves the cached `/api/game-hub/art/:kind` URLs without bundling a placeholder.
+- Run the root production build and `npx expo export --platform android`. Confirm all five production assets exist under `public/game-hub/*.png` and both web and Expo resolve those same static URLs without a placeholder or `.ai-bridge` runtime dependency.
 - At phone, Galaxy Tab portrait, Galaxy Tab landscape, and desktop widths, confirm no clipped cards, overlapping status/action controls, or nested generic board-card metadata. Verify keyboard focus, screen-reader names, 44px touch targets, reduced motion, loading, retry, missing-setup, and safe back-to-hub behavior.
 
 ## Authoritative Multiplayer Play

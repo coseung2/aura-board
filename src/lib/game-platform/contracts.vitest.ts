@@ -86,8 +86,8 @@ describe("game platform canonical contract", () => {
     for (const kind of GAME_HUB_ORDER) {
       const assetPath = join(
         process.cwd(),
-        ".ai-bridge",
-        "generated-game-hub-assets",
+        "public",
+        "game-hub",
         `${OFFICIAL_GAME_CATALOG[kind].artworkKey}.png`,
       );
       const bytes = readFileSync(assetPath);

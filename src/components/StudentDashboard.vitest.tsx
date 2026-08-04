@@ -162,6 +162,17 @@ describe("StudentDashboard pet hero", () => {
     expect(
       screen.getByRole("link", { name: "펫 관리하기" }).getAttribute("href"),
     ).toBe("/student/aura-pet");
+
+    const heroSprite = screen.getByRole("img", {
+      name: "블루 슬라임, 트램펄린 적용 미리보기",
+    });
+    const heroWell = heroSprite.closest(".student-slime-sprite");
+    expect(heroSprite.getAttribute("data-renderer-scale")).toBe("2");
+    expect(heroSprite.getAttribute("data-expanded-scene")).toBe("true");
+    expect(heroSprite.style.width).toBe("192px");
+    // Dashboard CSS must not apply a second-stage CSS transform scale.
+    expect(heroSprite.style.transform || "").not.toContain("scale(");
+    expect(heroWell?.getAttribute("data-renderer-scale")).toBe("2");
   });
 
   it("shows an empty representative state when no slime is selected", async () => {
@@ -209,9 +220,9 @@ describe("student home and board hub separation", () => {
     const { container } = renderDashboard(playBoards);
     await screen.findByText("블루 슬라임");
 
-    expect(screen.getByRole("heading", { level: 1, name: "홈" })).toBeTruthy();
-    expect(container.querySelectorAll(".student-board-highlight")).toHaveLength(1);
-    expect(screen.getByText("실시간 퀴즈")).toBeTruthy();
+    expect(screen.queryByRole("heading", { level: 1, name: "홈" })).toBeNull();
+    expect(container.querySelectorAll(".student-board-highlight")).toHaveLength(0);
+    expect(screen.queryByText("실시간 퀴즈")).toBeNull();
     expect(screen.queryByText("오늘의 코들")).toBeNull();
     expect(screen.queryByText("번개 낱말")).toBeNull();
     expect(container.querySelector(".student-board-card")).toBeNull();
@@ -231,7 +242,7 @@ describe("student home and board hub separation", () => {
       expect(screen.getByRole("heading", { level: 3, name: title })).toBeTruthy();
       expect(screen.getByRole("img", { name: `${title} 게임 대표 아트` })).toBeTruthy();
     }
-    expect(screen.getAllByRole("button", { name: "입장하기" })).toHaveLength(5);
+    expect(screen.getAllByRole("button", { name: "입장" })).toHaveLength(5);
     expect(container.querySelector(".student-board-card")).toBeNull();
   });
 
@@ -251,7 +262,7 @@ describe("student home and board hub separation", () => {
       .getByRole("heading", { level: 3, name: "오목" })
       .closest("article");
     expect(card).not.toBeNull();
-    fireEvent.click(within(card!).getByRole("button", { name: "입장하기" }));
+    fireEvent.click(within(card!).getByRole("button", { name: "입장" }));
 
     await waitFor(() => {
       expect(push).toHaveBeenCalledWith(

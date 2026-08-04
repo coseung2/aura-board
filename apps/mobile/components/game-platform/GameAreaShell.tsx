@@ -1,13 +1,10 @@
 import type { ReactNode } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import type { MobileGameConnectionState } from "../../lib/game-platform";
 import {
-  borders,
   colors,
-  gamePlatform,
   layers,
-  radii,
-  shadows,
   spacing,
   typography,
 } from "../../theme/tokens";
@@ -30,106 +27,61 @@ export function GameAreaShell({
   statusMessage,
   hostControls,
   participantActions,
-  scrollEnabled = true,
+  scrollEnabled: _scrollEnabled = true,
   ...hudProps
 }: MobileGameAreaShellProps) {
   const locked = inputLocked || connection !== "online";
   return (
-    <ScrollView
-      contentInsetAdjustmentBehavior="automatic"
-      scrollEnabled={scrollEnabled}
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={styles.scrollContent}
-      style={styles.scroll}
-    >
-      <View style={styles.frame} accessibilityState={{ busy: locked }}>
-        <GameHud {...hudProps} connection={connection} />
-        <View style={styles.playfield}>
-          {hostControls ? (
-            <View style={styles.zone} accessibilityLabel="진행자 조작">
-              <Text selectable style={styles.zoneLabel}>진행자 조작</Text>
-              {hostControls}
-            </View>
-          ) : null}
-          {participantActions ? (
-            <View style={styles.zone} accessibilityLabel="참가자 조작">
-              <Text selectable style={styles.zoneLabel}>참가자 조작</Text>
-              {participantActions}
-            </View>
-          ) : null}
-          {children}
-          {locked ? (
-            <View style={styles.lockOverlay} accessibilityLiveRegion="polite">
-              <View style={styles.lockCard}>
-                <Text selectable style={styles.lockTitle}>
-                  {connection === "offline" ? "연결이 끊겼어요" : "최신 상태를 확인 중이에요"}
-                </Text>
-                <Text selectable style={styles.lockText}>
-                  {statusMessage ??
-                    "입력은 잠시 잠겨요. 연결이 복구되면 서버의 최신 상태를 다시 불러옵니다."}
-                </Text>
-              </View>
-            </View>
-          ) : null}
-        </View>
+    <SafeAreaView style={styles.root} edges={["top", "bottom"]} accessibilityState={{ busy: locked }}>
+      <GameHud {...hudProps} connection={connection} />
+      <View style={styles.playfield}>
+        {hostControls ? <View style={styles.zone}>{hostControls}</View> : null}
+        {participantActions ? <View style={styles.zone}>{participantActions}</View> : null}
+        <View style={styles.content}>{children}</View>
+        {locked ? (
+          <View style={styles.lockOverlay} accessibilityLiveRegion="polite">
+            <Text selectable style={styles.lockText}>
+              {statusMessage ??
+                (connection === "offline"
+                  ? "연결이 끊겼어요"
+                  : "최신 상태를 확인 중이에요")}
+            </Text>
+          </View>
+        ) : null}
       </View>
-    </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: colors.gameCanvas },
-  scrollContent: { flexGrow: 1, padding: spacing.md },
-  frame: {
-    flexGrow: 1,
-    overflow: "hidden",
-    borderWidth: borders.hairline,
-    borderColor: colors.gameFrameBorder,
-    borderRadius: radii.card,
-    backgroundColor: colors.gameFrame,
-    borderCurve: "continuous",
-    ...shadows.gameFrame,
+  root: {
+    flex: 1,
+    backgroundColor: colors.bg,
   },
   playfield: {
     position: "relative",
-    flexGrow: 1,
-    gap: spacing.md,
-    minHeight: gamePlatform.playfieldMinHeight,
-    padding: spacing.lg,
-    borderTopLeftRadius: radii.card,
-    borderTopRightRadius: radii.card,
-    borderCurve: "continuous",
-    backgroundColor: colors.gamePlayfield,
+    flex: 1,
+    backgroundColor: colors.bg,
+  },
+  content: {
+    flex: 1,
   },
   zone: {
     gap: spacing.sm,
-    padding: spacing.md,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderCurve: "continuous",
-    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
   },
-  zoneLabel: { ...typography.micro, color: colors.textMuted, textTransform: "uppercase" },
   lockOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: layers.bottomNav,
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.xl,
-    backgroundColor: colors.gamePlayfieldOverlay,
+    backgroundColor: colors.bg,
   },
-  lockCard: {
-    width: "100%",
-    maxWidth: gamePlatform.lockCardMaxWidth,
-    gap: spacing.sm,
-    padding: spacing.xl,
-    borderWidth: borders.hairline,
-    borderColor: colors.warning,
-    borderRadius: radii.card,
-    borderCurve: "continuous",
-    backgroundColor: colors.warningTintedBg,
+  lockText: {
+    ...typography.body,
+    color: colors.text,
+    textAlign: "center",
   },
-  lockTitle: { ...typography.subtitle, color: colors.text },
-  lockText: { ...typography.body, color: colors.textMuted },
 });

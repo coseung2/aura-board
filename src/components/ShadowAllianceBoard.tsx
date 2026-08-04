@@ -67,8 +67,6 @@ function errorLabel(code: string | undefined): string {
       return "다른 기기에서 상태가 바뀌어 서버의 최신 게임을 반영했어요.";
     case "participants_not_ready":
       return "입장한 참가자가 모두 준비해야 시작할 수 있어요.";
-    case "not_found":
-      return "진행자가 게임을 준비 중이에요. 잠시 후 다시 확인해 주세요.";
     case "not_enough_participants":
       return "두 명 이상 입장해야 시작할 수 있어요.";
     case "teams_not_balanced":
@@ -85,6 +83,9 @@ function errorLabel(code: string | undefined): string {
       return "현재 단계에서는 이 조작을 할 수 없어요.";
     case "session_terminal":
       return "이미 끝난 게임이에요.";
+    case "storage_error":
+    case "play_engine_unavailable":
+      return "게임 서버 연결이 불안정해요. 잠시 후 다시 시도해 주세요.";
     default:
       return "요청을 처리하지 못했어요. 연결을 확인하고 다시 시도해 주세요.";
   }
@@ -175,8 +176,15 @@ export function ShadowAllianceBoard({ boardId, boardTitle, viewer }: Props) {
           snapshot?: ShadowAllianceSnapshot;
           error?: string;
         }>(response);
+        if (response.status === 404) {
+          setSnapshot(null);
+          setError(null);
+          return null;
+        }
         if (!response.ok || !body?.snapshot) {
-          if (mode !== "poll") setError(errorLabel(body?.error));
+          if (mode !== "poll" || !snapshotRef.current) {
+            setError(errorLabel(body?.error));
+          }
           return null;
         }
         acceptSnapshot(body.snapshot);
@@ -348,6 +356,27 @@ export function ShadowAllianceBoard({ boardId, boardTitle, viewer }: Props) {
   }
 
   if (!snapshot) {
+    if (!error) {
+      return (
+        <section className={`${styles.root} ${styles.waitingRoom}`} aria-live="polite">
+          <p className={styles.waitingEyebrow}>익명 대기실</p>
+          <h2 className={styles.waitingTitle}>그림자연합</h2>
+          <p className={styles.waitingCopy}>
+            익명 공작원으로 합류할 준비가 됐어요. 진행자가 본부를 열면 첫 지령이 도착합니다.
+          </p>
+          <p className={styles.waitingMeta}>
+            닉네임과 소속은 게임 안에서만 쓰이며, 실제 이름은 표시되지 않습니다.
+          </p>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => void load("retry")}
+          >
+            다시 확인
+          </button>
+        </section>
+      );
+    }
     return (
       <section className={styles.root}>
         <p className={styles.error} role="alert">

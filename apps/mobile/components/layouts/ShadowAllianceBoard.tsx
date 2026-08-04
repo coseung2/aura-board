@@ -54,8 +54,6 @@ function errorLabel(code: string | undefined): string {
   switch (code) {
     case "version_conflict":
       return "다른 기기에서 상태가 바뀌어 최신 게임을 반영했어요.";
-    case "not_found":
-      return "진행자가 게임을 준비 중이에요. 잠시 후 다시 확인해 주세요.";
     case "already_submitted":
       return "이번 라운드 숫자는 이미 제출됐어요.";
     case "participant_forfeited":
@@ -66,6 +64,9 @@ function errorLabel(code: string | undefined): string {
       return "1부터 100 사이의 정수를 입력해 주세요.";
     case "invalid_state":
       return "현재 단계에서는 이 조작을 할 수 없어요.";
+    case "storage_error":
+    case "play_engine_unavailable":
+      return "게임 서버 연결이 불안정해요. 잠시 후 다시 시도해 주세요.";
     default:
       return "요청을 처리하지 못했어요. 연결을 확인하고 다시 시도해 주세요.";
   }
@@ -142,7 +143,15 @@ export function ShadowAllianceBoard({ data }: Props) {
         }
         return response.snapshot;
       } catch (caught) {
-        if (initial) setError(errorLabel(commandError(caught).error));
+        const body = commandError(caught);
+        if (caught instanceof ApiError && caught.status === 404) {
+          setSnapshot(null);
+          setError(null);
+          return null;
+        }
+        if (initial || !snapshotRef.current) {
+          setError(errorLabel(body.error));
+        }
         return null;
       } finally {
         setLoading(false);
@@ -283,6 +292,25 @@ export function ShadowAllianceBoard({ data }: Props) {
   }
 
   if (!snapshot) {
+    if (!error) {
+      return (
+        <View style={styles.waitingRoot} accessibilityLiveRegion="polite">
+          <Text selectable style={styles.waitingEyebrow}>
+            익명 대기실
+          </Text>
+          <Text selectable style={styles.waitingTitle}>
+            그림자연합
+          </Text>
+          <Text selectable style={styles.waitingCopy}>
+            익명 공작원으로 합류할 준비가 됐어요. 진행자가 본부를 열면 첫 지령이 도착합니다.
+          </Text>
+          <Text selectable style={styles.waitingMeta}>
+            닉네임과 소속은 게임 안에서만 쓰이며, 실제 이름은 표시되지 않습니다.
+          </Text>
+          <ActionButton label="다시 확인" onPress={() => void load(true)} />
+        </View>
+      );
+    }
     return (
       <View style={styles.stateBox}>
         <Text selectable style={styles.error} accessibilityLiveRegion="assertive">
@@ -601,6 +629,31 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md,
     paddingVertical: spacing.xxl,
+  },
+  waitingRoot: {
+    flex: 1,
+    justifyContent: "center",
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xxl,
+    backgroundColor: colors.gameFrame,
+  },
+  waitingEyebrow: {
+    ...typography.micro,
+    color: colors.rankingGold,
+    textTransform: "uppercase",
+  },
+  waitingTitle: {
+    ...typography.display,
+    color: colors.gamePlayfield,
+  },
+  waitingCopy: {
+    ...typography.body,
+    color: colors.gamePlayfield,
+  },
+  waitingMeta: {
+    ...typography.label,
+    color: colors.gameHudBorder,
   },
   eyebrow: { ...typography.micro, color: colors.textMuted },
   title: { ...typography.title, color: colors.text },

@@ -1781,10 +1781,11 @@
 }
 
 .student-overview-row {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(280px, 0.85fr) minmax(0, 1.15fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
-  gap: 24px;
+  gap: 48px;
   margin: 24px 0 32px;
 }
 
@@ -1836,16 +1837,22 @@
 }
 
 .student-utilities .student-wallet-header {
-  align-items: center;
+  align-items: flex-end;
+  justify-content: flex-start;
   gap: 12px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .student-utilities .student-wallet-title {
-  font-size: 16px;
+  font-size: 18px;
+  padding-bottom: 8px;
 }
 
 .student-utilities .student-wallet-link {
-  padding: 6px 10px;
+  height: 24px;
+  min-height: 0;
+  padding: 0 0 8px;
+  box-sizing: border-box;
   font-size: 12px;
 }
 
@@ -1882,7 +1889,7 @@
 
 .student-assignment-panel {
   display: grid;
-  gap: 14px;
+  gap: 0;
   min-width: 0;
   max-width: none;
   margin: 0;
@@ -1895,9 +1902,11 @@
 
 .student-assignment-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
+  min-height: 44px;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .student-assignment-eyebrow {
@@ -1919,19 +1928,24 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 0;
+  align-self: stretch;
+  margin-bottom: -1px;
+  position: relative;
+  z-index: 1;
 }
 
 .student-assignment-summary-chip {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 72px;
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid transparent;
-  border-radius: var(--radius-pill);
-  background: var(--color-bg-alt);
+  min-width: 64px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
   font: inherit;
@@ -1945,21 +1959,22 @@
 }
 
 .student-assignment-summary-chip.is-missing {
-  background: rgba(220, 38, 38, 0.08);
   color: var(--color-bank-negative);
 }
 
 .student-assignment-summary-chip:hover,
 .student-assignment-summary-chip.is-active {
-  border-color: var(--color-border-hover);
-  background: var(--color-surface-alt);
   color: var(--color-text);
 }
 
 .student-assignment-summary-chip.is-missing.is-active {
-  border-color: rgba(220, 38, 38, 0.18);
-  background: rgba(220, 38, 38, 0.12);
+  border-bottom-color: var(--color-bank-negative);
   color: var(--color-bank-negative);
+}
+
+.student-assignment-summary-chip:not(.is-missing).is-active {
+  border-bottom-color: var(--color-accent);
+  color: var(--color-accent-tinted-text);
 }
 
 .student-assignment-list {
@@ -1979,7 +1994,7 @@
 
 .student-assignment-item {
   display: grid;
-  grid-template-columns: 28px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
   min-height: 58px;
@@ -1993,10 +2008,6 @@
   transition:
     background var(--t-normal),
     color var(--t-normal);
-}
-
-.student-assignment-item:first-child {
-  border-top: 1px solid var(--color-border);
 }
 
 .student-assignment-item:last-child {
@@ -2017,24 +2028,6 @@
 
 .student-assignment-item.is-missing {
   background: transparent;
-}
-
-.student-assignment-check {
-  width: 24px;
-  height: 24px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border: 2px solid var(--color-border);
-  border-radius: 999px;
-  color: var(--color-accent);
-  font-size: 14px;
-  font-weight: 900;
-}
-
-.student-assignment-item.is-submitted .student-assignment-check {
-  border-color: var(--color-accent);
-  background: var(--color-accent-tinted-bg);
 }
 
 .student-assignment-main {
@@ -2086,6 +2079,30 @@
   font-size: 11px;
 }
 
+.student-assignment-expand {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.student-assignment-expand:hover,
+.student-assignment-expand:focus-visible {
+  color: var(--color-accent-active);
+  background: var(--color-surface-alt);
+}
+
 @media (max-width: 640px) {
   .student-assignment-header {
     flex-direction: column;
@@ -2096,12 +2113,11 @@
   }
 
   .student-assignment-item {
-    grid-template-columns: 28px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .student-assignment-meta {
-    grid-column: 2;
-    align-items: flex-start;
+    align-items: flex-end;
   }
 }
 
@@ -2518,9 +2534,12 @@
 
 .student-wallet-header {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: 16px;
+  min-height: 44px;
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 .student-wallet-eyebrow {
@@ -2541,18 +2560,21 @@
 .student-wallet-link {
   display: inline-flex;
   align-items: center;
-  padding: 8px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-btn);
-  color: var(--color-text);
+  gap: 2px;
+  height: 24px;
+  min-height: 0;
+  padding: 0 0 8px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-muted);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
 }
 
 .student-wallet-link:hover {
-  border-color: var(--color-accent);
   color: var(--color-accent);
 }
 
@@ -2683,6 +2705,126 @@
 }
 
 /* -------- Slime dashboard widget -------- */
+.student-daily-game-panel {
+  display: grid;
+  grid-template-rows: 44px minmax(260px, auto);
+}
+
+.student-daily-game-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  column-gap: clamp(16px, 4vw, 48px);
+}
+
+.student-daily-game-header h2 {
+  align-self: stretch;
+  display: flex;
+  align-items: flex-end;
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.student-daily-game-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: clamp(16px, 4vw, 48px);
+  min-height: 260px;
+}
+
+.student-daily-game-panel .student-slime-card {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.student-daily-game-panel .student-slime-header {
+  display: none;
+}
+
+.student-daily-game-panel .student-slime-link,
+.student-daily-game-panel .student-slime-copy {
+  display: none;
+}
+
+.student-daily-game-panel .student-slime-body {
+  min-height: 260px;
+  grid-template-columns: 1fr;
+  padding: 0;
+  background: transparent;
+}
+
+.student-daily-game-panel .student-slime-sprite {
+  min-height: 260px;
+  width: 100%;
+}
+
+.student-daily-reward-panel {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.student-daily-reward-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px 12px;
+  border-radius: 0;
+  color: var(--color-text);
+  background: transparent;
+  text-decoration: none;
+}
+
+.student-daily-reward-row:hover,
+.student-daily-reward-row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.student-daily-reward-label {
+  width: 48px;
+  font-weight: 700;
+}
+
+.student-daily-reward-status {
+  color: var(--color-accent-active);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.student-daily-reward-status.is-complete {
+  color: var(--color-text-muted);
+}
+
+.student-daily-reward-icon {
+  color: var(--color-text-muted);
+  flex: 0 0 auto;
+}
+
+.student-daily-reward-status {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.student-daily-reward-chevron {
+  color: var(--color-text-faint);
+  flex: 0 0 auto;
+}
+
+.student-daily-reward-complete {
+  color: var(--color-success);
+  flex: 0 0 auto;
+}
+
 .student-slime-card {
   display: grid;
   gap: 8px;
@@ -2753,35 +2895,49 @@
 
 .student-slime-sprite {
   display: grid;
-  width: clamp(180px, 24vw, 240px);
-  height: clamp(180px, 24vw, 240px);
+  width: max-content;
+  max-width: 100%;
+  min-width: 128px;
+  min-height: 0;
+  height: auto;
   place-items: center;
   justify-self: center;
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--color-surface) 62%, transparent);
-  overflow: hidden;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .student-slime-sprite.student-slime-sprite-scene {
-  width: 240px;
-  height: 240px;
-  border: 1px solid rgba(24, 74, 92, 0.1);
-  border-radius: var(--radius-card);
-  background-color: var(--color-surface-alt);
-  background-image: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
-  background-position: center;
-  background-size: cover;
+  /* Shared scene canvas: width follows expanded 96*scale (scale 2 => 192).
+     Height follows OfficialSlimeSprite geometry (vehicle 64x81 etc). */
+  width: max-content;
+  max-width: none;
+  height: auto;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: none;
+  overflow: visible;
   image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
+/* The sprite renderer owns integer scaling. Never re-scale children here. */
 .student-slime-sprite > * {
-  transform: scale(2.5);
+  transform: none;
   transform-origin: center;
+  max-width: none;
 }
 
 .student-slime-sprite img {
   display: block;
+  max-width: none;
+  object-fit: fill;
   image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .student-slime-copy {
@@ -2859,18 +3015,27 @@
   background: transparent;
 }
 
+.student-page .student-daily-game-panel .student-slime-card {
+  min-height: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
 .student-page .student-slime-sprite {
-  background: var(--color-accent-tinted-bg);
+  background: transparent;
 }
 
 .student-page .student-overview-row {
-  margin-block: 28px;
+  margin-block: 0 32px;
+}
+
+.student-page .student-daily-game-panel {
+  margin-bottom: 64px;
 }
 
 .student-page .student-utilities,
 .student-page .student-assignment-panel {
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--color-border);
+    padding-bottom: 20px;
 }
 
 @media (max-width: 480px) {
@@ -2880,18 +3045,15 @@
     text-align: center;
   }
 
-  .student-slime-sprite {
-    width: 176px;
-    height: 176px;
-  }
-
+  .student-slime-sprite,
   .student-slime-sprite.student-slime-sprite-scene {
-    width: 192px;
-    height: 192px;
+    width: max-content;
+    max-width: 100%;
+    height: auto;
   }
 
   .student-slime-sprite > * {
-    transform: scale(2);
+    transform: none;
   }
 
   .student-slime-copy {
@@ -2938,7 +3100,7 @@
 
   .student-overview-row {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: 40px;
   }
 
   .student-board-tools {
@@ -2997,14 +3159,11 @@
     grid-template-columns: 240px minmax(0, 1fr);
   }
 
-  .student-slime-sprite {
-    width: 180px;
-    height: 180px;
-  }
-
+  .student-slime-sprite,
   .student-slime-sprite.student-slime-sprite-scene {
-    width: 240px;
-    height: 240px;
+    width: max-content;
+    max-width: 100%;
+    height: auto;
   }
 }
 

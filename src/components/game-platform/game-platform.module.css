@@ -1,78 +1,36 @@
 .shell {
   min-height: 100dvh;
-  padding: clamp(12px, 2vw, 24px);
-  background: #f4efe6;
-  color: #17223b;
+  background: var(--color-bg);
+  color: var(--color-text);
 }
 
 .frame {
-  width: min(1180px, 100%);
-  margin: 0 auto;
-  border: 1px solid #1d2b4f;
-  border-radius: 24px;
-  background: #17223b;
-  box-shadow: 0 18px 48px rgb(23 34 59 / 16%);
+  position: relative;
+  width: 100%;
+  min-height: 100dvh;
+  background: var(--color-bg);
   overflow: clip;
 }
 
 .hud {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: center;
-  min-height: 72px;
-  padding: 14px 18px;
-  color: #fffdf8;
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px;
 }
 
-.hudPrimary,
-.hudMeta,
 .hudActions,
 .resultActions,
 .filters,
 .summaryGrid {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-}
-
-.title {
-  margin: 0;
-  font-size: clamp(1.05rem, 2.5vw, 1.45rem);
-  line-height: 1.25;
-  font-weight: 800;
-  letter-spacing: -0.025em;
-}
-
-.metaItem,
-.connection,
-.badge {
-  display: inline-flex;
-  min-height: 32px;
-  align-items: center;
-  padding: 5px 10px;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 10%);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.connection::before {
-  width: 8px;
-  height: 8px;
-  margin-right: 6px;
-  border-radius: 50%;
-  background: #8ad9a5;
-  content: "";
-}
-
-.connection[data-state="reconnecting"]::before {
-  background: #f4c86b;
-}
-
-.connection[data-state="offline"]::before {
-  background: #ef8f8f;
 }
 
 .hudButton,
@@ -82,40 +40,40 @@
 .filterButton {
   min-height: 44px;
   border: 1px solid transparent;
-  border-radius: 12px;
+  border-radius: var(--radius-btn);
   padding: 9px 14px;
   font: inherit;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .hudButton {
-  border-color: rgb(255 255 255 / 24%);
-  background: rgb(255 255 255 / 8%);
-  color: #fff;
+  border-color: var(--color-border);
+  background: transparent;
+  color: var(--color-text);
 }
 
 .primaryButton {
-  background: #1f6f55;
-  color: #fff;
+  background: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .secondaryButton,
 .filterButton {
-  border-color: #cdd4df;
-  background: #fff;
-  color: #17223b;
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .filterButton[data-active="true"] {
-  border-color: #1f6f55;
-  background: #e8f4ee;
-  color: #174c3c;
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
 }
 
 .dangerButton {
-  background: #a43d45;
-  color: #fff;
+  background: var(--color-danger);
+  color: var(--color-on-accent);
 }
 
 .hudButton:disabled,
@@ -129,72 +87,35 @@
 
 .playfield {
   position: relative;
-  min-height: min(72dvh, 760px);
-  padding: clamp(14px, 2.4vw, 28px);
-  border-radius: 22px 22px 0 0;
-  background: #fffdf8;
-}
-
-.hostZone,
-.participantZone,
-.panel,
-.resultPanel,
-.recordsPanel,
-.lobby {
-  border: 1px solid #dce1e9;
-  border-radius: 18px;
-  background: #fff;
+  min-height: 100dvh;
+  padding: 0;
+  background: var(--color-bg);
 }
 
 .hostZone,
 .participantZone {
-  padding: 14px;
+  padding: 12px;
 }
 
-.hostZone + .participantZone {
-  margin-top: 12px;
-}
-
-.zoneLabel,
-.eyebrow {
-  margin: 0 0 8px;
-  color: #657089;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.reconnectOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 20;
-  display: grid;
-  place-items: center;
-  padding: 24px;
-  background: rgb(255 253 248 / 88%);
-  text-align: center;
-}
-
-.reconnectCard {
-  max-width: 420px;
-  border: 1px solid #d7c8ae;
-  border-radius: 18px;
-  padding: 22px;
-  background: #fffaf0;
+.panel,
+.resultPanel,
+.recordsPanel,
+.lobby {
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
 }
 
 .lobby,
 .resultPanel,
 .recordsPanel {
-  padding: clamp(18px, 3vw, 30px);
+  padding: 16px;
 }
 
 .lobbyGrid,
 .recordList {
   display: grid;
-  gap: 12px;
-  margin-top: 16px;
+  gap: 8px;
+  margin-top: 12px;
 }
 
 .participantRow,
@@ -203,44 +124,43 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
   align-items: center;
-  border: 1px solid #e1e5ec;
-  border-radius: 14px;
-  padding: 12px 14px;
-  background: #fffdf9;
+  border-top: 1px solid var(--color-border);
+  padding: 12px 0;
+  background: transparent;
 }
 
 .participantState,
 .recordMeta,
 .muted,
 .disabledReason {
-  color: #69748a;
+  color: var(--color-text-muted);
   font-size: 0.86rem;
 }
 
 .resultOutcome {
   margin: 0;
-  font-size: clamp(1.6rem, 5vw, 2.6rem);
-  line-height: 1.1;
+  font-size: clamp(1.4rem, 4vw, 2.2rem);
+  line-height: 1.15;
 }
 
 .metricGrid,
 .summaryGrid {
-  margin: 18px 0;
+  margin: 12px 0;
 }
 
 .metric,
 .summaryCard {
   min-width: 132px;
   flex: 1 1 132px;
-  border: 1px solid #e1e5ec;
-  border-radius: 14px;
-  padding: 13px;
-  background: #fffdf9;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 12px;
+  background: var(--color-bg);
 }
 
 .metric dt,
 .summaryCard span {
-  color: #69748a;
+  color: var(--color-text-muted);
   font-size: 0.78rem;
 }
 
@@ -249,7 +169,7 @@
   display: block;
   margin: 4px 0 0;
   font-size: 1.05rem;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .dialogBackdrop {
@@ -259,67 +179,55 @@
   display: grid;
   place-items: center;
   padding: 18px;
-  background: rgb(15 23 42 / 56%);
+  background: rgb(15 23 42 / 40%);
 }
 
 .dialog {
   width: min(460px, 100%);
-  border: 0;
-  border-radius: 20px;
-  padding: 24px;
-  background: #fffdf8;
-  box-shadow: 0 24px 70px rgb(15 23 42 / 28%);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  background: var(--color-surface);
 }
 
 .recordTitle {
   margin: 0;
-  font-weight: 800;
+  font-weight: 700;
 }
 
 .recordOutcome {
-  font-weight: 800;
+  font-weight: 700;
   text-align: right;
 }
 
 .skeleton {
   min-height: 72px;
-  border-radius: 14px;
-  background: linear-gradient(90deg, #edf0f4, #f8f9fb, #edf0f4);
-  background-size: 200% 100%;
-  animation: record-loading 1.2s ease-in-out infinite;
+  background: var(--color-surface-alt);
 }
 
 .empty,
 .error {
-  padding: 28px 14px;
+  padding: 24px 12px;
   text-align: center;
 }
 
 .error {
-  color: #8d2933;
+  color: var(--color-danger);
 }
 
-@keyframes record-loading {
-  from { background-position: 100% 0; }
-  to { background-position: -100% 0; }
+.reconnectOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--color-bg);
+  text-align: center;
 }
 
 @media (max-width: 720px) {
-  .shell { padding: 0; }
-  .frame { border: 0; border-radius: 0; box-shadow: none; }
-  .hud { grid-template-columns: 1fr; }
-  .hudActions { justify-content: flex-start; }
-  .playfield { min-height: calc(100dvh - 112px); border-radius: 18px 18px 0 0; }
   .participantRow,
   .recordRow { grid-template-columns: 1fr; }
   .recordOutcome { text-align: left; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .skeleton { animation: none; }
-  .hudButton,
-  .primaryButton,
-  .secondaryButton,
-  .dangerButton,
-  .filterButton { transition: none; }
 }

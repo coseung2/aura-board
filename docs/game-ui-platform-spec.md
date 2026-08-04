@@ -13,7 +13,7 @@
 - 실제 권위형 런타임은 기존 `boardId` 격리 경계를 유지한다. `POST /api/student/game-hub/entry`는 인증된 학생의 학급과 canonical game kind만 사용해 `Board.systemGameKind`가 표시된 내부 방을 지연 생성하거나 재사용한다. `(classroomId, systemGameKind)` 유일 키가 웹·모바일 동시 최초 입장 경쟁을 직렬화한다.
 - 내부 방은 일반 교사 제작 보드가 아니다. 학생 보드 목록과 학생 홈 payload에서 제외하고, 서버가 해당 학급 교사를 `owner`로 연결해 문제·참가자 설정이 필요한 게임의 권한 있는 관리 경로는 유지한다.
 - 입장 요청 스키마는 strict이며 점수, 시간, 참가자, 호스트나 런타임 상태를 받지 않는다. 완료 결과는 기존 authoritative session/run과 append-only `GameResult` 투영에서만 확정한다.
-- 생성 PNG 원본은 `.ai-bridge/generated-game-hub-assets/`의 정확한 5개 파일이다. 웹은 빌드 시 정적 import하고, Expo는 동일 웹 빌드 아트를 `/api/game-hub/art/:kind`의 캐시 가능한 redirect 경계로 받아 중복 자산 드리프트를 방지한다.
+- 생성 PNG 원본 5개는 정식 앱 자산인 `public/game-hub/*.png`로 배치한다. 웹과 Expo는 같은 공개 정적 경로를 직접 사용해 자산 드리프트와 로컬 `.ai-bridge` 의존을 방지한다.
 - `20260802160000_game_ui_platform` 마이그레이션은 `systemGameKind` 체크와 유일 인덱스를 포함하지만 이 구현 작업에서는 어떤 환경에도 적용하지 않는다.
 
 ## 시각 레퍼런스
