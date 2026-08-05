@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   InteractionManager,
@@ -24,6 +24,7 @@ import {
   colors,
   dashboard,
   iconSizes,
+  layout,
   media,
   pageChrome,
   radii,
@@ -64,7 +65,9 @@ import {
 } from "../../components/NavigationTabs";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import {
-  FeatheredSceneBackground,
+  resolvePetCardSceneGeometry,
+} from "../../components/slime/slime-types";
+import {
   SlimeSprite,
 } from "../../components/slime/SlimeSprite";
 import {
@@ -427,6 +430,29 @@ function DailyGamePanel({
   onOpenReadingRank: () => void;
   onOpenBoards: () => void;
 }) {
+  const { width: windowWidth } = useWindowDimensions();
+  const homePetScene = useMemo(() => {
+    const contentWidth = Math.min(windowWidth, layout.readableMaxWidth);
+    const bodyWidth = Math.max(0, contentWidth - pageChrome.horizontalPadding * 2);
+    // Home pet pane is authored as 46% of the daily-game row.
+    const paneWidth = bodyWidth * 0.46;
+    // Phone keeps the authored 120px scene (0.3125 scale) inside the 46% pane.
+    // Fill factor is the phone scene width over the phone pane width so compact
+    // layouts stay put while wider tablets grow the whole scene uniformly.
+    const phoneBodyWidth = Math.max(0, 360 - pageChrome.horizontalPadding * 2);
+    const phonePaneWidth = phoneBodyWidth * 0.46;
+    const phoneSceneWidth =
+      64 * 4 * slimeUi.vehicleSceneScale * slimeUi.homePetSceneDisplayScale;
+    const widthFill =
+      phonePaneWidth > 0 ? Math.min(1, phoneSceneWidth / phonePaneWidth) : 1;
+    return resolvePetCardSceneGeometry({
+      cardWidth: paneWidth,
+      baseDisplayScale: slimeUi.homePetSceneDisplayScale,
+      baseSlotHeight: slimeUi.homePetSceneHeight,
+      sceneScale: slimeUi.vehicleSceneScale,
+      widthFill,
+    });
+  }, [windowWidth]);
   const color = petHome?.representativeColor;
   const stage = color && petHome ? stageForColor(petHome, color) : null;
   const equippedItems = color && petHome ? petHome.equippedItemsByColor[color] ?? [] : [];
@@ -472,13 +498,12 @@ function DailyGamePanel({
       <View style={styles.dailyGameBody}>
         <View style={styles.petPane}>
           {color && stage !== null ? (
-            <View style={styles.representativePetScene}>
-          {equippedBackgroundPath ? (
-            <FeatheredSceneBackground
-              spritePath={equippedBackgroundPath}
-              style={StyleSheet.absoluteFill}
-            />
-          ) : null}
+            <View
+              style={[
+                styles.representativePetScene,
+                { height: homePetScene.slotHeight },
+              ]}
+            >
           <SlimeSprite
             slimeColor={color}
             growthStage={stage}
@@ -499,8 +524,9 @@ function DailyGamePanel({
           vehicleBobY={renderedVehicle?.vehicleBobY}
           vehicleRiseY={renderedVehicle?.vehicleRiseY}
           vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
-            displayScale={slimeUi.homePetSceneDisplayScale}
+            displayScale={homePetScene.displayScale}
             expandSceneSurfaces
+            backgroundSpritePath={equippedBackgroundPath ?? undefined}
             accessibilityLabel="내 대표 펫"
           />
             </View>

@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
@@ -25,7 +26,9 @@ import {
   ContentTabs,
 } from "../../components/NavigationTabs";
 import {
-  FeatheredSceneBackground,
+  resolvePetCardSceneGeometry,
+} from "../../components/slime/slime-types";
+import {
   SlimeSprite,
 } from "../../components/slime/SlimeSprite";
 import { SlimePurchaseConfirmModal } from "../../components/slime/SlimePurchaseConfirmModal";
@@ -207,6 +210,20 @@ function itemFloor(item: SlimeShopItem): Exclude<EquippedFloor, "none"> | null {
 
 export default function StudentSlimeScreen() {
   const router = useRouter();
+  const { width: windowWidth } = useWindowDimensions();
+  const petCardScene = useMemo(() => {
+    const contentWidth = Math.min(windowWidth, layout.readableMaxWidth);
+    const gridWidth = Math.max(0, contentWidth - pageChrome.horizontalPadding * 2);
+    // Own-pet and classmate grids are authored as three 32%-wide cells.
+    const cardWidth = gridWidth * 0.32;
+    return resolvePetCardSceneGeometry({
+      cardWidth,
+      baseDisplayScale: slimeUi.petSceneDisplayScale,
+      baseSlotHeight: slimeUi.vehicleSceneSlotHeight,
+      sceneScale: slimeUi.vehicleSceneScale,
+    });
+  }, [windowWidth]);
+
   const params = useLocalSearchParams<{ section?: string }>();
   const [home, setHome] = useState<MobileSlimeHome | null>(null);
   const [selectedColor, setSelectedColor] = useState<SlimeColor>("blue");
@@ -935,6 +952,7 @@ export default function StudentSlimeScreen() {
         </ContentTabs>
       </View>
       <ScrollView
+        removeClippedSubviews
         contentContainerStyle={[
           styles.scrollContent,
           styles.scrollContentWide,
@@ -1021,22 +1039,22 @@ export default function StudentSlimeScreen() {
                       style={[
                         styles.classmateSprite,
                         styles.vehicleSceneSlot,
+                        { height: petCardScene.slotHeight },
                       ]}
                     >
-                      {classBackground ? (
-                        <FeatheredSceneBackground
-                          spritePath={selectSceneBackgroundSpritePath(classBackground)}
-                          style={StyleSheet.absoluteFill}
-                        />
-                      ) : null}
                       {representative ? (
                           <SlimeSprite
                             slimeColor={representative.color}
                             growthStage={representative.growthStage}
                             action={classAction}
                             equippedFloor={classUsesTrampoline ? "trampoline" : classFloor}
-                            displayScale={slimeUi.petSceneDisplayScale}
+                            displayScale={petCardScene.displayScale}
                             expandSceneSurfaces
+                            backgroundSpritePath={
+                              classBackground
+                                ? selectSceneBackgroundSpritePath(classBackground)
+                                : undefined
+                            }
                             repeat={Boolean(classPropAction) || classAction !== "idle"}
                             propAction={classPropAction}
                             wearables={classWearables ?? undefined}
@@ -1165,14 +1183,9 @@ export default function StudentSlimeScreen() {
                 <View style={[
                   styles.myPetSprite,
                   styles.vehicleSceneSlot,
+                  { height: petCardScene.slotHeight },
                   openEffectColor === itemColor && styles.myPetSpriteEffectOpen,
                 ]}>
-                  {petBackground ? (
-                    <FeatheredSceneBackground
-                      spritePath={selectSceneBackgroundSpritePath(petBackground)}
-                      style={StyleSheet.absoluteFill}
-                    />
-                  ) : null}
                   {isOwned ? (
                     <>
                       {openEffectColor === itemColor ? (
@@ -1196,8 +1209,13 @@ export default function StudentSlimeScreen() {
                       growthStage={petStage}
                       action={petAction}
                       equippedFloor={petUsesTrampoline ? "trampoline" : petFloor}
-                      displayScale={slimeUi.petSceneDisplayScale}
+                      displayScale={petCardScene.displayScale}
                       expandSceneSurfaces
+                      backgroundSpritePath={
+                        petBackground
+                          ? selectSceneBackgroundSpritePath(petBackground)
+                          : undefined
+                      }
                       repeat={!manualAction && (Boolean(petPropAction) || petAction !== "idle")}
                       propAction={petPropAction}
                       wearables={petWearables}
