@@ -27,6 +27,7 @@ export type BoardCloneSource = {
   title: string;
   layout: string;
   description: string;
+  category: "LESSON" | "PLAY";
   thumbnailMode: string;
   thumbnailUrl: string | null;
   anonymousAuthor: boolean;
@@ -58,6 +59,7 @@ export type BoardCloneSource = {
   streamTitlePrompt: string;
   streamContentPrompt: string;
   streamSectionsEnabled: boolean;
+  subjectOrder: string | null;
   boardTheme: string;
   auraEvaluationEnabled: boolean;
   auraSubject: string | null;
@@ -110,6 +112,10 @@ export type BoardCloneOverrides = {
   slug?: string;
   /** Override the auto-generated title. */
   title?: string;
+  /** Attach the private clone to a classroom already authorized by the caller. */
+  classroomId?: string | null;
+  /** Skip every card and attachment while preserving board sections. */
+  copyCards?: boolean;
 };
 
 /**
@@ -150,6 +156,7 @@ export async function cloneTeacherBoard(
       slug,
       layout: source.layout,
       description: source.description,
+      category: source.category,
       thumbnailMode: source.thumbnailMode,
       thumbnailUrl: source.thumbnailUrl,
       anonymousAuthor: source.anonymousAuthor,
@@ -181,6 +188,7 @@ export async function cloneTeacherBoard(
       streamTitlePrompt: source.streamTitlePrompt,
       streamContentPrompt: source.streamContentPrompt,
       streamSectionsEnabled: source.streamSectionsEnabled,
+      subjectOrder: source.subjectOrder,
       boardTheme: source.boardTheme,
       auraEvaluationEnabled: source.auraEvaluationEnabled,
       auraSubject: source.auraSubject,
@@ -192,7 +200,7 @@ export async function cloneTeacherBoard(
       shareToken: null,
       shareShortCode: null,
       accessToken: null,
-      classroomId: null,
+      classroomId: overrides.classroomId ?? null,
       members: {
         create: { userId: ownerUserId, role: "owner" },
       },
@@ -218,7 +226,7 @@ export async function cloneTeacherBoard(
     sectionIdMap.set(section.id, createdSection.id);
   }
 
-  if (source.cards.length === 0) {
+  if (overrides.copyCards === false || source.cards.length === 0) {
     return {
       id: created.id,
       slug: created.slug,
