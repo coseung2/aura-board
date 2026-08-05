@@ -1,4 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+
+vi.mock("../../../apps/mobile/lib/persistent-json-cache", () => ({
+  readPersistentJson: async () => null,
+  writePersistentJson: async () => undefined,
+  removePersistentJson: async () => undefined,
+}));
+
 import {
   BOARD_CACHE_MAX_ENTRIES,
   BOARD_LIST_CACHE_KEY,
@@ -128,4 +135,3 @@ describe("mobile board cache", () => {
     expect(readBoardCache(BOARD_LIST_CACHE_KEY)).toBeNull();
   });
 });
-
