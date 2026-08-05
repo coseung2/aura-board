@@ -23,6 +23,7 @@ import {
   slimeShopItemPreview,
   slimeShopItemSpritePath,
 } from "../../lib/slime-shop-presentation";
+import { slimeShopBallPreviewImagePath } from "../../lib/slime-shop-preview-performance";
 import {
   borders,
   colors,
@@ -63,6 +64,10 @@ export function SlimeShopItemCard({
   const buffLabel = slimeShopItemBuffLabel(item);
   const preview = slimeShopItemPreview(item);
   const sceneBackground = isSceneBackgroundItem(item);
+  const ballPreviewImagePath = slimeShopBallPreviewImagePath(item);
+  const itemSpritePath = sceneBackground
+    ? undefined
+    : ballPreviewImagePath ?? slimeShopItemSpritePath(item);
   const unavailable = owned && !repeatable;
   const priceLabel = `${item.price.toLocaleString()}${unitLabel}`;
 
@@ -97,12 +102,11 @@ export function SlimeShopItemCard({
           action={preview.action}
           equippedFloor={preview.equippedFloor}
           displayScale={slimeUi.shopCardSceneDisplayScale}
-          repeat={Boolean(preview.propAction)}
+          repeat={Boolean(preview.propAction) && !ballPreviewImagePath}
+          animate={!ballPreviewImagePath}
           expandSceneSurfaces={preview.expandSceneSurfaces || sceneBackground}
-          itemSpritePath={
-            sceneBackground ? undefined : slimeShopItemSpritePath(item)
-          }
-          propAction={preview.propAction}
+          itemSpritePath={itemSpritePath}
+          propAction={ballPreviewImagePath ? undefined : preview.propAction}
           backgroundSpritePath={
             sceneBackground ? selectSceneBackgroundSpritePath(item) : undefined
           }
