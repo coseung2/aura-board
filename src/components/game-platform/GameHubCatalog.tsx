@@ -95,7 +95,7 @@ export function GameHubCatalog() {
                   alt={`${game.label} 게임 대표 아트`}
                   fill
                   priority={index < 2}
-                  sizes="(max-width: 680px) 50vw, 33vw"
+                  sizes="(max-width: 420px) 100vw, (max-width: 640px) 50vw, (max-width: 900px) 33vw, 20vw"
                 />
               </div>
               <div className={styles.body}>
