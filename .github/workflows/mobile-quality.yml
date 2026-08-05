@@ -64,6 +64,7 @@ jobs:
             src/lib/__tests__/mobile-board-cache.vitest.ts \
             src/lib/__tests__/mobile-board-realtime.vitest.ts \
             src/lib/__tests__/mobile-media.vitest.ts \
+            src/lib/__tests__/mobile-slime-shop-preview-performance.vitest.ts \
             2>&1 | tee .artifacts/mobile-quality/mobile-model-tests.log
 
       - name: Upload failure diagnostics
