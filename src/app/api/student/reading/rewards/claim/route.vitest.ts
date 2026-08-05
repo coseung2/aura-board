@@ -148,6 +148,10 @@ describe("reading mission step claims", () => {
         baseAmount: 60,
       }),
     );
+    const rankQuery = mocks.queryRaw.mock.calls[0]?.[0] as {
+      strings?: TemplateStringsArray;
+    };
+    expect(rankQuery.strings?.join("?")).toContain('HAVING COUNT(log."id") > 0');
   });
 
   it("rejects reading ranks outside the Top 5", async () => {

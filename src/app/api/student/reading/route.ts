@@ -142,6 +142,7 @@ async function readClassroomTopFive(
       AND log."createdAt" < ${weekEnd}
     WHERE student."classroomId" = ${classroomId}
     GROUP BY student."id", student."number", student."name"
+    HAVING COUNT(log."id") > 0
     ORDER BY "weeklyCount" DESC, student."number" ASC NULLS LAST, student."name" ASC
     LIMIT ${TOP_FIVE_LIMIT}
   `);
@@ -186,6 +187,7 @@ async function readClassroomRankReward(
         AND log."createdAt" < ${weekEnd}
       WHERE student."classroomId" = ${classroomId}
       GROUP BY student."id", student."number", student."name"
+      HAVING COUNT(log."id") > 0
     )
     SELECT "rank"
     FROM ranked

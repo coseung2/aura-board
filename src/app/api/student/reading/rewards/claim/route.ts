@@ -113,6 +113,7 @@ async function readCurrentClassroomRank(
         AND log."createdAt" < ${weekEnd}
       WHERE student."classroomId" = ${classroomId}
       GROUP BY student."id", student."number", student."name"
+      HAVING COUNT(log."id") > 0
     )
     SELECT "rank"
     FROM ranked

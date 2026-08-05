@@ -139,6 +139,15 @@ describe("GET /api/student/walking fixed KST week", () => {
     expect(body.classroomRankRewards).toEqual([
       { weekStart: "2026-07-13", rank: 2, amount: 60 },
     ]);
+    const rankQueries = mocks.queryRaw.mock.calls.map(
+      ([query]: [{ strings?: TemplateStringsArray }]) => query.strings?.join("?") ?? "",
+    );
+    expect(rankQueries.filter((source) => source.includes('AS "weeklySteps"'))[0]).toContain(
+      'HAVING COALESCE(SUM(walking."steps"), 0) > 0',
+    );
+    expect(rankQueries.filter((source) => source.includes('SELECT "rank"'))[0]).toContain(
+      'HAVING COALESCE(SUM(walking."steps"), 0) > 0',
+    );
     expect(body.classroomRankNextResetAt).toBe("2026-07-26T15:00:00.000Z");
   });
 

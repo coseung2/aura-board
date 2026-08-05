@@ -601,6 +601,7 @@ async function readClassroomTopFive(
       AND walking."day" < ${range.weekEnd}::date
     WHERE student."classroomId" = ${classroomId}
     GROUP BY student."id", student."number", student."name"
+    HAVING COALESCE(SUM(walking."steps"), 0) > 0
     ORDER BY "weeklySteps" DESC, student."number" ASC NULLS LAST, student."name" ASC
     LIMIT 5
   `);
@@ -644,6 +645,7 @@ async function readClassroomRankReward(
         AND walking."day" < ${range.weekEnd}::date
       WHERE student."classroomId" = ${classroomId}
       GROUP BY student."id", student."number", student."name"
+      HAVING COALESCE(SUM(walking."steps"), 0) > 0
     )
     SELECT "rank"
     FROM ranked

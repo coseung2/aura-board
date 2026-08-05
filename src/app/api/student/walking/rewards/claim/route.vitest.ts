@@ -150,6 +150,12 @@ describe("POST /api/student/walking/rewards/claim", () => {
         baseAmount: 60,
       }),
     );
+    const rankQuery = mocks.queryRaw.mock.calls[0]?.[0] as {
+      strings?: TemplateStringsArray;
+    };
+    expect(rankQuery.strings?.join("?")).toContain(
+      'HAVING COALESCE(SUM(walking."steps"), 0) > 0',
+    );
   });
 
   it("does not pay students outside the current Top 5", async () => {

@@ -252,6 +252,15 @@ describe("reading logs and missions", () => {
       expect(body.classroomRankRewards).toEqual([
         { weekStart: "2026-07-13", rank: 2, amount: 60 },
       ]);
+      const rankQueries = mocks.queryRaw.mock.calls.map(
+        ([query]: [{ strings?: TemplateStringsArray }]) => query.strings?.join("?") ?? "",
+      );
+      expect(rankQueries.filter((source) => source.includes('AS "weeklyCount"'))[0]).toContain(
+        'HAVING COUNT(log."id") > 0',
+      );
+      expect(rankQueries.filter((source) => source.includes('SELECT "rank"'))[0]).toContain(
+        'HAVING COUNT(log."id") > 0',
+      );
     } finally {
       vi.useRealTimers();
     }

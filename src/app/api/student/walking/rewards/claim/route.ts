@@ -172,6 +172,7 @@ async function readCurrentClassroomRank(
         AND walking."day" < ${weekEnd}::date
       WHERE student."classroomId" = ${classroomId}
       GROUP BY student."id", student."number", student."name"
+      HAVING COALESCE(SUM(walking."steps"), 0) > 0
     )
     SELECT "rank"
     FROM ranked
