@@ -15,6 +15,7 @@ import {
   READING_WEEKLY_MISSION_REWARD_SOURCE_TYPE,
   readingWeeklyMissionSourceRef,
 } from "@/lib/reward-policy";
+import { SLIME_COLORS, type SlimeColor } from "@/lib/pets/types";
 import { getStudentDuties } from "@/lib/role-portals";
 import { getStudentMonthlyAttendance } from "@/lib/student-attendance";
 import { getCurrentStudent } from "@/lib/student-auth";
@@ -58,8 +59,14 @@ export default async function StudentReadingPage({
   const missionPeriod = getKstClassroomWalkingRankPeriods().active;
   const missionWeekStart = new Date(`${missionPeriod.weekStart}T00:00:00+09:00`);
   const missionWeekEnd = new Date(`${missionPeriod.weekEnd}T00:00:00+09:00`);
-  const [classroom, duties, attendance, weeklyReadingLogs, claimed] =
-    await Promise.all([
+  const [
+    classroom,
+    duties,
+    attendance,
+    weeklyReadingLogs,
+    claimed,
+    representativeSlime,
+  ] = await Promise.all([
       db.classroom.findUnique({
         where: { id: student.classroomId },
         select: { id: true, name: true },
@@ -75,6 +82,10 @@ export default async function StudentReadingPage({
         select: { createdAt: true, reflection: true },
       }),
       readReadingWeeklyMissionClaimed(student.id, missionPeriod.weekStart),
+      db.studentSlime.findFirst({
+        where: { studentId: student.id, isRepresentative: true },
+        select: { color: true, growthStage: true },
+      }),
     ]);
 
   if (!classroom) redirect("/login?from=/student/reading");
@@ -87,6 +98,17 @@ export default async function StudentReadingPage({
       logs: weeklyReadingLogs,
       claimed,
     });
+  const initialRepresentativePet =
+    representativeSlime &&
+    SLIME_COLORS.includes(representativeSlime.color as SlimeColor) &&
+    (representativeSlime.growthStage === 1 ||
+      representativeSlime.growthStage === 2 ||
+      representativeSlime.growthStage === 3)
+      ? {
+          color: representativeSlime.color as SlimeColor,
+          growthStage: representativeSlime.growthStage as 1 | 2 | 3,
+        }
+      : null;
 
   return (
     <>
@@ -102,8 +124,11 @@ export default async function StudentReadingPage({
           records={<ReadingForm />}
           missions={
             <div className="student-reading-missions-content">
-              <AttendanceMission studentId={student.id} attendance={attendance} />
-              <WeeklyReadingMission initialReward={weeklyMissionReward} />
+              <AttendanceMission attendance={attendance} />
+              <WeeklyReadingMission
+                initialReward={weeklyMissionReward}
+                initialRepresentativePet={initialRepresentativePet}
+              />
             </div>
           }
           titles={<ReadingTitles />}

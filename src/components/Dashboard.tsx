@@ -108,8 +108,15 @@ function BoardSectionTabs({
           className="board-grid-card board-grid-new"
           onClick={onCreate}
         >
-          <div className="board-grid-new-icon">+</div>
-          <span className="board-grid-new-label">새 보드 만들기</span>
+          <div className="board-grid-preview board-grid-new-preview">
+            <div className="board-grid-new-icon">+</div>
+          </div>
+          <div className="board-grid-info">
+            <span className="board-grid-title board-grid-new-label">
+              새 보드 만들기
+            </span>
+            <span className="board-grid-meta">보드 추가</span>
+          </div>
         </button>
         {activeBoards.map((b) => {
           const thumbnail =
@@ -130,8 +137,10 @@ function BoardSectionTabs({
                     alt={`${layoutLabel(b.layout)} 화면 미리보기`}
                   />
                 </div>
-                <div className="board-grid-title">{b.title}</div>
-                <div className="board-grid-meta">{layoutLabel(b.layout)}</div>
+                <div className="board-grid-info">
+                  <div className="board-grid-title">{b.title}</div>
+                  <div className="board-grid-meta">{layoutLabel(b.layout)}</div>
+                </div>
               </Link>
               {b.role === "owner" && (
                 <button

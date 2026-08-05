@@ -9,14 +9,20 @@ import type {
   ReadingWeeklyMissionReward,
 } from "@/lib/reading-missions";
 import { READING_MISSION_STEP_REWARD_AMOUNT } from "@/lib/reading-missions";
+import { SLIME_COLORS, type SlimeColor } from "@/lib/pets/types";
 
 import {
   MissionRewardClaimButton,
   MissionRewardCoin,
 } from "./MobileMissionAssets";
+import {
+  MissionProgressTrack,
+  type MissionProgressPet,
+} from "./MissionProgressTrack";
 
 type Props = {
   initialReward: ReadingWeeklyMissionReward;
+  initialRepresentativePet?: MissionProgressPet | null;
 };
 
 type ClaimState = "claimable" | "pending" | "claimed" | "error" | "locked";
@@ -24,20 +30,20 @@ type PendingClaimKey = `${ReadingMissionKey}:${number}`;
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 
-const stepsRowStyle = {
-  display: "flex",
-  flexWrap: "wrap",
-  alignItems: "flex-start",
-  gap: "10px 12px",
-} as const;
-
-const stepItemStyle = {
-  display: "grid",
-  justifyItems: "center",
-  gap: "4px",
-  minWidth: "56px",
-  maxWidth: "100%",
-} as const;
+function normalizeRepresentativePet(value: unknown): MissionProgressPet | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as { color?: unknown; growthStage?: unknown };
+  const color = raw.color;
+  const growthStage = Number(raw.growthStage);
+  if (
+    typeof color !== "string" ||
+    !SLIME_COLORS.includes(color as SlimeColor) ||
+    (growthStage !== 1 && growthStage !== 2 && growthStage !== 3)
+  ) {
+    return null;
+  }
+  return { color: color as SlimeColor, growthStage };
+}
 
 function pendingClaimKey(missionKey: ReadingMissionKey, unit: number): PendingClaimKey {
   return `${missionKey}:${unit}`;
@@ -210,8 +216,14 @@ function stateLabel(state: ClaimState) {
   return "잠김";
 }
 
-export function WeeklyReadingMission({ initialReward }: Props) {
+export function WeeklyReadingMission({
+  initialReward,
+  initialRepresentativePet = null,
+}: Props) {
   const [reward, setReward] = useState(() => normalizeReward(initialReward) ?? initialReward);
+  const [representativePet, setRepresentativePet] = useState<MissionProgressPet | null>(
+    initialRepresentativePet,
+  );
   const [pendingKey, setPendingKey] = useState<PendingClaimKey | null>(null);
   const [errorKey, setErrorKey] = useState<PendingClaimKey | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -227,9 +239,14 @@ export function WeeklyReadingMission({ initialReward }: Props) {
         if (!response.ok) return;
         const payload = (await response.json()) as {
           weeklyMissionReward?: unknown;
+          representativeSlime?: unknown;
         };
         const next = normalizeReward(payload.weeklyMissionReward);
         if (!cancelled && next) setReward(next);
+        if (!cancelled) {
+          const nextPet = normalizeRepresentativePet(payload.representativeSlime);
+          if (nextPet) setRepresentativePet(nextPet);
+        }
       } catch {
         // Keep server-rendered values if the refresh fails.
       }
@@ -319,34 +336,16 @@ export function WeeklyReadingMission({ initialReward }: Props) {
     }
   }
 
-  const claimableAmount =
-    reward.claimableAmount ??
-    reward.missions
-      .flatMap((mission) => missionSteps(mission))
-      .filter((step) => step.claimable)
-      .reduce((sum, step) => sum + step.amount, 0);
-  const claimedCount =
-    reward.claimedStepCount ??
-    reward.missions
-      .flatMap((mission) => missionSteps(mission))
-      .filter((step) => step.claimed).length;
-  const totalStepCount =
-    reward.totalStepCount ??
-    reward.missions.reduce((sum, mission) => sum + missionSteps(mission).length, 0);
-
   return (
     <section
       className="student-mission-section student-reading-future-missions"
       aria-labelledby="reading-missions-title"
     >
       <div className="student-mission-section-header">
-        <div>
-          <h2 id="reading-missions-title">독서 미션</h2>
-          <p>학생마다 매주 새로운 목표가 정해져요. 단계마다 따로 보상을 받아요.</p>
-        </div>
+        <h2 id="reading-missions-title">독서 미션</h2>
         <strong
           className="student-walking-reward-total"
-          aria-label={`완료 ${reward.completedCount}개, 수령 ${claimedCount}단계, 목표 ${reward.totalCount}개`}
+          aria-label={`완료 ${reward.completedCount}개, 목표 ${reward.totalCount}개`}
         >
           {reward.completedCount}/{reward.totalCount}
         </strong>
@@ -355,10 +354,33 @@ export function WeeklyReadingMission({ initialReward }: Props) {
       <ul className="student-reading-future-mission-list">
         {reward.missions.map((mission) => {
           const steps = missionSteps(mission);
-          const percent = Math.min(
-            100,
-            Math.round((mission.progress / Math.max(1, mission.target)) * 100),
-          );
+          const markers = steps.map((step) => {
+            const claimKey = pendingClaimKey(mission.key, step.unit);
+            const state = stepState(step, pendingKey, errorKey, claimKey);
+            const label = stateLabel(state);
+            return {
+              key: `${mission.key}:${step.unit}`,
+              value: step.target,
+              label: `${numberFormatter.format(step.target)}${mission.unit}`,
+              achieved: step.achieved,
+              content: (
+                <>
+                  <MissionRewardCoin amount={step.amount} />
+                  {step.claimed ? (
+                    <span className="student-reading-mission-step-state">수령 완료</span>
+                  ) : (
+                    <MissionRewardClaimButton
+                      disabled={!step.claimable || pendingKey !== null}
+                      busy={pendingKey === claimKey}
+                      onClick={() => void claim(mission.key, step.unit)}
+                      label={`${mission.title} ${numberFormatter.format(step.target)}${mission.unit} 보상 ${numberFormatter.format(step.amount)}원 ${label}`}
+                    />
+                  )}
+                </>
+              ),
+            };
+          });
+
           return (
             <li
               className={
@@ -373,93 +395,28 @@ export function WeeklyReadingMission({ initialReward }: Props) {
               <div className="student-reading-mission-heading">
                 <strong>{mission.title}</strong>
                 <span>
-                  {mission.claimed
-                    ? "수령 완료"
-                    : mission.completed
-                      ? "수령 가능"
-                      : `${mission.progress}/${mission.target}${mission.unit}`}
+                  {numberFormatter.format(mission.progress)}/
+                  {numberFormatter.format(mission.target)}{mission.unit}
                 </span>
               </div>
-              <p>{mission.description}</p>
-              <div
-                className="student-reading-mission-progress"
-                role="progressbar"
-                aria-label={`${mission.title} 진행도 ${mission.progress}/${mission.target}${mission.unit}`}
-                aria-valuemin={0}
-                aria-valuemax={mission.target}
-                aria-valuenow={Math.min(mission.target, mission.progress)}
-                aria-valuetext={`${mission.progress}/${mission.target}${mission.unit}`}
-              >
-                <span style={{ width: `${percent}%` }} />
-              </div>
-              <div className="student-reading-mission-reward-row">
-                <strong>
-                  보상 {numberFormatter.format(mission.amount)}원
-                  {steps.length > 1
-                    ? ` · 단계 ${mission.claimedStepCount ?? steps.filter((step) => step.claimed).length}/${steps.length}`
-                    : ""}
-                </strong>
-              </div>
-              <div
-                className="student-reading-mission-steps"
-                style={stepsRowStyle}
-                aria-label={`${mission.title} 단계별 보상`}
-              >
-                {steps.map((step) => {
-                  const claimKey = pendingClaimKey(mission.key, step.unit);
-                  const state = stepState(step, pendingKey, errorKey, claimKey);
-                  const label = stateLabel(state);
-                  const isBusy = pendingKey !== null;
-                  return (
-                    <div
-                      className="student-reading-mission-step"
-                      style={stepItemStyle}
-                      key={step.unit}
-                    >
-                      <span className="student-reading-mission-step-target">
-                        {numberFormatter.format(step.target)}
-                        {mission.unit}
-                      </span>
-                      <MissionRewardCoin amount={step.amount} />
-                      {step.claimed ? (
-                        <span className="student-reading-mission-step-state">수령 완료</span>
-                      ) : (
-                        <MissionRewardClaimButton
-                          disabled={!step.claimable || step.claimed || isBusy}
-                          busy={pendingKey === claimKey}
-                          onClick={() => void claim(mission.key, step.unit)}
-                          label={`${mission.title} ${numberFormatter.format(step.target)}${mission.unit} 보상 ${numberFormatter.format(step.amount)}원 ${label}`}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+              <MissionProgressTrack
+                value={mission.progress}
+                max={mission.target}
+                markers={markers}
+                accessibilityLabel={`${mission.title} 진행도 ${numberFormatter.format(mission.progress)}/${numberFormatter.format(mission.target)}${mission.unit}`}
+                representativePet={representativePet}
+                minWidth={Math.max(360, steps.length * 104)}
+              />
             </li>
           );
         })}
       </ul>
 
-      <div className="student-reading-final-reward">
-        <div className="student-reading-final-reward-copy">
-          <strong>
-            미션별 보상 합계 {numberFormatter.format(reward.amount)}원
-            {totalStepCount > 0 ? ` · ${totalStepCount}단계` : ""}
-          </strong>
-          <p>
-            {reward.claimed
-              ? "이번 주 미션 보상을 모두 받았어요."
-              : claimableAmount > 0
-                ? `지금 받을 수 있는 보상 ${numberFormatter.format(claimableAmount)}원`
-                : "각 미션 단계를 완료하면 바로 보상을 받을 수 있어요."}
-          </p>
-        </div>
-        {error ? (
-          <p id="reading-reward-error" className="student-walking-mission-error" role="alert">
-            {error}
-          </p>
-        ) : null}
-      </div>
+      {error ? (
+        <p id="reading-reward-error" className="student-walking-mission-error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </section>
   );
 }

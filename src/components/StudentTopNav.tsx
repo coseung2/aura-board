@@ -49,7 +49,6 @@ export function StudentTopNav({
   const legacyBoard = searchParams.get("board");
   const boardCategory = searchParams.get("category");
   const petSection = searchParams.get("section");
-  const activity = searchParams.get("activity");
 
   const legacyLessonActive = pathname === "/student" && legacyBoard === "lesson";
   const legacyPlayActive = pathname === "/student" && legacyBoard === "play";
@@ -69,19 +68,8 @@ export function StudentTopNav({
   const petShopActive =
     pathname === "/student/aura-pet" && petSection === "shop";
 
-  const legacyReadingActive = pathMatches(pathname, "/student/reading");
-  const legacyWalkingActive = pathMatches(pathname, "/student/walking");
-  const selfDirectedActive =
-    pathMatches(pathname, "/student/self-directed") ||
-    legacyReadingActive ||
-    legacyWalkingActive;
-  const readingActive =
-    (pathname === "/student/self-directed" &&
-      (activity === null || activity === "reading")) ||
-    legacyReadingActive;
-  const walkingActive =
-    (pathname === "/student/self-directed" && activity === "walking") ||
-    legacyWalkingActive;
+  const readingActive = pathMatches(pathname, "/student/reading");
+  const walkingActive = pathMatches(pathname, "/student/walking");
 
   const walletActive = pathMatches(pathname, "/my/wallet");
   const portfolioActive = pathMatches(pathname, "/student/portfolio");
@@ -158,27 +146,18 @@ export function StudentTopNav({
       ],
     },
     {
-      id: "self-directed",
-      label: "자율활동",
+      id: "reading",
+      label: "독서",
       href: "/student/reading",
-      active: selfDirectedActive,
-      groups: [
-        {
-          title: "자율활동",
-          links: [
-            {
-              href: "/student/reading",
-              label: "독서",
-              active: readingActive,
-            },
-            {
-              href: "/student/walking",
-              label: "걷기",
-              active: walkingActive,
-            },
-          ],
-        },
-      ],
+      active: readingActive,
+      groups: [],
+    },
+    {
+      id: "walking",
+      label: "걷기",
+      href: "/student/walking",
+      active: walkingActive,
+      groups: [],
     },
     {
       id: "more",

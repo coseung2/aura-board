@@ -28,10 +28,10 @@ describe("AttendanceMission", () => {
   });
 
   it("records the app visit and updates the shared monthly progress", async () => {
-    render(<AttendanceMission studentId="student-1" attendance={attendance} />);
+    render(<AttendanceMission attendance={attendance} />);
 
-    expect(screen.getByText("2 / 28일")).toBeInTheDocument();
-    await waitFor(() => expect(screen.getByText("3 / 28일")).toBeInTheDocument());
+    expect(screen.getByText("2 / 28회")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("3 / 28회")).toBeInTheDocument());
     expect(fetch).toHaveBeenCalledWith("/api/student/attendance", { method: "POST" });
   });
 });

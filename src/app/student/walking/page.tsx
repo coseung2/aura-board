@@ -34,7 +34,7 @@ export default async function StudentWalkingPage({
         duties={home.duties}
       />
       <main className={`student-page student-walking-page ${styles.page}`}>
-        <WalkingDashboard initialView={initialView} studentId={student.id} />
+        <WalkingDashboard initialView={initialView} />
       </main>
     </>
   );

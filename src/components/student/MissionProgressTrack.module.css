@@ -1,0 +1,134 @@
+.viewport {
+  width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 54px 0 4px;
+  scrollbar-width: thin;
+}
+
+.canvas {
+  --mission-track-min-width: 360px;
+
+  position: relative;
+  min-width: var(--mission-track-min-width);
+  margin-inline: 34px;
+  padding-bottom: 126px;
+}
+
+.track {
+  position: relative;
+  height: 12px;
+  overflow: visible;
+  border-radius: 999px;
+  background: var(--color-accent-tinted-bg);
+}
+
+.fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width var(--t-slow);
+}
+
+.marker {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  border-radius: 999px;
+  background: var(--color-text-muted);
+  transform: translateX(-1px);
+}
+
+.markerAchieved {
+  background: var(--color-accent-tinted-text);
+}
+
+.pet {
+  position: absolute;
+  bottom: 4px;
+  width: 64px;
+  height: 64px;
+  margin-left: -32px;
+  pointer-events: none;
+  z-index: 2;
+  animation: missionPetJump 720ms infinite;
+}
+
+.rewards {
+  position: absolute;
+  inset: 26px 0 auto;
+  height: 100px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.reward {
+  position: absolute;
+  top: 0;
+  display: grid;
+  width: 96px;
+  justify-items: center;
+  gap: 5px;
+  text-align: center;
+  transform: translateX(-50%);
+}
+
+.rewardStart {
+  transform: none;
+}
+
+.rewardEnd {
+  transform: translateX(-100%);
+}
+
+.rewardLabel {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.rewardContent {
+  display: grid;
+  width: 100%;
+  justify-items: center;
+  gap: 4px;
+}
+
+@keyframes missionPetJump {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-9px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pet {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .viewport {
+    padding-top: 50px;
+  }
+
+  .canvas {
+    margin-inline: 30px;
+    padding-bottom: 122px;
+  }
+
+  .reward {
+    width: 88px;
+  }
+}

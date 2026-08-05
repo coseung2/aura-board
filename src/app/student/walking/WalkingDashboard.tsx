@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import { OfficialSlimeSprite } from "@/components/creatures/OfficialSlimeSprite";
 import {
   MissionRewardClaimButton,
   MissionRewardCoin,
 } from "@/components/student/MobileMissionAssets";
+import { MissionProgressTrack } from "@/components/student/MissionProgressTrack";
 import type { StudentActivityView } from "@/components/student/StudentActivityHeader";
 import { StudentTitleCollection } from "@/components/student/StudentTitleCollection";
 import { StudentWalkingTabs } from "@/components/student/StudentWalkingTabs";
@@ -198,10 +198,8 @@ function ClaimButton({
 
 export function WalkingDashboard({
   initialView = "records",
-  studentId = "current",
 }: {
   initialView?: StudentActivityView;
-  studentId?: string;
 }) {
   const [snapshot, setSnapshot] = useState<WalkingSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
@@ -334,6 +332,9 @@ export function WalkingDashboard({
       : latest;
   }, null);
   const titleBusyKey = busy?.startsWith("title:") ? busy.slice("title:".length) : null;
+  const attendanceBusyDay = busy?.startsWith("attendance:")
+    ? busy.slice("attendance:".length)
+    : null;
 
   return (
     <>
@@ -498,49 +499,32 @@ export function WalkingDashboard({
               <div className="student-mission-section-header">
                 <h2 id="walking-attendance-title">출석미션</h2>
                 <strong>
-                  {attendance.attendanceCount} / {attendance.monthDays}일
+                  {attendance.visitCount ?? attendance.attendanceCount} / {attendance.monthDays}회
                 </strong>
               </div>
               <WalkingAttendanceCalendar
-                studentId={studentId}
                 month={attendance.month}
                 monthDays={attendance.monthDays}
                 attendanceCount={attendance.attendanceCount}
+                visitCount={attendance.visitCount}
+                claimedOrdinals={attendance.claimedOrdinals}
+                claimableAttendance={attendance.claimableAttendance}
+                itemRewardOrdinal={attendance.itemRewardOrdinal}
+                claimingDay={attendanceBusyDay}
+                onClaim={(day) => {
+                  const key = `attendance:${day}` as const;
+                  void mutate(
+                    key,
+                    "/api/student/attendance",
+                    {
+                      method: "PATCH",
+                      body: JSON.stringify({ day }),
+                    },
+                    "출석 보상을 받았어요.",
+                    "출석 보상을 받지 못했어요.",
+                  );
+                }}
               />
-              {(attendance.claimableAttendance ?? []).length > 0 ? (
-                <div className={styles.attendanceClaims}>
-                  {(attendance.claimableAttendance ?? []).map((entry) => {
-                    const key = `attendance:${entry.day}` as const;
-                    return (
-                      <div className={styles.attendanceClaim} key={entry.day}>
-                        <span>
-                          <strong>{entry.ordinal}번째 출석</strong>
-                          <small>{entry.day}</small>
-                        </span>
-                        <MissionRewardClaimButton
-                          disabled={busy !== null}
-                          busy={busy === key}
-                          label="출석 보상 받기"
-                          onClick={() =>
-                            void mutate(
-                              key,
-                              "/api/student/attendance",
-                              {
-                                method: "PATCH",
-                                body: JSON.stringify({ day: entry.day }),
-                              },
-                              "출석 보상을 받았어요.",
-                              "출석 보상을 받지 못했어요.",
-                            )
-                          }
-                        />
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <p className={styles.emptyText}>지금 받을 수 있는 출석 보상이 없어요.</p>
-              )}
             </section>
 
             <MissionTrack
@@ -649,12 +633,40 @@ function MissionTrack({
 }) {
   const safeMax = Math.max(1, maxSteps);
   const progress = Math.min(1, Math.max(0, totalSteps / safeMax));
+  const rewardMarkers = tiers.map((tier, index) => {
+    const claimable = tier.claimable ?? tier.achieved;
+    const key =
+      kind === "daily"
+        ? (`daily:${tier.unit ?? Number(tier.key.replace(/\D/g, ""))}` as const)
+        : (`weekly:${tier.key}` as const);
+    const label = tier.claimed
+      ? "수령 완료"
+      : claimable
+        ? "보상 받기"
+        : "미달성";
+    return {
+      key: `${kind}:${tier.key}:${tier.unit ?? tier.steps}:${index}`,
+      value: tier.steps,
+      label: `${numberFormatter.format(tier.steps)}걸음`,
+      achieved: tier.achieved,
+      content: (
+        <>
+          <MissionRewardCoin amount={tier.amount} />
+          <MissionRewardClaimButton
+            disabled={tier.claimed || busy !== null || !claimable}
+            busy={busy === key}
+            label={label}
+            onClick={() => void onClaim(tier)}
+          />
+        </>
+      ),
+    };
+  });
 
   return (
     <section className="student-mission-section" aria-label={title} role="region">
       <div className="student-mission-section-header">
         <h2>{title}</h2>
-        <span>{Math.round(progress * 100)}%</span>
       </div>
       <div className={styles.missionProgressLabels}>
         <span>
@@ -662,79 +674,21 @@ function MissionTrack({
         </span>
         <strong>{Math.round(progress * 100)}%</strong>
       </div>
-      <div
-        className={styles.missionTrack}
-        role="progressbar"
-        aria-label={`${title} 진행도 ${numberFormatter.format(totalSteps)}/${numberFormatter.format(safeMax)}걸음`}
-        aria-valuemin={0}
-        aria-valuemax={safeMax}
-        aria-valuenow={Math.min(safeMax, totalSteps)}
-      >
-        <span className={styles.missionTrackFill} style={{ width: `${progress * 100}%` }} />
-        {tiers.map((tier, index) => (
-          <span
-            key={`${kind}:marker:${tier.key}:${tier.unit ?? tier.steps}:${index}`}
-            className={styles.missionTrackMarker}
-            style={{ left: `${Math.min(100, (tier.steps / safeMax) * 100)}%` }}
-            aria-hidden="true"
-          />
-        ))}
-        {representativeSlime ? (
-          <span
-            className={styles.missionSlimeMarker}
-            style={{ left: `${progress * 100}%` }}
-            aria-hidden="true"
-          >
-            <OfficialSlimeSprite
-              slimeColor={representativeSlime.color}
-              growthStage={representativeSlime.growthStage}
-              equippedFloor="none"
-              action="idle"
-              scale={1}
-              alt=""
-            />
-          </span>
-        ) : null}
-      </div>
-      <div className={styles.missionMilestones}>
-        {tiers.map((tier, index) => {
-          const claimable = tier.claimable ?? tier.achieved;
-          const key =
-            kind === "daily"
-              ? (`daily:${tier.unit ?? Number(tier.key.replace(/\D/g, ""))}` as const)
-              : (`weekly:${tier.key}` as const);
-          const label = tier.claimed
-            ? "수령 완료"
-            : claimable
-              ? "보상 받기"
-              : "미달성";
-          return (
-            <div
-              className={styles.missionMilestone}
-              key={`${kind}:${tier.key}:${tier.unit ?? tier.steps}:${index}`}
-            >
-              <span className={styles.missionMilestoneSteps}>
-                {numberFormatter.format(tier.steps)}걸음
-              </span>
-              <MissionRewardCoin amount={tier.amount} />
-              {tier.claimed ? (
-                <MissionRewardClaimButton
-                  disabled
-                  label="수령 완료"
-                  onClick={() => undefined}
-                />
-              ) : (
-                <MissionRewardClaimButton
-                  disabled={busy !== null || !claimable}
-                  busy={busy === key}
-                  label={label}
-                  onClick={() => void onClaim(tier)}
-                />
-              )}
-            </div>
-          );
-        })}
-      </div>
+      <MissionProgressTrack
+        value={totalSteps}
+        max={safeMax}
+        markers={rewardMarkers}
+        accessibilityLabel={`${title} 진행도 ${numberFormatter.format(totalSteps)}/${numberFormatter.format(safeMax)}걸음`}
+        representativePet={
+          representativeSlime
+            ? {
+                color: representativeSlime.color,
+                growthStage: representativeSlime.growthStage,
+              }
+            : null
+        }
+        minWidth={Math.max(340, tiers.length * 104)}
+      />
     </section>
   );
 }

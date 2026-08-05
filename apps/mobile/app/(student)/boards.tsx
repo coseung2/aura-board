@@ -23,7 +23,6 @@ import {
   borders,
   colors,
   layout as layoutTokens,
-  media,
   pageChrome,
   radii,
   spacing,
@@ -54,7 +53,7 @@ import {
   AppButton,
   AppHeader,
   EmptyState,
-  SurfacePressable,
+  ControlPressable,
 } from "../../components/ui";
 import {
   SectionNav,
@@ -65,6 +64,8 @@ import { GameHubCatalog } from "../../components/game-platform/GameHubCatalog";
 import { GameRecordsPanel } from "../../components/game-platform/GameRecordsPanel";
 
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
+const BOARD_TILE_WIDE_BREAKPOINT = 700;
+const BOARD_TILE_GAP = spacing.sm;
 type StudentBoardsResponse = {
   boards: MeResponse["boards"];
   classroomName: string | null;
@@ -131,12 +132,15 @@ export default function StudentBoardsScreen() {
     Math.min(width, layoutTokens.readableMaxWidth) - horizontalPadding * 2,
     0,
   );
+  const boardColumns =
+    width >= BOARD_TILE_WIDE_BREAKPOINT
+      ? 3
+      : layoutTokens.mobileBoardColumns;
   const boardCardWidth = Math.max(
     1,
     Math.floor(
-      (boardGridWidth -
-        layoutTokens.boardGridGap * (layoutTokens.mobileBoardColumns - 1)) /
-        layoutTokens.mobileBoardColumns,
+      (boardGridWidth - BOARD_TILE_GAP * (boardColumns - 1)) /
+        boardColumns,
     ),
   );
   const contentBoards = useMemo(
@@ -368,12 +372,13 @@ export default function StudentBoardsScreen() {
         </View>
       ) : (
         <FlatList
+          key={`board-tiles-${boardColumns}`}
           data={visibleRows}
           keyExtractor={(row) => row.board.id}
           initialNumToRender={8}
           maxToRenderPerBatch={8}
           windowSize={5}
-          numColumns={layoutTokens.mobileBoardColumns}
+          numColumns={boardColumns}
           columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={[
             styles.content,
@@ -433,7 +438,7 @@ function BoardRow({
 }) {
   const { board } = row;
   return (
-    <SurfacePressable
+    <ControlPressable
       style={[styles.boardCard, { width: cardWidth }]}
       onPressIn={onPressIn}
       onPress={onPress}
@@ -449,14 +454,14 @@ function BoardRow({
         accessible={false}
       />
       <View style={styles.boardCardBody}>
-        <Text style={styles.boardTitle} numberOfLines={2}>
+        <Text style={styles.boardTitle} numberOfLines={1}>
           {board.title}
         </Text>
         <Text style={styles.boardType} numberOfLines={1}>
           {layoutLabel(board.layout)}
         </Text>
       </View>
-    </SurfacePressable>
+    </ControlPressable>
   );
 }
 
@@ -534,30 +539,36 @@ const styles = StyleSheet.create({
     alignSelf: "flex-start",
   },
   columnWrapper: {
-    gap: layoutTokens.boardGridGap,
+    gap: BOARD_TILE_GAP,
   },
   boardCard: {
+    position: "relative",
     minWidth: 0,
     flexShrink: 0,
-    overflow: "hidden",
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.none,
+    paddingVertical: spacing.none,
+    overflow: "visible",
+    borderWidth: borders.none,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+    alignItems: "stretch",
+    justifyContent: "flex-start",
+    gap: spacing.sm,
   },
   thumbnail: {
     width: "100%",
-    aspectRatio: media.previewAspectRatio,
+    aspectRatio: 1,
     borderRadius: radii.none,
     backgroundColor: colors.surfaceAlt,
   },
   boardCardBody: {
     minWidth: 0,
-    gap: spacing.xs,
-    padding: spacing.md,
+    gap: spacing.xxs,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.md,
   },
   boardTitle: {
-    ...typography.subtitle,
+    ...typography.label,
     color: colors.text,
   },
   boardType: {

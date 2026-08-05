@@ -194,8 +194,16 @@ describe("WalkingDashboard", () => {
     render(<WalkingDashboard />);
     await openMissions();
 
-    fireEvent.click(screen.getByRole("button", { name: "출석 보상 받기" }));
-    expect(await screen.findByText("지금 받을 수 있는 출석 보상이 없어요.")).toBeTruthy();
+    fireEvent.click(
+      screen.getByRole("button", { name: "4일차, 10원, 보상 받기" }),
+    );
+    expect(
+      (
+        await screen.findByRole("button", {
+          name: "4일차, 10원, 출석 도장 완료",
+        })
+      ).hasAttribute("disabled"),
+    ).toBe(true);
     expect(JSON.parse(fetchMock.mock.calls[2][1].body as string)).toEqual({ day: "2026-07-26" });
 
     fireEvent.click(screen.getByRole("tab", { name: "칭호" }));
