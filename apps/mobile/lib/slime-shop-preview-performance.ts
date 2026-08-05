@@ -2,17 +2,14 @@ import type { SlimeShopItem } from "./slimes";
 
 const BALL_ITEM_PREFIX = "slime-ball-";
 
-function removeHighDensityGifSuffix(path: string): string {
-  return path.replace(/-4x(?=\.gif(?:$|\?))/i, "");
-}
-
 /**
  * Pick the lightweight native-image preview used by ball cards in the shop.
  *
  * Equipped balls still use the split local action/overlay sheets so their prop
  * can layer correctly with wearables. A catalog grid does not need that split:
- * its official flattened GIF is visually equivalent, is decoded by Expo Image,
- * and avoids one React frame update plus two moving sheet views per ball card.
+ * its official flattened high-density GIF is visually equivalent, is decoded
+ * by Expo Image, and avoids one React frame update plus two moving sheet views
+ * per ball card.
  */
 export function slimeShopBallPreviewImagePath(
   item: Pick<
@@ -25,7 +22,7 @@ export function slimeShopBallPreviewImagePath(
   const mobilePath = item.mobileSpritePath?.trim();
   if (mobilePath) return mobilePath;
 
-  const fallbackPath = removeHighDensityGifSuffix(item.spritePath);
+  const fallbackPath = item.spritePath;
   const slug = item.key.slice(BALL_ITEM_PREFIX.length);
   const previewColor = item.previewColor;
   if (!slug || !previewColor) return fallbackPath;
@@ -37,5 +34,5 @@ export function slimeShopBallPreviewImagePath(
   const queryIndex = item.spritePath.indexOf("?", markerIndex + marker.length);
   const query = queryIndex >= 0 ? item.spritePath.slice(queryIndex) : "";
   const root = item.spritePath.slice(0, markerIndex + marker.length);
-  return `${root}${previewColor}/slime-${previewColor}-${slug}-hit.gif${query}`;
+  return `${root}${previewColor}/slime-${previewColor}-${slug}-hit-4x.gif${query}`;
 }
