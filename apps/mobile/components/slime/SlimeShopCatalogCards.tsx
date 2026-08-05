@@ -68,6 +68,11 @@ export function SlimeShopItemCard({
   const itemSpritePath = sceneBackground
     ? undefined
     : ballPreviewImagePath ?? slimeShopItemSpritePath(item);
+  // The flattened ball GIF contains the same expanded scene as the split
+  // compositor, so retain its 1.5x card footprint while dropping JS playback.
+  const previewDisplayScale = ballPreviewImagePath
+    ? slimeUi.shopCardSceneDisplayScale * slimeUi.vehicleSceneScale
+    : slimeUi.shopCardSceneDisplayScale;
   const unavailable = owned && !repeatable;
   const priceLabel = `${item.price.toLocaleString()}${unitLabel}`;
 
@@ -101,7 +106,7 @@ export function SlimeShopItemCard({
           evolution="base"
           action={preview.action}
           equippedFloor={preview.equippedFloor}
-          displayScale={slimeUi.shopCardSceneDisplayScale}
+          displayScale={previewDisplayScale}
           repeat={Boolean(preview.propAction) && !ballPreviewImagePath}
           animate={!ballPreviewImagePath}
           expandSceneSurfaces={preview.expandSceneSurfaces || sceneBackground}
