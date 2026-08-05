@@ -16,7 +16,10 @@ import {
 } from "../../lib/slime-assets";
 import { resolveSlimeRemoteSpriteUri } from "../../lib/slimes";
 import {
+  ensureRemoteSlimeWearable,
   resolveSlimeWearables,
+  slimeWearableEntry,
+  SLIME_WEARABLE_ROLES,
   type ResolvedSlimeWearable,
 } from "../../lib/slime-wearables";
 import {
@@ -25,6 +28,12 @@ import {
   slimePropFrameOffset,
   type SlimePropAction,
 } from "../../lib/slime-props";
+import {
+  cancelSlimeAnimationSchedule,
+  scheduleSlimeAnimationInterval,
+  scheduleSlimeAnimationTimeout,
+  type SlimeAnimationScheduleHandle,
+} from "../../lib/slime-animation-scheduler";
 import {
   type SlimeSpriteProps,
 } from "./slime-types";
@@ -142,6 +151,7 @@ export function SlimeSprite({
   displayScale: requestedDisplayScale = DEFAULT_DISPLAY_SCALE,
   accessibilityLabel,
   repeat = false,
+  animate = true,
   itemSpritePath,
   propAction,
   backgroundSpritePath,
@@ -163,6 +173,7 @@ export function SlimeSprite({
   onComplete,
 }: SlimeSpriteProps) {
   const displayScale = normalizedDisplayScale(requestedDisplayScale);
+  const [remoteWearableRevision, setRemoteWearableRevision] = useState(0);
   const requestedPropAction = useMemo<SlimePropAction | null>(
     () => propAction
       ?? (action === "drink" && drinkFlavor
@@ -195,8 +206,37 @@ export function SlimeSprite({
       actionResolution.prop,
       slimeColor,
       wearables?.headwear,
+      remoteWearableRevision,
     ],
   );
+  useEffect(() => {
+    let cancelled = false;
+    const requests = SLIME_WEARABLE_ROLES.flatMap((role) => {
+      const option = wearables?.[role];
+      const assetPath = wearables?.assetPaths?.[role];
+      if (!option || !assetPath || slimeWearableEntry(role, option)) return [];
+      return [ensureRemoteSlimeWearable(role, option, assetPath)];
+    });
+    if (requests.length === 0) return;
+    void Promise.all(requests).then((loaded) => {
+      if (!cancelled && loaded.some(Boolean)) {
+        setRemoteWearableRevision((current) => current + 1);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    wearables?.assetPaths?.blush,
+    wearables?.assetPaths?.drink,
+    wearables?.assetPaths?.eyewear,
+    wearables?.assetPaths?.headwear,
+    wearables?.blush,
+    wearables?.drink,
+    wearables?.eyewear,
+    wearables?.headwear,
+  ]);
+
   const ballAsset = actionResolution.prop?.kind === "ball"
     ? resolveSlimeBallPropAsset(actionResolution.prop.slug, slimeColor)
     : null;
@@ -233,6 +273,7 @@ export function SlimeSprite({
       resolution.composition.mode,
       resolution.drinkFlavor,
       resolution.renderedHeadwear,
+      remoteWearableRevision,
       slimeColor,
       wearables,
     ],
@@ -325,10 +366,11 @@ export function SlimeSprite({
   }, [playbackKey]);
 
   useEffect(() => {
+    if (!animate) return;
     const currentDuration = ballAsset
       ? ballAsset.durations[frameIndex % ballAsset.frameCount]
       : getSlimeFrame(resolution, frameIndex).duration;
-    const timeoutId = setTimeout(() => {
+    const handle = scheduleSlimeAnimationTimeout(Math.max(0, currentDuration), () => {
       const isLastFrame = frameIndex >= playbackFrameCount - 1;
       if (playbackIsOneShot && isLastFrame && !repeat) {
         if (completedPlaybackRef.current !== playbackKey) {
@@ -343,10 +385,10 @@ export function SlimeSprite({
           ? (current + 1) % playbackFrameCount
           : Math.min(current + 1, playbackFrameCount - 1),
       );
-    }, Math.max(0, currentDuration));
+    });
 
-    return () => clearTimeout(timeoutId);
-  }, [ballAsset, frameIndex, playbackFrameCount, playbackIsOneShot, playbackKey, playbackLoops, repeat, resolution]);
+    return () => cancelSlimeAnimationSchedule(handle);
+  }, [animate, ballAsset, frameIndex, playbackFrameCount, playbackIsOneShot, playbackKey, playbackLoops, repeat, resolution]);
 
   const puddleAsset = equippedFloor === "water-puddle"
     ? SLIME_SHARED_ASSETS.sharedPuddle
@@ -388,13 +430,13 @@ export function SlimeSprite({
    */
   const [groundedFrame, setGroundedFrame] = useState(0);
   useEffect(() => {
-    if (!vehicleGroundedSpritePath || vehicleGroundedFrames <= 1) return;
+    if (!animate || !vehicleGroundedSpritePath || vehicleGroundedFrames <= 1) return;
     const period = Math.max(16, Math.trunc(vehicleGroundedFrameDurationMs));
-    const timer = setInterval(() => {
+    const handle: SlimeAnimationScheduleHandle = scheduleSlimeAnimationInterval(period, () => {
       setGroundedFrame((current) => (current + 1) % vehicleGroundedFrames);
-    }, period);
-    return () => clearInterval(timer);
-  }, [vehicleGroundedFrameDurationMs, vehicleGroundedFrames, vehicleGroundedSpritePath]);
+    });
+    return () => cancelSlimeAnimationSchedule(handle);
+  }, [animate, vehicleGroundedFrameDurationMs, vehicleGroundedFrames, vehicleGroundedSpritePath]);
 
   const vehicleCanvas = Math.max(64, Math.trunc(vehicleCanvasHeight));
   // Vehicle headroom sits above the grounded pose, so the offset is subtracted to
@@ -446,7 +488,11 @@ export function SlimeSprite({
       testID={frontmost ? "slime-prop-overlay" : undefined}
     >
       <Image
-        source={imageSource(wearable.image)}
+        source={
+          wearable.image.kind === "remote"
+            ? { uri: resolveSlimeRemoteSpriteUri(wearable.image.path, getApiBase()) }
+            : imageSource(wearable.image.source)
+        }
         style={[
           styles.layer,
           {
@@ -466,7 +512,9 @@ export function SlimeSprite({
         ]}
         contentFit="fill"
         allowDownscaling={false}
-        recyclingKey={`${playbackKey}:${wearable.key}`}
+        recyclingKey={`${playbackKey}:${wearable.key}:${
+          wearable.image.kind === "remote" ? wearable.image.path : "local"
+        }`}
         transition={0}
         accessible={false}
       />

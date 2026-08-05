@@ -123,6 +123,9 @@ const VEHICLE_DEFINITIONS = [
   {
     option: "go-kart",
     labelKo: "고카트",
+    // The approved art replaced files at the same public paths. Bump the URL so
+    // Expo Image and browser disk caches do not keep rendering the retired kart.
+    assetVersion: "20260805",
     tier: 2,
     stance: "grounded",
     // The authored front wheel reaches y=72 while the right rear wheel reaches
@@ -273,11 +276,15 @@ const VEHICLE_DEFINITIONS = [
   wheels?: { frameCount: number; frameDurationMs: number };
   characterOffsetY?: number;
   vehicleOffsetX?: number;
+  assetVersion?: string;
   vehicleEffectSpritePaths?: readonly string[];
 }[];
 
 export const SLIME_VEHICLE_CATALOG: readonly SlimeShopItem[] = VEHICLE_DEFINITIONS.map(
-  (vehicle): SlimeShopItem => ({
+  (vehicle): SlimeShopItem => {
+    const assetVersion = "assetVersion" in vehicle ? vehicle.assetVersion : undefined;
+    const assetVersionSuffix = assetVersion ? `?v=${assetVersion}` : "";
+    return {
     key: `slime-vehicle-${vehicle.option}`,
     category: "vehicle",
     floor: null,
@@ -298,8 +305,8 @@ export const SLIME_VEHICLE_CATALOG: readonly SlimeShopItem[] = VEHICLE_DEFINITIO
     effectKey: vehicle.effectKey,
     effectBps: SLIME_VEHICLE_TIER_BPS[vehicle.tier],
     // The still frame doubles as the shop card image.
-    spritePath: `${VEHICLE_ROOT}/${vehicle.option}/vehicle.png`,
-    vehicleSheetPath: `${VEHICLE_ROOT}/${vehicle.option}/idle-sheet.png`,
+    spritePath: `${VEHICLE_ROOT}/${vehicle.option}/vehicle.png${assetVersionSuffix}`,
+    vehicleSheetPath: `${VEHICLE_ROOT}/${vehicle.option}/idle-sheet.png${assetVersionSuffix}`,
     ...("wheels" in vehicle && vehicle.wheels
       ? {
           vehicleGroundedSpritePath: `${VEHICLE_ROOT}/${vehicle.option}/wheels-idle-sheet.png`,
@@ -308,9 +315,14 @@ export const SLIME_VEHICLE_CATALOG: readonly SlimeShopItem[] = VEHICLE_DEFINITIO
         }
       : {}),
     ...("vehicleEffectSpritePaths" in vehicle && vehicle.vehicleEffectSpritePaths
-      ? { vehicleEffectSpritePaths: vehicle.vehicleEffectSpritePaths }
+      ? {
+          vehicleEffectSpritePaths: vehicle.vehicleEffectSpritePaths.map(
+            (path) => `${path}${assetVersionSuffix}`,
+          ),
+        }
       : {}),
-  }),
+    };
+  },
 );
 /**
  * Upper bound for one consumable purchase.
@@ -801,6 +813,7 @@ export const SLIME_SHOP_CATALOG: readonly SlimeShopItem[] = [
     spritePath: slimeWearableEntry(wearable.role, wearable.option)?.sheets.idle?.url ?? "",
     wearableRole: wearable.role,
     wearableOption: wearable.option,
+    wearableAssetPath: `/api/slime-assets/wearables/${wearable.role}/${wearable.option}`,
     effectKey: wearable.effectKey,
     effectBps: wearable.effectBps,
   })),

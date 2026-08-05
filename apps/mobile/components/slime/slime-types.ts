@@ -7,6 +7,68 @@ import type {
 import type { SlimeWearableSelection } from "../../lib/slime-wearables";
 import type { SlimePropAction } from "../../lib/slime-props";
 
+/** Resolved pet-card scene size for a measured card cell. */
+export type PetCardSceneGeometry = {
+  displayScale: number;
+  slotHeight: number;
+  sceneWidth: number;
+};
+
+/**
+ * Fit the full expanded pet scene into a card cell without distorting aspect ratio.
+ *
+ * The expanded scene is characterFrame * imageScale * sceneScale wide at
+ * displayScale=1. Phone-authored baseDisplayScale is a floor so compact layouts
+ * keep their current visual size; wider tablet cells grow the whole scene
+ * (background, character, vehicle, props, wearables) uniformly.
+ */
+export function resolvePetCardSceneGeometry({
+  cardWidth,
+  baseDisplayScale,
+  baseSlotHeight,
+  characterFrameSize = 64,
+  imageScale = 4,
+  sceneScale,
+  widthFill = 1,
+}: {
+  cardWidth: number;
+  baseDisplayScale: number;
+  baseSlotHeight: number;
+  characterFrameSize?: number;
+  imageScale?: number;
+  sceneScale: number;
+  widthFill?: number;
+}): PetCardSceneGeometry {
+  const safeCardWidth = Number.isFinite(cardWidth) && cardWidth > 0 ? cardWidth : 0;
+  const safeBaseScale =
+    Number.isFinite(baseDisplayScale) && baseDisplayScale > 0 ? baseDisplayScale : 0.25;
+  const safeSceneScale =
+    Number.isFinite(sceneScale) && sceneScale > 0 ? sceneScale : 1;
+  const safeImageScale =
+    Number.isFinite(imageScale) && imageScale > 0 ? imageScale : 4;
+  const safeFrame =
+    Number.isFinite(characterFrameSize) && characterFrameSize > 0
+      ? characterFrameSize
+      : 64;
+  const safeSlot =
+    Number.isFinite(baseSlotHeight) && baseSlotHeight > 0 ? baseSlotHeight : 116;
+  const safeFill =
+    Number.isFinite(widthFill) && widthFill > 0 ? Math.min(widthFill, 1) : 1;
+
+  const unitSceneWidth = safeFrame * safeImageScale * safeSceneScale;
+  const targetSceneWidth = safeCardWidth * safeFill;
+  const unclampedScale =
+    unitSceneWidth > 0 ? targetSceneWidth / unitSceneWidth : safeBaseScale;
+  // Match SlimeSprite quantization so layout math and renderer agree.
+  const displayScale = Math.max(
+    safeBaseScale,
+    Math.round(unclampedScale * 16) / 16,
+  );
+  const sceneWidth = unitSceneWidth * displayScale;
+  const slotHeight = safeSlot * (displayScale / safeBaseScale);
+  return { displayScale, slotHeight, sceneWidth };
+}
+
 export type SlimeSpriteProps = {
   slimeColor: SlimeColor;
   /**
@@ -23,6 +85,8 @@ export type SlimeSpriteProps = {
   accessibilityLabel?: string;
   /** Force a normally one-shot equipped animation to loop in the pet preview. */
   repeat?: boolean;
+  /** When false, freeze the current frame and stop wheel clocks. Defaults to true. */
+  animate?: boolean;
   /** Legacy remote prop image. Composable ball and drink actions use `propAction`. */
   itemSpritePath?: string;
   /** Explicit highest-priority prop action composed by the renderer. */

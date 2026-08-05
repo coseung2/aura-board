@@ -281,7 +281,7 @@ describe("slime catalog", () => {
         || item.key === "slime-vehicle-wooden-cart"
         || item.vehicleCharacterOffsetY === 17
       )
-      && item.vehicleSheetPath?.endsWith("/idle-sheet.png"),
+      && item.vehicleSheetPath?.split("?")[0]?.endsWith("/idle-sheet.png"),
     )).toBe(true);
     expect(SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-open-convertible"))
       .toMatchObject({
@@ -294,9 +294,11 @@ describe("slime catalog", () => {
       });
     const goKart = SLIME_VEHICLE_CATALOG.find((item) => item.key === "slime-vehicle-go-kart");
     expect(goKart).toMatchObject({
+      spritePath: "/creatures/slimes/shop/vehicles/go-kart/vehicle.png?v=20260805",
+      vehicleSheetPath: "/creatures/slimes/shop/vehicles/go-kart/idle-sheet.png?v=20260805",
       vehicleEffectSpritePaths: [
-        "/creatures/slimes/shop/vehicles/go-kart/fx/wind-idle-sheet.png",
-        "/creatures/slimes/shop/vehicles/go-kart/fx/exhaust-idle-sheet.png",
+        "/creatures/slimes/shop/vehicles/go-kart/fx/wind-idle-sheet.png?v=20260805",
+        "/creatures/slimes/shop/vehicles/go-kart/fx/exhaust-idle-sheet.png?v=20260805",
       ],
     });
     expect(goKart?.vehicleGroundedSpritePath).toBeUndefined();

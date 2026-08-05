@@ -131,6 +131,7 @@ export async function apiFetch<T = unknown>(
   } = opts;
   const hdrs: Record<string, string> = {
     Accept: "application/json",
+    "X-Aura-Mobile-Capabilities": "slime-wearable-assets-v1",
     ...((headers as Record<string, string>) ?? {}),
   };
 

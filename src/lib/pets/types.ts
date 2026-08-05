@@ -98,6 +98,36 @@ export type SlimeShopCategory = (typeof SLIME_SHOP_CATEGORIES)[number];
 
 export type SlimeShopTier = 1 | 2 | 3;
 
+export type SlimeRemoteWearableAnchor = Readonly<{
+  sourceFrame: number;
+  dx: number;
+  dy: number;
+}>;
+
+export type SlimeRemoteWearableAsset = Readonly<{
+  version: 1;
+  key: string;
+  role: "blush" | "eyewear" | "headwear";
+  option: string;
+  zIndex: number;
+  colorSensitive: boolean;
+  /** Official wearable sheets are nearest-neighbour authored at 4x. */
+  imageScale: 4;
+  sheets: Readonly<Record<string, Readonly<{
+    frameCount: number;
+    frameSize: Readonly<{ w: number; h: number }>;
+    characterOffsetY: number;
+    grounded: boolean;
+    url?: string;
+    urlByColor?: Readonly<Partial<Record<SlimeColor, string>>>;
+  }>>>;
+  timelines: Readonly<Record<string, Readonly<{
+    sheet: string;
+    anchors: readonly SlimeRemoteWearableAnchor[];
+    anchorOverridesByColor?: Readonly<Partial<Record<SlimeColor, readonly SlimeRemoteWearableAnchor[]>>>;
+  }>>>;
+}>;
+
 export type SlimeShopItem = {
   readonly key: string;
   readonly category: SlimeShopCategory;
@@ -119,6 +149,8 @@ export type SlimeShopItem = {
   /** Imported anchor-overlay slot and option for wearable shop items. */
   readonly wearableRole?: "blush" | "eyewear" | "headwear";
   readonly wearableOption?: string;
+  /** Public JSON manifest loaded when an installed app lacks this wearable locally. */
+  readonly wearableAssetPath?: string;
   /** Vehicle stance; present only for `vehicle` shop items. */
   readonly vehicleStance?: SlimeVehicleStance;
   /**

@@ -95,6 +95,8 @@ export type SlimeShopItem = {
   previewColor?: SlimeColor;
   wearableRole?: SlimeWearableRole;
   wearableOption?: string;
+  /** Public manifest for wearables not bundled in this installed app. */
+  wearableAssetPath?: string;
   /** Vehicle stance; `floating` rides never touch the floor surface. */
   vehicleStance?: "grounded" | "floating";
   /** Pixels the vehicle lifts the slime, in 64px-viewport units. */
@@ -132,6 +134,7 @@ export type MobileSlimeWearableSelection = {
   eyewear: string | null;
   headwear: string | null;
   drink: string | null;
+  assetPaths: Partial<Record<SlimeWearableRole, string>>;
 };
 
 export type SlimeShopFilter =
@@ -439,6 +442,7 @@ export function resolveEquippedSlimeWearables(
     eyewear: null,
     headwear: null,
     drink: null,
+    assetPaths: {},
   };
 
   for (const itemKey of itemKeys) {
@@ -456,6 +460,9 @@ export function resolveEquippedSlimeWearables(
       continue;
     }
     selection[item.wearableRole] = item.wearableOption;
+    if (item.wearableAssetPath) {
+      selection.assetPaths[item.wearableRole] = item.wearableAssetPath;
+    }
   }
 
   return selection;
@@ -685,6 +692,10 @@ function normalizeShopCatalog(value: unknown): SlimeShopItem[] {
         wearableOption:
           typeof entry.wearableOption === "string" && entry.wearableOption.length > 0
             ? entry.wearableOption
+            : undefined,
+        wearableAssetPath:
+          typeof entry.wearableAssetPath === "string" && entry.wearableAssetPath.length > 0
+            ? entry.wearableAssetPath
             : undefined,
         // Vehicle fields have to survive normalization or the ride never renders
         // on mobile even though the server sent it.

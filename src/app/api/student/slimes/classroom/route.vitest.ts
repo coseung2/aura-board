@@ -21,7 +21,9 @@ describe("GET /api/student/slimes/classroom", () => {
   it("requires an authenticated student", async () => {
     mocks.getCurrentStudent.mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(
+      new Request("https://example.test/api/student/slimes/classroom"),
+    );
 
     expect(response.status).toBe(401);
     expect(mocks.findMany).not.toHaveBeenCalled();
@@ -60,7 +62,9 @@ describe("GET /api/student/slimes/classroom", () => {
       },
     ]);
 
-    const response = await GET();
+    const response = await GET(
+      new Request("https://example.test/api/student/slimes/classroom"),
+    );
     const payload = await response.json();
 
     expect(response.status).toBe(200);
@@ -106,5 +110,38 @@ describe("GET /api/student/slimes/classroom", () => {
         representative: null,
       },
     ]);
+  });
+
+  it("removes unsupported equipped wearables from legacy bearer gallery rows", async () => {
+    mocks.getCurrentStudent.mockResolvedValue({
+      id: "student-1",
+      classroomId: "classroom-1",
+    });
+    mocks.findMany.mockResolvedValue([{
+      id: "a",
+      number: 1,
+      name: "서연",
+      slimes: [{
+        color: "blue",
+        growthStage: 1,
+        equippedItemKeys: [
+          "slime-ball-soccer-ball",
+          "slime-headwear-sprout-terrarium-dome-hat",
+        ],
+        hiddenItemKeys: ["slime-headwear-sprout-terrarium-dome-hat"],
+        equippedTitleKey: null,
+      }],
+    }]);
+
+    const response = await GET(new Request(
+      "https://example.test/api/student/slimes/classroom",
+      { headers: { authorization: "Bearer legacy-mobile" } },
+    ));
+    const payload = await response.json();
+
+    expect(payload.students[0].representative).toMatchObject({
+      equippedItemKeys: ["slime-ball-soccer-ball"],
+      hiddenItemKeys: [],
+    });
   });
 });

@@ -4,6 +4,7 @@ import {
 } from "./slime-wearables.generated";
 import { SLIME_MOBILE_WEARABLE_ACTION_REGISTRY } from "./slime-wearable-actions.generated";
 import type { SlimeColor, SlimeSheetAction } from "./slime-assets";
+import { apiFetch } from "./api";
 
 export { SLIME_WEARABLE_LAYER_ORDER };
 
@@ -50,6 +51,8 @@ type RegistryEntry = Readonly<{
         grounded: boolean;
         image?: unknown;
         imageByColor?: Readonly<Record<SlimeColor, unknown>>;
+        url?: string;
+        urlByColor?: Readonly<Partial<Record<SlimeColor, string>>>;
       }>
     >
   >;
@@ -71,7 +74,9 @@ export type ResolvedSlimeWearable = Readonly<{
   key: string;
   role: SlimeWearableRole;
   option: string;
-  image: unknown;
+  image:
+    | Readonly<{ kind: "local"; source: unknown }>
+    | Readonly<{ kind: "remote"; path: string }>;
   zIndex: number;
   sourceFrame: number;
   dx: number;
@@ -88,6 +93,8 @@ export type SlimeWearableSelection = Readonly<{
   eyewear?: string | null;
   blush?: string | null;
   drink?: string | null;
+  /** Manifest endpoints for options newer than the installed Metro bundle. */
+  assetPaths?: Readonly<Partial<Record<SlimeWearableRole, string>>>;
 }>;
 
 /** Which head option wins, and why. Independent of what an action can draw. */
@@ -128,8 +135,65 @@ const registry = Object.fromEntries(
   }),
 ) as Record<string, RegistryEntry>;
 
+const remoteRegistry = new Map<string, RegistryEntry>();
+const remoteLoads = new Map<string, Promise<boolean>>();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object";
+}
+
+function remoteEntry(value: unknown, expectedKey: string): RegistryEntry | null {
+  if (!isRecord(value) || value.version !== 1 || value.key !== expectedKey) return null;
+  if (
+    typeof value.role !== "string" ||
+    typeof value.option !== "string" ||
+    typeof value.zIndex !== "number" ||
+    typeof value.colorSensitive !== "boolean" ||
+    typeof value.imageScale !== "number" ||
+    !isRecord(value.sheets) ||
+    !isRecord(value.timelines)
+  ) {
+    return null;
+  }
+  return value as unknown as RegistryEntry;
+}
+
 export function slimeWearableEntry(role: SlimeWearableRole, option: string): RegistryEntry | null {
-  return registry[`${role}/${option}`] ?? null;
+  const key = `${role}/${option}`;
+  return registry[key] ?? remoteRegistry.get(key) ?? null;
+}
+
+/**
+ * Fetch one published wearable manifest only when the installed bundle does not
+ * already contain it. In-flight and successful loads are shared across every
+ * shop card and pet preview using the same option.
+ */
+export function ensureRemoteSlimeWearable(
+  role: SlimeWearableRole,
+  option: string,
+  assetPath: string,
+): Promise<boolean> {
+  const key = `${role}/${option}`;
+  if (slimeWearableEntry(role, option)) return Promise.resolve(true);
+  const inFlight = remoteLoads.get(key);
+  if (inFlight) return inFlight;
+
+  const request = apiFetch<{ asset?: unknown }>(assetPath, {
+    skipAuth: true,
+    cacheTtlMs: 24 * 60 * 60_000,
+  })
+    .then((response) => {
+      const entry = remoteEntry(response.asset, key);
+      if (!entry) return false;
+      remoteRegistry.set(key, entry);
+      return true;
+    })
+    .catch(() => false)
+    .finally(() => {
+      remoteLoads.delete(key);
+    });
+  remoteLoads.set(key, request);
+  return request;
 }
 
 /**
@@ -239,7 +303,17 @@ export function resolveSlimeWearables(
     const anchors = timeline.anchorOverridesByColor?.[slimeColor] ?? timeline.anchors;
     const anchor = anchors[normalizedFrameIndex(frameIndex, anchors.length)];
     if (!anchor) continue;
-    const image = entry.colorSensitive ? sheet.imageByColor?.[slimeColor] : sheet.image;
+    const localImage = entry.colorSensitive
+      ? sheet.imageByColor?.[slimeColor]
+      : sheet.image;
+    const remotePath = entry.colorSensitive
+      ? sheet.urlByColor?.[slimeColor]
+      : sheet.url;
+    const image = localImage
+      ? ({ kind: "local", source: localImage } as const)
+      : remotePath
+        ? ({ kind: "remote", path: remotePath } as const)
+        : null;
     if (!image) continue;
     resolved.push({
       key: entry.key,

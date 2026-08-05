@@ -309,6 +309,7 @@ describe("mobile slime parity model", () => {
           spritePath: "/hat.png",
           wearableRole: "headwear",
           wearableOption: "straw-hat",
+          wearableAssetPath: "/api/slime-assets/wearables/headwear/straw-hat",
         },
         {
           key: "slime-blue-drink-lemonade",
@@ -332,6 +333,9 @@ describe("mobile slime parity model", () => {
       eyewear: "round-glasses",
       headwear: "straw-hat",
       drink: "lemonade",
+      assetPaths: {
+        headwear: "/api/slime-assets/wearables/headwear/straw-hat",
+      },
     });
   });
 
