@@ -4,6 +4,7 @@ import {
   kstDayKey,
   liveQuizEndsAt,
   liveQuizLockAt,
+  liveQuizSetupNextStartsAt,
   liveQuizStartsAt,
   liveQuizTimeline,
 } from "./schedule";
@@ -21,6 +22,21 @@ describe("live quiz schedule", () => {
     expect(liveQuizStartsAt("2026-08-06").toISOString()).toBe(
       "2026-08-06T04:30:00.000Z",
     );
+  });
+
+  it("moves an underfilled setup to tomorrow once the daily lock passes", () => {
+    expect(
+      liveQuizSetupNextStartsAt(
+        new Date("2026-08-06T04:24:59.999Z"),
+        "2026-08-06",
+      ).toISOString(),
+    ).toBe("2026-08-06T04:30:00.000Z");
+    expect(
+      liveQuizSetupNextStartsAt(
+        new Date("2026-08-06T04:25:00.000Z"),
+        "2026-08-06",
+      ).toISOString(),
+    ).toBe("2026-08-07T04:30:00.000Z");
   });
 
   it("moves from answer to reveal and then the next question", () => {

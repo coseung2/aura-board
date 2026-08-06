@@ -39,6 +39,26 @@ function panelClassName(contentClassName: string, panelClassName: string): strin
   return `${contentClassName} ${panelClassName}`;
 }
 
+function RefreshWarning({
+  message,
+  retrying,
+  onRetry,
+}: {
+  message: string | null;
+  retrying: boolean;
+  onRetry: () => void;
+}) {
+  if (!message) return null;
+  return (
+    <div className={styles.refreshWarning} role="status">
+      <span>{message}</span>
+      <button type="button" disabled={retrying} onClick={onRetry}>
+        {retrying ? "동기화 중…" : "다시 동기화"}
+      </button>
+    </div>
+  );
+}
+
 type LivePanelProps = {
   contentClassName: string;
   state: LiveQuizStateResponse | null;
@@ -101,14 +121,27 @@ export function LiveQuizLivePanel({
   if (!state) return null;
 
   if (state.phase === "setup") {
+    const deferredToNextBroadcast = state.nextStartsAt !== state.startsAt;
     return (
       <section className={panelClassName(contentClassName, styles.stateCard)}>
         <span className={styles.stateIcon} aria-hidden>
           🧩
         </span>
-        <p className={styles.eyebrow}>방송 준비 중</p>
-        <h2>승인된 문제를 모으고 있어요</h2>
+        <p className={styles.eyebrow}>
+          {deferredToNextBroadcast ? "다음 방송 준비 중" : "방송 준비 중"}
+        </p>
+        <h2>
+          {deferredToNextBroadcast
+            ? "다음 방송 문제를 모으고 있어요"
+            : "승인된 문제를 모으고 있어요"}
+        </h2>
         <p>{state.setupReason}</p>
+        {deferredToNextBroadcast ? (
+          <p>
+            다음 방송은 <strong>{formatKoreanDateTime(state.nextStartsAt)}</strong>
+            입니다.
+          </p>
+        ) : null}
         <div className={styles.stateActions}>
           <button type="button" className={styles.primaryButton} onClick={onSuggest}>
             문제 추천하기
@@ -119,6 +152,11 @@ export function LiveQuizLivePanel({
             </a>
           ) : null}
         </div>
+        <RefreshWarning
+          message={loadError}
+          retrying={loading}
+          onRetry={onRetry}
+        />
       </section>
     );
   }
@@ -133,9 +171,7 @@ export function LiveQuizLivePanel({
         <p className={styles.eyebrow}>다음 방송</p>
         <h2>{formatKoreanDateTime(state.startsAt)}</h2>
         <p className={styles.countdownLabel}>시작까지</p>
-        <strong className={styles.countdown} aria-live="polite">
-          {formatCountdown(countdown)}
-        </strong>
+        <strong className={styles.countdown}>{formatCountdown(countdown)}</strong>
         <div className={styles.waitingFacts}>
           <span>오늘 {state.questionCount}문제</span>
           <span>문제당 20초</span>
@@ -144,6 +180,11 @@ export function LiveQuizLivePanel({
         <p className={styles.mutedText}>
           화면을 켜 두면 오후 1시 30분에 첫 문제가 자동으로 열립니다.
         </p>
+        <RefreshWarning
+          message={loadError}
+          retrying={loading}
+          onRetry={onRetry}
+        />
       </section>
     );
   }
@@ -164,6 +205,11 @@ export function LiveQuizLivePanel({
         <button type="button" className={styles.primaryButton} onClick={onSuggest}>
           다음 방송 문제 추천하기
         </button>
+        <RefreshWarning
+          message={loadError}
+          retrying={loading}
+          onRetry={onRetry}
+        />
       </section>
     );
   }
@@ -189,10 +235,7 @@ export function LiveQuizLivePanel({
     nowMs < Date.parse(state.stageEndsAt);
 
   return (
-    <section
-      className={panelClassName(contentClassName, styles.quizCard)}
-      aria-live="polite"
-    >
+    <section className={panelClassName(contentClassName, styles.quizCard)}>
       <div className={styles.quizMeta}>
         <div>
           <span className={styles.questionIndex}>
@@ -224,7 +267,9 @@ export function LiveQuizLivePanel({
         <span style={{ width: `${timerPercent}%` }} />
       </div>
 
-      <h2 className={styles.prompt}>{question.prompt}</h2>
+      <h2 className={styles.prompt} aria-live="polite" aria-atomic="true">
+        {question.prompt}
+      </h2>
 
       <div className={styles.options}>
         {question.choices.map((choice, index) => {
@@ -261,7 +306,7 @@ export function LiveQuizLivePanel({
         })}
       </div>
 
-      <div className={styles.answerStatus}>
+      <div className={styles.answerStatus} aria-live="polite" aria-atomic="true">
         {answerError ? <p role="alert">{answerError}</p> : null}
         {!answerError && !reveal && selectedChoice !== null ? (
           <p>선택 완료 · 정답 공개를 기다려 주세요.</p>
@@ -291,7 +336,11 @@ export function LiveQuizLivePanel({
       ) : null}
 
       <p className={styles.answerCount}>현재 {state.activeAnswerCount}명 응답</p>
-      {loadError ? <p className={styles.pollWarning}>{loadError}</p> : null}
+      <RefreshWarning
+        message={loadError}
+        retrying={loading}
+        onRetry={onRetry}
+      />
     </section>
   );
 }

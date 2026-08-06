@@ -7,6 +7,14 @@ import {
   useState,
 } from "react";
 
+import {
+  estimateServerOffsetMs,
+  liveQuizBoundaryTarget,
+  liveQuizCounterKey,
+  mergeCachedLiveQuizAnswerCount,
+  mergeLiveQuizAnswerCount,
+  parseLiveQuizRealtimeCounter,
+} from "@/lib/live-quiz/client-sync";
 import type {
   LiveQuizStateResponse,
   LiveQuizViewerKind,
@@ -25,12 +33,6 @@ type Props = {
 type OptimisticAnswer = {
   questionId: string;
   choice: number;
-};
-
-type RealtimeCounterRow = {
-  sessionKey?: unknown;
-  questionId?: unknown;
-  answerCount?: unknown;
 };
 
 function stateErrorMessage(status: number): string {
@@ -59,7 +61,7 @@ export function LiveQuizExperience({
     useState<OptimisticAnswer | null>(null);
   const stateRequestInFlightRef = useRef(false);
   const stateRefreshQueuedRef = useRef(false);
-  const activeQuestionIdRef = useRef<string | null>(null);
+  const realtimeAnswerCountsRef = useRef(new Map<string, number>());
   const boundaryRefreshKeyRef = useRef<string | null>(null);
 
   const loadState = useCallback(async (silent = false) => {
@@ -74,15 +76,29 @@ export function LiveQuizExperience({
       stateRequestInFlightRef.current = true;
       if (!nextRequestSilent) setLoading(true);
       try {
+        const requestStartedAtMs = Date.now();
         const response = await fetch("/api/live-quiz/state", {
           cache: "no-store",
           credentials: "same-origin",
           headers: { accept: "application/json" },
         });
+        const responseReceivedAtMs = Date.now();
         if (!response.ok) throw new Error(stateErrorMessage(response.status));
         const body = (await response.json()) as LiveQuizStateResponse;
-        setState(body);
-        setServerOffsetMs(Date.parse(body.serverNow) - Date.now());
+        setState(
+          mergeCachedLiveQuizAnswerCount(
+            body,
+            realtimeAnswerCountsRef.current,
+          ),
+        );
+        const nextServerOffsetMs = estimateServerOffsetMs(
+          body.serverNow,
+          requestStartedAtMs,
+          responseReceivedAtMs,
+        );
+        if (nextServerOffsetMs !== null) {
+          setServerOffsetMs(nextServerOffsetMs);
+        }
         setLoadError(null);
       } catch (error) {
         setLoadError(
@@ -115,21 +131,13 @@ export function LiveQuizExperience({
     return () => window.clearTimeout(timeoutId);
   }, []);
 
-  useEffect(() => {
-    activeQuestionIdRef.current = state?.question?.id ?? null;
-  }, [state?.question?.id]);
-
   // The schedule itself is deterministic. Fetch exactly once after a start,
-  // answer, or reveal boundary so the server can disclose the next safe state.
+  // answer, reveal, or next-broadcast boundary so the server can disclose the
+  // next safe state without continuous polling.
   useEffect(() => {
     if (!state) return;
 
-    const target =
-      state.phase === "live"
-        ? state.stageEndsAt
-        : state.phase === "waiting" || state.phase === "setup"
-          ? state.startsAt
-          : null;
+    const target = liveQuizBoundaryTarget(state);
     if (!target) return;
 
     const targetMs = Date.parse(target);
@@ -161,6 +169,7 @@ export function LiveQuizExperience({
     const client = getLiveQuizRealtimeClient();
     if (!client) return;
 
+    realtimeAnswerCountsRef.current.clear();
     let hasSubscribed = false;
     let needsReconnectSync = false;
     const channel = client
@@ -186,36 +195,42 @@ export function LiveQuizExperience({
           filter: `sessionKey=eq.${sessionKey}`,
         },
         (payload) => {
-          const row = payload.new as RealtimeCounterRow;
+          const counter = parseLiveQuizRealtimeCounter(payload.new);
+          if (!counter || counter.sessionKey !== sessionKey) return;
+
+          const counterKey = liveQuizCounterKey(
+            counter.sessionKey,
+            counter.questionId,
+          );
+          const previousCount = realtimeAnswerCountsRef.current.get(counterKey);
           if (
-            row.questionId !== activeQuestionIdRef.current ||
-            typeof row.answerCount !== "number"
+            previousCount === undefined ||
+            counter.answerCount > previousCount
           ) {
-            return;
+            realtimeAnswerCountsRef.current.set(
+              counterKey,
+              counter.answerCount,
+            );
           }
-          const answerCount = row.answerCount;
-          setState((current) => {
-            if (!current || current.question?.id !== row.questionId) {
-              return current;
-            }
-            return { ...current, activeAnswerCount: answerCount };
-          });
+          setState((current) =>
+            current ? mergeLiveQuizAnswerCount(current, counter) : current,
+          );
         },
       )
       .subscribe((status) => {
         if (status === "SUBSCRIBED") {
-          if (hasSubscribed && needsReconnectSync) {
-            void loadState(true);
-          }
+          const shouldReconcile = !hasSubscribed || needsReconnectSync;
           hasSubscribed = true;
           needsReconnectSync = false;
+          if (shouldReconcile) {
+            void loadState(true);
+          }
           return;
         }
         if (
-          hasSubscribed &&
-          (status === "CHANNEL_ERROR" ||
-            status === "TIMED_OUT" ||
-            status === "CLOSED")
+          status === "CHANNEL_ERROR" ||
+          status === "TIMED_OUT" ||
+          status === "CLOSED"
         ) {
           needsReconnectSync = true;
         }

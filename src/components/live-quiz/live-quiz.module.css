@@ -556,16 +556,56 @@
   line-height: 1.55;
 }
 
-.answerCount,
-.pollWarning {
+.answerCount {
   margin: 12px 0 0;
   color: var(--color-text-muted);
   font-size: 0.78rem;
   text-align: center;
 }
 
-.pollWarning {
+.refreshWarning {
+  display: flex;
+  max-width: 640px;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px auto 0;
+  padding: 8px 10px 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 28%, var(--color-border));
+  border-radius: 12px;
   color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 6%, var(--color-surface));
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-align: center;
+}
+
+.refreshWarning button {
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  border-radius: 10px;
+  color: var(--color-danger);
+  background: var(--color-surface);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.refreshWarning button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-danger) 5%, var(--color-surface));
+}
+
+.refreshWarning button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.refreshWarning button:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-danger) 28%, transparent);
+  outline-offset: 2px;
 }
 
 .suggestionLayout {

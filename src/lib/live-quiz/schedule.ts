@@ -57,6 +57,13 @@ export function liveQuizLockAt(dayKey: string): Date {
   );
 }
 
+export function liveQuizSetupNextStartsAt(now: Date, dayKey: string): Date {
+  if (now.getTime() < liveQuizLockAt(dayKey).getTime()) {
+    return liveQuizStartsAt(dayKey);
+  }
+  return liveQuizStartsAt(addKstDays(dayKey, 1));
+}
+
 export function liveQuizRoundDurationMs(): number {
   return (LIVE_QUIZ_ANSWER_SECONDS + LIVE_QUIZ_REVEAL_SECONDS) * 1000;
 }

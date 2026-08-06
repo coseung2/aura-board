@@ -7,7 +7,8 @@ export function getLiveQuizRealtimeClient(): SupabaseClient | null {
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const publishableKey =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim() ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
   if (!url || !publishableKey) {
     client = null;
     return client;

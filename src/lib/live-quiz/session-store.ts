@@ -19,6 +19,7 @@ import {
   kstDayKey,
   liveQuizEndsAt,
   liveQuizLockAt,
+  liveQuizSetupNextStartsAt,
   liveQuizStartsAt,
   liveQuizTimeline,
 } from "./schedule";
@@ -55,7 +56,6 @@ type ScoreRow = {
 type SessionContext = {
   sessionKey: string;
   startsAt: Date;
-  lockAt: Date;
   session: LiveQuizSessionRow | null;
   questionCount: number;
 };
@@ -99,7 +99,6 @@ async function resolveSession(now: Date): Promise<SessionContext> {
     return {
       sessionKey,
       startsAt,
-      lockAt,
       session: existing,
       questionCount: existing.questionCount,
     };
@@ -117,7 +116,7 @@ async function resolveSession(now: Date): Promise<SessionContext> {
     now.getTime() < lockAt.getTime() ||
     questionCount < LIVE_QUIZ_MIN_QUESTIONS
   ) {
-    return { sessionKey, startsAt, lockAt, session: null, questionCount };
+    return { sessionKey, startsAt, session: null, questionCount };
   }
 
   const questionIds = selectSessionQuestionIds(sessionKey, approvedIds);
@@ -139,7 +138,6 @@ async function resolveSession(now: Date): Promise<SessionContext> {
   return {
     sessionKey,
     startsAt,
-    lockAt,
     session,
     questionCount: session.questionCount,
   };
@@ -200,6 +198,7 @@ function emptyState(input: {
   now: Date;
   sessionKey: string;
   startsAt: Date;
+  nextStartsAt?: Date;
   questionCount: number;
   setupReason?: string;
 }): LiveQuizStateResponse {
@@ -210,7 +209,7 @@ function emptyState(input: {
     sessionKey: input.sessionKey,
     startsAt: input.startsAt.toISOString(),
     endsAt: endsAt.toISOString(),
-    nextStartsAt: input.startsAt.toISOString(),
+    nextStartsAt: (input.nextStartsAt ?? input.startsAt).toISOString(),
     questionCount: input.questionCount,
     score: 0,
     answeredCount: 0,
@@ -233,11 +232,13 @@ export async function readLiveQuizState(
 ): Promise<LiveQuizStateResponse> {
   const context = await resolveSession(now);
   if (context.questionCount < LIVE_QUIZ_MIN_QUESTIONS) {
+    const nextStartsAt = liveQuizSetupNextStartsAt(now, context.sessionKey);
     return emptyState({
       phase: "setup",
       now,
       sessionKey: context.sessionKey,
       startsAt: context.startsAt,
+      nextStartsAt,
       questionCount: context.questionCount,
       setupReason: `방송을 시작하려면 승인된 문제가 ${LIVE_QUIZ_MIN_QUESTIONS}개 이상 필요합니다.`,
     });
