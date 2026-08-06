@@ -60,11 +60,15 @@ export function TeacherWithdrawalSection({ email }: Props) {
 
   return (
     <>
-      <section id="withdrawal" className="docs-section settings-section">
-        <div className="settings-section-header">
-          <h2 className="docs-h2">계정 탈퇴</h2>
-        </div>
-        <p className="docs-p">
+      <section id="withdrawal" className="settings-flat-section settings-account-section">
+        <header className="settings-flat-header">
+          <div>
+            <p className="settings-flat-eyebrow">ACCOUNT</p>
+            <h2>계정 탈퇴</h2>
+          </div>
+          <p>계정과 소유 데이터를 영구적으로 삭제합니다.</p>
+        </header>
+        <p className="settings-section-copy">
           탈퇴하면 계정에 포함된 모든 데이터가 영구적으로 삭제되며 복구할 수 없습니다.
         </p>
         <button

@@ -429,6 +429,23 @@
   gap: 12px;
 }
 
+.teacher-play-panel {
+  display: grid;
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+  gap: 32px;
+}
+
+.board-menu-backdrop {
+  position: fixed;
+  z-index: 1;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: default;
+}
+
 /* -------- Board Grid (Dashboard) -------- */
 
 .board-grid {

@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
-import { DEFAULT_AGENT_SYSTEM_PROMPT, streamDeepSeek } from "@/lib/agent/stream-deepseek";
+import { DEFAULT_AGENT_SYSTEM_PROMPT } from "@/lib/agent/stream-deepseek";
 import { AGENT_MODES, type AgentMode } from "@/lib/agent/types";
-import { decryptApiKey } from "@/lib/llm/encryption";
+import { getTeacherKeyForClassroom } from "@/lib/llm/teacher-key";
+import { streamLlm } from "@/lib/llm/stream";
 
 const SendSchema = z.object({
   content: z.string().min(1).max(4000),
@@ -19,25 +20,6 @@ const MODE_PROMPTS: Record<AgentMode, string> = {
   lesson:
     "모드: 수업. 선생님이 준비한 수업 자료를 학생이 따라갈 수 있도록 차근차근 안내하세요.",
 };
-
-async function getTeacherApiKey(classroomId: string): Promise<string | null> {
-  try {
-    const classroom = await db.classroom.findUnique({
-      where: { id: classroomId },
-      select: { teacherId: true },
-    });
-    if (!classroom) return null;
-
-    const llmKey = await db.teacherLlmKey.findUnique({
-      where: { userId: classroom.teacherId },
-    });
-    if (!llmKey?.apiKeyEnc) return null;
-
-    return decryptApiKey(llmKey.apiKeyEnc);
-  } catch {
-    return null;
-  }
-}
 
 function extractAgentJsonParts(jsonText: string) {
   try {
@@ -89,7 +71,7 @@ export async function POST(
     },
   });
 
-  const apiKey = await getTeacherApiKey(session.classroomId);
+  const llm = await getTeacherKeyForClassroom(session.classroomId, "agent");
   const priorMessages = await db.agentMessage.findMany({
     where: { sessionId: session.id },
     orderBy: { createdAt: "asc" },
@@ -120,28 +102,49 @@ export async function POST(
       let totalTokensOut = 0;
 
       try {
-        const result = await streamDeepSeek({
-          apiKey: apiKey ?? "",
+        if (!llm) {
+          send({
+            type: "error",
+            message: "선생님이 AI 학습 도우미용 모델과 API 키를 먼저 연결해야 해요.",
+          });
+          return;
+        }
+
+        const result = await streamLlm({
+          provider: llm.provider,
+          apiKey: llm.apiKey,
+          baseUrl: llm.baseUrl,
+          modelId: llm.modelId,
           systemPrompt,
           messages: priorMessages.map((message) => ({
             role: message.role as "user" | "assistant",
             content: message.content,
           })),
+          studentId: student.id,
+          classroomId: session.classroomId,
+          perStudentDailyTokenCap: null,
+          classroomDailyTokenPool: 0,
+          trackUsageLedger: false,
+          jsonMode: true,
           onDelta: (text) => {
             fullContent += text;
             send({ type: "delta", text });
           },
-          signal: req.signal,
+          onTokensUpdate: () => undefined,
+          onRefusal: () => send({ type: "refusal" }),
         });
 
         totalTokensIn = result.tokensIn;
         totalTokensOut = result.tokensOut;
 
         if (result.stopReason === "error" && !fullContent) {
-          send({ type: "error", message: result.content });
+          send({
+            type: "error",
+            message: result.errorMessage ?? "AI 응답을 생성하지 못했어요.",
+          });
         }
 
-        const sourceContent = fullContent || result.content;
+        const sourceContent = fullContent || result.finalContent;
         const extractedParts = extractAgentJsonParts(sourceContent);
         const finalParts =
           !extractedParts.message && !extractedParts.code && sourceContent

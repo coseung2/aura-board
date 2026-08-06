@@ -5,11 +5,23 @@
 
 .heading {
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--color-border);
+}
+
+.headingCopy {
+  display: grid;
+  gap: 4px;
+}
+
+.headingCopy p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .title {
@@ -35,6 +47,121 @@
   text-decoration: none;
 }
 
+.liveFeature {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  padding: 22px 24px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 90% 10%, color-mix(in srgb, var(--color-accent) 18%, transparent), transparent 34%),
+    linear-gradient(135deg, var(--color-surface), var(--color-surface-alt));
+}
+
+.liveFeatureCopy {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.liveFeatureCopy p,
+.liveFeatureCopy h3,
+.liveFeatureCopy span {
+  margin: 0;
+}
+
+.liveFeatureCopy p {
+  margin-bottom: 4px;
+  color: var(--color-accent);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.liveFeatureCopy h3 {
+  color: var(--color-text);
+  font-size: clamp(1.2rem, 2.3vw, 1.7rem);
+  line-height: 1.25;
+}
+
+.liveFeatureCopy div > span {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.liveFeatureBadge {
+  display: inline-flex;
+  min-height: 34px;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #fff;
+  background: #e23a4f;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.classroomField {
+  display: grid;
+  min-width: min(260px, 100%);
+  gap: 6px;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.classroomField > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.classroomField select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0 36px 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  font-weight: 700;
+}
+
+.classroomField select:focus-visible,
+.recordsLink:focus-visible,
+.liveFeatureButton:focus-visible,
+.entryButton:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-accent) 32%, transparent);
+  outline-offset: 2px;
+}
+
+.liveFeatureButton {
+  display: inline-flex;
+  min-height: 46px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-btn);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -47,6 +174,7 @@
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--color-border);
+  border-radius: 14px;
   background: var(--color-surface);
 }
 
@@ -64,8 +192,10 @@
 
 .body {
   display: grid;
-  gap: 12px;
-  padding: 12px;
+  min-height: 178px;
+  grid-template-rows: 1fr auto;
+  gap: 14px;
+  padding: 14px;
 }
 
 .cardTitle {
@@ -73,6 +203,31 @@
   color: var(--color-text);
   font-size: 1rem;
   line-height: 1.3;
+}
+
+.cardDescription {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.cardFooter {
+  display: grid;
+  gap: 9px;
+}
+
+.statusLabel {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 26px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+  font-size: 0.72rem;
+  font-weight: 800;
 }
 
 .entryButton {
@@ -92,8 +247,18 @@
 }
 
 .entryButton:disabled {
-  cursor: wait;
-  opacity: 0.68;
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
+.emptyState {
+  padding: 14px 16px;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+  font-size: 0.9rem;
+  line-height: 1.55;
 }
 
 .error {
@@ -113,6 +278,30 @@
 }
 
 @media (max-width: 640px) {
+  .heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .classroomField,
+  .recordsLink {
+    width: 100%;
+  }
+
+  .liveFeature {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .liveFeatureCopy {
+    gap: 12px;
+  }
+
+  .liveFeatureButton {
+    width: 100%;
+  }
+
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

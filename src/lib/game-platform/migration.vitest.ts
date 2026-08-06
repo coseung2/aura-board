@@ -13,6 +13,17 @@ const migration = readFileSync(
   "utf8",
 );
 
+const legacyRoomCleanupMigration = readFileSync(
+  join(
+    process.cwd(),
+    "prisma",
+    "migrations",
+    "20260806205500_remove_legacy_official_game_rooms",
+    "migration.sql",
+  ),
+  "utf8",
+);
+
 describe("game UI platform migration", () => {
   it("normalizes and constrains the official five PLAY layouts", () => {
     for (const layout of [
@@ -33,6 +44,23 @@ describe("game UI platform migration", () => {
     expect(migration).toContain('CONSTRAINT "Board_system_game_kind_check"');
     expect(migration).toContain('"systemGameKind" = "layout"');
     expect(migration).toContain('UNIQUE INDEX "Board_classroomId_systemGameKind_key"');
+  });
+
+  it("deletes only teacher-authored legacy official game rooms", () => {
+    expect(legacyRoomCleanupMigration).toContain('DELETE FROM public."Board"');
+    expect(legacyRoomCleanupMigration).toContain('"systemGameKind" IS NULL');
+    for (const layout of [
+      "kordle",
+      "speed-game",
+      "shadow-alliance",
+      "omok",
+      "song-guess",
+    ]) {
+      expect(legacyRoomCleanupMigration).toContain(`'${layout}'`);
+    }
+    for (const preservedLayout of ["quiz", "dj-queue", "columns", "stream"]) {
+      expect(legacyRoomCleanupMigration).not.toContain(`'${preservedLayout}'`);
+    }
   });
 
   it("adds append-only result identity and deterministic pagination indexes", () => {

@@ -27,21 +27,12 @@ export type QuizData = {
 };
 
 type Props = { boardId: string; quizzes: QuizData[] };
-type LLMSettings = {
-  provider: "openai" | "anthropic" | "gemini";
-  apiKey: string;
-};
 
 const OPT_COLORS = ["#e21b3c", "#1368ce", "#d89e00", "#26890c"];
 const OPT_LABELS = ["A", "B", "C", "D"];
 
 export function QuizBoard({ boardId, quizzes: initial }: Props) {
   const [quizzes, setQuizzes] = useState<QuizData[]>(initial);
-  const [showLLM, setShowLLM] = useState(false);
-  const [llm, setLlm] = useState<LLMSettings>({
-    provider: "openai",
-    apiKey: "",
-  });
   const [showGenerate, setShowGenerate] = useState(false);
   const [showReport, setShowReport] = useState(false);
   const [editing, setEditing] = useState<QuizDraftQuestion[] | null>(null);
@@ -76,23 +67,6 @@ export function QuizBoard({ boardId, quizzes: initial }: Props) {
     quizId: quiz?.id ?? null,
     onSnapshot: applySnapshot,
   });
-
-  useEffect(() => {
-    const pm = document.cookie.match(/llm_provider=([^;]+)/);
-    const km = document.cookie.match(/llm_api_key=([^;]+)/);
-    if (pm || km) {
-      setLlm({
-        provider: (pm?.[1] as LLMSettings["provider"]) ?? "openai",
-        apiKey: km ? decodeURIComponent(km[1]) : "",
-      });
-    }
-  }, []);
-
-  function saveLLM(settings: LLMSettings) {
-    setLlm(settings);
-    document.cookie = `llm_provider=${settings.provider};path=/;max-age=31536000;SameSite=Lax`;
-    document.cookie = `llm_api_key=${encodeURIComponent(settings.apiKey)};path=/;max-age=31536000;SameSite=Lax`;
-  }
 
   function handleCreated(nq: { id: string } & Record<string, unknown>) {
     const answerToIndex: Record<string, number> = {
@@ -203,38 +177,24 @@ export function QuizBoard({ boardId, quizzes: initial }: Props) {
             <div className="quiz-empty-icon">📄</div>
             <div className="quiz-empty-title">아직 만들어진 퀴즈가 없습니다</div>
             <div className="quiz-actions">
-              <button
-                type="button"
+              <a
                 className="quiz-btn quiz-btn-secondary"
-                onClick={() => setShowLLM(true)}
+                href="/teacher/settings#llm"
               >
-                LLM 설정
-              </button>
+                AI 설정
+              </a>
               <button
                 type="button"
                 className="quiz-btn quiz-btn-primary"
                 onClick={() => setShowGenerate(true)}
-                disabled={!llm.apiKey}
               >
                 + 퀴즈 만들기
               </button>
             </div>
-            {!llm.apiKey && (
-              <div className="quiz-empty-hint">
-                먼저 LLM 설정에서 API 키를 저장하세요.
-              </div>
-            )}
+            <div className="quiz-empty-hint">
+              퀴즈 생성 모델과 API 키는 교사 설정에서 관리합니다.
+            </div>
           </div>
-          {showLLM && (
-            <LLMModal
-              settings={llm}
-              onSave={(settings) => {
-                saveLLM(settings);
-                setShowLLM(false);
-              }}
-              onClose={() => setShowLLM(false)}
-            />
-          )}
           {showGenerate && (
             <QuizGenerateModal
               boardId={boardId}
@@ -512,85 +472,6 @@ function Leaderboard({
         ))}
       </div>
     </div>
-  );
-}
-
-function LLMModal({
-  settings,
-  onSave,
-  onClose,
-}: {
-  settings: LLMSettings;
-  onSave: (settings: LLMSettings) => void;
-  onClose: () => void;
-}) {
-  const [provider, setProvider] = useState(settings.provider);
-  const [apiKey, setApiKey] = useState(settings.apiKey);
-  return (
-    <>
-      <div className="modal-backdrop" onClick={onClose} />
-      <div className="add-card-modal llm-settings-modal">
-        <div className="modal-header">
-          <h2 className="modal-title">LLM 설정</h2>
-          <button
-            type="button"
-            className="modal-close"
-            onClick={onClose}
-          >
-            ×
-          </button>
-        </div>
-        <div className="modal-body">
-          <div className="llm-settings-field">
-            <label className="llm-settings-label">AI 제공자</label>
-            <select
-              className="modal-select"
-              value={provider}
-              onChange={(event) =>
-                setProvider(event.target.value as LLMSettings["provider"])
-              }
-            >
-              <option value="openai">OpenAI</option>
-              <option value="anthropic">Anthropic</option>
-              <option value="gemini">Google Gemini</option>
-            </select>
-          </div>
-          <div className="llm-settings-field">
-            <label className="llm-settings-label">API Key</label>
-            <input
-              className="modal-input"
-              type="password"
-              placeholder={
-                provider === "openai"
-                  ? "sk-..."
-                  : provider === "anthropic"
-                    ? "sk-ant-..."
-                    : "AIza..."
-              }
-              value={apiKey}
-              onChange={(event) => setApiKey(event.target.value)}
-            />
-          </div>
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="modal-btn-cancel"
-              onClick={onClose}
-            >
-              취소
-            </button>
-            <button
-              type="button"
-              className="modal-btn-submit"
-              disabled={!apiKey.trim()}
-              onClick={() => onSave({ provider, apiKey })}
-            >
-              저장
-            </button>
-          </div>
-        </div>
-      </div>
-    </>
   );
 }
 

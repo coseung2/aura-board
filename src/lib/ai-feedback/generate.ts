@@ -7,8 +7,8 @@ import type { LlmProvider } from "../llm/stream";
 
 const MODELS: Record<Exclude<LlmProvider, "ollama">, string> = {
   claude: process.env.CLAUDE_MODEL_ID ?? "claude-sonnet-4-5",
-  openai: process.env.OPENAI_MODEL_ID ?? "gpt-4o-mini",
-  gemini: process.env.GEMINI_MODEL_ID ?? "gemini-2.5-flash",
+  openai: process.env.OPENAI_MODEL_ID ?? "gpt-5.6-terra",
+  gemini: process.env.GEMINI_MODEL_ID ?? "gemini-3.6-flash",
   "opencode-go": process.env.OPENCODE_MODEL_ID ?? "deepseek-v4-flash",
 };
 
@@ -16,6 +16,16 @@ const MODELS: Record<Exclude<LlmProvider, "ollama">, string> = {
 // 토큰을 먼저 소비하면 본문 자리가 모자라 잘리는 사고가 났다. 여유 있게 잡아도
 // 호출당 비용은 출력 토큰 기준 < $0.0002 수준이라 무시 가능. (2026-04-24)
 const MAX_OUTPUT_TOKENS = 1024;
+
+function geminiThinkingConfig(model: string) {
+  if (model.startsWith("gemini-3")) {
+    return { thinkingLevel: "minimal" } as const;
+  }
+  if (model.startsWith("gemini-2.5-flash")) {
+    return { thinkingBudget: 0 } as const;
+  }
+  return null;
+}
 
 export type FeedbackImage = {
   /** raw bytes base64 인코딩 (data: prefix 없이). */
@@ -27,8 +37,9 @@ export type FeedbackImage = {
 export type GenerateFeedbackArgs = {
   provider: LlmProvider;
   apiKey: string;
-  baseUrl?: string | null; // ollama only
-  modelId?: string | null; // ollama only
+  baseUrl?: string | null;
+  /** Feature-specific model selected in teacher settings. */
+  modelId?: string | null;
   systemPrompt: string;
   userPrompt: string;
   /** 학생 작품 이미지. 비전 지원 provider(Gemini)만 사용. 그 외는 무시. */
@@ -71,8 +82,9 @@ async function callClaude(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
         }>;
       };
     })({ apiKey: args.apiKey });
+    const model = args.modelId ?? MODELS.claude;
     const res = await client.messages.create({
-      model: MODELS.claude,
+      model,
       max_tokens: MAX_OUTPUT_TOKENS,
       system: args.systemPrompt,
       messages: [{ role: "user", content: args.userPrompt }],
@@ -82,7 +94,7 @@ async function callClaude(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
       .map((b) => b.text ?? "")
       .join("")
       .trim();
-    return { ok: true, text, model: MODELS.claude };
+    return { ok: true, text, model };
   } catch (err) {
     return { ok: false, error: String((err as Error).message) };
   }
@@ -90,6 +102,7 @@ async function callClaude(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
 
 async function callOpenAI(args: GenerateFeedbackArgs): Promise<GenerateFeedbackResult> {
   try {
+    const model = args.modelId ?? MODELS.openai;
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -97,8 +110,8 @@ async function callOpenAI(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: MODELS.openai,
-        max_tokens: MAX_OUTPUT_TOKENS,
+        model,
+        max_completion_tokens: MAX_OUTPUT_TOKENS,
         messages: [
           { role: "system", content: args.systemPrompt },
           { role: "user", content: args.userPrompt },
@@ -113,7 +126,7 @@ async function callOpenAI(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
       choices?: Array<{ message?: { content?: string } }>;
     };
     const text = (data.choices?.[0]?.message?.content ?? "").trim();
-    return { ok: true, text, model: MODELS.openai };
+    return { ok: true, text, model };
   } catch (err) {
     return { ok: false, error: String((err as Error).message) };
   }
@@ -121,9 +134,11 @@ async function callOpenAI(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
 
 async function callGemini(args: GenerateFeedbackArgs): Promise<GenerateFeedbackResult> {
   try {
+    const model = args.modelId ?? MODELS.gemini;
     const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODELS.gemini)}:generateContent` +
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent` +
       `?key=${encodeURIComponent(args.apiKey)}`;
+    const thinkingConfig = geminiThinkingConfig(model);
     const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -149,10 +164,7 @@ async function callGemini(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
         ],
         generationConfig: {
           maxOutputTokens: MAX_OUTPUT_TOKENS,
-          // Gemini 2.5 Flash 의 thinking 토큰이 maxOutputTokens 한도를 잠식해
-          // 본문이 잘리는 회귀를 차단. 평어는 chain-of-thought 가 필요한 작업이
-          // 아니라 thinking 비활성이 안전.
-          thinkingConfig: { thinkingBudget: 0 },
+          ...(thinkingConfig ? { thinkingConfig } : {}),
         },
       }),
     });
@@ -167,7 +179,7 @@ async function callGemini(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
       .map((p) => p.text ?? "")
       .join("")
       .trim();
-    return { ok: true, text, model: MODELS.gemini };
+    return { ok: true, text, model };
   } catch (err) {
     return { ok: false, error: String((err as Error).message) };
   }

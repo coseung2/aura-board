@@ -25,9 +25,13 @@ export type LlmStreamArgs = {
   onDelta: (delta: string) => void;
   onTokensUpdate: (tokensIn: number, tokensOut: number) => void;
   onRefusal: () => void;
-  // Ollama uses an OpenAI-compatible base URL plus a teacher-selected model.
+  // Feature-specific endpoint/model selected in teacher settings.
   baseUrl?: string | null;
   modelId?: string | null;
+  /** Vibe Arcade tracks classroom/student quota; other AI surfaces opt out. */
+  trackUsageLedger?: boolean;
+  /** Ask compatible providers to return one JSON object. */
+  jsonMode?: boolean;
 };
 
 export type LlmStreamResult = {
@@ -54,11 +58,26 @@ export const DEFAULT_SYSTEM_PROMPT = `당신은 한국 초중등 학생을 돕�
 
 const MODELS: Record<Exclude<LlmProvider, "ollama">, string> = {
   claude: process.env.CLAUDE_MODEL_ID ?? "claude-sonnet-4-5",
-  openai: process.env.OPENAI_MODEL_ID ?? "gpt-4o-mini",
-  gemini: process.env.GEMINI_MODEL_ID ?? "gemini-2.5-flash",
-  "opencode-go": process.env.OPENCODE_MODEL_ID ?? "opencode/deepseek-v4-flash-free",
+  openai: process.env.OPENAI_MODEL_ID ?? "gpt-5.6-terra",
+  gemini: process.env.GEMINI_MODEL_ID ?? "gemini-3.6-flash",
+  "opencode-go": process.env.OPENCODE_MODEL_ID ?? "deepseek-v4-flash",
 };
 // Ollama uses the teacher-provided modelId instead of MODELS.
+
+async function recordUsageLedger(
+  args: LlmStreamArgs,
+  tokensIn: number,
+  tokensOut: number,
+) {
+  if (args.trackUsageLedger === false) return;
+  await incrementLedger({
+    classroomId: args.classroomId,
+    studentId: args.studentId,
+    tokensIn,
+    tokensOut,
+    newSession: true,
+  });
+}
 
 /** Dispatch to the right provider adapter. */
 export async function streamLlm(args: LlmStreamArgs): Promise<LlmStreamResult> {
@@ -112,7 +131,7 @@ async function streamClaude(args: LlmStreamArgs): Promise<LlmStreamResult> {
     })({ apiKey: args.apiKey });
 
     const stream = client.messages.stream({
-      model: MODELS.claude,
+      model: args.modelId ?? MODELS.claude,
       max_tokens: 4096,
       system: args.systemPrompt,
       messages: args.messages,
@@ -139,13 +158,7 @@ async function streamClaude(args: LlmStreamArgs): Promise<LlmStreamResult> {
       return { stopReason: "refusal", finalContent, tokensIn, tokensOut };
     }
 
-    await incrementLedger({
-      classroomId: args.classroomId,
-      studentId: args.studentId,
-      tokensIn,
-      tokensOut,
-      newSession: true,
-    });
+    await recordUsageLedger(args, tokensIn, tokensOut);
 
     return {
       stopReason: final.stop_reason === "max_tokens" ? "max_tokens" : "end_turn",
@@ -179,10 +192,11 @@ async function streamOpenAI(args: LlmStreamArgs): Promise<LlmStreamResult> {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: MODELS.openai,
+        model: args.modelId ?? MODELS.openai,
         stream: true,
         stream_options: { include_usage: true },
-        max_tokens: 4096,
+        max_completion_tokens: 4096,
+        ...(args.jsonMode ? { response_format: { type: "json_object" } } : {}),
         messages: [
           { role: "system", content: args.systemPrompt },
           ...args.messages.map((m) => ({ role: m.role, content: m.content })),
@@ -241,13 +255,7 @@ async function streamOpenAI(args: LlmStreamArgs): Promise<LlmStreamResult> {
       }
     }
 
-    await incrementLedger({
-      classroomId: args.classroomId,
-      studentId: args.studentId,
-      tokensIn,
-      tokensOut,
-      newSession: true,
-    });
+    await recordUsageLedger(args, tokensIn, tokensOut);
 
     return { stopReason, finalContent, tokensIn, tokensOut };
   } catch (err) {
@@ -275,7 +283,7 @@ async function streamGemini(args: LlmStreamArgs): Promise<LlmStreamResult> {
     }));
 
     const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(MODELS.gemini)}:streamGenerateContent` +
+      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(args.modelId ?? MODELS.gemini)}:streamGenerateContent` +
       `?alt=sse&key=${encodeURIComponent(args.apiKey)}`;
 
     const res = await fetch(url, {
@@ -284,7 +292,10 @@ async function streamGemini(args: LlmStreamArgs): Promise<LlmStreamResult> {
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: args.systemPrompt }] },
         contents,
-        generationConfig: { maxOutputTokens: 4096 },
+        generationConfig: {
+          maxOutputTokens: 4096,
+          ...(args.jsonMode ? { responseMimeType: "application/json" } : {}),
+        },
       }),
     });
 
@@ -349,13 +360,7 @@ async function streamGemini(args: LlmStreamArgs): Promise<LlmStreamResult> {
     }
 
     if (stopReason !== "refusal") {
-      await incrementLedger({
-        classroomId: args.classroomId,
-        studentId: args.studentId,
-        tokensIn,
-        tokensOut,
-        newSession: true,
-      });
+      await recordUsageLedger(args, tokensIn, tokensOut);
     }
 
     return { stopReason, finalContent, tokensIn, tokensOut };
@@ -465,13 +470,7 @@ async function streamOllama(args: LlmStreamArgs): Promise<LlmStreamResult> {
       args.onTokensUpdate(tokensIn, tokensOut);
     }
 
-    await incrementLedger({
-      classroomId: args.classroomId,
-      studentId: args.studentId,
-      tokensIn,
-      tokensOut,
-      newSession: true,
-    });
+    await recordUsageLedger(args, tokensIn, tokensOut);
 
     return { stopReason, finalContent, tokensIn, tokensOut };
   } catch (err) {
@@ -506,6 +505,7 @@ async function streamOpencodeGo(args: LlmStreamArgs): Promise<LlmStreamResult> {
         stream: true,
         stream_options: { include_usage: true },
         max_tokens: 4096,
+        ...(args.jsonMode ? { response_format: { type: "json_object" } } : {}),
         messages: [
           { role: "system", content: args.systemPrompt },
           ...args.messages.map((m) => ({ role: m.role, content: m.content })),
@@ -564,13 +564,7 @@ async function streamOpencodeGo(args: LlmStreamArgs): Promise<LlmStreamResult> {
       }
     }
 
-    await incrementLedger({
-      classroomId: args.classroomId,
-      studentId: args.studentId,
-      tokensIn,
-      tokensOut,
-      newSession: true,
-    });
+    await recordUsageLedger(args, tokensIn, tokensOut);
 
     return { stopReason, finalContent, tokensIn, tokensOut };
   } catch (err) {

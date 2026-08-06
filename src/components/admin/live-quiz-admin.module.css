@@ -1,0 +1,434 @@
+.stack {
+  display: grid;
+  gap: 24px;
+  margin-top: 24px;
+}
+
+.section {
+  padding: 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  background: var(--color-surface);
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.sectionHeading p {
+  margin: 0 0 4px;
+  color: var(--color-accent);
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.sectionHeading h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 1.35rem;
+}
+
+.sectionHeading > span {
+  max-width: 440px;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  text-align: right;
+}
+
+.planner {
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-accent) 7%, transparent), transparent 52%),
+    var(--color-surface);
+}
+
+.editor,
+.editorCompact {
+  display: grid;
+  gap: 14px;
+}
+
+.editorTopRow {
+  display: grid;
+  grid-template-columns: minmax(150px, 0.28fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.editor label,
+.editorCompact label,
+.noteField {
+  display: grid;
+  gap: 6px;
+}
+
+.editor label > span,
+.editorCompact label > span,
+.noteField > span,
+.choiceFields legend {
+  color: var(--color-text);
+  font-size: 0.8rem;
+  font-weight: 850;
+}
+
+.editor input,
+.editor textarea,
+.editorCompact input,
+.editorCompact textarea,
+.noteField textarea,
+.choiceFields > div > input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  outline: none;
+}
+
+.editor input,
+.editorCompact input,
+.choiceFields > div > input {
+  min-height: 42px;
+  padding: 0 11px;
+}
+
+.editor textarea,
+.editorCompact textarea,
+.noteField textarea {
+  resize: vertical;
+  padding: 10px 11px;
+  line-height: 1.5;
+}
+
+.editor input:focus,
+.editor textarea:focus,
+.editorCompact input:focus,
+.editorCompact textarea:focus,
+.noteField textarea:focus,
+.choiceFields > div > input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 13%, transparent);
+}
+
+.choiceFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choiceFields legend {
+  grid-column: 1 / -1;
+  margin-bottom: 2px;
+}
+
+.choiceFields > div {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.answerRadio {
+  position: relative;
+  display: grid !important;
+  min-height: 42px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-alt);
+  cursor: pointer;
+}
+
+.answerRadio input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.answerRadio span {
+  font-size: 0.82rem !important;
+  font-weight: 950 !important;
+}
+
+.answerRadio:has(input:checked) {
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.answerRadio:has(input:checked) span {
+  color: var(--color-on-accent);
+}
+
+.formActions,
+.reviewActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.primaryButton,
+.dangerButton,
+.approvedActions button {
+  min-height: 42px;
+  padding: 0 15px;
+  border-radius: var(--radius-btn);
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.primaryButton {
+  border: 1px solid var(--color-accent);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.dangerButton {
+  border: 1px solid color-mix(in srgb, var(--color-danger) 52%, var(--color-border));
+  color: var(--color-danger);
+  background: transparent;
+}
+
+.primaryButton:disabled,
+.dangerButton:disabled,
+.approvedActions button:disabled {
+  cursor: wait;
+  opacity: 0.62;
+}
+
+.success,
+.error {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.success {
+  color: #15803d;
+}
+
+.error {
+  color: var(--color-danger);
+}
+
+.empty {
+  display: grid;
+  min-height: 130px;
+  place-items: center;
+  border: 1px dashed var(--color-border);
+  border-radius: 14px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.reviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.reviewCard {
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface-alt);
+}
+
+.reviewMeta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.reviewMeta > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.reviewMeta span,
+.sourceChip {
+  display: inline-flex;
+  min-height: 24px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.reviewMeta strong {
+  color: var(--color-text);
+  font-size: 0.88rem;
+}
+
+.reviewMeta small,
+.reviewMeta time {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.editorCompact .editorTopRow,
+.editorCompact .choiceFields {
+  grid-template-columns: 1fr;
+}
+
+.editorCompact .choiceFields > div {
+  grid-column: 1;
+}
+
+.noteField {
+  margin-top: 14px;
+}
+
+.approvedList {
+  display: grid;
+  gap: 10px;
+}
+
+.approvedCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--color-border);
+  border-radius: 15px;
+  background: var(--color-surface-alt);
+}
+
+.approvedMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 7px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.approvedBody h3 {
+  margin: 10px 0;
+  color: var(--color-text);
+  font-size: 1.02rem;
+  line-height: 1.45;
+}
+
+.approvedBody ol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.approvedBody li {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  font-size: 0.82rem;
+}
+
+.approvedBody li span {
+  display: grid;
+  width: 23px;
+  height: 23px;
+  flex: none;
+  place-items: center;
+  border-radius: 7px;
+  background: var(--color-surface-alt);
+  font-size: 0.68rem;
+  font-weight: 900;
+}
+
+.approvedBody .correctChoice {
+  border-color: rgba(22, 163, 74, 0.38);
+  color: #166534;
+  background: rgba(22, 163, 74, 0.07);
+}
+
+.approvedBody .correctChoice span {
+  color: #fff;
+  background: #16a34a;
+}
+
+.approvedBody > p {
+  margin: 10px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.approvedActions {
+  display: grid;
+  min-width: 88px;
+  align-content: start;
+  gap: 8px;
+}
+
+.approvedActions button {
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+}
+
+@media (max-width: 960px) {
+  .reviewGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .section {
+    padding: 18px;
+  }
+
+  .sectionHeading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .sectionHeading > span {
+    text-align: left;
+  }
+
+  .editorTopRow,
+  .choiceFields,
+  .approvedBody ol {
+    grid-template-columns: 1fr;
+  }
+
+  .approvedCard {
+    grid-template-columns: 1fr;
+  }
+
+  .approvedActions {
+    grid-template-columns: auto 1fr;
+  }
+}
+
+.promptField,
+.explanationField {
+  min-width: 0;
+}

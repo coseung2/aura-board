@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { resolveIdentities } from "@/lib/identity";
 import { canAddCardToBoard } from "@/lib/card-permissions";
 import { generateQuizFromText, type QuizCountSpec } from "@/lib/quiz-llm";
+import { getTeacherKeyForBoard } from "@/lib/llm/teacher-key";
 import type { QuizDifficulty } from "@/types/quiz";
 
 const VALID_DIFFICULTIES: readonly QuizDifficulty[] = ["easy", "medium", "hard"];
@@ -56,15 +57,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
 
-    const cookies = req.headers.get("cookie") ?? "";
-    const providerMatch = cookies.match(/llm_provider=([^;]+)/);
-    const keyMatch = cookies.match(/llm_api_key=([^;]+)/);
-    const provider = (providerMatch?.[1] ?? "openai") as "openai" | "anthropic" | "gemini";
-    const apiKey = keyMatch?.[1] ? decodeURIComponent(keyMatch[1]) : "";
-    if (!apiKey) {
+    const llm = await getTeacherKeyForBoard(boardId, "quiz");
+    if (!llm) {
       return NextResponse.json(
-        { error: "llm_not_configured", message: "LLM API 키를 먼저 설정해주세요." },
-        { status: 400 }
+        {
+          error: "llm_not_configured",
+          message: "교사 설정에서 퀴즈 생성용 AI와 API 키를 연결해주세요.",
+        },
+        { status: 400 },
       );
     }
 
@@ -91,10 +91,9 @@ export async function POST(req: Request) {
 
     const questions = await generateQuizFromText(
       text,
-      apiKey,
+      llm,
       countSpec,
-      provider,
-      difficulty
+      difficulty,
     );
 
     if (questions.length === 0) {
