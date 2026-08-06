@@ -4422,9 +4422,9 @@ model CleaningDuty {
 // Reading log / reading champion (2026-07-02)
 // 학생이 아침 읽기 활동으로 제출한 한 줄 독후감/메타. bookType 은 'comic' | 'story'
 // 문자열만 받는다. enum 확장은 프론트 입력 옵션이 안정된 뒤 별도 PR 로 다룬다.
-// aiScore / aiFeedback / evaluatedAt 은 LLM 또는 결정적 placeholder 채점기 결과.
-// 채점기는 src/lib/reading-evaluator.ts 에 격리되어 있어 추후 실제 LLM 으로 교체
-// 가능. morning-summary 의 readingChampions 집계는 aiScore 의 단순 합 (v1).
+// aiScore / aiFeedback / evaluatedAt 은 Gemma 독서 평가 결과.
+// 기록은 먼저 저장하고 별도 평가 API가 상태를 pending → processing → generated/failed
+// 로 갱신한다. morning-summary 의 readingChampions 집계는 aiScore 의 단순 합 (v1).
 model ReadingLog {
   id          String    @id @default(cuid())
   classroomId String
@@ -4434,10 +4434,13 @@ model ReadingLog {
   title       String
   author      String
   reflection  String    @db.Text
-  aiScore     Int?
-  aiFeedback  String?   @db.Text
-  evaluatedAt DateTime?
-  createdAt   DateTime  @default(now())
+  aiScore          Int?
+  aiFeedback       String?   @db.Text
+  aiFeedbackStatus String    @default("pending")
+  aiFeedbackModel  String?
+  aiFeedbackError  String?
+  evaluatedAt      DateTime?
+  createdAt        DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)

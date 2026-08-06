@@ -154,6 +154,21 @@ export function limitLlmKeyMutation(userId: string): Promise<LimitVerdict> {
   return runLimit("rl:llm-key", userId, 10, "60 s");
 }
 
+/**
+ * 독서 Gemma 평가 — 무료 프로젝트 쿼터를 교실 전체가 한꺼번에 소진하지 않도록
+ * 담임 기준 분당 12회, 학생 기준 분당 3회로 이중 제한한다.
+ */
+export async function limitReadingFeedback(
+  teacherId: string,
+  studentId: string,
+): Promise<LimitVerdict> {
+  const [teacher, student] = await Promise.all([
+    runLimit("rl:reading-feedback:teacher", teacherId, 12, "60 s"),
+    runLimit("rl:reading-feedback:student", studentId, 3, "60 s"),
+  ]);
+  return teacher.ok ? student : teacher;
+}
+
 /** 교사 1인의 결제 시작(checkout) — 분당 10회. */
 export function limitBillingCheckout(userId: string): Promise<LimitVerdict> {
   return runLimit("rl:billing-checkout", userId, 10, "60 s");

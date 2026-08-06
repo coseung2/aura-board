@@ -124,14 +124,21 @@ type ReadingWeeklyMissionReward = {
   claimableAmount?: number;
   missions: ReadingMission[];
 };
-type ReadingEntry = {
+type ReadingFeedbackStatus = "pending" | "processing" | "generated" | "failed";
+type ReadingEvaluationFields = {
+  aiScore: number | null;
+  aiFeedback: string | null;
+  aiFeedbackStatus: ReadingFeedbackStatus;
+  aiFeedbackModel: string | null;
+  aiFeedbackError: string | null;
+  evaluatedAt: string | null;
+};
+type ReadingEntry = ReadingEvaluationFields & {
   id: string;
   bookType: BookType;
   title: string;
   author: string;
   reflection: string;
-  aiScore: number | null;
-  aiFeedback: string | null;
   createdAt: string;
 };
 
@@ -364,6 +371,42 @@ export default function StudentReadingScreen() {
     }
   }, [activeTab, attendanceReward, loadMission, missionLoading]);
 
+  const requestFeedback = useCallback(async (readingLogId: string) => {
+    setEntries((current) =>
+      current.map((entry) =>
+        entry.id === readingLogId
+          ? { ...entry, aiFeedbackStatus: "processing", aiFeedbackError: null }
+          : entry,
+      ),
+    );
+    try {
+      const payload = await apiFetch<{ evaluation: ReadingEvaluationFields }>(
+        `/api/student/reading/${encodeURIComponent(readingLogId)}/feedback`,
+        { method: "POST" },
+      );
+      setEntries((current) =>
+        current.map((entry) =>
+          entry.id === readingLogId ? { ...entry, ...payload.evaluation } : entry,
+        ),
+      );
+      setNotice("AI 피드백이 완성되었어요.");
+      void load(true);
+    } catch (nextError) {
+      if (await handleError(nextError)) return;
+      const message =
+        nextError instanceof ApiError && typeof nextError.message === "string"
+          ? nextError.message
+          : "AI 피드백을 만들지 못했어요.";
+      setEntries((current) =>
+        current.map((entry) =>
+          entry.id === readingLogId
+            ? { ...entry, aiFeedbackStatus: "failed", aiFeedbackError: message }
+            : entry,
+        ),
+      );
+    }
+  }, [handleError, load]);
+
   async function save() {
     if (!title.trim() || !author.trim() || !reflection.trim()) {
       setError("책 제목, 지은이, 독서 감상을 모두 입력해 주세요.");
@@ -382,11 +425,9 @@ export default function StudentReadingScreen() {
       setTitle("");
       setAuthor("");
       setReflection("");
-      setNotice("저장했어요.");
+      setNotice("저장했어요. AI 피드백을 만들고 있어요.");
       setComposerVisible(false);
-      // Summary and leaderboard totals are server-derived, so refresh them
-      // instead of guessing the new counts locally.
-      void load(true);
+      void requestFeedback(payload.entry.id);
     } catch (nextError) {
       if (!(await handleError(nextError))) setError("독서 기록을 저장하지 못했어요.");
     } finally {
@@ -562,12 +603,33 @@ export default function StudentReadingScreen() {
                           </View>
                           <Text style={styles.meta}>{entry.author}</Text>
                           <Text style={styles.body}>{entry.reflection}</Text>
-                          {entry.aiFeedback ? (
+                          {entry.aiFeedbackStatus === "generated" && entry.aiFeedback ? (
                             <View style={styles.feedbackRow}>
                               <Text style={styles.feedbackScore}>{entry.aiScore ?? 0}점</Text>
                               <Text style={styles.feedback}>{entry.aiFeedback}</Text>
                             </View>
-                          ) : null}
+                          ) : entry.aiFeedbackStatus === "failed" ? (
+                            <View style={styles.feedbackStatusBox}>
+                              <Text style={styles.feedbackStatusText}>
+                                {entry.aiFeedbackError || "AI 피드백을 만들지 못했어요."}
+                              </Text>
+                              <ControlPressable
+                                style={styles.feedbackRetry}
+                                onPress={() => void requestFeedback(entry.id)}
+                                accessibilityRole="button"
+                                accessibilityLabel={`${entry.title} AI 피드백 다시 시도`}
+                              >
+                                <Text style={styles.feedbackRetryText}>다시 시도</Text>
+                              </ControlPressable>
+                            </View>
+                          ) : (
+                            <View style={styles.feedbackStatusBox}>
+                              <ActivityIndicator size="small" color={colors.accent} />
+                              <Text style={styles.feedbackStatusText}>
+                                AI 피드백을 만들고 있어요.
+                              </Text>
+                            </View>
+                          )}
                         </View>
                       ) : null}
                     </View>
@@ -1172,4 +1234,23 @@ const styles = StyleSheet.create({
   },
   feedbackScore: { ...typography.label, color: colors.accentTintedText },
   feedback: { ...typography.body, color: colors.accentTintedText, flex: 1 },
+  feedbackStatusBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.border,
+  },
+  feedbackStatusText: { ...typography.body, color: colors.textMuted, flex: 1 },
+  feedbackRetry: {
+    minHeight: tapMin,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderWidth: borders.hairline,
+    borderColor: colors.border,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+  },
+  feedbackRetryText: { ...typography.label, color: colors.accent },
 });

@@ -6984,9 +6984,19 @@
   overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
+.classroom-reading-score {
+  display: grid;
+  gap: 6px;
+}
 .classroom-reading-score strong {
   color: var(--color-accent-tinted-text);
   white-space: nowrap;
+}
+.classroom-reading-ai-feedback {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
 }
 .classroom-reading-date { text-align: right; }
 .classroom-reading-actions {

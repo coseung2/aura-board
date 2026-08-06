@@ -16,6 +16,8 @@ type ReadingLogRow = {
   author: string;
   reflection: string;
   aiScore: number | null;
+  aiFeedback: string | null;
+  aiFeedbackStatus: string;
   createdAt: Date;
   student: {
     name: string;
@@ -52,6 +54,8 @@ async function loadReadingLogs(classroomId: string): Promise<ReadingLogRow[]> {
         author: true,
         reflection: true,
         aiScore: true,
+        aiFeedback: true,
+        aiFeedbackStatus: true,
         createdAt: true,
         student: {
           select: {
@@ -96,7 +100,7 @@ export default async function ClassroomReadingPage({ params }: Props) {
       <ClassroomFeatureHeader
         classroomId={classroom.id}
         eyebrow={classroom.name}
-        description="학생이 남긴 책 정보와 독서 감상, 채점 결과를 한곳에서 확인합니다."
+        description="학생이 남긴 책 정보와 독서 감상, Gemma 평가 결과를 한곳에서 확인합니다."
         active="reading"
       />
 
@@ -138,7 +142,16 @@ export default async function ClassroomReadingPage({ params }: Props) {
                 {log.reflection}
               </p>
               <div className="classroom-reading-score" data-label="점수" role="cell">
-                <strong>{log.aiScore === null ? "미평가" : `${log.aiScore}점`}</strong>
+                <strong>
+                  {log.aiFeedbackStatus === "generated" && log.aiScore !== null
+                    ? `${log.aiScore}점`
+                    : log.aiFeedbackStatus === "failed"
+                      ? "평가 실패"
+                      : "평가 중"}
+                </strong>
+                {log.aiFeedback ? (
+                  <small className="classroom-reading-ai-feedback">{log.aiFeedback}</small>
+                ) : null}
               </div>
               <time
                 className="classroom-reading-date"

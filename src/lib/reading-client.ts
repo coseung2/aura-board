@@ -7,15 +7,27 @@
 
 export type BookType = "comic" | "story";
 
-export type ReadingEntry = {
+export type ReadingFeedbackStatus =
+  | "pending"
+  | "processing"
+  | "generated"
+  | "failed";
+
+export type ReadingEvaluationFields = {
+  aiScore: number | null;
+  aiFeedback: string | null;
+  aiFeedbackStatus: ReadingFeedbackStatus;
+  aiFeedbackModel: string | null;
+  aiFeedbackError: string | null;
+  evaluatedAt: string | null;
+};
+
+export type ReadingEntry = ReadingEvaluationFields & {
   id: string;
   bookType: BookType;
   title: string;
   author: string;
   reflection: string;
-  aiScore: number | null;
-  aiFeedback: string | null;
-  evaluatedAt: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -48,6 +60,16 @@ export async function saveReadingEntry(
   });
   if (!res.ok) throw new Error(await errorMessage(res));
   return (await res.json()) as { entry: ReadingEntry };
+}
+
+export async function generateReadingFeedback(
+  readingLogId: string,
+): Promise<{ evaluation: ReadingEvaluationFields }> {
+  const res = await fetch(`/api/student/reading/${encodeURIComponent(readingLogId)}/feedback`, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error(await errorMessage(res));
+  return (await res.json()) as { evaluation: ReadingEvaluationFields };
 }
 
 async function errorMessage(res: Response): Promise<string> {

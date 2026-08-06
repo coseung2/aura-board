@@ -22,10 +22,7 @@ import {
 import { getEquippedSlimeFloor } from "@/lib/pets/catalog";
 import type { SlimeFloor } from "@/lib/pets/types";
 import { readReadingTitles } from "@/lib/titles";
-import {
-  evaluateReadingLog,
-  type ReadingBookType,
-} from "@/lib/reading-evaluator";
+import type { ReadingBookType } from "@/lib/reading-evaluator";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -233,6 +230,8 @@ async function readUnclaimedClassroomRankRewards(
     .sort((a, b) => b.weekStart.localeCompare(a.weekStart));
 }
 
+type ReadingFeedbackStatus = "pending" | "processing" | "generated" | "failed";
+
 type SerializedReadingLog = {
   id: string;
   classroomId: string;
@@ -243,6 +242,9 @@ type SerializedReadingLog = {
   reflection: string;
   aiScore: number | null;
   aiFeedback: string | null;
+  aiFeedbackStatus: ReadingFeedbackStatus;
+  aiFeedbackModel: string | null;
+  aiFeedbackError: string | null;
   evaluatedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -258,6 +260,9 @@ function serialize(row: {
   reflection: string;
   aiScore: number | null;
   aiFeedback: string | null;
+  aiFeedbackStatus: string;
+  aiFeedbackModel: string | null;
+  aiFeedbackError: string | null;
   evaluatedAt: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -272,6 +277,14 @@ function serialize(row: {
     reflection: row.reflection,
     aiScore: row.aiScore,
     aiFeedback: row.aiFeedback,
+    aiFeedbackStatus:
+      row.aiFeedbackStatus === "processing" ||
+      row.aiFeedbackStatus === "generated" ||
+      row.aiFeedbackStatus === "failed"
+        ? row.aiFeedbackStatus
+        : "pending",
+    aiFeedbackModel: row.aiFeedbackModel,
+    aiFeedbackError: row.aiFeedbackError,
     evaluatedAt: row.evaluatedAt ? row.evaluatedAt.toISOString() : null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -510,7 +523,6 @@ export async function POST(req: Request) {
   }
 
   const bookType = bookTypeRaw as ReadingBookType;
-  const evaluation = evaluateReadingLog({ bookType, title, author, reflection });
   let created: Awaited<ReturnType<typeof db.readingLog.create>>;
   try {
     created = await db.readingLog.create({
@@ -521,9 +533,12 @@ export async function POST(req: Request) {
         title,
         author,
         reflection,
-        aiScore: evaluation.score,
-        aiFeedback: evaluation.feedback,
-        evaluatedAt: new Date(),
+        aiScore: null,
+        aiFeedback: null,
+        aiFeedbackStatus: "pending",
+        aiFeedbackModel: null,
+        aiFeedbackError: null,
+        evaluatedAt: null,
       },
     });
   } catch (e) {

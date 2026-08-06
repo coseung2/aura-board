@@ -106,7 +106,7 @@ export function LlmKeyForm() {
         setMsg(
           provider === "opencode-go"
             ? `저장 완료. OpenCode-go · ${modelId} 연결되었습니다.`
-            : "저장 완료. 코딩 교실 보드에서 바로 사용할 수 있습니다.",
+            : "저장 완료. Gemma 독서 피드백과 코딩 교실에서 사용할 수 있습니다.",
         );
         setApiKey("");
       } else {
@@ -124,7 +124,7 @@ export function LlmKeyForm() {
   }
 
   async function handleDelete() {
-    if (!confirm("저장된 API Key를 삭제하시겠어요? 코딩 교실은 새 Key를 저장하기 전까지 사용할 수 없어요.")) return;
+    if (!confirm("저장된 API Key를 삭제하시겠어요? Gemma 독서 피드백과 코딩 교실은 새 Key를 저장하기 전까지 사용할 수 없어요.")) return;
     setBusy(true);
     setMsg(null);
     try {
@@ -200,7 +200,7 @@ export function LlmKeyForm() {
           <span className="llm-key-hint">
             {provider === "opencode-go"
               ? "OpenCode-go API 키를 입력하세요. 키는 암호화 저장되습니다."
-              : "Key는 서버에서 암호화 저장되고 학생 클라이언트에는 노출되지 않습니다."}
+              : "Google AI Studio의 Gemini API Key를 입력하세요. Gemma 독서 피드백에 사용되며 학생 클라이언트에는 노출되지 않습니다."}
           </span>
         </label>
 

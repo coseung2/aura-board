@@ -23,9 +23,6 @@ vi.mock("@/lib/student-auth", () => ({
 vi.mock("@/lib/bank", () => ({
   ensureAccountFor: vi.fn(async () => ({ accountId: "account-1", cardId: "card-1" })),
 }));
-vi.mock("@/lib/reading-evaluator", () => ({
-  evaluateReadingLog: vi.fn(() => ({ score: 5, feedback: "좋아요" })),
-}));
 vi.mock("@/lib/titles", () => ({
   readReadingTitles: vi.fn(async () => []),
 }));
@@ -110,7 +107,7 @@ describe("reading logs and missions", () => {
     vi.useRealTimers();
   });
 
-  it("saves a reading log without granting the retired per-record reward", async () => {
+  it("saves a pending reading log without granting the retired per-record reward", async () => {
     const response = await POST(request());
     const body = await response.json();
 
@@ -118,7 +115,9 @@ describe("reading logs and missions", () => {
     expect(body.entry).toMatchObject({
       id: "reading-1",
       title: "어린 왕자",
-      aiScore: 5,
+      aiScore: null,
+      aiFeedback: null,
+      aiFeedbackStatus: "pending",
     });
     expect(body).not.toHaveProperty("reward");
     expect(mocks.logs).toHaveLength(1);

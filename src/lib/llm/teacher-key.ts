@@ -1,6 +1,5 @@
 // 교사 LLM Key 조회·해석 헬퍼 (Seed 13 follow-up).
-// vibe-arcade 세션 라우트에서 boardId → classroom.teacherId → TeacherLlmKey를
-// 풀어 복호화된 {provider, apiKey}를 돌려준다.
+// board/classroom에서 담당 교사를 찾아 암호화된 TeacherLlmKey를 복호화한다.
 
 import "server-only";
 import { db } from "../db";
@@ -8,18 +7,33 @@ import { decryptApiKey } from "./encryption";
 import type { LlmProvider } from "./stream";
 
 export type ResolvedTeacherKey = {
+  teacherId: string;
   provider: LlmProvider;
   apiKey: string;
   baseUrl: string | null;
   modelId: string | null;
 };
 
-/**
- * boardId로부터 소유 교사의 LLM Key를 복호화해 반환.
- * - board에 classroom이 없으면 null
- * - 교사가 아직 Key를 저장하지 않았으면 null
- * - 복호화 실패(예: LLM_KEY_SECRET 회전 후)도 null
- */
+async function resolveTeacherKey(teacherId: string): Promise<ResolvedTeacherKey | null> {
+  const row = await db.teacherLlmKey.findUnique({ where: { userId: teacherId } });
+  if (!row) return null;
+
+  try {
+    // ollama 는 apiKey 가 비어있을 수 있음 — 빈 암호문도 허용.
+    const apiKey = row.apiKeyEnc ? decryptApiKey(row.apiKeyEnc) : "";
+    return {
+      teacherId,
+      provider: row.provider as LlmProvider,
+      apiKey,
+      baseUrl: row.baseUrl ?? null,
+      modelId: row.modelId ?? null,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** boardId로부터 소유 교사의 LLM Key를 복호화해 반환한다. */
 export async function getTeacherKeyForBoard(
   boardId: string,
 ): Promise<ResolvedTeacherKey | null> {
@@ -30,21 +44,16 @@ export async function getTeacherKeyForBoard(
     },
   });
   const teacherId = board?.classroom?.teacherId;
-  if (!teacherId) return null;
+  return teacherId ? resolveTeacherKey(teacherId) : null;
+}
 
-  const row = await db.teacherLlmKey.findUnique({ where: { userId: teacherId } });
-  if (!row) return null;
-
-  try {
-    // ollama 는 apiKey 가 비어있을 수 있음 — 빈 암호문도 허용.
-    const apiKey = row.apiKeyEnc ? decryptApiKey(row.apiKeyEnc) : "";
-    return {
-      provider: row.provider as LlmProvider,
-      apiKey,
-      baseUrl: row.baseUrl ?? null,
-      modelId: row.modelId ?? null,
-    };
-  } catch {
-    return null;
-  }
+/** classroomId로부터 담임 교사의 LLM Key를 복호화해 반환한다. */
+export async function getTeacherKeyForClassroom(
+  classroomId: string,
+): Promise<ResolvedTeacherKey | null> {
+  const classroom = await db.classroom.findUnique({
+    where: { id: classroomId },
+    select: { teacherId: true },
+  });
+  return classroom?.teacherId ? resolveTeacherKey(classroom.teacherId) : null;
 }

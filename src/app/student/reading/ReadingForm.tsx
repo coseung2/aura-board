@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   fetchReadingEntries,
+  generateReadingFeedback,
   saveReadingEntry,
   type BookType,
   type ReadingEntry,
@@ -60,6 +61,33 @@ export function ReadingForm() {
     setNotice(null);
   }
 
+  async function requestFeedback(readingLogId: string) {
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.id === readingLogId
+          ? { ...entry, aiFeedbackStatus: "processing", aiFeedbackError: null }
+          : entry,
+      ),
+    );
+    try {
+      const { evaluation } = await generateReadingFeedback(readingLogId);
+      setEntries((prev) =>
+        prev.map((entry) =>
+          entry.id === readingLogId ? { ...entry, ...evaluation } : entry,
+        ),
+      );
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "AI 피드백을 만들지 못했어요.";
+      setEntries((prev) =>
+        prev.map((entry) =>
+          entry.id === readingLogId
+            ? { ...entry, aiFeedbackStatus: "failed", aiFeedbackError: message }
+            : entry,
+        ),
+      );
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;
@@ -90,7 +118,8 @@ export function ReadingForm() {
       });
       setEntries((prev) => [entry, ...prev]);
       setForm(EMPTY_FORM);
-      setNotice("저장했어요.");
+      setNotice("저장했어요. AI 피드백을 만들고 있어요.");
+      void requestFeedback(entry.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장에 실패했어요.");
     } finally {
@@ -213,7 +242,8 @@ export function ReadingForm() {
                 {entry.reflection && (
                   <p className="reading-entry-reflection">{entry.reflection}</p>
                 )}
-                {(entry.aiScore !== null || entry.aiFeedback) && (
+                {entry.aiFeedbackStatus === "generated" &&
+                (entry.aiScore !== null || entry.aiFeedback) ? (
                   <div className="reading-entry-evaluation">
                     {entry.aiScore !== null && (
                       <span className="reading-entry-score">
@@ -225,6 +255,23 @@ export function ReadingForm() {
                         {entry.aiFeedback}
                       </span>
                     )}
+                  </div>
+                ) : entry.aiFeedbackStatus === "failed" ? (
+                  <div className="reading-entry-evaluation reading-entry-evaluation-status">
+                    <span className="reading-entry-feedback">
+                      {entry.aiFeedbackError || "AI 피드백을 만들지 못했어요."}
+                    </span>
+                    <button
+                      type="button"
+                      className="reading-feedback-retry"
+                      onClick={() => void requestFeedback(entry.id)}
+                    >
+                      다시 시도
+                    </button>
+                  </div>
+                ) : (
+                  <div className="reading-entry-evaluation reading-entry-evaluation-status">
+                    <span className="reading-entry-feedback">AI 피드백을 만들고 있어요.</span>
                   </div>
                 )}
               </li>
