@@ -507,7 +507,9 @@ button.assign-modal__close.assign-modal__close::after {
 }
 
 body:has(main[data-board-category="PLAY"]) .app-footer,
-body:has(main[data-play-board="true"], .shadow-alliance-game, .speed-game-board, .kordle-play-page, .kordle-waiting-page) .app-footer {
+body:has(main[data-play-board="true"], .shadow-alliance-game, .speed-game-board, .kordle-play-page, .kordle-waiting-page) .app-footer,
+body:has(main[data-board-category="PLAY"]) .board-toolkit-fab,
+body:has(main[data-play-board="true"], .shadow-alliance-game, .speed-game-board, .kordle-play-page, .kordle-waiting-page) .board-toolkit-fab {
   display: none !important;
 }
 

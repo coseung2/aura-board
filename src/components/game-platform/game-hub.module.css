@@ -203,6 +203,13 @@
   line-height: 1.3;
 }
 
+.cardTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .cardDescription {
   margin: 6px 0 0;
   color: var(--color-text-muted);
@@ -212,7 +219,6 @@
 
 .cardFooter {
   display: grid;
-  gap: 9px;
 }
 
 .statusLabel {
@@ -226,7 +232,13 @@
   background: var(--color-surface-alt);
   font-size: 0.72rem;
   font-weight: 800;
+  white-space: nowrap;
 }
+
+.status_active { color: #087a54; background: #dff7ec; }
+.status_paused { color: #8a5a00; background: #fff1c9; }
+.status_waiting { color: #365d7d; background: #e7f2fa; }
+.status_finished { color: #727272; background: #eeeeee; }
 
 .entryButton {
   display: inline-flex;

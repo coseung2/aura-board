@@ -57,6 +57,25 @@ describe("GameHubCatalog teacher mode", () => {
     expect(screen.getAllByRole("button", { name: "게임 열기" })).toHaveLength(5);
   });
 
+  it("shows live game state beside the game title with the entered-player count", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => json({
+      statuses: {
+        kordle: { phase: "open", label: "입장 가능", playerCount: 0 },
+        "speed-game": { phase: "open", label: "입장 가능", playerCount: 0 },
+        "shadow-alliance": { phase: "active", label: "진행 중", playerCount: 6 },
+        omok: { phase: "active", label: "대국 중", playerCount: 2 },
+        "song-guess": { phase: "open", label: "입장 가능", playerCount: 0 },
+      },
+    })));
+
+    render(<GameHubCatalog viewer="teacher" classrooms={classrooms} />);
+
+    const status = await screen.findByText("대국 중 · 2명");
+    const titleRow = status.parentElement;
+    expect(titleRow).not.toBeNull();
+    expect(within(titleRow!).getByRole("heading", { level: 3, name: "오목" })).toBeTruthy();
+  });
+
   it("opens a multi-classroom room after the teacher picks a class in the modal", async () => {
     const fetchMock = vi.fn(() =>
       json({

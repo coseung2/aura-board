@@ -14,7 +14,7 @@ const HIDDEN_TOOLKIT_PATHS = new Set([
 
 export function GlobalToolkitFab() {
   const pathname = usePathname();
-  if (HIDDEN_TOOLKIT_PATHS.has(pathname)) {
+  if (HIDDEN_TOOLKIT_PATHS.has(pathname) || pathname.startsWith("/board/")) {
     return null;
   }
 

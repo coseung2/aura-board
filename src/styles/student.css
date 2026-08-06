@@ -2817,6 +2817,10 @@
   margin-bottom: 16px;
 }
 
+.student-play-tabs button {
+  border-width: 2px;
+}
+
 .student-board-panel .student-board-grid {
   margin-top: 0;
 }

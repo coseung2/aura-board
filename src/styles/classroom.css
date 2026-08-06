@@ -7189,7 +7189,7 @@
   min-height: 34px;
   padding: 0 10px;
   border: 0;
-  border-bottom: 1px solid transparent;
+  border-bottom: 2px solid transparent;
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;

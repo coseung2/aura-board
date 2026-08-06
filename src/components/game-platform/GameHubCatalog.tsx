@@ -34,6 +34,12 @@ type Props = {
   classrooms?: TeacherClassroom[];
 };
 
+type GameHubStatus = {
+  phase: "open" | "waiting" | "active" | "paused" | "finished";
+  label: string;
+  playerCount: number;
+};
+
 const ARTWORK: Record<OfficialGameKind, string> = {
   kordle: "/game-hub/kordle.png",
   "speed-game": "/game-hub/speed-game.png",
@@ -57,10 +63,39 @@ export function GameHubCatalog({
   const [errors, setErrors] = useState<
     Partial<Record<OfficialGameKind, string>>
   >({});
+  const [statuses, setStatuses] = useState<
+    Partial<Record<OfficialGameKind, GameHubStatus>>
+  >({});
 
   useEffect(() => {
     setPendingKind(null);
     setPendingClassroomId(null);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadStatuses = async () => {
+      const response = await fetch("/api/game-hub/status", {
+        cache: "no-store",
+        headers: { accept: "application/json" },
+      }).catch(() => null);
+      if (!response?.ok) return;
+      const body = (await response.json().catch(() => null)) as
+        | { statuses?: Partial<Record<OfficialGameKind, GameHubStatus>> }
+        | null;
+      if (!cancelled && body?.statuses) setStatuses(body.statuses);
+    };
+    void loadStatuses();
+    const onFocus = () => void loadStatuses();
+    window.addEventListener("focus", onFocus);
+    document.addEventListener("visibilitychange", onFocus);
+    const timer = window.setInterval(loadStatuses, 15_000);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+      document.removeEventListener("visibilitychange", onFocus);
+      window.clearInterval(timer);
+    };
   }, []);
 
   const gameEntryDisabled = teacherMode && classrooms.length === 0;
@@ -181,6 +216,10 @@ export function GameHubCatalog({
           const game = OFFICIAL_GAME_CATALOG[kind];
           const pending = pendingKind === kind;
           const error = errors[kind];
+          const status = statuses[kind];
+          const statusText = status
+            ? `${status.label}${status.playerCount > 0 ? ` · ${status.playerCount}명` : ""}`
+            : "상태 확인 중";
           return (
             <article className={styles.card} key={kind}>
               <div className={styles.artwork}>
@@ -195,11 +234,15 @@ export function GameHubCatalog({
               </div>
               <div className={styles.body}>
                 <div>
-                  <h3 className={styles.cardTitle}>{game.label}</h3>
+                  <div className={styles.cardTitleRow}>
+                    <h3 className={styles.cardTitle}>{game.label}</h3>
+                    <span className={`${styles.statusLabel} ${status ? styles[`status_${status.phase}`] : ""}`}>
+                      {statusText}
+                    </span>
+                  </div>
                   <p className={styles.cardDescription}>{game.description}</p>
                 </div>
                 <div className={styles.cardFooter}>
-                  <span className={styles.statusLabel}>{game.statusLabel}</span>
                   <button
                     type="button"
                     className={styles.entryButton}

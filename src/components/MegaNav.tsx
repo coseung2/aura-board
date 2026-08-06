@@ -16,6 +16,7 @@ export type MegaNavLink = {
   emoji?: string | null;
   disabled?: boolean;
   onPreview?: () => void;
+  onSelect?: () => void;
 };
 
 export type MegaNavGroup = {
@@ -283,7 +284,13 @@ export function MegaNav({ items, ariaLabel }: Props) {
                             aria-current={isActive ? "page" : undefined}
                             onMouseEnter={link.onPreview}
                             onFocus={link.onPreview}
-                            onClick={closeNow}
+                            onClick={(event) => {
+                              if (link.onSelect) {
+                                event.preventDefault();
+                                link.onSelect();
+                              }
+                              closeNow();
+                            }}
                             onKeyDown={onPanelLinkKeyDown}
                           >
                             {link.emoji ? (
