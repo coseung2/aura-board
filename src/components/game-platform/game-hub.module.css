@@ -5,30 +5,11 @@
 
 .heading {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
+  align-items: center;
+  justify-content: flex-end;
   gap: 16px;
   padding-bottom: 12px;
   border-bottom: 1px solid var(--color-border);
-}
-
-.headingCopy {
-  display: grid;
-  gap: 4px;
-}
-
-.headingCopy p {
-  margin: 0;
-  color: var(--color-text-muted);
-  font-size: 0.9rem;
-  line-height: 1.45;
-}
-
-.title {
-  margin: 0;
-  color: var(--color-text);
-  font-size: 1.25rem;
-  line-height: 1.3;
 }
 
 .recordsLink {
@@ -65,34 +46,15 @@
 .liveFeatureCopy {
   display: flex;
   min-width: 0;
-  align-items: flex-start;
+  align-items: center;
   gap: 16px;
 }
 
-.liveFeatureCopy p,
-.liveFeatureCopy h3,
-.liveFeatureCopy span {
-  margin: 0;
-}
-
-.liveFeatureCopy p {
-  margin-bottom: 4px;
-  color: var(--color-accent);
-  font-size: 0.88rem;
-  font-weight: 800;
-}
-
 .liveFeatureCopy h3 {
+  margin: 0;
   color: var(--color-text);
   font-size: clamp(1.2rem, 2.3vw, 1.7rem);
   line-height: 1.25;
-}
-
-.liveFeatureCopy div > span {
-  display: block;
-  margin-top: 6px;
-  color: var(--color-text-muted);
-  line-height: 1.45;
 }
 
 .liveFeatureBadge {
@@ -110,39 +72,75 @@
   letter-spacing: 0.06em;
 }
 
-.classroomField {
-  display: grid;
-  min-width: min(260px, 100%);
-  gap: 6px;
-  color: var(--color-text-muted);
-  font-size: 0.78rem;
-  font-weight: 800;
-}
-
-.classroomField > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.classroomField select {
-  width: 100%;
-  min-height: 44px;
-  padding: 0 36px 0 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-btn);
-  color: var(--color-text);
-  background: var(--color-surface);
-  font: inherit;
-  font-weight: 700;
-}
-
-.classroomField select:focus-visible,
 .recordsLink:focus-visible,
 .liveFeatureButton:focus-visible,
-.entryButton:focus-visible {
+.entryButton:focus-visible,
+.classroomPickerOption:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-accent) 32%, transparent);
   outline-offset: 2px;
+}
+
+.inlineLink {
+  color: var(--color-accent);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.inlineLink:hover {
+  color: var(--color-accent-active);
+}
+
+.classroomPickerModal {
+  max-width: min(420px, calc(100vw - 32px));
+}
+
+.classroomPickerHint {
+  margin: 0 0 12px;
+  color: var(--color-text-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.classroomPickerList {
+  display: grid;
+  gap: 8px;
+}
+
+.classroomPickerOption {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  min-height: 56px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.classroomPickerOption:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  background: var(--color-surface-alt);
+}
+
+.classroomPickerOption:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.classroomPickerName {
+  font-size: 0.98rem;
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.classroomPickerMeta {
+  color: var(--color-text-muted);
+  font-size: 0.84rem;
+  line-height: 1.35;
 }
 
 .liveFeatureButton {
@@ -283,7 +281,6 @@
     flex-direction: column;
   }
 
-  .classroomField,
   .recordsLink {
     width: 100%;
   }

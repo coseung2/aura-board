@@ -5,7 +5,6 @@ import { getCurrentTierAsync } from "@/lib/tier";
 import { OFFICIAL_GAME_KINDS } from "@/lib/game-platform/contracts";
 import { Dashboard } from "@/components/Dashboard";
 import { TopNav } from "@/components/TopNav";
-import { AppBackgroundButton } from "@/components/AppBackground";
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
@@ -82,9 +81,6 @@ export default async function DashboardPage() {
             <div>
               <h1 className="home-title">내 보드</h1>
               <p className="home-subtitle">{user.name}님의 보드</p>
-            </div>
-            <div className="home-header-actions">
-              <AppBackgroundButton />
             </div>
           </div>
         </header>

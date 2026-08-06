@@ -41,7 +41,8 @@ describe("GameHubCatalog teacher mode", () => {
 
     expect(screen.getByRole("heading", { level: 3, name: "잼라이브" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "나의 전적" })).toBeNull();
-    expect(screen.getByLabelText("놀이 학급")).toBeTruthy();
+    expect(screen.queryByLabelText("놀이 학급")).toBeNull();
+    expect(screen.queryByRole("dialog", { name: "학급 선택" })).toBeNull();
 
     for (const title of [
       "그림자연합",
@@ -56,7 +57,7 @@ describe("GameHubCatalog teacher mode", () => {
     expect(screen.getAllByRole("button", { name: "게임 열기" })).toHaveLength(5);
   });
 
-  it("opens the selected teacher-owned classroom room", async () => {
+  it("opens a multi-classroom room after the teacher picks a class in the modal", async () => {
     const fetchMock = vi.fn(() =>
       json({
         gameKind: "omok",
@@ -68,14 +69,14 @@ describe("GameHubCatalog teacher mode", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<GameHubCatalog viewer="teacher" classrooms={classrooms} />);
 
-    fireEvent.change(screen.getByLabelText("놀이 학급"), {
-      target: { value: "classroom-2" },
-    });
     const card = screen
       .getByRole("heading", { level: 3, name: "오목" })
       .closest("article");
     expect(card).not.toBeNull();
     fireEvent.click(within(card!).getByRole("button", { name: "게임 열기" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "학급 선택" });
+    fireEvent.click(within(dialog).getByRole("button", { name: /별빛반/ }));
 
     await waitFor(() => {
       expect(push).toHaveBeenCalledWith("/board/game-hub-omok-classroom");
@@ -87,6 +88,45 @@ describe("GameHubCatalog teacher mode", () => {
         body: JSON.stringify({
           gameKind: "omok",
           classroomId: "classroom-2",
+        }),
+      }),
+    );
+  });
+
+  it("skips the classroom modal when the teacher owns only one class", async () => {
+    const fetchMock = vi.fn(() =>
+      json({
+        gameKind: "omok",
+        boardId: "room-omok",
+        boardSlug: "game-hub-omok-classroom",
+        href: "/board/game-hub-omok-classroom",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    render(
+      <GameHubCatalog
+        viewer="teacher"
+        classrooms={[{ id: "classroom-1", name: "햇살반", studentCount: 24 }]}
+      />,
+    );
+
+    const card = screen
+      .getByRole("heading", { level: 3, name: "오목" })
+      .closest("article");
+    expect(card).not.toBeNull();
+    fireEvent.click(within(card!).getByRole("button", { name: "게임 열기" }));
+
+    expect(screen.queryByRole("dialog", { name: "학급 선택" })).toBeNull();
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith("/board/game-hub-omok-classroom");
+    });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/teacher/game-hub/entry",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          gameKind: "omok",
+          classroomId: "classroom-1",
         }),
       }),
     );

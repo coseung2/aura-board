@@ -6,7 +6,6 @@ import {
   AlertCircle,
   CirclePlay,
   Radio,
-  School,
   Trophy,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -49,34 +48,29 @@ export function GameHubCatalog({
 }: Props) {
   const router = useRouter();
   const teacherMode = viewer === "teacher";
-  const [selectedClassroomId, setSelectedClassroomId] = useState(
-    () => classrooms[0]?.id ?? "",
-  );
   const [pendingKind, setPendingKind] = useState<OfficialGameKind | null>(null);
+  const [pendingClassroomId, setPendingClassroomId] = useState<string | null>(
+    null,
+  );
+  const [classroomPickerKind, setClassroomPickerKind] =
+    useState<OfficialGameKind | null>(null);
   const [errors, setErrors] = useState<
     Partial<Record<OfficialGameKind, string>>
   >({});
 
   useEffect(() => {
     setPendingKind(null);
+    setPendingClassroomId(null);
   }, []);
 
-  useEffect(() => {
-    if (!teacherMode) return;
-    if (classrooms.some((classroom) => classroom.id === selectedClassroomId)) {
-      return;
-    }
-    setSelectedClassroomId(classrooms[0]?.id ?? "");
-  }, [classrooms, selectedClassroomId, teacherMode]);
+  const gameEntryDisabled = teacherMode && classrooms.length === 0;
 
-  const selectedClassroom = classrooms.find(
-    (classroom) => classroom.id === selectedClassroomId,
-  );
-  const gameEntryDisabled = teacherMode && !selectedClassroom;
+  async function enterGame(gameKind: OfficialGameKind, classroomId?: string) {
+    if (pendingKind) return;
+    if (teacherMode && !classroomId) return;
 
-  async function enterGame(gameKind: OfficialGameKind) {
-    if (pendingKind || gameEntryDisabled) return;
     setPendingKind(gameKind);
+    setPendingClassroomId(classroomId ?? null);
     setErrors((current) => ({ ...current, [gameKind]: undefined }));
     try {
       const response = await fetch(
@@ -91,9 +85,7 @@ export function GameHubCatalog({
             "content-type": "application/json",
           },
           body: JSON.stringify(
-            teacherMode
-              ? { gameKind, classroomId: selectedClassroomId }
-              : { gameKind },
+            teacherMode ? { gameKind, classroomId } : { gameKind },
           ),
         },
       );
@@ -101,6 +93,7 @@ export function GameHubCatalog({
       if (!response.ok || !body?.href || body.gameKind !== gameKind) {
         throw new Error("game_hub_entry_failed");
       }
+      setClassroomPickerKind(null);
       router.push(body.href);
     } catch {
       setErrors((current) => ({
@@ -111,48 +104,38 @@ export function GameHubCatalog({
       }));
     } finally {
       setPendingKind(null);
+      setPendingClassroomId(null);
     }
   }
 
+  function requestTeacherGame(gameKind: OfficialGameKind) {
+    if (pendingKind || !teacherMode) return;
+
+    if (classrooms.length === 0) {
+      setErrors((current) => ({
+        ...current,
+        [gameKind]: "먼저 학급을 만들어 주세요.",
+      }));
+      return;
+    }
+
+    if (classrooms.length === 1) {
+      void enterGame(gameKind, classrooms[0].id);
+      return;
+    }
+
+    setErrors((current) => ({ ...current, [gameKind]: undefined }));
+    setClassroomPickerKind(gameKind);
+  }
+
+  const pickerGame = classroomPickerKind
+    ? OFFICIAL_GAME_CATALOG[classroomPickerKind]
+    : null;
+
   return (
-    <section className={styles.hub} aria-labelledby="game-hub-title">
-      <header className={styles.heading}>
-        <div className={styles.headingCopy}>
-          <h2 className={styles.title} id="game-hub-title">
-            게임
-          </h2>
-          <p>
-            {teacherMode
-              ? "학급을 선택하면 학생들과 같은 상시 게임방을 관리할 수 있어요."
-              : "언제든 들어가서 친구들과 함께 플레이할 수 있어요."}
-          </p>
-        </div>
-        {teacherMode ? (
-          classrooms.length > 0 ? (
-            <label className={styles.classroomField}>
-              <span>
-                <School aria-hidden size={17} strokeWidth={2.2} />
-                놀이 학급
-              </span>
-              <select
-                value={selectedClassroomId}
-                onChange={(event) => setSelectedClassroomId(event.target.value)}
-                disabled={pendingKind !== null}
-              >
-                {classrooms.map((classroom) => (
-                  <option key={classroom.id} value={classroom.id}>
-                    {classroom.name} · {classroom.studentCount}명
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <a className={styles.recordsLink} href="/classroom">
-              <School aria-hidden size={18} strokeWidth={2} />
-              학급 만들기
-            </a>
-          )
-        ) : (
+    <section className={styles.hub} aria-label="게임">
+      {!teacherMode ? (
+        <header className={styles.heading}>
           <a
             className={styles.recordsLink}
             href="/student/boards?category=play&playTab=records"
@@ -160,8 +143,8 @@ export function GameHubCatalog({
             <Trophy aria-hidden size={18} strokeWidth={2} />
             나의 전적
           </a>
-        )}
-      </header>
+        </header>
+      ) : null}
 
       <article className={styles.liveFeature}>
         <div className={styles.liveFeatureCopy}>
@@ -169,11 +152,7 @@ export function GameHubCatalog({
             <Radio aria-hidden size={15} strokeWidth={2.5} />
             LIVE
           </span>
-          <div>
-            <p>매일 오후 1:30 · 전체 이용자</p>
-            <h3>잼라이브</h3>
-            <span>진행자 없이 모두가 같은 문제를 푸는 실시간 4지선다 퀴즈</span>
-          </div>
+          <h3>잼라이브</h3>
         </div>
         <button
           type="button"
@@ -187,10 +166,13 @@ export function GameHubCatalog({
         </button>
       </article>
 
-      {teacherMode && !selectedClassroom ? (
+      {teacherMode && classrooms.length === 0 ? (
         <div className={styles.emptyState} role="status">
           공식 게임방을 열려면 먼저 학급을 만들어 주세요. 잼라이브는 학급 없이도
-          바로 참여할 수 있습니다.
+          바로 참여할 수 있습니다.{" "}
+          <a className={styles.inlineLink} href="/classroom">
+            학급 만들기
+          </a>
         </div>
       ) : null}
 
@@ -217,17 +199,17 @@ export function GameHubCatalog({
                   <p className={styles.cardDescription}>{game.description}</p>
                 </div>
                 <div className={styles.cardFooter}>
-                  <span className={styles.statusLabel}>
-                    {teacherMode && selectedClassroom
-                      ? selectedClassroom.name
-                      : game.statusLabel}
-                  </span>
+                  <span className={styles.statusLabel}>{game.statusLabel}</span>
                   <button
                     type="button"
                     className={styles.entryButton}
                     disabled={pendingKind !== null || gameEntryDisabled}
                     aria-describedby={error ? `game-hub-error-${kind}` : undefined}
-                    onClick={() => void enterGame(kind)}
+                    onClick={() =>
+                      teacherMode
+                        ? requestTeacherGame(kind)
+                        : void enterGame(kind)
+                    }
                   >
                     <CirclePlay aria-hidden size={19} strokeWidth={2.3} />
                     {pending
@@ -252,6 +234,76 @@ export function GameHubCatalog({
           );
         })}
       </div>
+
+      {classroomPickerKind && pickerGame ? (
+        <>
+          <div
+            className="modal-backdrop"
+            onClick={() => {
+              if (pendingKind) return;
+              setClassroomPickerKind(null);
+            }}
+          />
+          <div
+            className={`add-card-modal ${styles.classroomPickerModal}`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="game-hub-classroom-picker-title"
+          >
+            <div className="modal-header">
+              <h2
+                className="modal-title"
+                id="game-hub-classroom-picker-title"
+              >
+                학급 선택
+              </h2>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={() => {
+                  if (pendingKind) return;
+                  setClassroomPickerKind(null);
+                }}
+                disabled={pendingKind !== null}
+              >
+                닫기
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className={styles.classroomPickerHint}>
+                {pickerGame.label} 게임방을 열 학급을 선택하세요.
+              </p>
+              <div className={styles.classroomPickerList}>
+                {classrooms.map((classroom) => {
+                  const pendingThis =
+                    pendingKind === classroomPickerKind &&
+                    pendingClassroomId === classroom.id;
+                  return (
+                    <button
+                      key={classroom.id}
+                      type="button"
+                      className={styles.classroomPickerOption}
+                      disabled={pendingKind !== null}
+                      onClick={() =>
+                        void enterGame(classroomPickerKind, classroom.id)
+                      }
+                    >
+                      <span className={styles.classroomPickerName}>
+                        {classroom.name}
+                      </span>
+                      <span className={styles.classroomPickerMeta}>
+                        {pendingThis
+                          ? "여는 중..."
+                          : `학생 ${classroom.studentCount}명`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </>
+      ) : null}
     </section>
   );
 }

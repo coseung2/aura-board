@@ -97,5 +97,6 @@ describe("teacher dashboard board sections", () => {
     expect(screen.queryByRole("button", { name: /새 보드 만들기/ })).toBeNull();
     expect(screen.queryByRole("heading", { name: "기존 놀이보드" })).toBeNull();
     expect(screen.queryByText("예전 놀이보드")).toBeNull();
+    expect(screen.queryByRole("link", { name: /학급 관리/ })).toBeNull();
   });
 });

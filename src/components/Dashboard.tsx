@@ -237,9 +237,6 @@ function BoardSectionTabs({
             <span className="board-section-tab-count">{playEntryCount}</span>
           </button>
         </div>
-        <a href="/classroom" className="board-section-tabs-link">
-          학급 관리 →
-        </a>
       </div>
 
       <section
