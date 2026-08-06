@@ -145,22 +145,63 @@ describe("shadow alliance Rust authority proxy", () => {
       expect.objectContaining({
         method: "POST",
         body: {
-          requestId: "shadow-initial:board-1",
+          requestId: "shadow-initial-board-1",
           classroomId: "class-1",
           totalRounds: 5,
           participants: [
             {
               actorSubject: "student:student-1",
               studentId: "student-1",
-              displayName: "그림자 1",
+              displayName: expect.any(String),
             },
             {
               actorSubject: "student:student-2",
               studentId: "student-2",
-              displayName: "그림자 2",
+              displayName: expect.any(String),
             },
           ],
         },
+      }),
+    );
+  });
+
+  it("opens a fresh lobby when a host re-enters an ended session", async () => {
+    mocks.getStudent.mockResolvedValue(null);
+    mocks.getUser.mockResolvedValue({ id: "teacher-1" });
+    mocks.getRole.mockResolvedValue("owner");
+    const endedSnapshot = {
+      ...snapshot,
+      id: "ended-session-1",
+      version: 7,
+      phase: "host-ended" as const,
+      terminalReason: "host_ended",
+      completedAt: Date.now(),
+    };
+    const lobbySnapshot = {
+      ...snapshot,
+      id: "new-session-1",
+      version: 0,
+      phase: "lobby" as const,
+    };
+    mocks.playEngineFetch
+      .mockResolvedValueOnce(jsonResponse(endedSnapshot))
+      .mockResolvedValueOnce(
+        jsonResponse({ requestId: "shadow-reopen-ended-session-1", snapshot: lobbySnapshot }, 201),
+      );
+
+    const response = await GET(
+      new Request("http://localhost/api/shadow-alliance/boards/board-1"),
+      context,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ snapshot: lobbySnapshot, replayed: false });
+    expect(mocks.playEngineFetch).toHaveBeenNthCalledWith(
+      2,
+      "/v1/shadow-alliance/sessions/ended-session-1/rematch",
+      expect.objectContaining({
+        method: "POST",
+        body: { requestId: "shadow-reopen-ended-session-1" },
       }),
     );
   });

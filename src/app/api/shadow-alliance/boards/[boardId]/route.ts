@@ -10,6 +10,7 @@ import {
 } from "@/lib/play-platform/server-client";
 import { getBoardRole } from "@/lib/rbac";
 import type { ShadowAllianceSnapshot } from "@/lib/shadow-alliance/contracts";
+import { createShadowAllianceNicknames } from "@/lib/shadow-alliance/nicknames";
 import { getCurrentStudent } from "@/lib/student-auth";
 
 type Params = { params: Promise<{ boardId: string }> };
@@ -170,21 +171,47 @@ async function ensureHostSession(
       { status: 409 },
     );
   }
+  const nicknames = createShadowAllianceNicknames(students.length);
   const upstream = await playEngineFetch(
     `/v1/boards/${encodeURIComponent(board.id)}/shadow-alliance/sessions`,
     {
       actor,
       method: "POST",
       body: {
-        requestId: `shadow-initial:${board.id}`,
+        requestId: `shadow-initial-${board.id}`,
         classroomId: board.classroomId,
         totalRounds: 5,
         participants: students.map((student, index) => ({
           actorSubject: `student:${student.id}`,
           studentId: student.id,
-          displayName: `그림자 ${index + 1}`,
+          displayName: nicknames[index] ?? `그림자 ${index + 1}`,
         })),
       },
+    },
+  );
+  if (!upstream.ok) return proxyPlayEngineResponse(upstream);
+  const body = await readUpstreamJson<{
+    snapshot?: ShadowAllianceSnapshot;
+  }>(upstream);
+  if (!body?.snapshot) {
+    return jsonPrivateNoStore({ error: "invalid_upstream_response" }, { status: 502 });
+  }
+  return jsonPrivateNoStore({
+    snapshot: body.snapshot,
+    replayed: upstream.headers.get("x-idempotent-replay") === "true",
+  });
+}
+
+async function reopenEndedHostSession(
+  snapshot: ShadowAllianceSnapshot,
+  actor: PlayActor,
+): Promise<Response> {
+  const upstream = await playEngineFetch(
+    `/v1/shadow-alliance/sessions/${encodeURIComponent(snapshot.id)}/rematch`,
+    {
+      actor,
+      method: "POST",
+      body: { requestId: `shadow-reopen-${snapshot.id}` },
     },
   );
   if (!upstream.ok) return proxyPlayEngineResponse(upstream);
@@ -238,6 +265,12 @@ export async function GET(_request: Request, { params }: Params) {
     const snapshot = await readUpstreamJson<ShadowAllianceSnapshot>(upstream);
     if (!snapshot) {
       return jsonPrivateNoStore({ error: "invalid_upstream_response" }, { status: 502 });
+    }
+    if (
+      viewer.canCommandAsHost &&
+      (snapshot.phase === "finished" || snapshot.phase === "host-ended")
+    ) {
+      return reopenEndedHostSession(snapshot, viewer.actor);
     }
     return jsonPrivateNoStore({ snapshot });
   } catch (error) {

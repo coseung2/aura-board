@@ -10,7 +10,6 @@ import type {
   ShadowAllianceTeam,
 } from "../types";
 import { playShadowAllianceGuideTick } from "../sound";
-import { PlayBoardContinueButton } from "@/components/PlayBoardContinueButton";
 
 type GuideBlock =
   | { kind: "paragraph"; content: ReactNode }
@@ -160,10 +159,14 @@ type Props = {
   onSetSettings: (settings: { editable?: boolean; timerSec?: number }) => void;
   onStartGame: () => void;
   onResetGame: () => void;
+  onContinueGame?: () => boolean | Promise<boolean>;
+  onExitGame?: () => boolean | Promise<boolean>;
   onNextRound: () => void;
   onRevealRound: () => void;
   onShowPostround: () => void;
   onSetTimerRunning: (running: boolean) => void;
+  rosterManagedByClassroom?: boolean;
+  sessionActionBusy?: boolean;
 };
 
 function formatTime(seconds: number) {
@@ -421,10 +424,12 @@ function TeamRoster({
   team,
   players,
   onRemovePlayer,
+  allowRemoval = true,
 }: {
   team: ShadowAllianceTeam;
   players: ShadowAlliancePlayer[];
   onRemovePlayer: (playerId: string) => void;
+  allowRemoval?: boolean;
 }) {
   const teamLabel = team === "black" ? "블랙 연합" : "화이트 연합";
 
@@ -447,14 +452,16 @@ function TeamRoster({
           {players.map((player) => (
             <li key={player.id}>
               <span>{player.nick}</span>
-              <button
-                type="button"
-                className="shadow-alliance-icon-button"
-                aria-label={`${player.nick} ${teamLabel}에서 제외`}
-                onClick={() => onRemovePlayer(player.id)}
-              >
-                x
-              </button>
+              {allowRemoval ? (
+                <button
+                  type="button"
+                  className="shadow-alliance-icon-button"
+                  aria-label={`${player.nick} ${teamLabel}에서 제외`}
+                  onClick={() => onRemovePlayer(player.id)}
+                >
+                  x
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -473,13 +480,18 @@ export function ShadowAllianceTeacherGame({
   onSetSettings,
   onStartGame,
   onResetGame,
+  onContinueGame,
+  onExitGame,
   onNextRound,
   onRevealRound,
   onShowPostround,
   onSetTimerRunning,
+  rosterManagedByClassroom = false,
+  sessionActionBusy = false,
 }: Props) {
   const router = useRouter();
   const [guideIndex, setGuideIndex] = useState(0);
+  const [sessionAction, setSessionAction] = useState<"continue" | "end" | null>(null);
   const submittedCount = game.players.filter((player) => player.number !== null).length;
 
   const lobby = game.phase === "lobby";
@@ -494,6 +506,29 @@ export function ShadowAllianceTeacherGame({
     playShadowAllianceGuideTick();
     setGuideIndex(nextIndex);
   };
+  const leaveAndContinueLater = async () => {
+    if (sessionActionBusy || sessionAction) return;
+    setSessionAction("continue");
+    try {
+      const canLeave = (await onContinueGame?.()) ?? true;
+      if (canLeave) router.push("/dashboard");
+    } finally {
+      setSessionAction(null);
+    }
+  };
+  const endGameAndLeave = async () => {
+    if (sessionActionBusy || sessionAction) return;
+    if (!window.confirm("게임을 종료하고 보드 대시보드로 이동할까요?")) return;
+    setSessionAction("end");
+    try {
+      const ended = onExitGame
+        ? await onExitGame()
+        : (onResetGame(), true);
+      if (ended) router.push("/dashboard");
+    } finally {
+      setSessionAction(null);
+    }
+  };
 
   if (game.phase === "postround" && result) {
     return (
@@ -503,16 +538,19 @@ export function ShadowAllianceTeacherGame({
             <span className={`shadow-alliance-connection is-${connection}`}>
               {connection === "connected" ? "실시간 연결" : "연결 복구 중"}
             </span>
-            <PlayBoardContinueButton href="/dashboard" />
+            <button
+              type="button"
+              className="play-board-continue-button"
+              disabled={sessionActionBusy || sessionAction !== null}
+              onClick={() => void leaveAndContinueLater()}
+            >
+              다음에 이어하기
+            </button>
             <button
               type="button"
               className="shadow-alliance-button shadow-alliance-connection shadow-alliance-end-game-button"
-              onClick={() => {
-                if (window.confirm("게임을 종료하고 보드 대시보드로 이동할까요?")) {
-                  onResetGame();
-                  window.setTimeout(() => router.push("/dashboard"), 0);
-                }
-              }}
+              disabled={sessionActionBusy || sessionAction !== null}
+              onClick={() => void endGameAndLeave()}
             >
               게임 종료
             </button>
@@ -540,17 +578,20 @@ export function ShadowAllianceTeacherGame({
           <span className={`shadow-alliance-connection is-${connection}`}>
             {connection === "connected" ? "실시간 연결" : "연결 복구 중"}
           </span>
-          <PlayBoardContinueButton href="/dashboard" />
+          <button
+            type="button"
+            className="play-board-continue-button"
+            disabled={sessionActionBusy || sessionAction !== null}
+            onClick={() => void leaveAndContinueLater()}
+          >
+            다음에 이어하기
+          </button>
           {(
             <button
               type="button"
               className="shadow-alliance-button shadow-alliance-connection shadow-alliance-end-game-button"
-              onClick={() => {
-                if (window.confirm("게임을 종료하고 보드 대시보드로 이동할까요?")) {
-                  onResetGame();
-                  window.setTimeout(() => router.push("/dashboard"), 0);
-                }
-              }}
+              disabled={sessionActionBusy || sessionAction !== null}
+              onClick={() => void endGameAndLeave()}
             >
               게임 종료
             </button>
@@ -648,17 +689,21 @@ export function ShadowAllianceTeacherGame({
                 team="black"
                 players={playersByTeam.black}
                 onRemovePlayer={onRemovePlayer}
+                allowRemoval={!rosterManagedByClassroom}
               />
               <TeamRoster
                 team="white"
                 players={playersByTeam.white}
                 onRemovePlayer={onRemovePlayer}
+                allowRemoval={!rosterManagedByClassroom}
               />
             </div>
             <div className="shadow-alliance-action-row">
-              <button type="button" className="shadow-alliance-button secondary" onClick={onAddPlayer}>
-                연습 공작원 추가
-              </button>
+              {!rosterManagedByClassroom ? (
+                <button type="button" className="shadow-alliance-button secondary" onClick={onAddPlayer}>
+                  연습 공작원 추가
+                </button>
+              ) : null}
               <button type="button" className="shadow-alliance-button secondary" onClick={onRebalanceTeams}>
                 블랙·화이트 다시 배정
               </button>
@@ -718,7 +763,13 @@ export function ShadowAllianceTeacherGame({
                 <li key={player.id}>
                   <TeamBadge team={player.team} />
                   <span>{player.nick}</span>
-                  <b>{player.number ?? "미제출"}</b>
+                  <b>
+                    {player.number === null
+                      ? "미제출"
+                      : player.number === 0
+                        ? "제출 완료"
+                        : player.number}
+                  </b>
                 </li>
               ))}
             </ul>

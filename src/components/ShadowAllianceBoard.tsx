@@ -1,16 +1,23 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GameAreaShell } from "@/components/game-platform/GameAreaShell";
-import { GameExitDialog } from "@/components/game-platform/GameExitDialog";
-import { GameLobby } from "@/components/game-platform/GameLobby";
-import { GameResultPanel } from "@/components/game-platform/GameResultPanel";
+import { useRouter } from "next/navigation";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
+import { ShadowAllianceStudentGame } from "@/features/shadow-alliance/components/ShadowAllianceStudentGame";
+import { ShadowAllianceTeacherGame } from "@/features/shadow-alliance/components/ShadowAllianceTeacherGame";
+import type {
+  ShadowAllianceGame as LegacyGame,
+  ShadowAlliancePlayer as LegacyPlayer,
+  ShadowAlliancePlayerSnapshot as LegacyPlayerSnapshot,
+  ShadowAllianceResult as LegacyResult,
+  ShadowAllianceSnapshot as LegacySnapshot,
+  ShadowAllianceTeam as LegacyTeam,
+} from "@/features/shadow-alliance/types";
 import type {
   ShadowAllianceSnapshot,
   ShadowAllianceTeam,
 } from "@/lib/shadow-alliance/contracts";
-import styles from "./shadow-alliance-authority.module.css";
+import { boardChannelKey, PLAY_SESSION_CHANGED_EVENT } from "@/lib/realtime";
 
 type Props = {
   boardId: string;
@@ -64,62 +71,24 @@ async function readJson<T>(response: Response): Promise<T | null> {
 function errorLabel(code: string | undefined): string {
   switch (code) {
     case "version_conflict":
-      return "다른 기기에서 상태가 바뀌어 서버의 최신 게임을 반영했어요.";
+      return "다른 기기에서 상태가 바뀌어 최신 게임을 반영했어요.";
     case "participants_not_ready":
       return "입장한 참가자가 모두 준비해야 시작할 수 있어요.";
     case "not_enough_participants":
       return "두 명 이상 입장해야 시작할 수 있어요.";
     case "teams_not_balanced":
-      return "검정 팀과 흰색 팀에 각각 한 명 이상 필요해요.";
+      return "블랙 연합과 화이트 연합에 각각 한 명 이상 필요해요.";
     case "already_submitted":
       return "이번 라운드 숫자는 이미 제출됐어요.";
     case "round_expired":
-      return "제출 시간이 끝났어요. 진행자의 공개를 기다려 주세요.";
-    case "participant_forfeited":
-      return "이미 게임에서 나간 참가자예요.";
+      return "제출 시간이 끝났어요.";
     case "invalid_number":
       return "1부터 100 사이의 정수를 입력해 주세요.";
-    case "invalid_state":
-      return "현재 단계에서는 이 조작을 할 수 없어요.";
-    case "session_terminal":
-      return "이미 끝난 게임이에요.";
     case "storage_error":
     case "play_engine_unavailable":
       return "게임 서버 연결이 불안정해요. 잠시 후 다시 시도해 주세요.";
     default:
       return "요청을 처리하지 못했어요. 연결을 확인하고 다시 시도해 주세요.";
-  }
-}
-
-function participantState(
-  participant: ShadowAllianceSnapshot["participants"][number],
-) {
-  if (participant.forfeitedAt != null) return "forfeited" as const;
-  if (participant.readyAt != null) return "ready" as const;
-  if (participant.joinedAt != null) return "joined" as const;
-  return "invited" as const;
-}
-
-function teamLabel(team: ShadowAllianceTeam): string {
-  if (team === "black") return "검정 팀";
-  if (team === "white") return "흰색 팀";
-  return "팀 배정 전";
-}
-
-function phaseLabel(snapshot: ShadowAllianceSnapshot): string {
-  switch (snapshot.phase) {
-    case "lobby":
-      return "대기실";
-    case "playing":
-      return `${snapshot.round}/${snapshot.totalRounds} 라운드 입력`;
-    case "revealing":
-      return `${snapshot.round}/${snapshot.totalRounds} 라운드 결과`;
-    case "postround":
-      return `${snapshot.round}/${snapshot.totalRounds} 라운드 정리`;
-    case "finished":
-      return "게임 완료";
-    case "host-ended":
-      return "진행자 종료";
   }
 }
 
@@ -138,35 +107,157 @@ function commandFingerprint(
   });
 }
 
+function legacyTeam(team: ShadowAllianceTeam, index: number): LegacyTeam {
+  if (team === "black" || team === "white") return team;
+  return index % 2 === 0 ? "black" : "white";
+}
+
+function legacyResult(
+  snapshot: ShadowAllianceSnapshot,
+  players: LegacyPlayer[],
+): LegacyResult | null {
+  const result = snapshot.lastResult;
+  if (!result) return null;
+
+  const numbers = new Map(
+    result.players.map((player) => [player.studentId, player.number]),
+  );
+  const gains = Object.fromEntries(
+    result.players.map((player) => [player.studentId, player.gain]),
+  );
+  const resultPlayers = players.map((player) => ({
+    ...player,
+    number: numbers.get(player.id) ?? null,
+    lastGain: gains[player.id] ?? player.lastGain,
+  }));
+
+  return {
+    command: result.command,
+    winner: result.winner,
+    blackAvg: result.blackAverage,
+    whiteAvg: result.whiteAverage,
+    blackDiff: result.blackDifference,
+    whiteDiff: result.whiteDifference,
+    black: resultPlayers.filter((player) => player.team === "black"),
+    white: resultPlayers.filter((player) => player.team === "white"),
+    gains,
+  };
+}
+
+function toLegacyGame(
+  snapshot: ShadowAllianceSnapshot,
+  timeLeftMs: number,
+  timerSec: number,
+): LegacyGame {
+  const joined = snapshot.participants.filter(
+    (participant) => participant.joinedAt != null,
+  );
+  const players = joined.map<LegacyPlayer>((participant, index) => ({
+    id: participant.studentId,
+    nick: participant.name,
+    team: legacyTeam(participant.team, index),
+    power: participant.power,
+    number: participant.submitted ? 0 : null,
+    lastGain: participant.lastGain,
+  }));
+  const result = legacyResult(snapshot, players);
+
+  return {
+    phase:
+      snapshot.phase === "finished" || snapshot.phase === "host-ended"
+        ? "final"
+        : snapshot.phase,
+    totalRounds: snapshot.totalRounds,
+    round: snapshot.round,
+    command: snapshot.command,
+    editable: snapshot.editable,
+    timerSec,
+    timeLeft: Math.max(0, Math.ceil(timeLeftMs / 1000)),
+    timerRunning: snapshot.timerRunning,
+    players,
+    usedNicknames: players.map((player) => player.nick),
+    lastResult: result,
+    history: result ? [result] : [],
+  };
+}
+
+function toLegacySnapshot(
+  snapshot: ShadowAllianceSnapshot,
+  timeLeftMs: number,
+  ownStudentId?: string | null,
+): LegacySnapshot {
+  const joined = snapshot.participants.filter(
+    (participant) => participant.joinedAt != null || participant.isSelf,
+  );
+  const players = joined.map<LegacyPlayerSnapshot>((participant, index) => ({
+    id: participant.studentId,
+    nick:
+      participant.isSelf || participant.studentId === ownStudentId
+        ? participant.name
+        : participant.name,
+    team: legacyTeam(participant.team, index),
+    power: participant.power,
+    lastGain: participant.lastGain,
+    submitted: participant.submitted,
+  }));
+  const resultPlayers = players.map<LegacyPlayer>((player) => ({
+    ...player,
+    number: null,
+  }));
+  const result = legacyResult(snapshot, resultPlayers);
+  if (result && ownStudentId) {
+    const own = snapshot.participants.find(
+      (participant) => participant.studentId === ownStudentId,
+    );
+    if (own && result.gains[ownStudentId] == null) {
+      result.gains[ownStudentId] = own.lastGain;
+    }
+  }
+
+  return {
+    phase:
+      snapshot.phase === "finished" || snapshot.phase === "host-ended"
+        ? "final"
+        : snapshot.phase,
+    totalRounds: snapshot.totalRounds,
+    round: snapshot.round,
+    command: snapshot.command,
+    editable: snapshot.editable,
+    timeLeft: Math.max(0, Math.ceil(timeLeftMs / 1000)),
+    timerRunning: snapshot.timerRunning,
+    players,
+    lastResult: result,
+  };
+}
+
 export function ShadowAllianceBoard({ boardId, boardTitle, viewer }: Props) {
+  const router = useRouter();
   const [snapshot, setSnapshot] = useState<ShadowAllianceSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [reconnecting, setReconnecting] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [exitOpen, setExitOpen] = useState(false);
-  const [numberDraft, setNumberDraft] = useState("50");
-  const [editableDraft, setEditableDraft] = useState(true);
   const [timerDraft, setTimerDraft] = useState("300");
   const [receivedAt, setReceivedAt] = useState(Date.now());
   const [clockNow, setClockNow] = useState(Date.now());
   const commandRef = useRef<PendingCommand | null>(null);
   const joinedRunRef = useRef<string | null>(null);
+  const readyRunRef = useRef<string | null>(null);
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
 
   const acceptSnapshot = useCallback((next: ShadowAllianceSnapshot) => {
+    snapshotRef.current = next;
     setSnapshot(next);
     const now = Date.now();
     setReceivedAt(now);
     setClockNow(now);
-    setEditableDraft(next.editable);
   }, []);
 
   const load = useCallback(
-    async (mode: "initial" | "poll" | "retry" = "poll") => {
+    async (mode: "initial" | "refresh" | "retry" = "refresh") => {
       if (mode === "initial") setLoading(true);
-      else setReconnecting(true);
+      else if (mode === "retry") setReconnecting(true);
       try {
         const response = await fetch(
           `/api/shadow-alliance/boards/${encodeURIComponent(boardId)}`,
@@ -176,63 +267,27 @@ export function ShadowAllianceBoard({ boardId, boardTitle, viewer }: Props) {
           snapshot?: ShadowAllianceSnapshot;
           error?: string;
         }>(response);
-        if (response.status === 404) {
-          setSnapshot(null);
-          setError(null);
-          return null;
-        }
         if (!response.ok || !body?.snapshot) {
-          if (mode !== "poll" || !snapshotRef.current) {
+          if (mode !== "refresh" || !snapshotRef.current) {
             setError(errorLabel(body?.error));
           }
           return null;
         }
         acceptSnapshot(body.snapshot);
         setError(null);
-        if (
-          commandRef.current &&
-          body.snapshot.version !== commandRef.current.expectedVersion
-        ) {
-          commandRef.current = null;
-        }
         return body.snapshot;
       } catch {
-        if (mode !== "poll") {
+        if (mode !== "refresh" || !snapshotRef.current) {
           setError("게임 서버에 연결하지 못했어요. 다시 시도해 주세요.");
         }
         return null;
       } finally {
         setLoading(false);
-        setReconnecting(false);
+        if (mode === "retry") setReconnecting(false);
       }
     },
     [acceptSnapshot, boardId],
   );
-
-  useEffect(() => {
-    setSnapshot(null);
-    setError(null);
-    setExitOpen(false);
-    commandRef.current = null;
-    joinedRunRef.current = null;
-    void load("initial");
-  }, [load]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => void load("poll"), 2_500);
-    return () => window.clearInterval(timer);
-  }, [load]);
-
-  useEffect(() => {
-    if (snapshot?.phase !== "playing" || !snapshot.timerRunning) return;
-    const timer = window.setInterval(() => setClockNow(Date.now()), 250);
-    return () => window.clearInterval(timer);
-  }, [snapshot?.phase, snapshot?.timerRunning]);
-
-  const ownParticipant = useMemo(() => {
-    if (viewer !== "student" || !snapshot) return null;
-    return snapshot.participants.find((participant) => participant.isSelf) ?? null;
-  }, [snapshot, viewer]);
 
   const command = useCallback(
     async (action: CommandAction, options: CommandOptions = {}) => {
@@ -281,13 +336,20 @@ export function ShadowAllianceBoard({ boardId, boardTitle, viewer }: Props) {
           | ErrorPayload
         >(response);
         if (!response.ok) {
+          const errorCode = body && "error" in body ? body.error : undefined;
           if (body && "snapshot" in body && body.snapshot) {
             acceptSnapshot(body.snapshot);
-            if (body.snapshot.version !== envelope.expectedVersion) {
-              commandRef.current = null;
-            }
           }
-          setError(errorLabel(body && "error" in body ? body.error : undefined));
+          if (errorCode === "version_conflict") {
+            commandRef.current = null;
+            setError(
+              action === "settings"
+                ? null
+                : "게임 상태가 갱신됐어요. 다시 시도해 주세요.",
+            );
+            return null;
+          }
+          setError(errorLabel(errorCode));
           return null;
         }
         if (!body || !("snapshot" in body) || !body.snapshot) {
@@ -295,13 +357,14 @@ export function ShadowAllianceBoard({ boardId, boardTitle, viewer }: Props) {
           return null;
         }
         commandRef.current = null;
-        if (action === "rematch") joinedRunRef.current = null;
+        if (action === "rematch") {
+          joinedRunRef.current = null;
+          readyRunRef.current = null;
+        }
         acceptSnapshot(body.snapshot);
         return body.snapshot;
       } catch {
-        setError(
-          "게임 서버에 연결하지 못했어요. 같은 요청 ID로 안전하게 다시 시도할 수 있어요.",
-        );
+        setError("게임 서버에 연결하지 못했어요. 다시 시도해 주세요.");
         return null;
       } finally {
         setBusy(false);
@@ -309,6 +372,37 @@ export function ShadowAllianceBoard({ boardId, boardTitle, viewer }: Props) {
     },
     [acceptSnapshot, boardId],
   );
+
+  useEffect(() => {
+    setSnapshot(null);
+    setError(null);
+    commandRef.current = null;
+    joinedRunRef.current = null;
+    readyRunRef.current = null;
+    void load("initial");
+  }, [load]);
+
+  const refreshFromAuthority = useCallback(async () => {
+    await load("refresh");
+  }, [load]);
+
+  useRealtimeInvalidation({
+    channelName: boardChannelKey(boardId),
+    event: PLAY_SESSION_CHANGED_EVENT,
+    refresh: refreshFromAuthority,
+    fallbackPollMs: 10_000,
+  });
+
+  useEffect(() => {
+    if (snapshot?.phase !== "playing" || !snapshot.timerRunning) return;
+    const timer = window.setInterval(() => setClockNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [snapshot?.phase, snapshot?.timerRunning]);
+
+  const ownParticipant = useMemo(() => {
+    if (viewer !== "student" || !snapshot) return null;
+    return snapshot.participants.find((participant) => participant.isSelf) ?? null;
+  }, [snapshot, viewer]);
 
   useEffect(() => {
     if (
@@ -326,653 +420,202 @@ export function ShadowAllianceBoard({ boardId, boardTitle, viewer }: Props) {
     });
   }, [command, ownParticipant, snapshot, viewer]);
 
-  const rankedParticipants = useMemo(() => {
-    if (!snapshot) return [];
-    return [...snapshot.participants]
-      .filter((participant) => participant.joinedAt != null)
-      .sort(
-        (left, right) =>
-          right.power - left.power ||
-          left.name.localeCompare(right.name, "ko-KR"),
-      );
-  }, [snapshot]);
+  useEffect(() => {
+    if (
+      viewer !== "student" ||
+      !snapshot ||
+      !ownParticipant ||
+      ownParticipant.joinedAt == null ||
+      ownParticipant.readyAt != null ||
+      readyRunRef.current === snapshot.id
+    ) {
+      return;
+    }
+    readyRunRef.current = snapshot.id;
+    void command("ready").then((next) => {
+      if (!next) readyRunRef.current = null;
+    });
+  }, [command, ownParticipant, snapshot, viewer]);
 
   const displayedTimeLeft = useMemo(() => {
-    if (!snapshot) return null;
+    if (!snapshot) return 0;
     if (snapshot.phase !== "playing" || !snapshot.timerRunning) {
       return snapshot.timeLeftMs;
     }
     return Math.max(0, snapshot.timeLeftMs - (clockNow - receivedAt));
   }, [clockNow, receivedAt, snapshot]);
 
+  const connection = reconnecting
+    ? "reconnecting"
+    : error
+      ? "offline"
+      : snapshot
+        ? "connected"
+        : "connecting";
+
   if (loading && !snapshot) {
     return (
-      <section className={styles.root} aria-busy="true">
-        <p className={styles.notice} role="status">
-          그림자연합 게임을 불러오는 중이에요.
-        </p>
+      <section className="shadow-alliance-board" aria-label={boardTitle}>
+        <main className="shadow-alliance-game shadow-alliance-centered">
+          <p className="shadow-alliance-eyebrow">본부 연결 중</p>
+          <h1>그림자연합</h1>
+          <p>게임 상태를 불러오고 있습니다.</p>
+        </main>
       </section>
     );
   }
 
   if (!snapshot) {
-    if (!error) {
-      return (
-        <section className={`${styles.root} ${styles.waitingRoom}`} aria-live="polite">
-          <p className={styles.waitingEyebrow}>익명 대기실</p>
-          <h2 className={styles.waitingTitle}>그림자연합</h2>
-          <p className={styles.waitingCopy}>
-            익명 공작원으로 합류할 준비가 됐어요. 진행자가 본부를 열면 첫 지령이 도착합니다.
-          </p>
-          <p className={styles.waitingMeta}>
-            닉네임과 소속은 게임 안에서만 쓰이며, 실제 이름은 표시되지 않습니다.
-          </p>
+    return (
+      <section className="shadow-alliance-board" aria-label={boardTitle}>
+        <main className="shadow-alliance-game shadow-alliance-centered">
+          <p className="shadow-alliance-eyebrow">연결 오류</p>
+          <h1>그림자연합</h1>
+          <p role="alert">{error ?? "게임 상태를 불러오지 못했어요."}</p>
           <button
             type="button"
-            className={styles.secondaryButton}
+            className="shadow-alliance-button secondary"
             onClick={() => void load("retry")}
           >
-            다시 확인
+            다시 시도
           </button>
-        </section>
-      );
-    }
-    return (
-      <section className={styles.root}>
-        <p className={styles.error} role="alert">
-          {error ?? "게임 상태를 불러오지 못했어요."}
-        </p>
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          onClick={() => void load("retry")}
-        >
-          다시 시도
-        </button>
+        </main>
       </section>
     );
   }
 
-  const terminal = snapshot.phase === "finished" || snapshot.phase === "host-ended";
-  const connection = reconnecting ? "reconnecting" : error ? "offline" : "online";
-  const participantActions = viewer === "student" && !terminal ? (
-    <button
-      type="button"
-      className={styles.dangerButton}
-      disabled={busy || reconnecting || ownParticipant?.forfeitedAt != null}
-      onClick={() => setExitOpen(true)}
-    >
-      게임 나가기
-    </button>
-  ) : null;
+  const legacyGame = toLegacyGame(
+    snapshot,
+    displayedTimeLeft,
+    Number(timerDraft),
+  );
+  const legacySnapshot = toLegacySnapshot(
+    snapshot,
+    displayedTimeLeft,
+    ownParticipant?.studentId,
+  );
+  const ownLegacyPlayer = ownParticipant
+    ? {
+        id: ownParticipant.studentId,
+        nick: ownParticipant.name,
+        team: legacyTeam(
+          ownParticipant.team,
+          Math.max(
+            0,
+            snapshot.participants.findIndex(
+              (participant) => participant.studentId === ownParticipant.studentId,
+            ),
+          ),
+        ),
+        power: ownParticipant.power,
+        lastGain: ownParticipant.lastGain,
+        submitted: ownParticipant.submitted,
+      }
+    : null;
+  const rankings = [...legacyGame.players].sort(
+    (left, right) =>
+      right.power - left.power || left.nick.localeCompare(right.nick, "ko-KR"),
+  );
 
-  const hostControls = viewer === "teacher" && !terminal ? (
-    <HostControls
-      snapshot={snapshot}
-      busy={busy || reconnecting}
-      editableDraft={editableDraft}
-      timerDraft={timerDraft}
-      onEditableChange={setEditableDraft}
-      onTimerChange={setTimerDraft}
-      onCommand={command}
-      displayedTimeLeft={displayedTimeLeft ?? 0}
-    />
-  ) : null;
+  if (viewer === "student") {
+    return (
+      <section className="shadow-alliance-board" aria-label={boardTitle}>
+        {error ? <p className="shadow-alliance-error" role="alert">{error}</p> : null}
+        <ShadowAllianceStudentGame
+          connection={connection}
+          joinPending={busy || reconnecting || ownParticipant?.joinedAt == null}
+          player={ownLegacyPlayer}
+          snapshot={legacySnapshot}
+          onContinue={() => router.push("/student/boards?category=play&playTab=games")}
+          onRetryJoin={() => {
+            joinedRunRef.current = null;
+            readyRunRef.current = null;
+            void load("retry");
+          }}
+          onSubmitNumber={(number) => void command("submit", { number })}
+        />
+      </section>
+    );
+  }
 
   return (
-    <>
-      <GameAreaShell
-        title={boardTitle}
-        roundLabel={phaseLabel(snapshot)}
-        timeLeftMs={snapshot.phase === "playing" ? displayedTimeLeft : null}
-        score={ownParticipant?.power ?? null}
-        scoreLabel="파워"
-        rulesLabel="목표에 가까운 팀이 10,000 파워 획득"
+    <section className="shadow-alliance-board" aria-label={boardTitle}>
+      {error ? <p className="shadow-alliance-error" role="alert">{error}</p> : null}
+      <ShadowAllianceTeacherGame
+        game={legacyGame}
         connection={connection}
-        inputLocked={busy || reconnecting}
-        statusMessage={error}
-        hostControls={hostControls}
-        participantActions={participantActions}
-      >
-        <section className={styles.root}>
-          {error ? (
-            <p className={styles.error} role="alert">
-              {error}
-            </p>
-          ) : null}
-
-          {snapshot.phase === "lobby" ? (
-            <GameLobby
-              title={`${boardTitle} 대기실`}
-              description="익명 참가자가 입장하고 준비하면 진행자가 팀과 제한 시간을 확인한 뒤 시작합니다."
-              participants={snapshot.participants.map((participant) => ({
-                id: participant.studentId,
-                name: participant.name,
-                state: participantState(participant),
-              }))}
-              participantMessage={
-                viewer === "student" && ownParticipant
-                  ? ownParticipant.readyAt != null
-                    ? "준비가 완료됐어요. 진행자의 시작을 기다려 주세요."
-                    : "준비하기를 누르면 시작 명단에 포함됩니다."
-                  : null
-              }
-              actions={
-                viewer === "student" && ownParticipant ? (
-                  <button
-                    type="button"
-                    className={styles.button}
-                    disabled={
-                      busy ||
-                      reconnecting ||
-                      ownParticipant.joinedAt == null ||
-                      ownParticipant.readyAt != null
-                    }
-                    onClick={() => void command("ready")}
-                  >
-                    {ownParticipant.readyAt != null ? "준비 완료" : "준비하기"}
-                  </button>
-                ) : null
-              }
-            />
-          ) : null}
-
-          {snapshot.phase === "playing" ? (
-            <PlayingRound
-              snapshot={snapshot}
-              viewer={viewer}
-              ownParticipant={ownParticipant}
-              numberDraft={numberDraft}
-              disabled={busy || reconnecting || (displayedTimeLeft ?? 0) <= 0}
-              onNumberChange={setNumberDraft}
-              onSubmit={() => {
-                const number = Number(numberDraft);
-                if (!Number.isInteger(number) || number < 1 || number > 100) {
-                  setError("1부터 100 사이의 정수를 입력해 주세요.");
-                  return;
-                }
-                void command("submit", { number });
-              }}
-            />
-          ) : null}
-
-          {snapshot.phase === "revealing" || snapshot.phase === "postround" ? (
-            <RoundReveal snapshot={snapshot} />
-          ) : null}
-
-          {terminal ? (
-            <TerminalResult
-              snapshot={snapshot}
-              viewer={viewer}
-              ownParticipant={ownParticipant}
-              rankedParticipants={rankedParticipants}
-              busy={busy}
-              onRematch={() => void command("rematch")}
-            />
-          ) : (
-            <Scoreboard participants={rankedParticipants} />
-          )}
-
-          <p className={styles.runtimeMeta}>
-            session {snapshot.id} · v{snapshot.version}
-          </p>
-        </section>
-      </GameAreaShell>
-
-      <GameExitDialog
-        open={exitOpen}
-        title="그림자연합에서 나갈까요?"
-        description="진행 중 나가면 현재 파워로 기권 결과가 확정됩니다. 다른 참가자의 게임은 계속됩니다."
-        confirmLabel="기권하고 나가기"
-        busy={busy}
-        onCancel={() => setExitOpen(false)}
-        onConfirm={async () => {
-          const result = await command("forfeit");
-          if (result) setExitOpen(false);
+        rankings={rankings}
+        rosterManagedByClassroom
+        onAddPlayer={() => undefined}
+        onRemovePlayer={() => undefined}
+        onRebalanceTeams={() => void command("rebalance")}
+        onSetSettings={(settings) => {
+          const editable = settings.editable ?? snapshot.editable;
+          const timerSec = settings.timerSec ?? Number(timerDraft);
+          setTimerDraft(String(timerSec));
+          // Optimistic UI for the editable toggle; server remains authority and
+          // any conflict snapshot silently replaces this local value.
+          if (settings.editable !== undefined) {
+            setSnapshot((current) =>
+              current ? { ...current, editable: settings.editable! } : current,
+            );
+          }
+          void command("settings", { editable, timerSec });
         }}
-      />
-    </>
-  );
-}
-
-function HostControls({
-  snapshot,
-  busy,
-  editableDraft,
-  timerDraft,
-  onEditableChange,
-  onTimerChange,
-  onCommand,
-  displayedTimeLeft,
-}: {
-  snapshot: ShadowAllianceSnapshot;
-  busy: boolean;
-  editableDraft: boolean;
-  timerDraft: string;
-  onEditableChange: (value: boolean) => void;
-  onTimerChange: (value: string) => void;
-  onCommand: (
-    action: CommandAction,
-    options?: CommandOptions,
-  ) => Promise<ShadowAllianceSnapshot | null>;
-  displayedTimeLeft: number;
-}) {
-  if (snapshot.phase === "lobby") {
-    const timerSec = Number(timerDraft);
-    return (
-      <div className={styles.hostControlStack}>
-        <div className={styles.settingsRow}>
-          <label className={styles.checkboxLabel}>
-            <input
-              type="checkbox"
-              checked={editableDraft}
-              onChange={(event) => onEditableChange(event.target.checked)}
-            />
-            제출 후 수정 허용
-          </label>
-          <label className={styles.fieldLabel}>
-            제한 시간(초)
-            <input
-              className={styles.numberInput}
-              type="number"
-              min={10}
-              max={3600}
-              step={10}
-              value={timerDraft}
-              onChange={(event) => onTimerChange(event.target.value)}
-            />
-          </label>
-        </div>
-        <div className={styles.actions}>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            disabled={busy || !Number.isInteger(timerSec) || timerSec < 10 || timerSec > 3600}
-            onClick={() =>
-              void onCommand("settings", {
-                editable: editableDraft,
-                timerSec,
-              })
-            }
-          >
-            설정 저장
-          </button>
-          <button
-            type="button"
-            className={styles.secondaryButton}
-            disabled={busy}
-            onClick={() => void onCommand("rebalance")}
-          >
-            팀 재배정
-          </button>
-          <button
-            type="button"
-            className={styles.button}
-            disabled={busy}
-            onClick={() => void onCommand("start")}
-          >
-            게임 시작
-          </button>
-          <button
-            type="button"
-            className={styles.dangerButton}
-            disabled={busy}
-            onClick={() => void onCommand("end-early")}
-          >
-            세션 종료
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (snapshot.phase === "playing") {
-    return (
-      <div className={styles.actions}>
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          disabled={busy || displayedTimeLeft <= 0}
-          onClick={() =>
-            void onCommand(snapshot.timerRunning ? "pause" : "resume")
+        onStartGame={() => {
+          const needsTeams = snapshot.participants.some(
+            (participant) =>
+              participant.joinedAt != null && participant.team === "unassigned",
+          );
+          void (async () => {
+            if (needsTeams && !(await command("rebalance"))) return;
+            await command("start");
+          })();
+        }}
+        sessionActionBusy={busy || reconnecting}
+        onContinueGame={async () => {
+          const current = snapshotRef.current;
+          if (current?.phase === "playing" && current.timerRunning) {
+            const paused = await command("pause");
+            if (paused) return true;
+            const latest = await load("refresh");
+            return Boolean(
+              latest &&
+                (latest.phase !== "playing" || !latest.timerRunning),
+            );
           }
-        >
-          {snapshot.timerRunning ? "일시정지" : "계속"}
-        </button>
-        <button
-          type="button"
-          className={styles.button}
-          disabled={busy || (!snapshot.allSubmitted && displayedTimeLeft > 0)}
-          onClick={() => void onCommand("reveal")}
-        >
-          숫자 공개·결과 계산
-        </button>
-        <button
-          type="button"
-          className={styles.dangerButton}
-          disabled={busy}
-          onClick={() => void onCommand("end-early")}
-        >
-          조기 종료
-        </button>
-      </div>
-    );
-  }
-
-  if (snapshot.phase === "revealing") {
-    return (
-      <div className={styles.actions}>
-        <button
-          type="button"
-          className={styles.button}
-          disabled={busy}
-          onClick={() => void onCommand("postround")}
-        >
-          라운드 정리
-        </button>
-        <button
-          type="button"
-          className={styles.dangerButton}
-          disabled={busy}
-          onClick={() => void onCommand("end-early")}
-        >
-          조기 종료
-        </button>
-      </div>
-    );
-  }
-
-  if (snapshot.phase === "postround") {
-    return (
-      <div className={styles.actions}>
-        <button
-          type="button"
-          className={styles.button}
-          disabled={busy}
-          onClick={() =>
-            void onCommand(
-              snapshot.round >= snapshot.totalRounds ? "finish" : "next",
-            )
+          return true;
+        }}
+        onExitGame={async () => {
+          const ended = await command("end-early");
+          if (
+            ended?.phase === "host-ended" ||
+            ended?.phase === "finished"
+          ) {
+            return true;
           }
-        >
-          {snapshot.round >= snapshot.totalRounds ? "게임 완료" : "다음 라운드"}
-        </button>
-        <button
-          type="button"
-          className={styles.dangerButton}
-          disabled={busy}
-          onClick={() => void onCommand("end-early")}
-        >
-          조기 종료
-        </button>
-      </div>
-    );
-  }
 
-  return null;
-}
-
-function PlayingRound({
-  snapshot,
-  viewer,
-  ownParticipant,
-  numberDraft,
-  disabled,
-  onNumberChange,
-  onSubmit,
-}: {
-  snapshot: ShadowAllianceSnapshot;
-  viewer: Props["viewer"];
-  ownParticipant: ShadowAllianceSnapshot["participants"][number] | null;
-  numberDraft: string;
-  disabled: boolean;
-  onNumberChange: (value: string) => void;
-  onSubmit: () => void;
-}) {
-  return (
-    <>
-      <section className={styles.commandCard} aria-label="이번 라운드 목표 숫자">
-        <p className={styles.eyebrow}>TARGET COMMAND</p>
-        <strong className={styles.commandNumber}>{snapshot.command ?? "미공개"}</strong>
-        <p className={styles.meta}>
-          팀 평균이 목표 숫자에 더 가까우면 그 팀이 10,000 파워를 제출 비율대로 나눠 받습니다.
-        </p>
-      </section>
-
-      {viewer === "student" ? (
-        <section className={styles.choicePanel} aria-label="숫자 제출">
-          <h3>1부터 100 사이 숫자 제출</h3>
-          {ownParticipant?.forfeitedAt != null ? (
-            <p className={styles.error}>기권한 뒤에는 제출할 수 없어요.</p>
-          ) : (
-            <div className={styles.submitRow}>
-              <input
-                className={styles.largeNumberInput}
-                aria-label="제출할 숫자"
-                type="number"
-                inputMode="numeric"
-                min={1}
-                max={100}
-                step={1}
-                value={numberDraft}
-                disabled={disabled || ownParticipant?.joinedAt == null}
-                onChange={(event) => onNumberChange(event.target.value)}
-              />
-              <button
-                type="button"
-                className={styles.button}
-                disabled={
-                  disabled ||
-                  ownParticipant?.joinedAt == null ||
-                  (ownParticipant?.submitted === true && !snapshot.editable)
-                }
-                onClick={onSubmit}
-              >
-                {ownParticipant?.submitted ? "숫자 수정" : "숫자 제출"}
-              </button>
-            </div>
-          )}
-          {ownParticipant?.submitted ? (
-            <p className={styles.submitted} role="status">
-              {ownParticipant.ownNumber != null
-                ? `${ownParticipant.ownNumber}을(를) 제출했어요.`
-                : "숫자를 제출했어요."}
-              {snapshot.editable ? " 제한 시간 전까지 수정할 수 있어요." : ""}
-            </p>
-          ) : null}
-        </section>
-      ) : (
-        <section className={styles.hostPanel} aria-label="제출 현황">
-          <h3>제출 현황</h3>
-          <ul className={styles.hostList}>
-            {snapshot.participants
-              .filter(
-                (participant) =>
-                  participant.joinedAt != null && participant.forfeitedAt == null,
-              )
-              .map((participant) => (
-                <li className={styles.hostRow} key={participant.studentId}>
-                  <strong>{participant.name}</strong>
-                  <span className={styles.team}>{teamLabel(participant.team)}</span>
-                  <span>{participant.submitted ? "제출 완료" : "입력 중"}</span>
-                </li>
-              ))}
-          </ul>
-        </section>
-      )}
-    </>
-  );
-}
-
-function RoundReveal({ snapshot }: { snapshot: ShadowAllianceSnapshot }) {
-  const result = snapshot.lastResult;
-  if (!result) {
-    return (
-      <p className={styles.notice} role="status">
-        공개된 라운드 결과를 불러오는 중이에요.
-      </p>
-    );
-  }
-  return (
-    <section className={styles.resultCard} aria-label="라운드 결과">
-      <div className={styles.resultHeader}>
-        <div>
-          <p className={styles.eyebrow}>ROUND {result.round}</p>
-          <h2 className={styles.title}>
-            {result.winner === "tie"
-              ? "무승부"
-              : `${teamLabel(result.winner)} 승리`}
-          </h2>
-        </div>
-        <strong className={styles.commandBadge}>목표 {result.command}</strong>
-      </div>
-      <dl className={styles.averageGrid}>
-        <div>
-          <dt>검정 팀 평균</dt>
-          <dd>{result.blackAverage ?? "제출 없음"}</dd>
-        </div>
-        <div>
-          <dt>검정 팀 거리</dt>
-          <dd>{result.blackDifference ?? "없음"}</dd>
-        </div>
-        <div>
-          <dt>흰색 팀 평균</dt>
-          <dd>{result.whiteAverage ?? "제출 없음"}</dd>
-        </div>
-        <div>
-          <dt>흰색 팀 거리</dt>
-          <dd>{result.whiteDifference ?? "없음"}</dd>
-        </div>
-      </dl>
-      <ul className={styles.revealList}>
-        {result.players.map((player) => (
-          <li className={styles.revealRow} key={player.studentId}>
-            <div>
-              <strong>{player.name}</strong>
-              <span className={styles.team}>{teamLabel(player.team)}</span>
-            </div>
-            <span>제출 {player.number ?? "없음"}</span>
-            <strong>+{player.gain.toLocaleString("ko-KR")}</strong>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-function TerminalResult({
-  snapshot,
-  viewer,
-  ownParticipant,
-  rankedParticipants,
-  busy,
-  onRematch,
-}: {
-  snapshot: ShadowAllianceSnapshot;
-  viewer: Props["viewer"];
-  ownParticipant: ShadowAllianceSnapshot["participants"][number] | null;
-  rankedParticipants: ShadowAllianceSnapshot["participants"];
-  busy: boolean;
-  onRematch: () => void;
-}) {
-  const ownRank = ownParticipant
-    ? rankedParticipants.findIndex(
-        (participant) => participant.studentId === ownParticipant.studentId,
-      ) + 1
-    : 0;
-  return (
-    <>
-      <GameResultPanel
-        outcome={
-          ownParticipant?.forfeitedAt != null
-            ? "forfeit"
-            : snapshot.phase === "host-ended"
-              ? "host-ended"
-              : "completed"
-        }
-        score={ownParticipant?.power ?? null}
-        durationMs={
-          snapshot.startedAt != null && snapshot.completedAt != null
-            ? snapshot.completedAt - snapshot.startedAt
-            : null
-        }
-        metrics={[
-          ...(ownRank > 0 ? [{ label: "개인 순위", value: `${ownRank}위` }] : []),
-          ...(ownParticipant
-            ? [
-                { label: "라운드 승리", value: `${ownParticipant.roundWins}회` },
-                { label: "팀", value: teamLabel(ownParticipant.team) },
-              ]
-            : []),
-        ]}
-        message={
-          snapshot.phase === "host-ended"
-            ? "진행자가 게임을 종료했습니다. 서버가 확정한 현재 파워가 기록됩니다."
-            : "모든 라운드가 끝났습니다."
-        }
-        retryAction={
-          viewer === "teacher" ? (
-            <button
-              type="button"
-              className={styles.button}
-              disabled={busy}
-              onClick={onRematch}
-            >
-              새 세션으로 다시 하기
-            </button>
-          ) : null
-        }
-        gamesAction={
-          viewer === "student" ? (
-            <Link
-              className={styles.secondaryButton}
-              href="/student/boards?category=play&playTab=games"
-            >
-              게임 목록
-            </Link>
-          ) : null
-        }
-        recordsAction={
-          viewer === "student" ? (
-            <Link
-              className={styles.secondaryButton}
-              href="/student/boards?category=play&playTab=records&game=shadow-alliance"
-            >
-              나의 전적
-            </Link>
-          ) : null
+          // The authoritative mutation can commit even when a later response
+          // step fails. Re-read the server state before telling the teacher the
+          // game is still active or leaving them stranded on a stale screen.
+          const latest = await load("refresh");
+          if (
+            latest?.phase === "host-ended" ||
+            latest?.phase === "finished"
+          ) {
+            return true;
+          }
+          setError("게임을 종료하지 못했어요. 다시 시도해 주세요.");
+          return false;
+        }}
+        onResetGame={() => void command("rematch")}
+        onNextRound={() => void command("next")}
+        onRevealRound={() => void command("reveal")}
+        onShowPostround={() => void command("postround")}
+        onSetTimerRunning={(running) =>
+          void command(running ? "resume" : "pause")
         }
       />
-      <Scoreboard participants={rankedParticipants} />
-    </>
-  );
-}
-
-function Scoreboard({
-  participants,
-}: {
-  participants: ShadowAllianceSnapshot["participants"];
-}) {
-  return (
-    <section className={styles.scoreboard} aria-label="파워 순위">
-      <h3>파워 순위</h3>
-      <ol className={styles.scoreList}>
-        {participants.map((participant, index) => (
-          <li className={styles.scoreRow} key={participant.studentId}>
-            <div>
-              <span className={styles.rank}>{index + 1}위</span>{" "}
-              <strong>{participant.name}</strong>
-            </div>
-            <span className={styles.team}>{teamLabel(participant.team)}</span>
-            <strong>
-              {participant.power.toLocaleString("ko-KR")} 파워
-              {participant.lastGain > 0
-                ? ` (+${participant.lastGain.toLocaleString("ko-KR")})`
-                : ""}
-            </strong>
-          </li>
-        ))}
-      </ol>
     </section>
   );
 }
