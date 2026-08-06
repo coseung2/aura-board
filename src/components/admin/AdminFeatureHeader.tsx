@@ -6,6 +6,7 @@ export type AdminFeatureKey =
   | "errors"
   | "activity"
   | "daily-banners"
+  | "live-quiz"
   | "shop"
   | "creatures";
 
@@ -24,6 +25,7 @@ const FEATURE_LINKS: Array<{
   { key: "errors", label: "에러 로그", href: "/admin/errors" },
   { key: "activity", label: "보드 활동", href: "/admin/activity" },
   { key: "daily-banners", label: "일일 배너", href: "/admin/daily-banners" },
+  { key: "live-quiz", label: "라이브 퀴즈", href: "/admin/live-quiz" },
   { key: "shop", label: "상점", href: "/admin/shop" },
   { key: "creatures", label: "펫", href: "/admin/aura-pet" },
 ];

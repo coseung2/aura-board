@@ -121,6 +121,15 @@ export function AuthHeader() {
           </div>
         </details>
       )}
+      <Link href="/live-quiz" className="auth-settings">
+        <span
+          className="auth-settings-trigger"
+          title="오늘의 라이브 퀴즈 · 오후 1:30"
+          aria-label="오늘의 라이브 퀴즈로 이동"
+        >
+          📡
+        </span>
+      </Link>
       <TeacherNotificationBell />
       <SettingsMenu />
       <button

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { AlertCircle, CirclePlay, Trophy } from "lucide-react";
+import { AlertCircle, CirclePlay, Radio, Trophy } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { OfficialGameKind } from "@/lib/game-platform/contracts";
 import {
@@ -80,6 +80,28 @@ export function GameHubCatalog() {
           나의 전적
         </a>
       </header>
+
+      <article className={styles.liveFeature}>
+        <div className={styles.liveFeatureCopy}>
+          <span className={styles.liveFeatureBadge}>
+            <Radio aria-hidden size={15} strokeWidth={2.5} />
+            LIVE
+          </span>
+          <div>
+            <p>매일 오후 1:30 · 전체 이용자</p>
+            <h3>오늘의 라이브 퀴즈</h3>
+            <span>진행자 없이 모두가 같은 문제를 푸는 실시간 4지선다</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          className={styles.liveFeatureButton}
+          onClick={() => router.push("/student/live-quiz")}
+        >
+          <CirclePlay aria-hidden size={20} strokeWidth={2.3} />
+          라이브 입장
+        </button>
+      </article>
 
       <div className={styles.grid}>
         {GAME_HUB_ORDER.map((kind, index) => {

@@ -35,6 +35,86 @@
   text-decoration: none;
 }
 
+.liveFeature {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  min-width: 0;
+  padding: 22px 24px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
+  border-radius: 18px;
+  background:
+    radial-gradient(circle at 90% 10%, color-mix(in srgb, var(--color-accent) 18%, transparent), transparent 34%),
+    linear-gradient(135deg, var(--color-surface), var(--color-surface-alt));
+}
+
+.liveFeatureCopy {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.liveFeatureCopy p,
+.liveFeatureCopy h3,
+.liveFeatureCopy span {
+  margin: 0;
+}
+
+.liveFeatureCopy p {
+  margin-bottom: 4px;
+  color: var(--color-accent);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.liveFeatureCopy h3 {
+  color: var(--color-text);
+  font-size: clamp(1.2rem, 2.3vw, 1.7rem);
+  line-height: 1.25;
+}
+
+.liveFeatureCopy div > span {
+  display: block;
+  margin-top: 6px;
+  color: var(--color-text-muted);
+  line-height: 1.45;
+}
+
+.liveFeatureBadge {
+  display: inline-flex;
+  min-height: 34px;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border-radius: 999px;
+  color: #fff;
+  background: #e23a4f;
+  font-size: 0.78rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+}
+
+.liveFeatureButton {
+  display: inline-flex;
+  min-height: 46px;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 18px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-btn);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -113,6 +193,20 @@
 }
 
 @media (max-width: 640px) {
+  .liveFeature {
+    align-items: stretch;
+    flex-direction: column;
+    padding: 18px;
+  }
+
+  .liveFeatureCopy {
+    gap: 12px;
+  }
+
+  .liveFeatureButton {
+    width: 100%;
+  }
+
   .grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
