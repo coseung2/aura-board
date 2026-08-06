@@ -6,6 +6,32 @@ import { disconnectTeacherCanva } from "@/lib/canva";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const MAX_NAME_LEN = 40;
+
+export async function PATCH(req: Request) {
+  const user = await getCurrentUser().catch(() => null);
+  if (!user) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const body = (await req.json().catch(() => ({}))) as { name?: unknown };
+  const name = typeof body.name === "string" ? body.name.trim() : "";
+  if (!name) {
+    return NextResponse.json({ error: "name_required" }, { status: 400 });
+  }
+  if (name.length > MAX_NAME_LEN) {
+    return NextResponse.json({ error: "name_too_long" }, { status: 400 });
+  }
+
+  const updated = await db.user.update({
+    where: { id: user.id },
+    data: { name },
+    select: { id: true, email: true, name: true },
+  });
+
+  return NextResponse.json({ ok: true, user: updated });
+}
+
 export async function DELETE() {
   const user = await getCurrentUser().catch(() => null);
   if (!user) {

@@ -93,7 +93,7 @@ function defaultModel(provider: AiProvider, feature: AiFeatureKey): string {
 }
 
 export function LlmKeyForm() {
-  const [activeProvider, setActiveProvider] = useState<AiProvider>("gemini");
+  const [modalProvider, setModalProvider] = useState<AiProvider | null>(null);
   const [keys, setKeys] = useState<KeyStatus[]>([]);
   const [configs, setConfigs] = useState<FeatureConfig[]>(
     AI_FEATURE_DEFINITIONS.map(({ key }) => ({
@@ -107,13 +107,25 @@ export function LlmKeyForm() {
   const [featureBusy, setFeatureBusy] = useState<AiFeatureKey | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
 
-  const activeMeta = PROVIDERS.find((item) => item.id === activeProvider)!;
-  const activeKey = keys.find((key) => key.provider === activeProvider) ?? null;
   const keyByProvider = useMemo(
     () => new Map(keys.map((key) => [key.provider, key])),
     [keys],
   );
+  const connectedProviders = useMemo(
+    () => PROVIDERS.filter((provider) => keyByProvider.has(provider.id)),
+    [keyByProvider],
+  );
+  const availableProviders = useMemo(
+    () => PROVIDERS.filter((provider) => !keyByProvider.has(provider.id)),
+    [keyByProvider],
+  );
+  const modalMeta = modalProvider
+    ? PROVIDERS.find((item) => item.id === modalProvider) ?? null
+    : null;
+  const modalKey = modalProvider ? keyByProvider.get(modalProvider) ?? null : null;
+  const connectedCount = keys.filter((key) => key.verified).length;
 
   async function loadSettings() {
     setLoading(true);
@@ -130,10 +142,6 @@ export function LlmKeyForm() {
       }
       setKeys(body.keys);
       setConfigs(body.configs);
-      const firstConnected = AI_PROVIDERS.find((provider) =>
-        body.keys.some((key) => key.provider === provider),
-      );
-      if (firstConnected) setActiveProvider(firstConnected);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "AI 설정을 불러오지 못했습니다.");
     } finally {
@@ -145,17 +153,36 @@ export function LlmKeyForm() {
     void loadSettings();
   }, []);
 
+  function openConnectModal(provider: AiProvider = availableProviders[0]?.id ?? "gemini") {
+    setModalProvider(provider);
+    setApiKey("");
+    setModalError(null);
+  }
+
+  function openManageModal(provider: AiProvider) {
+    setModalProvider(provider);
+    setApiKey("");
+    setModalError(null);
+  }
+
+  function closeModal() {
+    if (providerBusy) return;
+    setModalProvider(null);
+    setApiKey("");
+    setModalError(null);
+  }
+
   async function saveProviderKey(event: React.FormEvent) {
     event.preventDefault();
-    if (providerBusy) return;
-    setProviderBusy(activeProvider);
+    if (!modalProvider || !modalMeta || providerBusy) return;
+    setProviderBusy(modalProvider);
     setMessage(null);
-    setError(null);
+    setModalError(null);
     try {
       const response = await fetch("/api/teacher/llm-key", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: activeProvider, apiKey: apiKey.trim() }),
+        body: JSON.stringify({ provider: modalProvider, apiKey: apiKey.trim() }),
       });
       const body = (await response.json().catch(() => ({}))) as {
         keys?: KeyStatus[];
@@ -170,25 +197,28 @@ export function LlmKeyForm() {
       setApiKey("");
       setMessage(
         body.key?.verified
-          ? `${activeMeta.label} 연결을 확인했습니다.`
-          : `${activeMeta.label} 키는 저장했지만 연결 검증에 실패했습니다.`,
+          ? `${modalMeta.label} 연결을 확인했습니다.`
+          : `${modalMeta.label} 키는 저장했지만 연결 검증에 실패했습니다.`,
       );
+      if (body.key?.verified) {
+        setModalProvider(null);
+      }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "API 키를 저장하지 못했습니다.");
+      setModalError(cause instanceof Error ? cause.message : "API 키를 저장하지 못했습니다.");
     } finally {
       setProviderBusy(null);
     }
   }
 
   async function deleteProviderKey() {
-    if (!activeKey || providerBusy) return;
-    if (!window.confirm(`${activeMeta.label} API 연결을 해제할까요?`)) return;
-    setProviderBusy(activeProvider);
+    if (!modalProvider || !modalMeta || !modalKey || providerBusy) return;
+    if (!window.confirm(`${modalMeta.label} API 연결을 해제할까요?`)) return;
+    setProviderBusy(modalProvider);
     setMessage(null);
-    setError(null);
+    setModalError(null);
     try {
       const response = await fetch(
-        `/api/teacher/llm-key?provider=${encodeURIComponent(activeProvider)}`,
+        `/api/teacher/llm-key?provider=${encodeURIComponent(modalProvider)}`,
         { method: "DELETE", cache: "no-store" },
       );
       const body = (await response.json().catch(() => ({}))) as {
@@ -199,9 +229,10 @@ export function LlmKeyForm() {
         throw new Error(body.error ?? "API 연결을 해제하지 못했습니다.");
       }
       setKeys(body.keys);
-      setMessage(`${activeMeta.label} 연결을 해제했습니다.`);
+      setMessage(`${modalMeta.label} 연결을 해제했습니다.`);
+      setModalProvider(null);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "API 연결을 해제하지 못했습니다.");
+      setModalError(cause instanceof Error ? cause.message : "API 연결을 해제하지 못했습니다.");
     } finally {
       setProviderBusy(null);
     }
@@ -252,115 +283,84 @@ export function LlmKeyForm() {
     void saveFeatureConfig(feature, provider, defaultModel(provider, feature));
   }
 
-  const connectedCount = keys.filter((key) => key.verified).length;
-
   return (
     <div className="ai-settings-stack" aria-busy={loading}>
       <section className="ai-settings-group" aria-labelledby="ai-provider-heading">
-        <div className="ai-settings-group-head">
+        <div className="ai-settings-group-head ai-provider-table-head">
           <div>
             <h3 id="ai-provider-heading">API 연결</h3>
-            <p>공급자별 키를 각각 저장해 여러 모델을 동시에 사용할 수 있습니다.</p>
           </div>
-          <span className="ai-settings-count">
-            {connectedCount}/{AI_PROVIDERS.length} 연결
-          </span>
+          <div className="ai-provider-table-labels" aria-hidden="true">
+            <span>연결</span>
+            <span>청구</span>
+          </div>
         </div>
 
-        <div className="ai-provider-tabs" role="tablist" aria-label="AI 공급자">
-          {PROVIDERS.map((provider) => {
-            const status = keyByProvider.get(provider.id);
-            return (
-              <button
-                key={provider.id}
-                type="button"
-                role="tab"
-                aria-selected={activeProvider === provider.id}
-                className={`ai-provider-tab ${activeProvider === provider.id ? "is-active" : ""}`}
-                onClick={() => {
-                  setActiveProvider(provider.id);
-                  setApiKey("");
-                  setMessage(null);
-                  setError(null);
-                }}
-              >
-                <span>{provider.label}</span>
-                <span
-                  className={`ai-provider-state ${status?.verified ? "is-on" : status ? "is-warn" : ""}`}
-                >
-                  {status?.verified ? "연결됨" : status ? "확인 필요" : "미연결"}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="ai-provider-panel" role="tabpanel">
-          <div className="ai-provider-panel-head">
-            <div>
-              <strong>{activeMeta.label}</strong>
-              <span>{activeMeta.description}</span>
-            </div>
-            {activeKey ? (
-              <div className={`ai-provider-current ${activeKey.verified ? "is-ok" : "is-warn"}`}>
-                <span>{activeKey.verified ? "검증 완료" : "검증 실패"}</span>
-                <code>•••• {activeKey.last4}</code>
-                <small>{formatDate(activeKey.verifiedAt ?? activeKey.updatedAt)}</small>
-              </div>
-            ) : null}
+        <div className="ai-settings-group-body">
+          <div className="ai-provider-table" role="table" aria-label="공급자 연결 및 청구">
+            {PROVIDERS.map((provider) => {
+              const status = keyByProvider.get(provider.id);
+              const connected = Boolean(status);
+              const verified = Boolean(status?.verified);
+              return (
+                <div className="ai-provider-table-row" role="row" key={provider.id}>
+                  <div className="ai-provider-table-provider" role="cell">
+                    <strong>{provider.label}</strong>
+                    <span>{provider.description}</span>
+                  </div>
+                  <div className="ai-provider-table-connection" role="cell">
+                    {connected ? (
+                      <button
+                        type="button"
+                        className="ai-provider-connection-btn"
+                        onClick={() => openManageModal(provider.id)}
+                        aria-label={`${provider.label} ${verified ? "연결됨" : "확인 필요"}`}
+                      >
+                        <span
+                          className={`ai-provider-status-dot ${verified ? "is-on" : "is-warn"}`}
+                          aria-hidden="true"
+                        />
+                        <code>•••• {status?.last4}</code>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        className="settings-action-btn"
+                        onClick={() => openConnectModal(provider.id)}
+                      >
+                        연결
+                      </button>
+                    )}
+                  </div>
+                  <div className="ai-provider-table-billing" role="cell">
+                    <a
+                      className="settings-action-btn"
+                      href={provider.billingUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {provider.billingLabel}
+                    </a>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-
-          <form className="ai-provider-key-form" onSubmit={saveProviderKey}>
-            <label>
-              <span>API Key</span>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(event) => setApiKey(event.target.value)}
-                placeholder={activeKey ? "새 키로 교체할 때만 입력" : activeMeta.keyPlaceholder}
-                disabled={providerBusy !== null}
-                autoComplete="off"
-                spellCheck={false}
-              />
-            </label>
-            <button
-              type="submit"
-              className="settings-action-btn is-primary"
-              disabled={providerBusy !== null || !apiKey.trim()}
-            >
-              {providerBusy === activeProvider
-                ? "확인 중…"
-                : activeKey
-                  ? "새 키로 교체"
-                  : "저장 + 검증"}
-            </button>
-            {activeKey ? (
-              <button
-                type="button"
-                className="settings-action-btn is-danger"
-                onClick={deleteProviderKey}
-                disabled={providerBusy !== null}
-              >
-                연결 해제
-              </button>
-            ) : null}
-          </form>
-          {activeKey?.lastError ? (
-            <p className="ai-settings-inline-error" role="alert">
-              {activeKey.lastError}
-            </p>
-          ) : null}
         </div>
       </section>
 
-      <section className="ai-settings-group" aria-labelledby="ai-feature-heading">
-        <div className="ai-settings-group-head">
+<section className="ai-settings-group" aria-labelledby="ai-feature-heading">
+        <div className="ai-settings-group-head ai-feature-group-head">
           <div>
             <h3 id="ai-feature-heading">영역별 모델</h3>
-            <p>기능의 성격과 비용에 맞게 공급자와 모델을 따로 선택합니다.</p>
+          </div>
+          <div className="ai-feature-column-labels" aria-hidden="true">
+            <span>공급자</span>
+            <span>모델</span>
           </div>
         </div>
 
+        <div className="ai-settings-group-body">
         <div className="ai-feature-model-list">
           {AI_FEATURE_DEFINITIONS.map((definition) => {
             const config =
@@ -369,8 +369,6 @@ export function LlmKeyForm() {
                 ...DEFAULT_FEATURE_MODELS[definition.key],
               };
             const providerModels = modelsForProvider(config.provider);
-            const model = providerModels.find((item) => item.id === config.modelId);
-            const providerKey = keyByProvider.get(config.provider);
             return (
               <div className="ai-feature-model-row" key={definition.key}>
                 <div className="ai-feature-model-copy">
@@ -378,7 +376,6 @@ export function LlmKeyForm() {
                   <span>{definition.description}</span>
                 </div>
                 <label className="ai-feature-select">
-                  <span>공급자</span>
                   <select
                     aria-label={`${definition.label} 공급자`}
                     value={config.provider}
@@ -398,7 +395,6 @@ export function LlmKeyForm() {
                   </select>
                 </label>
                 <label className="ai-feature-select ai-feature-model-select">
-                  <span>모델</span>
                   <select
                     aria-label={`${definition.label} 모델`}
                     value={config.modelId}
@@ -417,74 +413,139 @@ export function LlmKeyForm() {
                       </option>
                     ))}
                   </select>
-                  <small>{model?.description}</small>
                 </label>
-                <div
-                  className={`ai-feature-key-state ${providerKey?.verified ? "is-ok" : "is-warn"}`}
-                >
-                  {featureBusy === definition.key
-                    ? "저장 중…"
-                    : providerKey?.verified
-                      ? `${providerLabel(config.provider)} 연결됨`
-                      : `${providerLabel(config.provider)} 키 필요`}
-                </div>
               </div>
             );
           })}
         </div>
-      </section>
-
-      <section className="ai-settings-group" aria-labelledby="ai-usage-heading">
-        <div className="ai-settings-group-head">
-          <div>
-            <h3 id="ai-usage-heading">Usage</h3>
-            <p>아우라보드에서 발생한 요청과 토큰 사용량을 기능별로 집계합니다.</p>
-          </div>
-        </div>
-        <div className="ai-metric-grid">
-          <div><span>오늘 요청</span><strong>—</strong><small>집계 연결 예정</small></div>
-          <div><span>이번 달 토큰</span><strong>—</strong><small>입력 + 출력</small></div>
-          <div><span>최근 상태</span><strong>{connectedCount > 0 ? "연결됨" : "미연결"}</strong><small>{connectedCount}개 공급자 사용 가능</small></div>
-        </div>
-      </section>
-
-      <section className="ai-settings-group" aria-labelledby="ai-billing-heading">
-        <div className="ai-settings-group-head">
-          <div>
-            <h3 id="ai-billing-heading">Billing</h3>
-            <p>청구와 실제 잔여 할당량은 각 공급자 콘솔에서 관리합니다.</p>
-          </div>
-        </div>
-        <div className="ai-billing-provider-list">
-          {PROVIDERS.map((provider) => {
-            const status = keyByProvider.get(provider.id);
-            const featureCount = configs.filter(
-              (config) => config.provider === provider.id,
-            ).length;
-            return (
-              <div className="ai-billing-provider-row" key={provider.id}>
-                <div>
-                  <strong>{provider.label}</strong>
-                  <span>
-                    {status?.verified ? "연결됨" : "미연결"} · {featureCount}개 영역 사용
-                  </span>
-                </div>
-                <a
-                  className="settings-action-btn"
-                  href={provider.billingUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {provider.billingLabel}
-                </a>
-              </div>
-            );
-          })}
         </div>
       </section>
 
       {message ? <p className="ai-settings-message" role="status">{message}</p> : null}
       {error ? <p className="ai-settings-error" role="alert">{error}</p> : null}
+
+      {modalProvider && modalMeta ? (
+        <div
+          className="modal-backdrop"
+          onClick={(event) => {
+            if (event.target === event.currentTarget) closeModal();
+          }}
+        >
+          <div className="add-card-modal ai-connect-modal" role="dialog" aria-modal="true" aria-labelledby="ai-connect-title">
+            <div className="modal-header">
+              <h3 className="modal-title" id="ai-connect-title">
+                {modalKey ? `${modalMeta.label} 연결 관리` : "공급자 연결"}
+              </h3>
+              <button
+                type="button"
+                className="modal-close"
+                onClick={closeModal}
+                disabled={providerBusy !== null}
+                aria-label="닫기"
+              />
+            </div>
+            <div className="modal-body">
+              {!modalKey ? (
+                <label className="ai-connect-field">
+                  <span>공급자</span>
+                  <select
+                    value={modalProvider}
+                    onChange={(event) => {
+                      setModalProvider(event.target.value as AiProvider);
+                      setApiKey("");
+                      setModalError(null);
+                    }}
+                    disabled={providerBusy !== null}
+                  >
+                    {(availableProviders.length > 0 ? availableProviders : PROVIDERS).map(
+                      (provider) => (
+                        <option key={provider.id} value={provider.id}>
+                          {provider.label}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                </label>
+              ) : (
+                <div className="ai-connect-current">
+                  <strong>{modalMeta.label}</strong>
+                  <span>{modalMeta.description}</span>
+                  <div
+                    className={`ai-provider-current ${
+                      modalKey.verified ? "is-ok" : "is-warn"
+                    }`}
+                  >
+                    <span>{modalKey.verified ? "검증 완료" : "검증 실패"}</span>
+                    <code>•••• {modalKey.last4}</code>
+                    <small>{formatDate(modalKey.verifiedAt ?? modalKey.updatedAt)}</small>
+                  </div>
+                </div>
+              )}
+
+              <form className="ai-connect-form" onSubmit={saveProviderKey}>
+                <label className="ai-connect-field">
+                  <span>API Key</span>
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(event) => setApiKey(event.target.value)}
+                    placeholder={
+                      modalKey ? "새 키로 교체할 때만 입력" : modalMeta.keyPlaceholder
+                    }
+                    disabled={providerBusy !== null}
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                </label>
+                <div className="modal-actions ai-connect-actions">
+                  {modalKey ? (
+                    <button
+                      type="button"
+                      className="settings-action-btn is-danger"
+                      onClick={deleteProviderKey}
+                      disabled={providerBusy !== null}
+                    >
+                      연결 해제
+                    </button>
+                  ) : (
+                    <span className="ai-connect-spacer" />
+                  )}
+                  <button
+                    type="button"
+                    className="settings-action-btn"
+                    onClick={closeModal}
+                    disabled={providerBusy !== null}
+                  >
+                    취소
+                  </button>
+                  <button
+                    type="submit"
+                    className="settings-action-btn is-primary"
+                    disabled={providerBusy !== null || !apiKey.trim()}
+                  >
+                    {providerBusy === modalProvider
+                      ? "확인 중…"
+                      : modalKey
+                        ? "새 키로 교체"
+                        : "저장 + 검증"}
+                  </button>
+                </div>
+              </form>
+
+              {modalKey?.lastError ? (
+                <p className="ai-settings-inline-error" role="alert">
+                  {modalKey.lastError}
+                </p>
+              ) : null}
+              {modalError ? (
+                <p className="ai-settings-inline-error" role="alert">
+                  {modalError}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

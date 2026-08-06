@@ -17,9 +17,12 @@ const defaultConfigs = AI_FEATURE_DEFINITIONS.map(({ key }) => ({
   ...DEFAULT_FEATURE_MODELS[key],
 }));
 
-function settingsResponse(configs = defaultConfigs) {
+function settingsResponse(
+  configs = defaultConfigs,
+  keys: Array<Record<string, unknown>> = [],
+) {
   return new Response(
-    JSON.stringify({ keys: [], configs, catalog: AI_MODEL_CATALOG }),
+    JSON.stringify({ keys, configs, catalog: AI_MODEL_CATALOG }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
 }
@@ -56,7 +59,7 @@ describe("LlmKeyForm", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows provider credentials and six feature-specific model selectors", async () => {
+  it("shows provider connection/billing table, connect modal, and feature selectors", async () => {
     render(<LlmKeyForm />);
 
     await waitFor(() =>
@@ -65,12 +68,15 @@ describe("LlmKeyForm", () => {
       }),
     );
 
-    expect(screen.getByRole("tab", { name: /OpenAI/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /Google/ })).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: /OpenCode-go/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "API 연결" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "영역별 모델" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Usage" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Billing" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "청구" })).not.toBeInTheDocument();
+    expect(screen.getByRole("table", { name: "공급자 연결 및 청구" })).toBeInTheDocument();
+    expect(screen.getAllByText("OpenAI").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Google").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("OpenCode-go").length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: "연결" }).length).toBeGreaterThan(0);
+    expect(screen.getByRole("link", { name: "OpenAI Platform" })).toBeInTheDocument();
 
     for (const feature of AI_FEATURE_DEFINITIONS) {
       expect(screen.getByText(feature.label)).toBeInTheDocument();
@@ -78,17 +84,42 @@ describe("LlmKeyForm", () => {
     expect(screen.getAllByRole("combobox")).toHaveLength(12);
     expect(screen.getByRole("combobox", { name: "학생 평어 공급자" })).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "독서 피드백 모델" })).toBeInTheDocument();
+    expect(screen.queryByText("대량·저지연 작업용 경량 모델")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "연결" })[0]);
+    expect(screen.getByRole("dialog", { name: "공급자 연결" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("sk-...")).toBeInTheDocument();
   });
 
-  it("switches independent provider key panels", async () => {
+  it("shows connection status and opens manage modal for connected providers", async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/teacher/ai-settings" && (!init?.method || init.method === "GET")) {
+        return settingsResponse(defaultConfigs, [
+          {
+            provider: "gemini",
+            last4: "JQ04",
+            verified: true,
+            verifiedAt: "2026-07-05T07:11:00.000Z",
+            lastError: null,
+            updatedAt: "2026-07-05T07:11:00.000Z",
+          },
+        ]);
+      }
+      return new Response(JSON.stringify({ error: "unexpected_request" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    });
+
     render(<LlmKeyForm />);
-    await screen.findByRole("heading", { name: "영역별 모델" });
+    expect(await screen.findByText("•••• JQ04")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Google 연결됨" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "연결" }).length).toBeGreaterThan(0);
 
-    fireEvent.click(screen.getByRole("tab", { name: /OpenAI/ }));
-    expect(screen.getByPlaceholderText("sk-...")).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("tab", { name: /OpenCode-go/ }));
-    expect(screen.getByPlaceholderText("oc-...")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Google 연결됨" }));
+    expect(screen.getByRole("dialog", { name: "Google 연결 관리" })).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("새 키로 교체할 때만 입력")).toBeInTheDocument();
   });
 
   it("saves a recommended model when a feature provider changes", async () => {

@@ -9,6 +9,10 @@ import { RoleIcon } from "./login/RoleIcon";
 
 export function AuthHeader() {
   const { data: session, status } = useSession();
+  const teacherDisplayName =
+    session?.user?.name?.trim() ||
+    session?.user?.email?.split("@")[0] ||
+    "";
   const [canSwitchToParent, setCanSwitchToParent] = useState(false);
   const [switchingToParent, setSwitchingToParent] = useState(false);
   const roleMenuRef = useRef<HTMLDetailsElement>(null);
@@ -93,7 +97,7 @@ export function AuthHeader() {
           height={28}
         />
       )}
-      <span className="auth-name">{session.user.name}</span>
+      <span className="auth-name">{teacherDisplayName}</span>
       {canSwitchToParent && (
         <details ref={roleMenuRef} className="auth-role-menu">
           <summary className="auth-role-trigger" aria-label="사용자 유형 전환">

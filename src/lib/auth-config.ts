@@ -124,15 +124,36 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
       return true;
     },
-    jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
+        if (typeof user.name === "string" && user.name.trim()) {
+          token.name = user.name.trim();
+        }
       }
+
+      // Keep the JWT display name in sync with the teacher nickname stored in DB.
+      if (trigger === "update" && session && typeof (session as { name?: unknown }).name === "string") {
+        const nextName = String((session as { name?: string }).name ?? "").trim();
+        if (nextName) token.name = nextName;
+      } else if (token.id) {
+        const dbUser = await db.user.findUnique({
+          where: { id: String(token.id) },
+          select: { name: true },
+        });
+        if (dbUser?.name?.trim()) {
+          token.name = dbUser.name.trim();
+        }
+      }
+
       return token;
     },
     session({ session, token }) {
       if (token.id) {
         session.user.id = token.id as string;
+      }
+      if (typeof token.name === "string" && token.name.trim()) {
+        session.user.name = token.name.trim();
       }
       return session;
     },

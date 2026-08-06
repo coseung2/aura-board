@@ -7,6 +7,10 @@ type Props = {
   initialConnected: boolean;
 };
 
+const CANVA_SCOPE_SUMMARY = "디자인 메타데이터·콘텐츠 읽기 · 폴더 읽기·쓰기";
+const CANVA_SCOPE_VALUE =
+  "design:meta:read · design:content:read · folder:read · folder:write";
+
 export function CanvaConnectionCard({ initialConnected }: Props) {
   const [connected, setConnected] = useState(initialConnected);
   const [busy, setBusy] = useState(false);
@@ -36,35 +40,45 @@ export function CanvaConnectionCard({ initialConnected }: Props) {
   }
 
   return (
-    <div className="connected-app-row" aria-busy={busy}>
-      <div className="connected-app-main">
-        <div className="connected-app-heading">
-          <strong className="connected-app-name">Canva</strong>
-          <CanvaAttribution />
+    <div className="ai-provider-table" role="table" aria-label="Canva 연결" aria-busy={busy}>
+      <div className="ai-provider-table-row" role="row">
+        <div className="ai-provider-table-provider" role="cell">
+          <div className="connected-app-heading">
+            <strong className="connected-app-name">Canva</strong>
+            <CanvaAttribution />
+          </div>
+          <span>
+            {connected ? "계정이 연결되어 있습니다." : "연결된 Canva 계정이 없습니다."}
+          </span>
+          {error ? (
+            <span className="connected-apps-error" role="alert">
+              {error}
+            </span>
+          ) : null}
         </div>
-        <span className="connected-app-meta">
-          {connected ? "계정이 연결되어 있습니다." : "연결된 Canva 계정이 없습니다."}
-        </span>
-        <span className="connected-app-meta-faint">
-          연결 해제 시 OAuth 토큰과 임시 인증 데이터가 즉시 삭제됩니다.
-        </span>
-        {error && <span className="connected-apps-error" role="alert">{error}</span>}
+        <div className="canva-scope-cell" role="cell">
+          <strong>권한</strong>
+          <span>{CANVA_SCOPE_SUMMARY}</span>
+          <code>{CANVA_SCOPE_VALUE}</code>
+        </div>
+        <div className="ai-provider-table-billing" role="cell">
+          {connected ? (
+            <button
+              type="button"
+              className="settings-action-btn is-danger"
+              onClick={disconnect}
+              disabled={busy}
+              aria-busy={busy}
+            >
+              {busy ? "해제 중…" : "연결 해제"}
+            </button>
+          ) : (
+            <a className="settings-action-btn" href={connectUrl}>
+              연결
+            </a>
+          )}
+        </div>
       </div>
-      {connected ? (
-        <button
-          type="button"
-          className="settings-action-btn is-danger"
-          onClick={disconnect}
-          disabled={busy}
-          aria-busy={busy}
-        >
-          {busy ? "해제 중…" : "연결 해제"}
-        </button>
-      ) : (
-        <a className="settings-action-btn is-primary" href={connectUrl}>
-          Canva 연결
-        </a>
-      )}
     </div>
   );
 }
