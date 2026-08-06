@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 /**
  * Inline classroom-name editor used by the section header.
@@ -15,6 +16,7 @@ type Props = {
   renaming: boolean;
   error: string | null;
   onRename: (next: string) => void;
+  actions?: ReactNode;
 };
 
 export function ClassroomNameField({
@@ -22,6 +24,7 @@ export function ClassroomNameField({
   renaming,
   error,
   onRename,
+  actions,
 }: Props) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
@@ -96,6 +99,7 @@ export function ClassroomNameField({
       >
         <PencilIcon />
       </button>
+      {actions}
       {error ? (
         <p className="classroom-name-error" role="alert">
           이름 저장 실패: {error}

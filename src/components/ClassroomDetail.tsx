@@ -435,15 +435,6 @@ export function ClassroomDetail({ classroom }: Props) {
             </span>
           )}
         </a>
-        {/* The settings modal is gone (2026-07-27): renaming happens inline in
-            the section header, so only deletion needed a new home. */}
-        <button
-          type="button"
-          className="classroom-detail-delete"
-          onClick={() => setShowClassroomDelete(true)}
-        >
-          학급 삭제
-        </button>
       </div>
 
       <div className="classroom-table-wrap">

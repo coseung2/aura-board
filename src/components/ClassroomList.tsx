@@ -125,6 +125,14 @@ export function ClassroomList({ classrooms, onRefresh }: Props) {
             </button>
             {menuOpen === c.id && (
               <div className="classroom-grid-kebab-menu" role="menu">
+                <Link
+                  href={`/classroom/${c.id}/dashboard`}
+                  className="classroom-grid-kebab-item"
+                  role="menuitem"
+                  onClick={() => setMenuOpen(null)}
+                >
+                  수정
+                </Link>
                 <button
                   type="button"
                   className="classroom-grid-kebab-item classroom-grid-kebab-item--danger"

@@ -6757,6 +6757,28 @@
   outline-offset: 2px;
 }
 
+.classroom-name-delete {
+  display: inline-flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: 0;
+  margin-bottom: 0;
+  padding: 0 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--color-danger);
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+
+.classroom-name-delete:hover {
+  color: var(--color-danger);
+  background: transparent;
+  border-color: transparent;
+}
+
 .classroom-name-input {
   min-width: 0;
   width: min(320px, 100%);

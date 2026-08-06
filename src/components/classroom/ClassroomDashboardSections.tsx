@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Trash2 } from "lucide-react";
 import { ClassroomDetail } from "@/components/ClassroomDetail";
 import { ClassroomBankTab } from "./ClassroomBankTab";
 import { ClassroomBoardsTab } from "./ClassroomBoardsTab";
 import { ClassroomGroupsTab } from "./ClassroomGroupsTab";
 import { ClassroomMorningDashboard } from "./ClassroomMorningDashboard";
 import { ClassroomNameField } from "./ClassroomNameField";
+import { ClassroomDeleteModal } from "./ClassroomDeleteModal";
 import { ClassroomRolePanel } from "./ClassroomRolePanel";
 import { notifyClassroomListChanged } from "@/lib/client-lookup-cache";
 import type { Student } from "./StudentRow";
@@ -115,6 +118,7 @@ export function ClassroomDashboardSections({
   linkedBoards,
   allBoards,
 }: Props) {
+  const router = useRouter();
   const [activeSection, setActiveSection] =
     useState<DashboardSectionKey>("dashboard");
   const [activePanel, setActivePanel] =
@@ -124,6 +128,7 @@ export function ClassroomDashboardSections({
   const [name, setName] = useState(classroomName);
   const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [showClassroomDelete, setShowClassroomDelete] = useState(false);
 
   async function handleRename(next: string) {
     setRenaming(true);
@@ -150,6 +155,20 @@ export function ClassroomDashboardSections({
     }
   }
 
+  async function handleDeleteClassroom() {
+    const response = await fetch(`/api/classroom/${classroomId}`, {
+      method: "DELETE",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ confirmName: name }),
+    });
+    if (!response.ok) {
+      throw new Error("학급 삭제에 실패했습니다.");
+    }
+    notifyClassroomListChanged();
+    router.push("/classroom");
+    router.refresh();
+  }
+
   const activeKpis =
     activeSection === "dashboard"
       ? panelKpis[activePanel]
@@ -163,6 +182,17 @@ export function ClassroomDashboardSections({
             renaming={renaming}
             error={renameError}
             onRename={(next) => void handleRename(next)}
+            actions={
+              <button
+                type="button"
+                className="classroom-detail-delete classroom-name-delete"
+                onClick={() => setShowClassroomDelete(true)}
+                title="학급 삭제"
+                aria-label="학급 삭제"
+              >
+                <Trash2 size={17} strokeWidth={1.8} aria-hidden="true" />
+              </button>
+            }
           />
         </div>
 
@@ -188,6 +218,15 @@ export function ClassroomDashboardSections({
           })}
         </nav>
       </header>
+
+      <ClassroomDeleteModal
+        open={showClassroomDelete}
+        classroomName={name}
+        pendingCount={0}
+        activeCount={0}
+        onConfirm={handleDeleteClassroom}
+        onCancel={() => setShowClassroomDelete(false)}
+      />
 
       {activeKpis.length > 0 ? (
         <section className="classroom-dashboard-kpis" aria-label="학급 요약">
