@@ -1660,6 +1660,31 @@ model GameResult {
   @@index([boardId, completedAt])
 }
 
+// Durable student-driven Omok matchmaking. One reusable ticket per student and
+// canonical lobby board keeps refresh/reconnect idempotent while each match gets
+// its own hidden PLAY board and authoritative Rust session.
+model OmokMatchTicket {
+  id String @id @default(cuid())
+
+  lobbyBoardId String
+  classroomId String
+  studentId String
+
+  status String @default("waiting")
+  opponentStudentId String?
+  matchBoardId String?
+  sessionId String?
+
+  requestedAt DateTime @default(now())
+  matchedAt DateTime?
+  updatedAt DateTime @updatedAt
+
+  @@unique([lobbyBoardId, studentId])
+  @@index([lobbyBoardId, status, requestedAt])
+  @@index([matchBoardId])
+  @@index([sessionId])
+}
+
 // Question Board ???쑩?젆?(QB-1, 2026-04-23).
 
 // ??嚥▲굥猷??Board(layout=question-board) ??N ?????쑩?젆? ????뽓????獒??????벧?녌關苡? ??????

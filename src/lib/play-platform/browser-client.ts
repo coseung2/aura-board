@@ -1,5 +1,7 @@
 import type {
   OmokIntent,
+  OmokMatchmakingStatus,
+  OmokPlayerProfile,
   OmokRosterStudent,
   OmokSnapshot,
   PlayApiError,
@@ -119,5 +121,34 @@ export async function createOmokRematch(sessionId: string): Promise<PlaySessionR
       method: "POST",
       body: JSON.stringify({ requestId: createPlayRequestId("rematch") }),
     },
+  );
+}
+
+export async function fetchOmokMatchmaking(boardId: string): Promise<OmokMatchmakingStatus> {
+  return requestJson<OmokMatchmakingStatus>(
+    `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,
+  );
+}
+
+export async function requestOmokMatch(boardId: string): Promise<OmokMatchmakingStatus> {
+  return requestJson<OmokMatchmakingStatus>(
+    `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,
+    { method: "POST" },
+  );
+}
+
+export async function cancelOmokMatch(boardId: string): Promise<OmokMatchmakingStatus> {
+  return requestJson<OmokMatchmakingStatus>(
+    `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,
+    { method: "DELETE" },
+  );
+}
+
+export async function fetchOmokPlayerProfiles(sessionId: string): Promise<{
+  startedAtMs: number | null;
+  players: OmokPlayerProfile[];
+}> {
+  return requestJson(
+    `/api/play/sessions/${encodeURIComponent(sessionId)}/players`,
   );
 }

@@ -84,6 +84,26 @@ export type OmokRosterStudent = {
   number: number | null;
 };
 
+export type OmokMatchmakingStatus = {
+  status: "idle" | "waiting" | "matched";
+  playerCount: number;
+  sessionId?: string;
+  href?: string | null;
+};
+
+export type OmokPlayerProfile = {
+  studentId: string;
+  slot: OmokSlot;
+  name: string;
+  number: number | null;
+  pet: {
+    color: string;
+    growthStage: number;
+    equippedFloor: string;
+  } | null;
+  record: { wins: number; losses: number; draws: number };
+};
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object";
 }

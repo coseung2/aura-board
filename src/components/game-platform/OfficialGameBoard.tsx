@@ -22,6 +22,7 @@ export type OfficialGameBoardProps = {
     title: string;
     layout: string;
     classroomId: string | null;
+    systemGameKind?: string | null;
   };
   userId: string | null;
   student: { id: string; name: string; classroomId: string } | null;
@@ -105,6 +106,7 @@ export async function OfficialGameBoard({
           boardId={board.id}
           boardTitle={board.title}
           viewer={viewer}
+          matchmakingEnabled={board.systemGameKind === "omok"}
         />
       );
       break;
@@ -119,14 +121,26 @@ export async function OfficialGameBoard({
       break;
   }
 
+  // Purpose-built games own their complete game surface. The shared shell
+  // duplicates their controls and constrains their wide game layouts.
+  if (board.layout === "shadow-alliance" || board.layout === "omok") {
+    return (
+      <main data-board-category="PLAY" data-play-board="true">
+        {content}
+      </main>
+    );
+  }
+
   return (
-    <GameAreaShell
-      title={board.title}
-      rulesLabel={catalog.label}
-      connection="online"
-      actions={actions}
-    >
-      {content}
-    </GameAreaShell>
+    <main data-board-category="PLAY" data-play-board="true">
+      <GameAreaShell
+        title={board.title}
+        rulesLabel={catalog.label}
+        connection="online"
+        actions={actions}
+      >
+        {content}
+      </GameAreaShell>
+    </main>
   );
 }

@@ -165,6 +165,7 @@ export default async function BoardPage({
           title: board.title,
           layout: board.layout,
           classroomId: board.classroomId,
+          systemGameKind: board.systemGameKind,
         }}
         userId={user?.id ?? null}
         student={

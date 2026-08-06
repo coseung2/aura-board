@@ -1,21 +1,30 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
+import { OfficialSlimeSprite } from "@/components/creatures/OfficialSlimeSprite";
+import type { SlimeColor } from "@/lib/pets/slime-assets";
 import { boardChannelKey, PLAY_SESSION_CHANGED_EVENT } from "@/lib/realtime";
 import {
   createOmokRematch,
+  cancelOmokMatch,
   createOmokSession,
   fetchCurrentOmokSession,
   fetchOmokRoster,
+  fetchOmokMatchmaking,
+  fetchOmokPlayerProfiles,
   makeOmokCommand,
   PlayClientError,
   submitOmokCommand,
+  requestOmokMatch,
 } from "@/lib/play-platform/browser-client";
 import {
   isOmokSnapshot,
   mergeOmokCommandSnapshot,
   type OmokIntent,
+  type OmokMatchmakingStatus,
+  type OmokPlayerProfile,
   type OmokRosterStudent,
   type OmokSlot,
   type OmokSnapshot,
@@ -27,6 +36,7 @@ type Props = {
   boardId: string;
   boardTitle: string;
   viewer: "teacher" | "student";
+  matchmakingEnabled?: boolean;
 };
 
 type PendingCommand = {
@@ -36,7 +46,8 @@ type PendingCommand = {
 
 const STAR_POINTS = new Set(["3:3", "3:11", "7:7", "11:3", "11:11"]);
 
-export function OmokBoard({ boardId, boardTitle, viewer }: Props) {
+export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = false }: Props) {
+  const router = useRouter();
   const [snapshot, setSnapshot] = useState<OmokSnapshot | null>(null);
   const [roster, setRoster] = useState<OmokRosterStudent[]>([]);
   const [selected, setSelected] = useState<[string, string]>(["", ""]);
@@ -45,6 +56,10 @@ export function OmokBoard({ boardId, boardTitle, viewer }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasPending, setHasPending] = useState(false);
+  const [matchmaking, setMatchmaking] = useState<OmokMatchmakingStatus>({ status: "idle", playerCount: 0 });
+  const [profiles, setProfiles] = useState<OmokPlayerProfile[]>([]);
+  const [startedAtMs, setStartedAtMs] = useState<number | null>(null);
+  const [clockNow, setClockNow] = useState(Date.now());
   const requestSequence = useRef(0);
   const autoRetriedRequest = useRef<string | null>(null);
   const storageKey = `aura-play-pending:${boardId}`;
@@ -87,7 +102,7 @@ export function OmokBoard({ boardId, boardTitle, viewer }: Props) {
       if (sequence !== requestSequence.current) return;
       setSnapshot(next);
       setError(null);
-      if (!next && viewer === "teacher") {
+      if (!next && viewer === "teacher" && !matchmakingEnabled) {
         const students = await fetchOmokRoster(boardId);
         if (sequence !== requestSequence.current) return;
         setRoster(students);
@@ -107,7 +122,7 @@ export function OmokBoard({ boardId, boardTitle, viewer }: Props) {
         setSyncing(false);
       }
     }
-  }, [boardId, readPending, viewer]);
+  }, [boardId, matchmakingEnabled, readPending, viewer]);
 
   useEffect(() => {
     void refresh();
@@ -119,6 +134,44 @@ export function OmokBoard({ boardId, boardTitle, viewer }: Props) {
     refresh,
     fallbackPollMs: 10_000,
   });
+
+  const refreshMatchmaking = useCallback(async () => {
+    if (viewer !== "student" || !matchmakingEnabled) return;
+    try {
+      const next = await fetchOmokMatchmaking(boardId);
+      setMatchmaking(next);
+      if (next.status === "matched" && next.href) router.replace(next.href);
+    } catch (cause) {
+      setError(messageForError(cause));
+    }
+  }, [boardId, matchmakingEnabled, router, viewer]);
+
+  useEffect(() => {
+    if (viewer !== "student" || !matchmakingEnabled) return;
+    void refreshMatchmaking();
+  }, [matchmakingEnabled, refreshMatchmaking, viewer]);
+
+  useEffect(() => {
+    if (matchmaking.status !== "waiting") return;
+    const timer = window.setInterval(refreshMatchmaking, 2_000);
+    return () => window.clearInterval(timer);
+  }, [matchmaking.status, refreshMatchmaking]);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    void fetchOmokPlayerProfiles(snapshot.sessionId)
+      .then((next) => {
+        setProfiles(next.players);
+        setStartedAtMs(next.startedAtMs);
+      })
+      .catch(() => undefined);
+  }, [snapshot?.sessionId]);
+
+  useEffect(() => {
+    if (snapshot?.roomStatus !== "active") return;
+    const timer = window.setInterval(() => setClockNow(Date.now()), 1_000);
+    return () => window.clearInterval(timer);
+  }, [snapshot?.roomStatus]);
 
   const executeCommand = useCallback(
     async (pending: PendingCommand, persist = true) => {
@@ -224,12 +277,35 @@ export function OmokBoard({ boardId, boardTitle, viewer }: Props) {
     }
   }
 
+  async function startMatchmaking() {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await requestOmokMatch(boardId);
+      setMatchmaking(next);
+      if (next.status === "matched" && next.href) router.replace(next.href);
+    } catch (cause) {
+      setError(messageForError(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function stopMatchmaking() {
+    setBusy(true);
+    try {
+      setMatchmaking(await cancelOmokMatch(boardId));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (loading) {
     return (
       <section className={styles.shell} aria-label={boardTitle}>
         <div className={styles.panel}>
           <div className={styles.createPanel} role="status">
-            권위 게임 상태를 불러오는 중이에요…
+            대국 정보를 불러오는 중이에요…
           </div>
         </div>
       </section>
@@ -237,11 +313,55 @@ export function OmokBoard({ boardId, boardTitle, viewer }: Props) {
   }
 
   if (!snapshot) {
+    if (viewer === "student" && matchmakingEnabled) {
+      const waiting = matchmaking.status === "waiting";
+      return (
+        <section className={styles.shell} aria-label={boardTitle}>
+          <div className={styles.matchPanel}>
+            <p className={styles.eyebrow}>온라인 오목</p>
+            <h1 className={styles.title}>{waiting ? "상대를 찾는 중" : "오목 매칭"}</h1>
+            <div className={styles.matchSignal} aria-hidden>
+              <span />
+              <span />
+              <span />
+            </div>
+            <p className={styles.message} role="status" aria-live="polite">
+              {waiting
+                ? `현재 ${matchmaking.playerCount}명이 입장해 있어요.`
+                : "매칭을 잡으면 같은 학급의 상대와 바로 대국을 시작해요."}
+            </p>
+            <button
+              className={waiting ? styles.secondaryButton : styles.button}
+              type="button"
+              disabled={busy}
+              onClick={() => void (waiting ? stopMatchmaking() : startMatchmaking())}
+            >
+              {busy ? "처리 중…" : waiting ? "매칭 취소" : "매칭 잡기"}
+            </button>
+            {error ? <p className={styles.error}>{error}</p> : null}
+          </div>
+        </section>
+      );
+    }
+    if (viewer === "teacher" && matchmakingEnabled) {
+      return (
+        <section className={styles.shell} aria-label={boardTitle}>
+          <div className={styles.matchPanel}>
+            <p className={styles.eyebrow}>온라인 오목</p>
+            <h1 className={styles.title}>학생 매칭 대기</h1>
+            <p className={styles.message}>
+              학생이 직접 매칭을 잡으면 같은 학급의 상대와 대국이 시작됩니다.
+              현재 입장 인원과 대국 상태는 놀이보드에서 확인할 수 있어요.
+            </p>
+          </div>
+        </section>
+      );
+    }
     return (
       <section className={styles.shell} aria-label={boardTitle}>
         <header className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>Authoritative Omok</p>
+            <p className={styles.eyebrow}>1:1 온라인 대국</p>
             <h1 className={styles.title}>{boardTitle || "오목 대국"}</h1>
           </div>
         </header>
@@ -312,39 +432,19 @@ export function OmokBoard({ boardId, boardTitle, viewer }: Props) {
     !busy &&
     !syncing;
   const statusText = describeStatus(snapshot, turnParticipant?.displayName ?? null);
-  const viewerText =
-    snapshot.viewer.role === "host"
-      ? "교사 진행자"
-      : `${myParticipant?.displayName ?? "참가자"} · ${slotLabel(snapshot.viewer.slot)}`;
-
   return (
     <section className={styles.shell} aria-label={boardTitle}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Authoritative Omok</p>
+          <p className={styles.eyebrow}>1:1 온라인 대국</p>
           <h1 className={styles.title}>{boardTitle || "오목 대국"}</h1>
         </div>
-        <span className={styles.version} aria-label={`상태 버전 ${snapshot.version}`}>
-          v{snapshot.version} {syncing ? "· 동기화 중" : "· 동기화됨"}
+        <span className={styles.version} role="status">
+          {syncing ? "동기화 중" : "실시간 연결"}
         </span>
       </header>
 
       <div className={styles.panel}>
-        <div className={styles.statusBar} role="status" aria-live="polite">
-          <div className={styles.statusItem}>
-            <span className={styles.statusLabel}>진행 상태</span>
-            <span className={styles.statusValue}>{statusText}</span>
-          </div>
-          <div className={styles.statusItem}>
-            <span className={styles.statusLabel}>내 역할</span>
-            <span className={styles.statusValue}>{viewerText}</span>
-          </div>
-          <div className={styles.statusItem}>
-            <span className={styles.statusLabel}>착수 수</span>
-            <span className={styles.statusValue}>{snapshot.game.moveCount}수</span>
-          </div>
-        </div>
-
         <div className={styles.content}>
           <div className={styles.boardWrap}>
             <div className={styles.board} role="grid" aria-label="15줄 오목판">
@@ -380,23 +480,52 @@ export function OmokBoard({ boardId, boardTitle, viewer }: Props) {
           </div>
 
           <aside className={styles.sidebar}>
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>대국 참가자</h2>
-              {snapshot.participants.map((participant) => (
+            {snapshot.participants.map((participant, index) => {
+              const profile = profileFor(profiles, participant.slot);
+              return (
+                <Fragment key={participant.slot}>
+                  <div className={styles.card}>
+                    <h2 className={styles.cardTitle}>
+                      {participant.slot === "first" ? "흑돌 플레이어" : "백돌 플레이어"}
+                    </h2>
                 <div className={styles.playerRow} key={participant.slot}>
                   <div className={styles.playerIdentity}>
+                    <div className={styles.petThumb}>
+                      {profile?.pet ? (
+                        <OfficialSlimeSprite
+                          slimeColor={profile.pet.color as SlimeColor}
+                          growthStage={profile.pet.growthStage}
+                          scale={1}
+                          alt={`${profile.name} 대표 펫`}
+                        />
+                      ) : (
+                        <span aria-hidden>?</span>
+                      )}
+                    </div>
                     <span
                       className={`${styles.dot} ${participant.slot === "first" ? styles.first : styles.second}`}
                       aria-hidden="true"
                     />
                     <span className={styles.playerName}>{participant.displayName}</span>
+                    <span className={styles.playerRecord}>
+                      {recordLabel(profile)}
+                    </span>
                   </div>
                   <span className={styles.badge}>
                     {participant.ready ? "준비됨" : "대기"}
                   </span>
                 </div>
-              ))}
-            </div>
+                  </div>
+                  {index === 0 ? (
+                    <div className={styles.matchInfo} role="status" aria-live="polite">
+                      <div><span>대국 시간</span><strong>{formatElapsed(startedAtMs, clockNow)}</strong></div>
+                      <div><span>현재 상태</span><strong>{statusText}</strong></div>
+                      <div><span>착수</span><strong>{snapshot.game.moveCount}수</strong></div>
+                    </div>
+                  ) : null}
+                </Fragment>
+              );
+            })}
 
             <div className={styles.card}>
               <h2 className={styles.cardTitle}>진행 안내</h2>
@@ -485,6 +614,22 @@ function slotLabel(slot: OmokSlot | null): string {
   if (slot === "first") return "흑";
   if (slot === "second") return "백";
   return "관전자";
+}
+
+function profileFor(profiles: OmokPlayerProfile[], slot: OmokSlot) {
+  return profiles.find((profile) => profile.slot === slot) ?? null;
+}
+
+function recordLabel(profile: OmokPlayerProfile | null): string {
+  if (!profile) return "전적 확인 중";
+  const total = profile.record.wins + profile.record.losses + profile.record.draws;
+  if (total === 0) return "첫 대국";
+  return `${profile.record.wins}승 ${profile.record.losses}패 ${profile.record.draws}무`;
+}
+
+function formatElapsed(startedAtMs: number | null, now: number): string {
+  const seconds = startedAtMs == null ? 0 : Math.max(0, Math.floor((now - startedAtMs) / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 function describeStatus(snapshot: OmokSnapshot, turnName: string | null): string {
