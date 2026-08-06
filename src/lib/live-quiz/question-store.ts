@@ -116,7 +116,7 @@ export function ensureStarterLiveQuizQuestions(): Promise<void> {
 
 async function ensureStarterQuestionRows(): Promise<void> {
   // Existing (including archived) starter rows are never reset. The module-level
-  // promise keeps live-state polling from repeating this database check.
+  // promise keeps repeated state snapshots from rerunning this database check.
   const starterIds = STARTER_QUESTIONS.map((question) => question.id);
   const [existing] = await db.$queryRaw<CountRow[]>(Prisma.sql`
     SELECT COUNT(*)::int AS "count"
@@ -246,31 +246,42 @@ export async function submitLiveQuizSuggestion(
   now = new Date(),
 ): Promise<{ id: string; status: "pending" }> {
   const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-  const [recent] = await db.$queryRaw<CountRow[]>(Prisma.sql`
-    SELECT COUNT(*)::int AS "count"
-    FROM "LiveQuizQuestion"
-    WHERE "source" = 'community'
-      AND "submitterType" = ${viewer.kind}
-      AND "submitterId" = ${viewer.id}
-      AND "createdAt" >= ${since}
-  `);
-  if ((recent?.count ?? 0) >= 5) {
-    throw new LiveQuizError("suggestion_daily_limit", 429);
-  }
-
   const id = randomUUID();
-  await db.$executeRaw(Prisma.sql`
-    INSERT INTO "LiveQuizQuestion" (
-      "id", "prompt", "choices", "correctChoice", "explanation", "category",
-      "source", "status", "submitterType", "submitterId", "submitterName",
-      "submitterContext", "createdAt", "updatedAt"
-    )
-    VALUES (
-      ${id}, ${input.prompt}, CAST(${JSON.stringify(input.choices)} AS JSONB),
-      ${input.correctChoice}, ${input.explanation || null}, ${input.category || null},
-      'community', 'pending', ${viewer.kind}, ${viewer.id}, ${viewer.name},
-      ${viewer.context}, ${now}, ${now}
-    )
-  `);
+  const lockKey = `live-quiz-suggestion:${viewer.kind}:${viewer.id}`;
+
+  await db.$transaction(async (transaction) => {
+    // Serialize the count-and-insert sequence per participant across all app
+    // instances. Concurrent requests therefore cannot all observe the same count.
+    await transaction.$queryRaw<unknown[]>(Prisma.sql`
+      SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))
+    `);
+
+    const [recent] = await transaction.$queryRaw<CountRow[]>(Prisma.sql`
+      SELECT COUNT(*)::int AS "count"
+      FROM "LiveQuizQuestion"
+      WHERE "source" = 'community'
+        AND "submitterType" = ${viewer.kind}
+        AND "submitterId" = ${viewer.id}
+        AND "createdAt" >= ${since}
+    `);
+    if ((recent?.count ?? 0) >= 5) {
+      throw new LiveQuizError("suggestion_daily_limit", 429);
+    }
+
+    await transaction.$executeRaw(Prisma.sql`
+      INSERT INTO "LiveQuizQuestion" (
+        "id", "prompt", "choices", "correctChoice", "explanation", "category",
+        "source", "status", "submitterType", "submitterId", "submitterName",
+        "submitterContext", "createdAt", "updatedAt"
+      )
+      VALUES (
+        ${id}, ${input.prompt}, CAST(${JSON.stringify(input.choices)} AS JSONB),
+        ${input.correctChoice}, ${input.explanation || null}, ${input.category || null},
+        'community', 'pending', ${viewer.kind}, ${viewer.id}, ${viewer.name},
+        ${viewer.context}, ${now}, ${now}
+      )
+    `);
+  });
+
   return { id, status: "pending" };
 }

@@ -11,6 +11,7 @@ import type {
   LiveQuizStateResponse,
   LiveQuizViewerKind,
 } from "@/lib/live-quiz/contracts";
+import { getLiveQuizRealtimeClient } from "@/lib/live-quiz/realtime-client";
 import { LiveQuizLivePanel } from "./LiveQuizLivePanel";
 import { LiveQuizSuggestionPanel } from "./LiveQuizSuggestionPanel";
 import styles from "./live-quiz.module.css";
@@ -26,9 +27,19 @@ type OptimisticAnswer = {
   choice: number;
 };
 
+type RealtimeCounterRow = {
+  sessionKey?: unknown;
+  questionId?: unknown;
+  answerCount?: unknown;
+};
+
 function stateErrorMessage(status: number): string {
   if (status === 401) return "로그인이 필요합니다.";
   return "라이브 퀴즈 상태를 불러오지 못했습니다.";
+}
+
+function realtimeChannelSuffix(): string {
+  return Math.random().toString(36).slice(2, 10);
 }
 
 export function LiveQuizExperience({
@@ -48,6 +59,8 @@ export function LiveQuizExperience({
     useState<OptimisticAnswer | null>(null);
   const stateRequestInFlightRef = useRef(false);
   const stateRefreshQueuedRef = useRef(false);
+  const activeQuestionIdRef = useRef<string | null>(null);
+  const boundaryRefreshKeyRef = useRef<string | null>(null);
 
   const loadState = useCallback(async (silent = false) => {
     if (stateRequestInFlightRef.current) {
@@ -85,16 +98,135 @@ export function LiveQuizExperience({
     } while (stateRefreshQueuedRef.current);
   }, []);
 
+  // One initial snapshot only. Subsequent changes arrive through Realtime or a
+  // single server-time boundary refresh; there is no repeating state request.
   useEffect(() => {
     void loadState();
-    const interval = window.setInterval(() => void loadState(true), 2_000);
-    return () => window.clearInterval(interval);
   }, [loadState]);
 
+  // This timer repaints the local countdown only. It never calls the server.
   useEffect(() => {
-    const interval = window.setInterval(() => setLocalNowMs(Date.now()), 250);
-    return () => window.clearInterval(interval);
+    let timeoutId = 0;
+    const tick = () => {
+      setLocalNowMs(Date.now());
+      timeoutId = window.setTimeout(tick, 250);
+    };
+    timeoutId = window.setTimeout(tick, 250);
+    return () => window.clearTimeout(timeoutId);
   }, []);
+
+  useEffect(() => {
+    activeQuestionIdRef.current = state?.question?.id ?? null;
+  }, [state?.question?.id]);
+
+  // The schedule itself is deterministic. Fetch exactly once after a start,
+  // answer, or reveal boundary so the server can disclose the next safe state.
+  useEffect(() => {
+    if (!state) return;
+
+    const target =
+      state.phase === "live"
+        ? state.stageEndsAt
+        : state.phase === "waiting" || state.phase === "setup"
+          ? state.startsAt
+          : null;
+    if (!target) return;
+
+    const targetMs = Date.parse(target);
+    if (!Number.isFinite(targetMs)) return;
+
+    const boundaryKey = [
+      state.sessionKey,
+      state.questionNumber ?? "waiting",
+      state.stage ?? state.phase,
+      target,
+    ].join(":");
+    if (boundaryRefreshKeyRef.current === boundaryKey) return;
+
+    const serverNowMs = Date.now() + serverOffsetMs;
+    const delayMs = Math.max(0, targetMs - serverNowMs) + 250;
+    const timeoutId = window.setTimeout(() => {
+      boundaryRefreshKeyRef.current = boundaryKey;
+      void loadState(true);
+    }, delayMs);
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    loadState,
+    serverOffsetMs,
+    state,
+  ]);
+
+  // Supabase Realtime carries only safe projection rows. Internal answers,
+  // participant IDs, correct choices, and explanations are never published.
+  useEffect(() => {
+    const sessionKey = state?.sessionKey;
+    if (!sessionKey) return;
+
+    const client = getLiveQuizRealtimeClient();
+    if (!client) return;
+
+    let hasSubscribed = false;
+    let needsReconnectSync = false;
+    const channel = client
+      .channel(`live-quiz:${sessionKey}:${realtimeChannelSuffix()}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "LiveQuizPublicSession",
+          filter: `sessionKey=eq.${sessionKey}`,
+        },
+        () => {
+          void loadState(true);
+        },
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "LiveQuizQuestionCounter",
+          filter: `sessionKey=eq.${sessionKey}`,
+        },
+        (payload) => {
+          const row = payload.new as RealtimeCounterRow;
+          if (
+            row.questionId !== activeQuestionIdRef.current ||
+            typeof row.answerCount !== "number"
+          ) {
+            return;
+          }
+          setState((current) =>
+            current?.question?.id === row.questionId
+              ? { ...current, activeAnswerCount: row.answerCount as number }
+              : current,
+          );
+        },
+      )
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          if (hasSubscribed && needsReconnectSync) {
+            void loadState(true);
+          }
+          hasSubscribed = true;
+          needsReconnectSync = false;
+          return;
+        }
+        if (
+          hasSubscribed &&
+          (status === "CHANNEL_ERROR" ||
+            status === "TIMED_OUT" ||
+            status === "CLOSED")
+        ) {
+          needsReconnectSync = true;
+        }
+      });
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [loadState, state?.sessionKey]);
 
   useEffect(() => {
     const question = state?.question ?? null;
@@ -177,7 +309,8 @@ export function LiveQuizExperience({
         questionId: question.id,
         choice: body.selectedChoice,
       });
-      void loadState(true);
+      // The database trigger increments the public counter and Realtime delivers
+      // that aggregate to every participant, including this client.
     } catch (error) {
       setOptimisticAnswer(null);
       setAnswerError(

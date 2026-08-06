@@ -1,6 +1,6 @@
--- Global 13:30 KST live quiz. These tables are intentionally queried through
--- Prisma's parameterized raw-SQL API because sessions store a frozen JSON list
--- of question IDs and answers use a polymorphic teacher/student participant key.
+-- Global 13:30 KST live quiz. Internal tables are queried through Prisma's
+-- parameterized raw-SQL API. Only the two safe projection tables at the bottom
+-- are exposed to Supabase Realtime.
 
 CREATE TABLE "LiveQuizQuestion" (
   "id" TEXT NOT NULL,
@@ -96,21 +96,172 @@ CREATE INDEX "LiveQuizAnswer_session_participant_idx"
 CREATE INDEX "LiveQuizAnswer_session_question_correct_idx"
   ON "LiveQuizAnswer"("sessionId", "questionId", "isCorrect");
 
--- Only the server-side database connection may access quiz data. Direct
--- Supabase/PostgREST access must not expose answers or unrevealed correct choices.
+-- Realtime clients must never subscribe to the three internal tables above.
+-- These projections contain only public schedule metadata and aggregate counts.
+CREATE TABLE "LiveQuizPublicSession" (
+  "sessionKey" TEXT NOT NULL,
+  "startsAt" TIMESTAMP(3) NOT NULL,
+  "endsAt" TIMESTAMP(3) NOT NULL,
+  "questionCount" INTEGER NOT NULL,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT "LiveQuizPublicSession_pkey" PRIMARY KEY ("sessionKey"),
+  CONSTRAINT "LiveQuizPublicSession_question_count_check"
+    CHECK ("questionCount" >= 0)
+);
+
+CREATE TABLE "LiveQuizQuestionCounter" (
+  "sessionKey" TEXT NOT NULL,
+  "questionId" TEXT NOT NULL,
+  "answerCount" INTEGER NOT NULL DEFAULT 0,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+  CONSTRAINT "LiveQuizQuestionCounter_pkey"
+    PRIMARY KEY ("sessionKey", "questionId"),
+  CONSTRAINT "LiveQuizQuestionCounter_answer_count_check"
+    CHECK ("answerCount" >= 0)
+);
+
+-- Project a newly frozen session without exposing its question ID list.
+CREATE FUNCTION "publishLiveQuizPublicSession"()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public."LiveQuizPublicSession" (
+    "sessionKey", "startsAt", "endsAt", "questionCount", "updatedAt"
+  )
+  VALUES (
+    NEW."sessionKey", NEW."startsAt", NEW."endsAt", NEW."questionCount",
+    clock_timestamp()
+  )
+  ON CONFLICT ("sessionKey") DO UPDATE SET
+    "startsAt" = EXCLUDED."startsAt",
+    "endsAt" = EXCLUDED."endsAt",
+    "questionCount" = EXCLUDED."questionCount",
+    "updatedAt" = EXCLUDED."updatedAt";
+  RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER "LiveQuizSession_publish_realtime"
+AFTER INSERT OR UPDATE OF "startsAt", "endsAt", "questionCount"
+ON "LiveQuizSession"
+FOR EACH ROW
+EXECUTE FUNCTION "publishLiveQuizPublicSession"();
+
+-- Maintain the public aggregate in the same transaction as a successful answer.
+-- ON CONFLICT DO NOTHING answers do not fire this trigger, so duplicate attempts
+-- cannot inflate the Realtime count.
+CREATE FUNCTION "incrementLiveQuizQuestionCounter"()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  INSERT INTO public."LiveQuizQuestionCounter" (
+    "sessionKey", "questionId", "answerCount", "updatedAt"
+  )
+  SELECT
+    session."sessionKey", NEW."questionId", 1, clock_timestamp()
+  FROM public."LiveQuizSession" AS session
+  WHERE session."id" = NEW."sessionId"
+  ON CONFLICT ("sessionKey", "questionId") DO UPDATE SET
+    "answerCount" = "LiveQuizQuestionCounter"."answerCount" + 1,
+    "updatedAt" = EXCLUDED."updatedAt";
+  RETURN NEW;
+END
+$$;
+
+CREATE TRIGGER "LiveQuizAnswer_increment_realtime_counter"
+AFTER INSERT
+ON "LiveQuizAnswer"
+FOR EACH ROW
+EXECUTE FUNCTION "incrementLiveQuizQuestionCounter"();
+
+-- Internal quiz data is server-only. Direct Supabase/PostgREST access must not
+-- expose answers, participant identifiers, or unrevealed correct choices.
 ALTER TABLE "LiveQuizQuestion" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "LiveQuizSession" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "LiveQuizAnswer" ENABLE ROW LEVEL SECURITY;
 
+REVOKE ALL PRIVILEGES ON TABLE
+  "LiveQuizQuestion", "LiveQuizSession", "LiveQuizAnswer"
+FROM PUBLIC;
+
+-- Projection tables are read-only to Realtime clients. Their writes happen only
+-- through the SECURITY DEFINER triggers above.
+ALTER TABLE "LiveQuizPublicSession" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "LiveQuizQuestionCounter" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "LiveQuizPublicSession" REPLICA IDENTITY FULL;
+ALTER TABLE "LiveQuizQuestionCounter" REPLICA IDENTITY FULL;
+
+REVOKE ALL PRIVILEGES ON TABLE
+  "LiveQuizPublicSession", "LiveQuizQuestionCounter"
+FROM PUBLIC;
+REVOKE ALL PRIVILEGES ON FUNCTION
+  "publishLiveQuizPublicSession"(), "incrementLiveQuizQuestionCounter"()
+FROM PUBLIC;
+
+CREATE POLICY "LiveQuizPublicSession_select"
+ON "LiveQuizPublicSession"
+FOR SELECT
+TO PUBLIC
+USING (true);
+
+CREATE POLICY "LiveQuizQuestionCounter_select"
+ON "LiveQuizQuestionCounter"
+FOR SELECT
+TO PUBLIC
+USING (true);
+
 -- Keep local PostgreSQL migrations portable when Supabase roles are absent.
--- Neither direct-access role receives an RLS policy for these tables.
 DO $$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
     EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE public."LiveQuizQuestion", public."LiveQuizSession", public."LiveQuizAnswer" FROM anon';
+    EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE public."LiveQuizPublicSession", public."LiveQuizQuestionCounter" FROM anon';
+    EXECUTE 'GRANT SELECT ON TABLE public."LiveQuizPublicSession", public."LiveQuizQuestionCounter" TO anon';
+    EXECUTE 'REVOKE ALL PRIVILEGES ON FUNCTION public."publishLiveQuizPublicSession"(), public."incrementLiveQuizQuestionCounter"() FROM anon';
   END IF;
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
     EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE public."LiveQuizQuestion", public."LiveQuizSession", public."LiveQuizAnswer" FROM authenticated';
+    EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE public."LiveQuizPublicSession", public."LiveQuizQuestionCounter" FROM authenticated';
+    EXECUTE 'GRANT SELECT ON TABLE public."LiveQuizPublicSession", public."LiveQuizQuestionCounter" TO authenticated';
+    EXECUTE 'REVOKE ALL PRIVILEGES ON FUNCTION public."publishLiveQuizPublicSession"(), public."incrementLiveQuizQuestionCounter"() FROM authenticated';
+  END IF;
+END
+$$;
+
+-- Publish only the safe projections. On a non-Supabase PostgreSQL database the
+-- publication is absent and this block intentionally does nothing.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'LiveQuizPublicSession'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public."LiveQuizPublicSession"';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime'
+  ) AND NOT EXISTS (
+    SELECT 1
+    FROM pg_publication_tables
+    WHERE pubname = 'supabase_realtime'
+      AND schemaname = 'public'
+      AND tablename = 'LiveQuizQuestionCounter'
+  ) THEN
+    EXECUTE 'ALTER PUBLICATION supabase_realtime ADD TABLE public."LiveQuizQuestionCounter"';
   END IF;
 END
 $$;

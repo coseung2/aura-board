@@ -181,15 +181,16 @@ async function readViewerAnswer(
   return answer ?? null;
 }
 
-async function countQuestionAnswers(
-  sessionId: string,
+async function readQuestionAnswerCount(
+  sessionKey: string,
   questionId: string,
 ): Promise<number> {
   const [row] = await db.$queryRaw<CountRow[]>(Prisma.sql`
-    SELECT COUNT(*)::int AS "count"
-    FROM "LiveQuizAnswer"
-    WHERE "sessionId" = ${sessionId}
+    SELECT "answerCount"::int AS "count"
+    FROM "LiveQuizQuestionCounter"
+    WHERE "sessionKey" = ${sessionKey}
       AND "questionId" = ${questionId}
+    LIMIT 1
   `);
   return row?.count ?? 0;
 }
@@ -310,7 +311,7 @@ export async function readLiveQuizState(
   const [score, currentAnswer, activeAnswerCount] = await Promise.all([
     readViewerScore(session.id, viewer, scoredQuestionIds),
     readViewerAnswer(session.id, questionId, viewer),
-    countQuestionAnswers(session.id, questionId),
+    readQuestionAnswerCount(session.sessionKey, questionId),
   ]);
   const reveal = timeline.stage === "reveal";
 
