@@ -35,7 +35,12 @@ function formatKoreanDateTime(value: string): string {
   }).format(new Date(value));
 }
 
+function panelClassName(contentClassName: string, panelClassName: string): string {
+  return `${contentClassName} ${panelClassName}`;
+}
+
 type LivePanelProps = {
+  contentClassName: string;
   state: LiveQuizStateResponse | null;
   loading: boolean;
   loadError: string | null;
@@ -50,6 +55,7 @@ type LivePanelProps = {
 };
 
 export function LiveQuizLivePanel({
+  contentClassName,
   state,
   loading,
   loadError,
@@ -64,7 +70,10 @@ export function LiveQuizLivePanel({
 }: LivePanelProps) {
   if (loading && !state) {
     return (
-      <section className={styles.stateCard} aria-busy="true">
+      <section
+        className={panelClassName(contentClassName, styles.stateCard)}
+        aria-busy="true"
+      >
         <div className={styles.skeletonTitle} />
         <div className={styles.skeletonBody} />
       </section>
@@ -73,7 +82,10 @@ export function LiveQuizLivePanel({
 
   if (loadError && !state) {
     return (
-      <section className={styles.stateCard} role="alert">
+      <section
+        className={panelClassName(contentClassName, styles.stateCard)}
+        role="alert"
+      >
         <span className={styles.stateIcon} aria-hidden>
           ⚠️
         </span>
@@ -90,7 +102,7 @@ export function LiveQuizLivePanel({
 
   if (state.phase === "setup") {
     return (
-      <section className={styles.stateCard}>
+      <section className={panelClassName(contentClassName, styles.stateCard)}>
         <span className={styles.stateIcon} aria-hidden>
           🧩
         </span>
@@ -114,7 +126,7 @@ export function LiveQuizLivePanel({
   if (state.phase === "waiting") {
     const countdown = secondsUntil(state.startsAt, nowMs);
     return (
-      <section className={styles.waitingCard}>
+      <section className={panelClassName(contentClassName, styles.waitingCard)}>
         <div className={styles.waitingPulse} aria-hidden>
           <span />
         </div>
@@ -138,7 +150,7 @@ export function LiveQuizLivePanel({
 
   if (state.phase === "finished") {
     return (
-      <section className={styles.resultCard}>
+      <section className={panelClassName(contentClassName, styles.resultCard)}>
         <p className={styles.eyebrow}>오늘 방송 종료</p>
         <h2>수고했어요!</h2>
         <div className={styles.finalScore}>
@@ -173,7 +185,10 @@ export function LiveQuizLivePanel({
   const reveal = state.stage === "reveal";
 
   return (
-    <section className={styles.quizCard} aria-live="polite">
+    <section
+      className={panelClassName(contentClassName, styles.quizCard)}
+      aria-live="polite"
+    >
       <div className={styles.quizMeta}>
         <div>
           <span className={styles.questionIndex}>
