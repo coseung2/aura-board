@@ -187,7 +187,7 @@ async function generateWordsWithLlm(
   locale: KordleLocale,
   wordLength: number,
 ): Promise<KordleWordCandidate[]> {
-  const key = await getTeacherKeyForBoard(boardId);
+  const key = await getTeacherKeyForBoard(boardId, "kordle");
   if (!key) return [];
 
   const languageRule =

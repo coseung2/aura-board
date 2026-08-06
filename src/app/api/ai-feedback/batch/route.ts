@@ -12,11 +12,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { decryptApiKey } from "@/lib/llm/encryption";
+import { resolveTeacherAiForUser } from "@/lib/ai/teacher-ai";
 import { getCurrentUser } from "@/lib/auth";
 import { buildFeedbackPrompt } from "@/lib/ai-feedback/prompt";
 import { generateFeedback, type FeedbackImage } from "@/lib/ai-feedback/generate";
-import type { LlmProvider } from "@/lib/llm/stream";
 
 const Body = z.object({
   studentIds: z.array(z.string().min(1)).min(1).max(60),
@@ -131,22 +130,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
 
-  const keyRow = await db.teacherLlmKey.findUnique({ where: { userId: user.id } });
-  if (!keyRow) {
+  const llm = await resolveTeacherAiForUser(user.id, "feedback");
+  if (!llm) {
     return NextResponse.json({ error: "ai_key_missing" }, { status: 400 });
   }
-  let apiKey = "";
-  try {
-    apiKey = keyRow.apiKeyEnc ? decryptApiKey(keyRow.apiKeyEnc) : "";
-  } catch {
-    return NextResponse.json({ error: "ai_key_decrypt_failed" }, { status: 400 });
-  }
-  const llm = {
-    provider: keyRow.provider as LlmProvider,
-    apiKey,
-    baseUrl: keyRow.baseUrl ?? null,
-    modelId: keyRow.modelId ?? null,
-  };
   const visionEnabled = llm.provider === "gemini";
 
   const students = await db.student.findMany({

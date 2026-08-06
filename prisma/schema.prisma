@@ -69,9 +69,10 @@ model User {
 
   roleAssignmentsGranted ClassroomRoleAssignment[] @relation("ClassroomRoleAssignedBy")
 
-  // Teacher's own LLM API key (vibe-arcade + future AI features)
+  // Provider-specific AI API keys and feature-level model selections.
 
-  llmKey TeacherLlmKey?
+  llmKeys          TeacherLlmKey[]
+  aiFeatureConfigs TeacherAiFeatureConfig[]
 
   // Billing (Toss Payments ?嶺???껊눇?용맪?????Seed 14 scaffold, 2026-04-22)
 
@@ -228,25 +229,24 @@ model BoardActivityEvent {
 
 //
 
-// 1 teacher = 1 key row (???????upsert????????ㅼ뒧??.
+// One encrypted key row per teacher and provider.
 
 // verified/verifiedAt: ??????????API????? ???獒???嶺뚮ㅎ?????怨뚮옖?雅??濚밸Þ?볠쾮????덉툗癲ル슣??.
 
 // lastError: 401/?濡ろ뜏???????됰꽡 ?濚밸Ŧ?김キ?UI????筌?六????꾨탿 ??ш낄援η뵳?癲ル슔?됭짆???????癲ル슢???????.
 
 model TeacherLlmKey {
-  userId String @id
+  userId String
 
-  provider String // "claude" | "openai" | "gemini" | "ollama"
+  provider String // "openai" | "gemini" | "opencode-go"
 
-  apiKeyEnc String // base64(iv[12] || authTag[16] || ciphertext). ollama癲??????뽮덫??????源낅츛
+  apiKeyEnc String // base64(iv[12] || authTag[16] || ciphertext)
 
-  last4 String // ????API Key??癲ル슢???癲?4??(UI ??筌?六??
-
-  // ollama ?棺??짆?쏆춾????獒?嶺뚮ㅎ?????????렺?provider??null
+  last4 String
 
   baseUrl String?
 
+  // Legacy provider default. Feature-specific choices live in TeacherAiFeatureConfig.
   modelId String?
 
   verified Boolean @default(false)
@@ -260,6 +260,28 @@ model TeacherLlmKey {
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, provider])
+  @@index([provider])
+}
+
+model TeacherAiFeatureConfig {
+  userId String
+
+  feature String // feedback | vibe | quiz | agent | kordle | reading
+
+  provider String // openai | gemini | opencode-go
+
+  modelId String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, feature])
+  @@index([provider, modelId])
 }
 
 // ???????? Billing / ?嶺???껊눇?용맪???(Seed 14 scaffold, 2026-04-22) ????????

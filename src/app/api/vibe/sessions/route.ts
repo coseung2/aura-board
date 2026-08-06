@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   }
 
   // Resolve teacher-supplied API key (Claude/OpenAI/Gemini).
-  const teacherKey = await getTeacherKeyForBoard(boardId);
+  const teacherKey = await getTeacherKeyForBoard(boardId, "vibe");
   if (!teacherKey) {
     return new Response(
       JSON.stringify({
