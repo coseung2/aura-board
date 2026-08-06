@@ -35,9 +35,7 @@ import {
   SectionHeader,
 } from "../../components/ui";
 
-type ExpandedStudentNotificationItem = Omit<StudentNotificationItem, "kind"> & {
-  kind: StudentNotificationItem["kind"] | "attendance" | "assignment";
-};
+type ExpandedStudentNotificationItem = StudentNotificationItem;
 
 type ExpandedStudentNotificationPayload = Omit<StudentNotificationPayload, "items"> & {
   items: ExpandedStudentNotificationItem[];
@@ -150,7 +148,7 @@ export default function StudentNotificationsScreen() {
               ) : undefined
             }
           />
-          <Text style={styles.subtitle}>좋아요, 댓글, 보상, 출석과 과제 소식이에요.</Text>
+          <Text style={styles.subtitle}>좋아요, 댓글과 답글, 입출금, 출석과 과제 소식이에요.</Text>
           {!payload?.items.length ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>새 알림이 없어요.</Text>
@@ -177,9 +175,9 @@ export default function StudentNotificationsScreen() {
                         styles.kind,
                         item.kind === "like"
                           ? styles.kindLike
-                          : item.kind === "comment"
+                          : item.kind === "comment" || item.kind === "reply"
                             ? styles.kindComment
-                            : item.kind === "reward"
+                            : item.kind === "reward" || item.kind === "wallet" || item.kind === "refund"
                               ? styles.kindReward
                               : styles.kindSystem,
                       ]}
@@ -213,23 +211,31 @@ function notificationKindLabel(
 ): string {
   if (kind === "like") return "좋아요";
   if (kind === "comment") return "댓글";
+  if (kind === "reply") return "답글";
+  if (kind === "wallet") return "입출금";
   if (kind === "reward") return "보상";
+  if (kind === "refund") return "환불";
   return kind === "attendance" ? "출석" : "과제";
 }
 
 function notificationTitle(item: ExpandedStudentNotificationItem): string {
+  if (item.title) return item.title;
   if (item.kind === "like") return `${item.actorLabel}님이 좋아요를 눌렀어요.`;
   if (item.kind === "comment") return `${item.actorLabel}님이 댓글을 남겼어요.`;
+  if (item.kind === "reply") return `${item.actorLabel}님이 내 댓글에 답글을 남겼어요.`;
+  if (item.kind === "wallet" || item.kind === "refund") return item.cardTitle || "통장에 변동이 있어요.";
   if (item.kind === "reward") return `${item.cardTitle || "보상"}을 받았어요.`;
   return item.cardTitle || (item.kind === "attendance" ? "출석 알림" : "과제 알림");
 }
 
 function notificationMeta(item: ExpandedStudentNotificationItem): string {
-  if (item.kind === "reward") return item.boardTitle || "내 통장";
+  if (item.kind === "reward" || item.kind === "wallet" || item.kind === "refund") {
+    return item.boardTitle || "내 통장";
+  }
   if (item.kind === "attendance" || item.kind === "assignment") {
     return item.boardTitle || (item.kind === "attendance" ? "출석" : "과제");
   }
-  return `${item.cardTitle || "제목 없는 카드"} · ${item.boardTitle}`;
+  return `${item.cardTitle || "제목 없는 카드"}, ${item.boardTitle}`;
 }
 
 function formatRelativeTime(value: string): string {

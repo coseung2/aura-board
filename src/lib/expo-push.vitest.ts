@@ -6,6 +6,7 @@ import {
   ExpoPushSendError,
   expoPushFailureDetails,
   sendExpoPush,
+  sendExpoPushMessages,
 } from "./expo-push";
 
 const devices = [
@@ -65,6 +66,70 @@ describe("sendExpoPush", () => {
     await expect(sendExpoPush(devices, message)).rejects.toMatchObject({
       reason: "ticket_error",
     });
+  });
+
+  it("splits 2,000 device-specific messages into batches of 100", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (_url, init: RequestInit) => {
+      const batch = JSON.parse(String(init.body)) as unknown[];
+      return {
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          data: batch.map(() => ({ status: "ok" })),
+        }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const envelopes = Array.from({ length: 2_000 }, (_, index) => ({
+      device: {
+        id: `device-${index}`,
+        expoPushToken: `ExpoPushToken[token${index}]`,
+      },
+      message: {
+        title: `알림 ${index}`,
+        body: "새 소식이 있어요.",
+        data: { type: "test" },
+      },
+    }));
+
+    await expect(sendExpoPushMessages(envelopes)).resolves.toEqual({
+      attempted: 2_000,
+      invalidDeviceIds: [],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(20);
+  });
+
+  it("batches device-specific messages in groups of 100", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (_url, init: RequestInit) => {
+      const payload = JSON.parse(String(init.body)) as unknown[];
+      return {
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          data: payload.map(() => ({ status: "ok" })),
+        }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const envelopes = Array.from({ length: 205 }, (_, index) => ({
+      device: {
+        id: `device-${index}`,
+        expoPushToken: `ExpoPushToken[token${index}]`,
+      },
+      message: {
+        title: `알림 ${index}`,
+        body: `본문 ${index}`,
+        data: { type: "student_notification", href: "/student" },
+      },
+    }));
+
+    await expect(sendExpoPushMessages(envelopes)).resolves.toEqual({
+      attempted: 205,
+      invalidDeviceIds: [],
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toHaveLength(100);
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toHaveLength(100);
+    expect(JSON.parse(String(fetchMock.mock.calls[2][1]?.body))).toHaveLength(5);
   });
 
   it("keeps DeviceNotRegistered terminal and observable for cleanup", async () => {

@@ -2,14 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   findStudents: vi.fn(),
-  dispatch: vi.fn(),
+  dispatchBatch: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/db", () => ({ db: { student: { findMany: mocks.findStudents } } }));
 vi.mock("@/lib/student-push", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/student-push")>()),
-  dispatchStudentNotificationPush: mocks.dispatch,
+  dispatchStudentNotificationPushBatch: mocks.dispatchBatch,
 }));
 
 import { GET } from "./route";
@@ -20,8 +20,8 @@ describe("GET /api/cron/attendance-reminder", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-31T23:00:00.000Z"));
     process.env.CRON_SECRET = "cron-test";
-    mocks.findStudents.mockResolvedValue([{ id: "student-1" }]);
-    mocks.dispatch.mockResolvedValue({ attempted: 1, skipped: 0 });
+    mocks.findStudents.mockResolvedValue([{ id: "student-1", assignmentSlots: [] }]);
+    mocks.dispatchBatch.mockResolvedValue({ attempted: 1, skipped: 0, reserved: 1 });
   });
 
   afterEach(() => {
@@ -37,7 +37,15 @@ describe("GET /api/cron/attendance-reminder", () => {
     expect(mocks.findStudents).not.toHaveBeenCalled();
   });
 
-  it("scans once for the KST day and dispatches an idempotent event key", async () => {
+  it("scans once for the KST day and sends one morning task digest batch", async () => {
+    mocks.findStudents.mockResolvedValueOnce([{
+      id: "student-1",
+      assignmentSlots: [{
+        dueAt: new Date("2026-08-01T07:00:00.000Z"),
+        board: { title: "과학 관찰 기록", slug: "science" },
+      }],
+    }]);
+
     const response = await GET(new Request("http://localhost", {
       headers: { authorization: "Bearer cron-test" },
     }));
@@ -46,42 +54,65 @@ describe("GET /api/cron/attendance-reminder", () => {
     expect(mocks.findStudents).toHaveBeenCalledWith({
       where: {
         attendances: { none: { day: new Date("2026-08-01T00:00:00.000Z") } },
-        notifications: {
+        pushDispatches: {
           none: {
             eventKey: {
-              startsWith: "attendance-missing:",
+              startsWith: "morning-tasks:",
               endsWith: ":2026-08-01",
             },
           },
         },
       },
       orderBy: { id: "asc" },
-      select: { id: true },
+      select: {
+        id: true,
+        assignmentSlots: {
+          where: {
+            submissionStatus: { in: ["assigned", "returned", "orphaned"] },
+          },
+          orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }],
+          select: {
+            dueAt: true,
+            board: { select: { title: true, slug: true } },
+          },
+        },
+      },
       take: 500,
     });
-    expect(mocks.dispatch).toHaveBeenCalledWith(
-      expect.objectContaining({
-        eventKey: "attendance-missing:student-1:2026-08-01",
+    expect(mocks.dispatchBatch).toHaveBeenCalledWith(
+      [expect.objectContaining({
+        eventKey: "morning-tasks:student-1:2026-08-01",
         kind: "attendance",
-      }),
+        body: expect.stringContaining(
+          "과학 관찰 기록 과제의 마감이 오늘 오후 4시까지예요.",
+        ),
+      })],
       { propagateFailure: true },
     );
+    await expect(response.json()).resolves.toEqual({
+      day: "2026-08-01",
+      scanned: 1,
+      dispatched: 1,
+      attemptedDevices: 1,
+      failed: 0,
+    });
   });
 
-  it("exhausts multiple keyset pages without looping or dispatching a student twice", async () => {
+  it("exhausts multiple keyset pages in 100-student push batches", async () => {
     const firstPage = Array.from({ length: 500 }, (_, index) => ({
       id: `student-${String(index + 1).padStart(4, "0")}`,
+      assignmentSlots: [],
     }));
     const secondPage = [
-      { id: "student-0501" },
-      { id: "student-0502" },
+      { id: "student-0501", assignmentSlots: [] },
+      { id: "student-0502", assignmentSlots: [] },
     ];
     mocks.findStudents
       .mockResolvedValueOnce(firstPage)
       .mockResolvedValueOnce(secondPage);
-    mocks.dispatch.mockImplementation(async (input: { studentId: string }) => {
-      if (input.studentId === "student-0502") throw new Error("send failed");
-      return { attempted: 1, skipped: 0 };
+    mocks.dispatchBatch.mockImplementation(async (batch: Array<{ studentId: string }>) => {
+      if (batch[0]?.studentId === "student-0501") throw new Error("send failed");
+      return { attempted: batch.length, skipped: 0, reserved: batch.length };
     });
 
     const response = await GET(new Request("http://localhost", {
@@ -95,15 +126,19 @@ describe("GET /api/cron/attendance-reminder", () => {
       orderBy: { id: "asc" },
       take: 500,
     });
-
-    const eventKeys = mocks.dispatch.mock.calls.map(([input]) => input.eventKey);
-    expect(eventKeys).toHaveLength(502);
-    expect(new Set(eventKeys).size).toBe(502);
+    expect(mocks.dispatchBatch).toHaveBeenCalledTimes(6);
+    const firstPageBatches = mocks.dispatchBatch.mock.calls.slice(0, 5)
+      .flatMap(([batch]) => batch as Array<{ eventKey: string }>);
+    expect(mocks.dispatchBatch.mock.calls.slice(0, 5).every(([batch]) => batch.length === 100))
+      .toBe(true);
+    expect(firstPageBatches).toHaveLength(500);
+    expect(new Set(firstPageBatches.map((item) => item.eventKey)).size).toBe(500);
     await expect(response.json()).resolves.toEqual({
       day: "2026-08-01",
       scanned: 502,
-      dispatched: 501,
-      failed: 1,
+      dispatched: 500,
+      attemptedDevices: 500,
+      failed: 2,
     });
   });
 });

@@ -34,6 +34,7 @@ describe("/api/student/notifications", () => {
       sourceId: "comment-1",
       kind: "comment",
       actorLabel: "김 선생님",
+      title: "게시물에 새 댓글이 달렸어요",
       cardTitle: "여름 일기",
       boardTitle: "우리 반",
       href: "/board/class-board",
@@ -56,7 +57,7 @@ describe("/api/student/notifications", () => {
       where: { studentId: "student-1" },
       orderBy: { createdAt: "desc" },
       take: 20,
-      select: expect.objectContaining({ sourceId: true, kind: true, readAt: true }),
+      select: expect.objectContaining({ sourceId: true, kind: true, title: true, readAt: true }),
     });
     await expect(response.json()).resolves.toEqual({
       count: 1,
@@ -64,6 +65,7 @@ describe("/api/student/notifications", () => {
         id: "comment:comment-1",
         kind: "comment",
         actorLabel: "김 선생님",
+        title: "게시물에 새 댓글이 달렸어요",
         cardTitle: "여름 일기",
         boardTitle: "우리 반",
         href: "/board/class-board",

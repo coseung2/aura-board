@@ -2,18 +2,20 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import {
-  attendanceReminderPush,
-  dispatchStudentNotificationPush,
+  dispatchStudentNotificationPushBatch,
+  morningTaskReminderPush,
   studentPushKstDay,
 } from "@/lib/student-push";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 const ATTENDANCE_PAGE_SIZE = 500;
-const DISPATCH_CONCURRENCY = 10;
+const PUSH_BATCH_SIZE = 100;
+const MISSING_SUBMISSION_STATUSES = ["assigned", "returned", "orphaned"] as const;
 
-export async function GET(req: Request) {
+async function consume(req: Request) {
   if (!isAuthorizedCronRequest(req)) {
     return NextResponse.json({ error: "invalid_secret" }, { status: 401 });
   }
@@ -22,6 +24,7 @@ export async function GET(req: Request) {
   const attendanceDate = new Date(`${day}T00:00:00.000Z`);
   let scanned = 0;
   let dispatched = 0;
+  let attemptedDevices = 0;
   let failed = 0;
   let afterId: string | undefined;
 
@@ -30,40 +33,62 @@ export async function GET(req: Request) {
       where: {
         ...(afterId ? { id: { gt: afterId } } : {}),
         attendances: { none: { day: attendanceDate } },
-        notifications: {
-          none: { eventKey: { startsWith: "attendance-missing:", endsWith: `:${day}` } },
+        pushDispatches: {
+          none: { eventKey: { startsWith: "morning-tasks:", endsWith: `:${day}` } },
         },
       },
       orderBy: { id: "asc" },
-      select: { id: true },
+      select: {
+        id: true,
+        assignmentSlots: {
+          where: { submissionStatus: { in: [...MISSING_SUBMISSION_STATUSES] } },
+          orderBy: [{ dueAt: "asc" }, { createdAt: "asc" }],
+          select: {
+            dueAt: true,
+            board: { select: { title: true, slug: true } },
+          },
+        },
+      },
       take: ATTENDANCE_PAGE_SIZE,
     });
     if (students.length === 0) break;
 
     scanned += students.length;
-    let pageCursor = 0;
-    await Promise.all(Array.from(
-      { length: Math.min(DISPATCH_CONCURRENCY, students.length) },
-      async () => {
-        while (pageCursor < students.length) {
-          const student = students[pageCursor];
-          pageCursor += 1;
-          try {
-            await dispatchStudentNotificationPush(
-              attendanceReminderPush(student.id, day),
-              { propagateFailure: true },
-            );
-            dispatched += 1;
-          } catch {
-            failed += 1;
-          }
-        }
-      },
-    ));
+    const pushes = students.map((student) => morningTaskReminderPush({
+      studentId: student.id,
+      day,
+      assignments: student.assignmentSlots.map((slot) => ({
+        boardTitle: slot.board.title,
+        boardSlug: slot.board.slug,
+        dueAt: slot.dueAt,
+      })),
+    }));
+    for (let start = 0; start < pushes.length; start += PUSH_BATCH_SIZE) {
+      const batch = pushes.slice(start, start + PUSH_BATCH_SIZE);
+      try {
+        const result = await dispatchStudentNotificationPushBatch(
+          batch,
+          { propagateFailure: true },
+        );
+        dispatched += result.reserved;
+        attemptedDevices += result.attempted;
+      } catch {
+        failed += batch.length;
+      }
+    }
 
     afterId = students[students.length - 1].id;
     if (students.length < ATTENDANCE_PAGE_SIZE) break;
   }
 
-  return NextResponse.json({ day, scanned, dispatched, failed });
+  return NextResponse.json({
+    day,
+    scanned,
+    dispatched,
+    attemptedDevices,
+    failed,
+  });
 }
+
+export const GET = consume;
+export const POST = consume;

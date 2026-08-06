@@ -1,7 +1,11 @@
 import "server-only";
 
 import { db } from "@/lib/db";
-import { expoPushFailureDetails, sendExpoPush } from "@/lib/expo-push";
+import {
+  expoPushFailureDetails,
+  sendExpoPush,
+  sendExpoPushMessages,
+} from "@/lib/expo-push";
 import type { StudentNotificationKind } from "@/lib/student-notification-contract";
 
 export type StudentPushKind = StudentNotificationKind;
@@ -21,6 +25,12 @@ export type StudentNotificationPush = {
   createdAt?: Date;
 };
 
+export type MorningAssignmentReminder = {
+  boardTitle: string;
+  boardSlug: string;
+  dueAt: Date | null;
+};
+
 type DispatchOptions = { propagateFailure?: boolean };
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1_000;
@@ -37,18 +47,59 @@ export function shouldSendAttendanceReminder(now: Date = new Date()): boolean {
     >= ATTENDANCE_REMINDER_KST_HOUR;
 }
 
+export function morningTaskReminderPush(input: {
+  studentId: string;
+  day?: string;
+  assignments?: MorningAssignmentReminder[];
+}): StudentNotificationPush {
+  const day = input.day ?? studentPushKstDay();
+  const assignments = input.assignments ?? [];
+  const todayAssignments = assignments
+    .filter((assignment) => assignment.dueAt && studentPushKstDay(assignment.dueAt) === day)
+    .sort((left, right) => left.dueAt!.getTime() - right.dueAt!.getTime());
+
+  const sentences = ["오늘 출석을 확인해 주세요."];
+  for (const assignment of todayAssignments.slice(0, 2)) {
+    sentences.push(
+      `${assignmentLabel(assignment.boardTitle)}의 마감이 오늘 ${formatKstDeadlineTime(assignment.dueAt!)}까지예요.`,
+    );
+  }
+  if (todayAssignments.length > 2) {
+    sentences.push(
+      `오늘 마감인 과제가 ${todayAssignments.length - 2}개 더 있어요. 과제 목록에서 확인해 주세요.`,
+    );
+  } else if (todayAssignments.length === 0 && assignments.length === 1) {
+    sentences.push(
+      `아직 제출하지 않은 과제는 ${assignmentLabel(assignments[0].boardTitle)}예요.`,
+    );
+  } else if (todayAssignments.length === 0 && assignments.length > 1) {
+    sentences.push(
+      `아직 제출하지 않은 과제가 ${assignments.length}개 있어요. 과제 목록에서 확인해 주세요.`,
+    );
+  }
+
+  return {
+    eventKey: `morning-tasks:${input.studentId}:${day}`,
+    sourceId: `${input.studentId}:${day}`,
+    studentId: input.studentId,
+    kind: "attendance",
+    title: assignments.length > 0
+      ? "오늘 출석과 과제를 확인해 주세요"
+      : "오늘 출석을 확인해 주세요",
+    body: sentences.join(" "),
+    href: "/student",
+    actorLabel: "Aura Board",
+    cardTitle: "오늘 할 일",
+    boardTitle: "출석과 과제",
+  };
+}
+
+/** Backward-compatible builder for callers that only need attendance. */
 export function attendanceReminderPush(
   studentId: string,
   day = studentPushKstDay(),
 ): StudentNotificationPush {
-  return {
-    eventKey: `attendance-missing:${studentId}:${day}`,
-    studentId,
-    kind: "attendance",
-    title: "오늘 출석을 확인해 주세요",
-    body: "Aura Board에 들어와 오늘의 출석을 기록해 주세요.",
-    href: "/student",
-  };
+  return morningTaskReminderPush({ studentId, day, assignments: [] });
 }
 
 export function assignmentDistributedPush(input: {
@@ -80,18 +131,7 @@ export async function dispatchStudentNotificationPush(
           eventKey: input.eventKey,
         },
       },
-      create: {
-        studentId: input.studentId,
-        eventKey: input.eventKey,
-        sourceId: input.sourceId ?? sourceIdFromEventKey(input.eventKey),
-        kind: input.kind,
-        actorLabel: input.actorLabel ?? "Aura Board",
-        cardTitle: input.cardTitle ?? input.title,
-        boardTitle: input.boardTitle ?? defaultBoardTitle(input.kind),
-        href: input.href,
-        content: input.content === undefined ? input.body : input.content,
-        ...(input.createdAt ? { createdAt: input.createdAt } : {}),
-      },
+      create: notificationCreateData(input),
       update: {},
     });
 
@@ -123,30 +163,8 @@ export async function dispatchStudentNotificationPush(
     });
     if (devices.length === 0) return { attempted: 0, skipped: 0 };
 
-    const result = await sendExpoPush(devices, {
-      title: input.title,
-      body: input.body,
-      data: {
-        type: "student_notification",
-        kind: input.kind,
-        href: input.href,
-      },
-    });
-
-    if (result.invalidDeviceIds.length > 0) {
-      try {
-        await db.studentPushDevice.updateMany({
-          where: { id: { in: result.invalidDeviceIds } },
-          data: { disabledAt: new Date() },
-        });
-      } catch (error) {
-        console.error("[student-push] invalid-device cleanup failed", {
-          eventKey: input.eventKey,
-          studentId: input.studentId,
-          error: safeErrorDetails(error),
-        });
-      }
-    }
+    const result = await sendExpoPush(devices, pushMessage(input));
+    await disableInvalidDevices(result.invalidDeviceIds, input);
     return { attempted: result.attempted, skipped: 0 };
   } catch (error) {
     const released = dispatchId
@@ -163,6 +181,148 @@ export async function dispatchStudentNotificationPush(
   }
 }
 
+/**
+ * Persists, reserves, and sends many student-specific messages as one bounded
+ * operation. Expo messages are grouped in batches of 100 by sendExpoPushMessages.
+ */
+export async function dispatchStudentNotificationPushBatch(
+  inputs: StudentNotificationPush[],
+  options: DispatchOptions = {},
+): Promise<{ attempted: number; skipped: number; reserved: number }> {
+  const unique = Array.from(new Map(
+    inputs.map((input) => [`${input.studentId}\u001f${input.eventKey}`, input]),
+  ).values());
+  if (unique.length === 0) return { attempted: 0, skipped: 0, reserved: 0 };
+
+  const inputByKey = new Map(
+    unique.map((input) => [`${input.studentId}\u001f${input.eventKey}`, input]),
+  );
+  let reservations: Array<{ id: string; studentId: string; eventKey: string }> = [];
+
+  try {
+    await db.studentNotification.createMany({
+      data: unique.map(notificationCreateData),
+      skipDuplicates: true,
+    });
+    reservations = await db.studentPushDispatch.createManyAndReturn({
+      data: unique.map((input) => ({
+        studentId: input.studentId,
+        eventKey: input.eventKey,
+        kind: input.kind,
+        title: input.title,
+        body: input.body,
+        href: input.href,
+      })),
+      skipDuplicates: true,
+      select: { id: true, studentId: true, eventKey: true },
+    });
+
+    if (reservations.length === 0) {
+      return { attempted: 0, skipped: unique.length, reserved: 0 };
+    }
+
+    const devices = await db.studentPushDevice.findMany({
+      where: {
+        studentId: { in: [...new Set(reservations.map((row) => row.studentId))] },
+        disabledAt: null,
+      },
+      select: { id: true, studentId: true, expoPushToken: true },
+    });
+    const devicesByStudent = new Map<string, typeof devices>();
+    for (const device of devices) {
+      const current = devicesByStudent.get(device.studentId) ?? [];
+      current.push(device);
+      devicesByStudent.set(device.studentId, current);
+    }
+
+    const envelopes = reservations.flatMap((reservation) => {
+      const input = inputByKey.get(`${reservation.studentId}\u001f${reservation.eventKey}`);
+      if (!input) return [];
+      return (devicesByStudent.get(reservation.studentId) ?? []).map((device) => ({
+        device: { id: device.id, expoPushToken: device.expoPushToken },
+        message: pushMessage(input),
+      }));
+    });
+    if (envelopes.length === 0) {
+      return {
+        attempted: 0,
+        skipped: unique.length - reservations.length,
+        reserved: reservations.length,
+      };
+    }
+
+    const result = await sendExpoPushMessages(envelopes);
+    if (result.invalidDeviceIds.length > 0) {
+      await db.studentPushDevice.updateMany({
+        where: { id: { in: result.invalidDeviceIds } },
+        data: { disabledAt: new Date() },
+      });
+    }
+    return {
+      attempted: result.attempted,
+      skipped: unique.length - reservations.length,
+      reserved: reservations.length,
+    };
+  } catch (error) {
+    if (reservations.length > 0) {
+      await db.studentPushDispatch.deleteMany({
+        where: { id: { in: reservations.map((row) => row.id) } },
+      }).catch(() => undefined);
+    }
+    console.error("[student-push] batch dispatch failed", {
+      notifications: unique.length,
+      reservations: reservations.length,
+      error: expoPushFailureDetails(error),
+    });
+    if (options.propagateFailure) throw error;
+    return { attempted: 0, skipped: 0, reserved: 0 };
+  }
+}
+
+function notificationCreateData(input: StudentNotificationPush) {
+  return {
+    studentId: input.studentId,
+    eventKey: input.eventKey,
+    sourceId: input.sourceId ?? sourceIdFromEventKey(input.eventKey),
+    kind: input.kind,
+    actorLabel: input.actorLabel ?? "Aura Board",
+    title: input.title,
+    cardTitle: input.cardTitle ?? input.title,
+    boardTitle: input.boardTitle ?? defaultBoardTitle(input.kind),
+    href: input.href,
+    content: input.content === undefined ? input.body : input.content,
+    ...(input.createdAt ? { createdAt: input.createdAt } : {}),
+  };
+}
+
+function pushMessage(input: StudentNotificationPush) {
+  return {
+    title: input.title,
+    body: input.body,
+    data: {
+      type: "student_notification",
+      kind: input.kind,
+      href: input.href,
+    },
+  };
+}
+
+function assignmentLabel(title: string): string {
+  const normalized = title.trim() || "과제";
+  return normalized.endsWith("과제") ? normalized : `${normalized} 과제`;
+}
+
+function formatKstDeadlineTime(value: Date): string {
+  const shifted = new Date(value.getTime() + KST_OFFSET_MS);
+  const hour24 = shifted.getUTCHours();
+  const minute = shifted.getUTCMinutes();
+  const period = hour24 < 12 ? "오전" : "오후";
+  const hour12 = hour24 % 12 || 12;
+  return minute === 0
+    ? `${period} ${hour12}시`
+    : `${period} ${hour12}시 ${minute}분`;
+}
+
 function sourceIdFromEventKey(eventKey: string): string {
   const separator = eventKey.indexOf(":");
   return separator >= 0 ? eventKey.slice(separator + 1) : eventKey;
@@ -171,8 +331,27 @@ function sourceIdFromEventKey(eventKey: string): string {
 function defaultBoardTitle(kind: StudentPushKind): string {
   if (kind === "attendance") return "출석";
   if (kind === "assignment") return "과제";
-  if (kind === "reward" || kind === "refund") return "내 통장";
+  if (kind === "wallet" || kind === "reward" || kind === "refund") return "내 통장";
   return "게시판";
+}
+
+async function disableInvalidDevices(
+  invalidDeviceIds: string[],
+  input: StudentNotificationPush,
+): Promise<void> {
+  if (invalidDeviceIds.length === 0) return;
+  try {
+    await db.studentPushDevice.updateMany({
+      where: { id: { in: invalidDeviceIds } },
+      data: { disabledAt: new Date() },
+    });
+  } catch (error) {
+    console.error("[student-push] invalid-device cleanup failed", {
+      eventKey: input.eventKey,
+      studentId: input.studentId,
+      error: safeErrorDetails(error),
+    });
+  }
 }
 
 async function releaseStudentPushReservation(

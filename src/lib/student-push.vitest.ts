@@ -4,10 +4,14 @@ const mocks = vi.hoisted(() => ({
   findDevices: vi.fn(),
   countDevices: vi.fn(),
   createDispatch: vi.fn(),
+  createManyDispatches: vi.fn(),
   deleteDispatch: vi.fn(),
+  deleteManyDispatches: vi.fn(),
   disableDevices: vi.fn(),
   upsertNotification: vi.fn(),
+  createManyNotifications: vi.fn(),
   sendExpoPush: vi.fn(),
+  sendExpoPushMessages: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -20,13 +24,19 @@ vi.mock("@/lib/db", () => ({
     },
     studentPushDispatch: {
       create: mocks.createDispatch,
+      createManyAndReturn: mocks.createManyDispatches,
       delete: mocks.deleteDispatch,
+      deleteMany: mocks.deleteManyDispatches,
     },
-    studentNotification: { upsert: mocks.upsertNotification },
+    studentNotification: {
+      upsert: mocks.upsertNotification,
+      createMany: mocks.createManyNotifications,
+    },
   },
 }));
 vi.mock("@/lib/expo-push", () => ({
   sendExpoPush: mocks.sendExpoPush,
+  sendExpoPushMessages: mocks.sendExpoPushMessages,
   expoPushFailureDetails: () => ({ reason: "request_error" }),
 }));
 
@@ -34,6 +44,8 @@ import {
   assignmentDistributedPush,
   attendanceReminderPush,
   dispatchStudentNotificationPush,
+  dispatchStudentNotificationPushBatch,
+  morningTaskReminderPush,
   shouldSendAttendanceReminder,
   studentPushKstDay,
 } from "./student-push";
@@ -56,7 +68,11 @@ describe("dispatchStudentNotificationPush", () => {
     mocks.countDevices.mockResolvedValue(1);
     mocks.createDispatch.mockResolvedValue({ id: "dispatch-1" });
     mocks.deleteDispatch.mockResolvedValue({ id: "dispatch-1" });
+    mocks.deleteManyDispatches.mockResolvedValue({ count: 0 });
+    mocks.createManyNotifications.mockResolvedValue({ count: 0 });
+    mocks.createManyDispatches.mockResolvedValue([]);
     mocks.sendExpoPush.mockResolvedValue({ attempted: 1, invalidDeviceIds: [] });
+    mocks.sendExpoPushMessages.mockResolvedValue({ attempted: 0, invalidDeviceIds: [] });
     mocks.disableDevices.mockResolvedValue({ count: 0 });
     mocks.upsertNotification.mockResolvedValue({ id: "notification-1" });
   });
@@ -203,6 +219,47 @@ describe("dispatchStudentNotificationPush", () => {
   });
 });
 
+describe("dispatchStudentNotificationPushBatch", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.createManyNotifications.mockResolvedValue({ count: 2 });
+    mocks.createManyDispatches.mockResolvedValue([
+      { id: "dispatch-1", studentId: "student-1", eventKey: "morning-tasks:student-1:2026-08-07" },
+      { id: "dispatch-2", studentId: "student-2", eventKey: "morning-tasks:student-2:2026-08-07" },
+    ]);
+    mocks.findDevices.mockResolvedValue([
+      { id: "device-1", studentId: "student-1", expoPushToken: "ExpoPushToken[token1]" },
+      { id: "device-2", studentId: "student-2", expoPushToken: "ExpoPushToken[token2]" },
+    ]);
+    mocks.sendExpoPushMessages.mockResolvedValue({ attempted: 2, invalidDeviceIds: [] });
+    mocks.disableDevices.mockResolvedValue({ count: 0 });
+  });
+
+  it("reserves many students together and delegates one device-specific batch", async () => {
+    const pushes = ["student-1", "student-2"].map((studentId) =>
+      morningTaskReminderPush({ studentId, day: "2026-08-07" }),
+    );
+
+    await expect(dispatchStudentNotificationPushBatch(pushes)).resolves.toEqual({
+      attempted: 2,
+      skipped: 0,
+      reserved: 2,
+    });
+    expect(mocks.createManyNotifications).toHaveBeenCalledWith({
+      data: expect.arrayContaining([
+        expect.objectContaining({ studentId: "student-1", title: "오늘 출석을 확인해 주세요" }),
+        expect.objectContaining({ studentId: "student-2", title: "오늘 출석을 확인해 주세요" }),
+      ]),
+      skipDuplicates: true,
+    });
+    expect(mocks.createManyDispatches).toHaveBeenCalledOnce();
+    expect(mocks.sendExpoPushMessages).toHaveBeenCalledWith([
+      expect.objectContaining({ device: expect.objectContaining({ id: "device-1" }) }),
+      expect.objectContaining({ device: expect.objectContaining({ id: "device-2" }) }),
+    ]);
+  });
+});
+
 describe("student push event builders", () => {
   it("uses the KST calendar day in stable per-student attendance keys", () => {
     const beforeKstMidnight = new Date("2026-07-25T14:59:59.999Z");
@@ -211,13 +268,36 @@ describe("student push event builders", () => {
     expect(studentPushKstDay(beforeKstMidnight)).toBe("2026-07-25");
     expect(studentPushKstDay(afterKstMidnight)).toBe("2026-07-26");
     expect(attendanceReminderPush("student-1", "2026-07-26")).toMatchObject({
-      eventKey: "attendance-missing:student-1:2026-07-26",
+      eventKey: "morning-tasks:student-1:2026-07-26",
       studentId: "student-1",
       kind: "attendance",
       href: "/student",
     });
     expect(shouldSendAttendanceReminder(new Date("2026-07-25T22:59:59.999Z"))).toBe(false);
     expect(shouldSendAttendanceReminder(new Date("2026-07-25T23:00:00.000Z"))).toBe(true);
+  });
+
+  it("writes each due-today assignment as a sentence without middle-dot separators", () => {
+    const push = morningTaskReminderPush({
+      studentId: "student-1",
+      assignments: [
+        {
+          boardTitle: "과학 관찰 기록",
+          boardSlug: "science",
+          dueAt: new Date("2026-08-01T07:00:00.000Z"),
+        },
+        {
+          boardTitle: "독서 기록",
+          boardSlug: "reading",
+          dueAt: new Date("2026-08-01T11:00:00.000Z"),
+        },
+      ],
+      day: "2026-08-01",
+    });
+
+    expect(push.body).toContain("과학 관찰 기록 과제의 마감이 오늘 오후 4시까지예요.");
+    expect(push.body).toContain("독서 기록 과제의 마감이 오늘 오후 8시까지예요.");
+    expect(push.body).not.toContain("·");
   });
 
   it("uses the slot identity and assigned board link", () => {

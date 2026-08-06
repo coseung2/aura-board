@@ -4,21 +4,23 @@ import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { dispatchParentNotificationPush } from "@/lib/parent-push";
-import {
-  STUDENT_NOTIFICATION_REFUND_SOURCE_TYPE,
-  STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES,
-  studentRefundItemKey,
-  studentRewardTitle,
-  type StudentNotificationRewardSourceType,
-} from "@/lib/student-notification-contract";
 import { dispatchStudentNotificationPush } from "@/lib/student-push";
-import { getSlimeShopItem } from "@/lib/pets/catalog";
+import { getWalletTransactionDisplay } from "@/lib/wallet-transaction-display";
 
 const DEFAULT_BATCH_SIZE = 50;
 const MAX_BATCH_SIZE = 100;
 const DEFAULT_CONCURRENCY = 5;
 const MAX_ATTEMPTS = 8;
 const LEASE_MS = 5 * 60 * 1_000;
+const INCOMING_TRANSACTION_TYPES = new Set([
+  "deposit",
+  "refund",
+  "fd_matured",
+  "fd_cancelled",
+  "slime_refund",
+  "slime_item_refund",
+  "correction_credit",
+]);
 
 export type ClaimedNotificationOutbox = {
   id: string;
@@ -173,10 +175,9 @@ async function processCardLike(sourceId: string): Promise<void> {
   const like = await db.cardLike.findUnique({
     where: { id: sourceId },
     include: {
-      likerUser: { select: { name: true } },
-      likerStudent: { select: { name: true } },
       card: {
         select: {
+          id: true,
           title: true,
           studentAuthorId: true,
           authors: { select: { studentId: true } },
@@ -187,18 +188,43 @@ async function processCardLike(sourceId: string): Promise<void> {
   });
   if (!like || !["teacher", "student", "external"].includes(like.likerKind)) return;
 
-  const actorLabel = actorLabelFor(
-    like.likerKind,
-    like.likerKind === "teacher" ? like.likerUser?.name : like.likerStudent?.name,
-    like.card.board.anonymousAuthor,
-  );
-  const title = "게시물에 좋아요가 눌렸어요";
-  const body = `${actorLabel}이(가) ${like.card.title || "내 게시물"}에 좋아요를 눌렀어요.`;
-  await Promise.all(cardStudentIds(like.card)
-    .filter((studentId) => studentId !== like.likerStudentId)
-    .map((studentId) => dispatchStudentNotificationPush({
-      eventKey: `like:${like.id}`,
-      sourceId: like.id,
+  const bucketMs = 5 * 60 * 1_000;
+  const bucketStartMs = Math.floor(like.createdAt.getTime() / bucketMs) * bucketMs;
+  const bucketStart = new Date(bucketStartMs);
+  const bucketEnd = new Date(bucketStartMs + bucketMs);
+  const likes = await db.cardLike.findMany({
+    where: {
+      cardId: like.card.id,
+      createdAt: { gte: bucketStart, lt: bucketEnd },
+      likerKind: { in: ["teacher", "student", "external"] },
+    },
+    orderBy: { createdAt: "asc" },
+    include: {
+      likerUser: { select: { name: true } },
+      likerStudent: { select: { name: true } },
+    },
+  });
+  if (likes.length === 0) return;
+  const digestKey = `like-digest:${like.card.id}:${bucketStart.toISOString()}`;
+  await Promise.all(cardStudentIds(like.card).map(async (studentId) => {
+    const recipientLikes = likes.filter((entry) => entry.likerStudentId !== studentId);
+    if (recipientLikes.length === 0) return;
+    const first = recipientLikes[0];
+    const actorLabel = actorLabelFor(
+      first.likerKind,
+      first.likerKind === "teacher" ? first.likerUser?.name : first.likerStudent?.name,
+      like.card.board.anonymousAuthor,
+    );
+    const count = recipientLikes.length;
+    const title = count === 1
+      ? "내 게시물에 좋아요가 눌렸어요"
+      : `내 게시물이 좋아요 ${count}개를 받았어요`;
+    const body = count === 1
+      ? `${actorLabel}이(가) ${like.card.title || "내 게시물"}에 좋아요를 눌렀어요.`
+      : `${actorLabel} 외 ${count - 1}명이 ${like.card.title || "내 게시물"}에 좋아요를 눌렀어요.`;
+    await dispatchStudentNotificationPush({
+      eventKey: digestKey,
+      sourceId: digestKey,
       studentId,
       kind: "like",
       title,
@@ -207,9 +233,10 @@ async function processCardLike(sourceId: string): Promise<void> {
       actorLabel,
       cardTitle: like.card.title || "내 게시물",
       boardTitle: like.card.board.title,
-      content: null,
-      createdAt: like.createdAt,
-    }, { propagateFailure: true })));
+      content: body,
+      createdAt: bucketEnd,
+    }, { propagateFailure: true });
+  }));
 }
 
 async function processCardComment(sourceId: string): Promise<void> {
@@ -218,6 +245,7 @@ async function processCardComment(sourceId: string): Promise<void> {
     include: {
       authorUser: { select: { name: true } },
       authorStudent: { select: { name: true } },
+      parentComment: { select: { authorStudentId: true } },
       card: {
         select: {
           title: true,
@@ -240,22 +268,32 @@ async function processCardComment(sourceId: string): Promise<void> {
     comment.card.board.anonymousAuthor,
   );
   const content = truncate(comment.content, 72);
-  await Promise.all(cardStudentIds(comment.card)
-    .filter((studentId) => studentId !== comment.authorStudentId)
-    .map((studentId) => dispatchStudentNotificationPush({
-      eventKey: `comment:${comment.id}`,
+  const recipients = new Map<string, "comment" | "reply">();
+  for (const studentId of cardStudentIds(comment.card)) {
+    if (studentId !== comment.authorStudentId) recipients.set(studentId, "comment");
+  }
+  const parentAuthorId = comment.parentComment?.authorStudentId;
+  if (parentAuthorId && parentAuthorId !== comment.authorStudentId) {
+    recipients.set(parentAuthorId, "reply");
+  }
+  await Promise.all(Array.from(recipients, ([studentId, kind]) =>
+    dispatchStudentNotificationPush({
+      eventKey: `${kind}:${comment.id}`,
       sourceId: comment.id,
       studentId,
-      kind: "comment",
-      title: "게시물에 새 댓글이 달렸어요",
-      body: `${actorLabel}: ${truncate(comment.content, 80)}`,
+      kind,
+      title: kind === "reply" ? "내 댓글에 새 답글이 달렸어요" : "게시물에 새 댓글이 달렸어요",
+      body: kind === "reply"
+        ? `${actorLabel}이(가) 내 댓글에 답글을 남겼어요. ${truncate(comment.content, 80)}`
+        : `${actorLabel}이(가) 댓글을 남겼어요. ${truncate(comment.content, 80)}`,
       href: `/board/${comment.card.board.slug}`,
       actorLabel,
       cardTitle: comment.card.title || "내 게시물",
       boardTitle: comment.card.board.title,
       content,
       createdAt: comment.createdAt,
-    }, { propagateFailure: true })));
+    }, { propagateFailure: true }),
+  ));
 }
 
 async function processTransaction(sourceId: string): Promise<void> {
@@ -270,60 +308,30 @@ async function processTransaction(sourceId: string): Promise<void> {
       },
     },
   });
-  if (!transaction?.sourceType) return;
+  if (!transaction) return;
 
   const unit = transaction.account.classroom.currency?.unitLabel ?? "원";
-  const amount = `+${transaction.amount.toLocaleString("ko-KR")} ${unit}`;
-  if (
-    transaction.type === "deposit" &&
-    isRewardSourceType(transaction.sourceType)
-  ) {
-    const cardTitle = studentRewardTitle(transaction.sourceType);
-    const content = [transaction.note && truncate(transaction.note, 120), amount]
-      .filter(Boolean)
-      .join(" · ");
-    await dispatchStudentNotificationPush({
-      eventKey: `reward:${transaction.id}`,
-      sourceId: transaction.id,
-      studentId: transaction.account.studentId,
-      kind: "reward",
-      title: cardTitle,
-      body: content,
-      href: "/my/wallet",
-      actorLabel: "보상",
-      cardTitle,
-      boardTitle: "내 통장",
-      content,
-      createdAt: transaction.createdAt,
-    }, { propagateFailure: true });
-    return;
-  }
-
-  if (
-    transaction.type === "refund" &&
-    transaction.sourceType === STUDENT_NOTIFICATION_REFUND_SOURCE_TYPE
-  ) {
-    const itemKey = studentRefundItemKey(transaction.note);
-    const itemLabel = itemKey ? getSlimeShopItem(itemKey)?.labelKo : null;
-    const cardTitle = itemLabel
-      ? `${itemLabel} 값을 돌려드렸어요`
-      : "상점에서 사라진 물건 값을 돌려드렸어요";
-    const content = `상점에서 더 이상 살 수 없게 되어 값을 그대로 돌려주었어요 · ${amount}`;
-    await dispatchStudentNotificationPush({
-      eventKey: `refund:${transaction.id}`,
-      sourceId: transaction.id,
-      studentId: transaction.account.studentId,
-      kind: "refund",
-      title: cardTitle,
-      body: content,
-      href: "/my/wallet",
-      actorLabel: "상점",
-      cardTitle,
-      boardTitle: "내 통장",
-      content,
-      createdAt: transaction.createdAt,
-    }, { propagateFailure: true });
-  }
+  const amount = `${Math.abs(transaction.amount).toLocaleString("ko-KR")}${unit}`;
+  const balance = `현재 잔액은 ${transaction.balanceAfter.toLocaleString("ko-KR")}${unit}이에요.`;
+  const display = getWalletTransactionDisplay(transaction);
+  const incoming = isIncomingTransaction(transaction.type);
+  const title = incoming ? `${amount}이 들어왔어요` : `${amount}이 나갔어요`;
+  const reason = display.noteLabel ?? display.typeLabel;
+  const content = `${reason}${roEuroParticle(reason)} 처리됐어요. ${balance}`;
+  await dispatchStudentNotificationPush({
+    eventKey: `wallet:${transaction.id}`,
+    sourceId: transaction.id,
+    studentId: transaction.account.studentId,
+    kind: "wallet",
+    title,
+    body: content,
+    href: "/my/wallet",
+    actorLabel: "내 통장",
+    cardTitle: title,
+    boardTitle: "내 통장",
+    content,
+    createdAt: transaction.createdAt,
+  }, { propagateFailure: true });
 }
 
 async function processParentLink(sourceId: string): Promise<void> {
@@ -399,17 +407,24 @@ function actorLabelFor(
   return trimmed || "방문자";
 }
 
+function isIncomingTransaction(type: string): boolean {
+  return INCOMING_TRANSACTION_TYPES.has(type);
+}
+
+function roEuroParticle(value: string): "로" | "으로" {
+  const last = value.trim().at(-1);
+  if (!last) return "으로";
+  const code = last.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return "으로";
+  const jongseong = (code - 0xac00) % 28;
+  return jongseong === 0 || jongseong === 8 ? "로" : "으로";
+}
+
 function truncate(value: string, limit: number): string {
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length > limit
     ? `${normalized.slice(0, limit - 1)}…`
     : normalized;
-}
-
-function isRewardSourceType(
-  value: string,
-): value is StudentNotificationRewardSourceType {
-  return (STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES as readonly string[]).includes(value);
 }
 
 function safeOutboxError(error: unknown): string {

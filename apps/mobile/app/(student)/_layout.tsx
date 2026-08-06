@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { AppState, StyleSheet, View } from "react-native";
 import { Stack, usePathname, useRouter } from "expo-router";
 import { colors } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
@@ -87,13 +87,25 @@ export default function StudentLayout() {
   useEffect(() => {
     if (hideNav) return;
     let unsubscribe: () => void = () => undefined;
+    let active = true;
     void registerStudentPushNotifications();
+    const appStateSubscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void registerStudentPushNotifications();
+    });
     void subscribeStudentPushNavigation((href) => {
       router.push(studentNotificationTarget(href) as Href);
     }).then((next) => {
+      if (!active) {
+        next();
+        return;
+      }
       unsubscribe = next;
     });
-    return () => unsubscribe();
+    return () => {
+      active = false;
+      appStateSubscription.remove();
+      unsubscribe();
+    };
   }, [hideNav, router]);
 
   if (!cacheReady) {

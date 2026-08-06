@@ -6,6 +6,7 @@ import { baseColors } from "./theme/base-colors.cjs";
 // This flag is set only by the local Expo Go launcher; release builds retain
 // the production update configuration below.
 const isExpoGoDevelopment = process.env.AURA_EXPO_GO === "1";
+const googleServicesFile = process.env.GOOGLE_SERVICES_JSON?.trim();
 
 const config: ExpoConfig = {
   name: "Aura-board",
@@ -30,6 +31,7 @@ const config: ExpoConfig = {
     softwareKeyboardLayoutMode: "resize",
     package: "com.auraboard.app",
     versionCode: 17,
+    ...(googleServicesFile ? { googleServicesFile } : {}),
   },
   web: {
     favicon: "./assets/favicon.png",

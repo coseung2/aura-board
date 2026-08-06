@@ -34,18 +34,40 @@ describe("/api/cron/notification-push", () => {
     expect(mocks.consume).not.toHaveBeenCalled();
   });
 
-  it("consumes only a bounded outbox batch", async () => {
+  it("drains a bounded 100-row outbox batch", async () => {
     const response = await GET(new Request("http://localhost/api/cron/notification-push", {
       headers: { authorization: "Bearer cron-test" },
     }));
 
     expect(response.status).toBe(200);
-    expect(mocks.consume).toHaveBeenCalledWith({ batchSize: 50, concurrency: 5 });
+    expect(mocks.consume).toHaveBeenCalledWith({ batchSize: 100, concurrency: 5 });
     await expect(response.json()).resolves.toEqual({
+      batches: 1,
       claimed: 2,
       processed: 2,
       retried: 0,
       dead: 0,
+      hasMore: false,
+    });
+  });
+
+  it("continues draining while a full batch is claimed", async () => {
+    mocks.consume
+      .mockResolvedValueOnce({ claimed: 100, processed: 98, retried: 2, dead: 0 })
+      .mockResolvedValueOnce({ claimed: 3, processed: 3, retried: 0, dead: 0 });
+
+    const response = await GET(new Request("http://localhost/api/cron/notification-push", {
+      headers: { authorization: "Bearer cron-test" },
+    }));
+
+    expect(mocks.consume).toHaveBeenCalledTimes(2);
+    await expect(response.json()).resolves.toEqual({
+      batches: 2,
+      claimed: 103,
+      processed: 101,
+      retried: 2,
+      dead: 0,
+      hasMore: false,
     });
   });
 
@@ -60,7 +82,7 @@ describe("/api/cron/notification-push", () => {
     }));
 
     expect(response.status).toBe(200);
-    expect(mocks.consume).toHaveBeenCalledWith({ batchSize: 50, concurrency: 5 });
+    expect(mocks.consume).toHaveBeenCalledWith({ batchSize: 100, concurrency: 5 });
   });
 
   it("rejects an unauthenticated POST database webhook", async () => {

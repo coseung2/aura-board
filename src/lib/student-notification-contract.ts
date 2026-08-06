@@ -8,6 +8,8 @@ import {
 export const STUDENT_NOTIFICATION_KINDS = [
   "like",
   "comment",
+  "reply",
+  "wallet",
   "reward",
   "refund",
   "attendance",

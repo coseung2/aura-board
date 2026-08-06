@@ -18,6 +18,32 @@ const requiredMobileFiles = [
 
 const errors = [];
 
+if (process.env.EAS_BUILD_PROFILE === "production") {
+  const googleServicesPath = process.env.GOOGLE_SERVICES_JSON?.trim();
+  if (!googleServicesPath) {
+    errors.push(
+      "Production push notifications require the EAS file variable GOOGLE_SERVICES_JSON",
+    );
+  } else if (!existsSync(googleServicesPath)) {
+    errors.push("GOOGLE_SERVICES_JSON does not point to a readable file");
+  } else {
+    try {
+      const googleServices = JSON.parse(readFileSync(googleServicesPath, "utf8"));
+      const packageNames = (googleServices.client ?? []).flatMap((client) => {
+        const packageName = client?.client_info?.android_client_info?.package_name;
+        return typeof packageName === "string" ? [packageName] : [];
+      });
+      if (!packageNames.includes("com.auraboard.app")) {
+        errors.push(
+          "GOOGLE_SERVICES_JSON must contain the Android package com.auraboard.app",
+        );
+      }
+    } catch {
+      errors.push("GOOGLE_SERVICES_JSON is not valid Firebase configuration JSON");
+    }
+  }
+}
+
 for (const file of requiredMobileFiles) {
   if (!existsSync(join(mobileRoot, file))) {
     errors.push(`Missing release input: apps/mobile/${file}`);

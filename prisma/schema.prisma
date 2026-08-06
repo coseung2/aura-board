@@ -1063,6 +1063,7 @@ model StudentNotification {
   kind      String
 
   actorLabel String
+  title      String?
   cardTitle  String
   boardTitle String
   href       String
