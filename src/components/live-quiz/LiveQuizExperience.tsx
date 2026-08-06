@@ -173,61 +173,66 @@ export function LiveQuizExperience({
 
   return (
     <main className={styles.page}>
-      <div className={styles.shell}>
-        <header className={styles.hero}>
-          <div>
-            <div className={styles.liveLine}>
-              <span className={styles.liveBadge}>LIVE</span>
-              <span>매일 오후 1:30 · 전체 이용자</span>
-            </div>
-            <h1>오늘의 라이브 퀴즈</h1>
-            <p>
-              진행자 없이 같은 시각에 모두가 함께 푸는 4지선다 퀴즈예요.
-            </p>
+      <header className={`${styles.shell} ${styles.hero}`}>
+        <div>
+          <div className={styles.liveLine}>
+            <span className={styles.liveBadge}>LIVE</span>
+            <span>매일 오후 1:30 · 전체 이용자</span>
           </div>
-          <div className={styles.viewerCard}>
-            <span>{viewerKind === "student" ? "학생 참가자" : "교사 참가자"}</span>
-            <strong>{displayName}</strong>
-          </div>
-        </header>
+          <h1>오늘의 라이브 퀴즈</h1>
+          <p>
+            진행자 없이 같은 시각에 모두가 함께 푸는 4지선다 퀴즈예요.
+          </p>
+        </div>
+        <div className={styles.viewerCard}>
+          <span>{viewerKind === "student" ? "학생 참가자" : "교사 참가자"}</span>
+          <strong>{displayName}</strong>
+        </div>
+      </header>
 
-        <nav className={styles.tabs} aria-label="라이브 퀴즈 메뉴">
-          <button
-            type="button"
-            className={activeTab === "live" ? styles.activeTab : undefined}
-            aria-current={activeTab === "live" ? "page" : undefined}
-            onClick={() => setActiveTab("live")}
-          >
-            라이브 퀴즈
-          </button>
-          <button
-            type="button"
-            className={activeTab === "suggest" ? styles.activeTab : undefined}
-            aria-current={activeTab === "suggest" ? "page" : undefined}
-            onClick={() => setActiveTab("suggest")}
-          >
-            문제 추천
-          </button>
-        </nav>
+      <nav
+        className={`${styles.shell} ${styles.tabs}`}
+        aria-label="라이브 퀴즈 메뉴"
+      >
+        <button
+          type="button"
+          className={activeTab === "live" ? styles.activeTab : undefined}
+          aria-current={activeTab === "live" ? "page" : undefined}
+          onClick={() => setActiveTab("live")}
+        >
+          라이브 퀴즈
+        </button>
+        <button
+          type="button"
+          className={activeTab === "suggest" ? styles.activeTab : undefined}
+          aria-current={activeTab === "suggest" ? "page" : undefined}
+          onClick={() => setActiveTab("suggest")}
+        >
+          문제 추천
+        </button>
+      </nav>
 
-        {activeTab === "live" ? (
-          <LiveQuizLivePanel
-            state={state}
-            loading={loading}
-            loadError={loadError}
-            nowMs={nowMs}
-            selectedChoice={selectedChoice}
-            answering={answering}
-            answerError={answerError}
-            adminHref={adminHref}
-            onRetry={() => void loadState()}
-            onAnswer={(choice) => void answer(choice)}
-            onSuggest={() => setActiveTab("suggest")}
-          />
-        ) : (
-          <LiveQuizSuggestionPanel displayName={displayName} />
-        )}
-      </div>
+      {activeTab === "live" ? (
+        <LiveQuizLivePanel
+          contentClassName={styles.shell}
+          state={state}
+          loading={loading}
+          loadError={loadError}
+          nowMs={nowMs}
+          selectedChoice={selectedChoice}
+          answering={answering}
+          answerError={answerError}
+          adminHref={adminHref}
+          onRetry={() => void loadState()}
+          onAnswer={(choice) => void answer(choice)}
+          onSuggest={() => setActiveTab("suggest")}
+        />
+      ) : (
+        <LiveQuizSuggestionPanel
+          contentClassName={styles.shell}
+          displayName={displayName}
+        />
+      )}
     </main>
   );
 }
