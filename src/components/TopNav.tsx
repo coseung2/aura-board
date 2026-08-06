@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { AuthHeader } from "./AuthHeader";
 import { MegaNav, type MegaNavItem, type MegaNavLink } from "./MegaNav";
@@ -20,6 +20,9 @@ type TeacherNavBoard = {
   category: BoardCategory;
   classroomId: string | null;
   updatedAt: string;
+  layout?: string | null;
+  systemGameKind?: string | null;
+  pending?: boolean;
 };
 
 type TeacherNavClassroom = {
@@ -62,17 +65,26 @@ function boardHref(board: TeacherNavBoard) {
   return `/board/${board.slug}`;
 }
 
-function readRecentBoardIds() {
-  try {
-    const raw = localStorage.getItem("lastVisitedBoards");
-    const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
-    return Object.entries(parsed)
-      .filter((entry): entry is [string, string] => typeof entry[1] === "string")
-      .sort((a, b) => Date.parse(b[1]) - Date.parse(a[1]))
-      .map(([boardId]) => boardId);
-  } catch {
-    return [];
+async function openTeacherPlayBoard(board: TeacherNavBoard) {
+  if (!board.pending || !board.classroomId || !board.systemGameKind) {
+    window.location.assign(boardHref(board));
+    return;
   }
+  const response = await fetch("/api/teacher/game-hub/entry", {
+    method: "POST",
+    headers: { "content-type": "application/json", accept: "application/json" },
+    body: JSON.stringify({
+      gameKind: board.systemGameKind,
+      classroomId: board.classroomId,
+    }),
+  });
+  const body = (await response.json().catch(() => null)) as
+    | { href?: string }
+    | null;
+  if (!response.ok || !body?.href) {
+    throw new Error("play_board_entry_failed");
+  }
+  window.location.assign(body.href);
 }
 
 export function TopNav({ showAdmin = false }: Props) {
@@ -81,7 +93,6 @@ export function TopNav({ showAdmin = false }: Props) {
   const [navLoadError, setNavLoadError] = useState(false);
   const [navLoading, setNavLoading] = useState(false);
   const navRequestRef = useRef<AbortController | null>(null);
-  const [recentBoardIds, setRecentBoardIds] = useState<string[]>([]);
   const [previewClassroomId, setPreviewClassroomId] = useState<string | null>(
     null,
   );
@@ -151,20 +162,6 @@ export function TopNav({ showAdmin = false }: Props) {
   }, [loadTeacherNav]);
 
   useEffect(() => {
-    function refreshRecentBoards() {
-      setRecentBoardIds(readRecentBoardIds());
-    }
-
-    refreshRecentBoards();
-    window.addEventListener("storage", refreshRecentBoards);
-    window.addEventListener("focus", refreshRecentBoards);
-    return () => {
-      window.removeEventListener("storage", refreshRecentBoards);
-      window.removeEventListener("focus", refreshRecentBoards);
-    };
-  }, []);
-
-  useEffect(() => {
     if (currentClassroomId) {
       setPreviewClassroomId(currentClassroomId);
       return;
@@ -177,10 +174,6 @@ export function TopNav({ showAdmin = false }: Props) {
       return navData.classrooms[0]?.id ?? null;
     });
   }, [currentClassroomId, navData.classrooms]);
-
-  const boardById = useMemo(() => {
-    return new Map(navData.boards.map((board) => [board.id, board]));
-  }, [navData.boards]);
 
   const previewClassroom =
     navData.classrooms.find(
@@ -195,11 +188,6 @@ export function TopNav({ showAdmin = false }: Props) {
   const previewClassroomPlayBoards = (previewClassroom?.boards ?? []).filter(
     (board) => board.category === "PLAY",
   );
-
-  const recentBoards = recentBoardIds
-    .map((boardId) => boardById.get(boardId))
-    .filter((board): board is TeacherNavBoard => Boolean(board))
-    .slice(0, 6);
 
   const classroomBoardHref = previewClassroom
     ? `/classroom/${previewClassroom.id}/boards`
@@ -235,12 +223,20 @@ export function TopNav({ showAdmin = false }: Props) {
   const classroomBoardLinks = (
     boards: TeacherNavBoard[],
     emptyLabel: string,
+    options?: { playHub?: boolean },
   ): MegaNavLink[] =>
     boards.length > 0
-      ? boards.slice(0, 7).map((board) => ({
-          href: boardHref(board),
+      ? boards.slice(0, options?.playHub ? 8 : 7).map((board) => ({
+          href: board.pending ? classroomBoardHref : boardHref(board),
           label: board.title,
-          active: pathname === boardHref(board),
+          active: !board.pending && pathname === boardHref(board),
+          onSelect: board.pending
+            ? () => {
+                void openTeacherPlayBoard(board).catch(() => {
+                  window.location.assign("/dashboard?category=play");
+                });
+              }
+            : undefined,
         }))
       : [
           {
@@ -257,22 +253,8 @@ export function TopNav({ showAdmin = false }: Props) {
   const playBoardLinks = classroomBoardLinks(
     previewClassroomPlayBoards,
     "놀이보드 없음",
+    { playHub: true },
   );
-
-  const recentBoardLinks: MegaNavLink[] =
-    recentBoards.length > 0
-      ? recentBoards.map((board) => ({
-          href: boardHref(board),
-          label: board.title,
-          active: pathname === boardHref(board),
-        }))
-      : [
-          {
-            href: "/",
-            label: "최근 이용 기록 없음",
-            disabled: true,
-          },
-        ];
 
   const classroomContextLinks: MegaNavLink[] =
     navData.classrooms.length > 0
@@ -339,10 +321,6 @@ export function TopNav({ showAdmin = false }: Props) {
         {
           title: "놀이보드",
           links: playBoardLinks,
-        },
-        {
-          title: "최근 이용 보드",
-          links: recentBoardLinks,
         },
       ],
     },
