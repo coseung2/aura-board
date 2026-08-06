@@ -150,11 +150,7 @@ export function LiveQuizExperience({
       void loadState(true);
     }, delayMs);
     return () => window.clearTimeout(timeoutId);
-  }, [
-    loadState,
-    serverOffsetMs,
-    state,
-  ]);
+  }, [loadState, serverOffsetMs, state]);
 
   // Supabase Realtime carries only safe projection rows. Internal answers,
   // participant IDs, correct choices, and explanations are never published.
@@ -197,11 +193,13 @@ export function LiveQuizExperience({
           ) {
             return;
           }
-          setState((current) =>
-            current?.question?.id === row.questionId
-              ? { ...current, activeAnswerCount: row.answerCount as number }
-              : current,
-          );
+          const answerCount = row.answerCount;
+          setState((current) => {
+            if (!current || current.question?.id !== row.questionId) {
+              return current;
+            }
+            return { ...current, activeAnswerCount: answerCount };
+          });
         },
       )
       .subscribe((status) => {
