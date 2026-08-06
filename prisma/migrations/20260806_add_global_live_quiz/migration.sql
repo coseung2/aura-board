@@ -95,3 +95,22 @@ CREATE INDEX "LiveQuizAnswer_session_participant_idx"
   ON "LiveQuizAnswer"("sessionId", "participantType", "participantId");
 CREATE INDEX "LiveQuizAnswer_session_question_correct_idx"
   ON "LiveQuizAnswer"("sessionId", "questionId", "isCorrect");
+
+-- Only the server-side database connection may access quiz data. Direct
+-- Supabase/PostgREST access must not expose answers or unrevealed correct choices.
+ALTER TABLE "LiveQuizQuestion" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "LiveQuizSession" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "LiveQuizAnswer" ENABLE ROW LEVEL SECURITY;
+
+-- Keep local PostgreSQL migrations portable when Supabase roles are absent.
+-- Neither direct-access role receives an RLS policy for these tables.
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'anon') THEN
+    EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE public."LiveQuizQuestion", public."LiveQuizSession", public."LiveQuizAnswer" FROM anon';
+  END IF;
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'authenticated') THEN
+    EXECUTE 'REVOKE ALL PRIVILEGES ON TABLE public."LiveQuizQuestion", public."LiveQuizSession", public."LiveQuizAnswer" FROM authenticated';
+  END IF;
+END
+$$;

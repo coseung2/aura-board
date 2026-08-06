@@ -169,23 +169,13 @@ export async function readApprovedQuestionIds(
     ? await db.$queryRaw<IdRow[]>(Prisma.sql`
         SELECT "id"
         FROM "LiveQuizQuestion"
-        WHERE
-          (
-            "source" = 'starter'
-            AND (
-              "status" = 'approved'
-              OR ("status" = 'archived' AND "updatedAt" >= ${lockAt})
-            )
+        WHERE "approvedAt" IS NOT NULL
+          AND "approvedAt" < ${lockAt}
+          AND (
+            "status" = 'approved'
+            OR ("status" = 'archived' AND "updatedAt" >= ${lockAt})
           )
-          OR (
-            "source" <> 'starter'
-            AND "approvedAt" < ${lockAt}
-            AND (
-              "status" = 'approved'
-              OR ("status" = 'archived' AND "updatedAt" >= ${lockAt})
-            )
-          )
-        ORDER BY "approvedAt" ASC NULLS LAST, "createdAt" ASC, "id" ASC
+        ORDER BY "approvedAt" ASC, "createdAt" ASC, "id" ASC
         LIMIT 500
       `)
     : await db.$queryRaw<IdRow[]>(Prisma.sql`

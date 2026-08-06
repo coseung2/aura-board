@@ -47,32 +47,42 @@ export function LiveQuizExperience({
   const [optimisticAnswer, setOptimisticAnswer] =
     useState<OptimisticAnswer | null>(null);
   const stateRequestInFlightRef = useRef(false);
+  const stateRefreshQueuedRef = useRef(false);
 
   const loadState = useCallback(async (silent = false) => {
-    if (stateRequestInFlightRef.current) return;
-    stateRequestInFlightRef.current = true;
-    if (!silent) setLoading(true);
-    try {
-      const response = await fetch("/api/live-quiz/state", {
-        cache: "no-store",
-        credentials: "same-origin",
-        headers: { accept: "application/json" },
-      });
-      if (!response.ok) throw new Error(stateErrorMessage(response.status));
-      const body = (await response.json()) as LiveQuizStateResponse;
-      setState(body);
-      setServerOffsetMs(Date.parse(body.serverNow) - Date.now());
-      setLoadError(null);
-    } catch (error) {
-      setLoadError(
-        error instanceof Error
-          ? error.message
-          : "라이브 퀴즈 상태를 불러오지 못했습니다.",
-      );
-    } finally {
-      stateRequestInFlightRef.current = false;
-      if (!silent) setLoading(false);
+    if (stateRequestInFlightRef.current) {
+      stateRefreshQueuedRef.current = true;
+      return;
     }
+
+    let nextRequestSilent = silent;
+    do {
+      stateRefreshQueuedRef.current = false;
+      stateRequestInFlightRef.current = true;
+      if (!nextRequestSilent) setLoading(true);
+      try {
+        const response = await fetch("/api/live-quiz/state", {
+          cache: "no-store",
+          credentials: "same-origin",
+          headers: { accept: "application/json" },
+        });
+        if (!response.ok) throw new Error(stateErrorMessage(response.status));
+        const body = (await response.json()) as LiveQuizStateResponse;
+        setState(body);
+        setServerOffsetMs(Date.parse(body.serverNow) - Date.now());
+        setLoadError(null);
+      } catch (error) {
+        setLoadError(
+          error instanceof Error
+            ? error.message
+            : "라이브 퀴즈 상태를 불러오지 못했습니다.",
+        );
+      } finally {
+        stateRequestInFlightRef.current = false;
+        if (!nextRequestSilent) setLoading(false);
+      }
+      nextRequestSilent = true;
+    } while (stateRefreshQueuedRef.current);
   }, []);
 
   useEffect(() => {
@@ -115,13 +125,23 @@ export function LiveQuizExperience({
       : state?.selectedChoice ?? null;
 
   async function answer(choice: number) {
+    const answerDeadlineMs = Date.parse(state?.stageEndsAt ?? "");
     if (
       !state?.question ||
       state.phase !== "live" ||
       state.stage !== "answer" ||
+      !Number.isFinite(answerDeadlineMs) ||
+      nowMs >= answerDeadlineMs ||
       selectedChoice !== null ||
       answering
     ) {
+      if (
+        state?.phase === "live" &&
+        Number.isFinite(answerDeadlineMs) &&
+        nowMs >= answerDeadlineMs
+      ) {
+        void loadState(true);
+      }
       return;
     }
 

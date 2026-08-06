@@ -158,7 +158,7 @@ export function LiveQuizLivePanel({
           <span>/ {state.questionCount} 정답</span>
         </div>
         <p>
-          {state.answeredCount}문제에 답했어요. 다음 방송은 {" "}
+          {state.answeredCount}문제에 답했어요. 다음 방송은{" "}
           <strong>{formatKoreanDateTime(state.nextStartsAt)}</strong>입니다.
         </p>
         <button type="button" className={styles.primaryButton} onClick={onSuggest}>
@@ -183,6 +183,10 @@ export function LiveQuizLivePanel({
     Math.min(100, (remainingSeconds / stageSeconds) * 100),
   );
   const reveal = state.stage === "reveal";
+  const answerWindowOpen =
+    !reveal &&
+    state.stageEndsAt !== null &&
+    nowMs < Date.parse(state.stageEndsAt);
 
   return (
     <section
@@ -240,9 +244,11 @@ export function LiveQuizLivePanel({
               key={`${question.id}-${index}`}
               type="button"
               className={className}
-              disabled={reveal || selectedChoice !== null || answering}
+              disabled={!answerWindowOpen || selectedChoice !== null || answering}
               aria-pressed={chosen}
-              onClick={() => onAnswer(index)}
+              onClick={() => {
+                if (answerWindowOpen) onAnswer(index);
+              }}
             >
               <span className={styles.optionLabel}>{OPTION_LABELS[index]}</span>
               <span>{choice}</span>
@@ -260,8 +266,11 @@ export function LiveQuizLivePanel({
         {!answerError && !reveal && selectedChoice !== null ? (
           <p>선택 완료 · 정답 공개를 기다려 주세요.</p>
         ) : null}
-        {!answerError && !reveal && selectedChoice === null ? (
+        {!answerError && answerWindowOpen && selectedChoice === null ? (
           <p>가장 알맞은 답 하나를 선택하세요.</p>
+        ) : null}
+        {!answerError && !reveal && !answerWindowOpen && selectedChoice === null ? (
+          <p>답변이 마감됐어요. 정답 공개를 기다려 주세요.</p>
         ) : null}
         {reveal && state.isCorrect === true ? (
           <p className={styles.correctMessage}>정답입니다! 🎉</p>
