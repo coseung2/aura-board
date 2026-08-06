@@ -34,8 +34,8 @@ Realtime publication에는 `LiveQuizPublicSession`과 `LiveQuizQuestionCounter`�
 
 ## 진입 경로
 
-- 교사: 상단 📡 버튼 또는 `/live-quiz`
-- 학생: 놀이보드의 **오늘의 라이브 퀴즈** 카드 또는 `/student/live-quiz`
+- 교사: 보드 화면의 **놀이** 탭에 있는 **잼라이브** 카드 또는 `/live-quiz`
+- 학생: 놀이보드의 **잼라이브** 카드 또는 `/student/live-quiz`
 - 운영자: 라이브 화면의 검수 버튼 또는 `/admin/live-quiz`
 
 ## API

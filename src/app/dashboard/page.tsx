@@ -2,6 +2,7 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin";
 import { getCurrentTierAsync } from "@/lib/tier";
+import { OFFICIAL_GAME_KINDS } from "@/lib/game-platform/contracts";
 import { Dashboard } from "@/components/Dashboard";
 import { TopNav } from "@/components/TopNav";
 import { AppBackgroundButton } from "@/components/AppBackground";
@@ -17,7 +18,10 @@ export default async function DashboardPage() {
 
   const [memberships, classrooms, tier] = await Promise.all([
     db.boardMember.findMany({
-      where: { userId: user.id },
+      where: {
+        userId: user.id,
+        board: { layout: { notIn: [...OFFICIAL_GAME_KINDS] } },
+      },
       select: {
         role: true,
         board: {

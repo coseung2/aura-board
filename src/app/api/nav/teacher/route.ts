@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
+import { OFFICIAL_GAME_KINDS } from "@/lib/game-platform/contracts";
 
 const BOARD_SELECT = {
   id: true,
@@ -40,6 +41,7 @@ export async function GET() {
           id: true,
           name: true,
           boards: {
+            where: { layout: { notIn: [...OFFICIAL_GAME_KINDS] } },
             select: BOARD_SELECT,
             orderBy: { updatedAt: "desc" },
             take: 12,
@@ -48,7 +50,10 @@ export async function GET() {
         orderBy: { createdAt: "desc" },
       }),
       db.boardMember.findMany({
-        where: { userId: user.id },
+        where: {
+          userId: user.id,
+          board: { layout: { notIn: [...OFFICIAL_GAME_KINDS] } },
+        },
         select: { board: { select: BOARD_SELECT } },
         orderBy: { board: { updatedAt: "desc" } },
         take: 80,

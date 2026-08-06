@@ -5,9 +5,9 @@ import { db } from "@/lib/db";
 import type { OfficialGameKind } from "./contracts";
 import { OFFICIAL_GAME_CATALOG } from "./catalog";
 
-export type GameHubStudentScope = {
-  id: string;
+export type GameHubClassroomScope = {
   classroomId: string;
+  id?: string;
 };
 
 export type CanonicalGameRoom = {
@@ -83,17 +83,17 @@ async function findCanonicalRoom(
 /**
  * Resolve the stable classroom-owned room used by the first-class game hub.
  *
- * The client supplies only the canonical game kind. Classroom identity comes
- * from the authenticated student, and the database unique key serializes the
- * first-entry race between web and mobile. No score, timing, participant, host,
- * or runtime state is accepted here.
+ * The client supplies only the canonical game kind. Classroom identity is
+ * resolved from an authenticated student or an ownership-checked teacher
+ * request, and the database unique key serializes the first-entry race between
+ * clients. No score, timing, participant, host, or runtime state is accepted.
  */
 export async function resolveOrCreateCanonicalGameRoom(
-  student: GameHubStudentScope,
+  scope: GameHubClassroomScope,
   gameKind: OfficialGameKind,
 ): Promise<CanonicalGameRoom> {
-  const teacherId = await loadClassroomTeacherId(student.classroomId);
-  const existing = await findCanonicalRoom(student.classroomId, gameKind);
+  const teacherId = await loadClassroomTeacherId(scope.classroomId);
+  const existing = await findCanonicalRoom(scope.classroomId, gameKind);
   if (existing) {
     await ensureTeacherOwnership(existing.id, teacherId);
     return existing;
@@ -103,12 +103,12 @@ export async function resolveOrCreateCanonicalGameRoom(
   try {
     const room = await db.board.create({
       data: {
-        slug: stableRoomSlug(student.classroomId, gameKind),
+        slug: stableRoomSlug(scope.classroomId, gameKind),
         title: catalog.label,
         description: catalog.description,
         layout: gameKind,
         category: "PLAY",
-        classroomId: student.classroomId,
+        classroomId: scope.classroomId,
         systemGameKind: gameKind,
         thumbnailMode: "none",
         members: {
@@ -126,7 +126,7 @@ export async function resolveOrCreateCanonicalGameRoom(
     return room as CanonicalGameRoom;
   } catch (error) {
     if (!isUniqueConstraintError(error)) throw error;
-    const raced = await findCanonicalRoom(student.classroomId, gameKind);
+    const raced = await findCanonicalRoom(scope.classroomId, gameKind);
     if (raced) {
       await ensureTeacherOwnership(raced.id, teacherId);
       return raced;

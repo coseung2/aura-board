@@ -219,7 +219,7 @@ export function CreateBoardModal({
           {step === "layout" && (
             <>
               <p className="create-board-hint">
-                수업 보드 유형을 선택하세요. 공식 게임은 학생 놀이 탭의 게임 허브에서
+                수업 보드 유형을 선택하세요. 공식 게임은 교사와 학생의 놀이 탭에서
                 학급별 상시 방으로 자동 제공됩니다.
               </p>
               {renderLayoutGrid(visibleLayoutsForCategory)}
