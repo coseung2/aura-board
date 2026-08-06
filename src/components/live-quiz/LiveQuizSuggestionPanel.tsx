@@ -25,7 +25,15 @@ const EMPTY_QUESTION: LiveQuizQuestionInput = {
   category: "",
 };
 
-export function LiveQuizSuggestionPanel({ displayName }: { displayName: string }) {
+type Props = {
+  contentClassName: string;
+  displayName: string;
+};
+
+export function LiveQuizSuggestionPanel({
+  contentClassName,
+  displayName,
+}: Props) {
   const [draft, setDraft] = useState<LiveQuizQuestionInput>(EMPTY_QUESTION);
   const [suggestions, setSuggestions] = useState<LiveQuizSuggestionSummary[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
@@ -46,6 +54,7 @@ export function LiveQuizSuggestionPanel({ displayName }: { displayName: string }
         suggestions: LiveQuizSuggestionSummary[];
       };
       setSuggestions(body.suggestions);
+      setError(null);
     } catch (loadError) {
       setError(
         loadError instanceof Error
@@ -117,7 +126,7 @@ export function LiveQuizSuggestionPanel({ displayName }: { displayName: string }
   }
 
   return (
-    <section className={styles.suggestionLayout}>
+    <section className={`${contentClassName} ${styles.suggestionLayout}`}>
       <form className={styles.suggestionForm} onSubmit={submit}>
         <div className={styles.sectionHeading}>
           <div>
