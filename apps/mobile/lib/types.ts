@@ -618,6 +618,27 @@ export type ParentPostCounts = {
   text: number;
 };
 
+export type ParentReadingEntry = {
+  id: string;
+  bookType: "comic" | "story";
+  title: string;
+  author: string;
+  reflection: string;
+  aiScore: number | null;
+  aiFeedback: string | null;
+  createdAt: string;
+};
+
+export type ParentReadingResponse = {
+  children: Array<{
+    studentId: string;
+    name: string;
+    number: number | null;
+    classroom: { id: string; name: string } | null;
+    entries: ParentReadingEntry[];
+  }>;
+};
+
 export type ParentWalkingResponse = {
   week: {
     weekStart: string;

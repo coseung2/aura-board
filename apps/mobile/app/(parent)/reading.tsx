@@ -1,0 +1,291 @@
+import { useCallback, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { useFocusEffect, useRouter } from "expo-router";
+import { ChevronDown, ChevronUp } from "lucide-react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { ParentBottomNav } from "../../components/parent-bottom-nav";
+import { ParentHeaderActions } from "../../components/parent-header-actions";
+import {
+  AppButton,
+  AppHeader,
+  ControlPressable,
+  SectionHeader,
+} from "../../components/ui";
+import { SectionNav, SectionNavItem } from "../../components/NavigationTabs";
+import { ApiError, getApiBase, parentApiFetch } from "../../lib/api";
+import { clearParentSession, getUnifiedLoginRoute } from "../../lib/session";
+import type {
+  ParentReadingEntry,
+  ParentReadingResponse,
+} from "../../lib/types";
+import {
+  borders,
+  colors,
+  pageChrome,
+  radii,
+  spacing,
+  tapMin,
+  typography,
+} from "../../theme/tokens";
+
+type BookType = ParentReadingEntry["bookType"];
+
+export default function ParentReadingScreen() {
+  const router = useRouter();
+  const [children, setChildren] = useState<ParentReadingResponse["children"]>([]);
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const [bookType, setBookType] = useState<BookType>("story");
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleAuthError = useCallback(async (cause: unknown) => {
+    if (cause instanceof ApiError && cause.status === 401) {
+      await clearParentSession();
+      router.replace(getUnifiedLoginRoute("parent"));
+      return true;
+    }
+    return false;
+  }, [router]);
+
+  const load = useCallback(async (refresh = false) => {
+    if (refresh) setRefreshing(true);
+    else setLoading(true);
+    setError(null);
+
+    try {
+      const response = await parentApiFetch<ParentReadingResponse>(
+        __DEV__ ? `${getApiBase()}/api/parent/reading` : "/api/parent/reading",
+        { forceRefresh: refresh },
+      );
+      setChildren(response.children);
+      setSelectedChildId((current) =>
+        response.children.some((child) => child.studentId === current)
+          ? current
+          : response.children[0]?.studentId ?? null,
+      );
+    } catch (cause) {
+      if (!(await handleAuthError(cause))) {
+        setError("자녀 독서 기록을 불러오지 못했어요.");
+      }
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [handleAuthError]);
+
+  useFocusEffect(useCallback(() => {
+    void load();
+  }, [load]));
+
+  const selectedChild =
+    children.find((child) => child.studentId === selectedChildId) ?? null;
+  const counts = useMemo(() => ({
+    story: selectedChild?.entries.filter((entry) => entry.bookType === "story").length ?? 0,
+    comic: selectedChild?.entries.filter((entry) => entry.bookType === "comic").length ?? 0,
+  }), [selectedChild]);
+  const visibleEntries = useMemo(
+    () => selectedChild?.entries.filter((entry) => entry.bookType === bookType) ?? [],
+    [bookType, selectedChild],
+  );
+
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
+      <AppHeader title="독서" right={<ParentHeaderActions />} />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void load(true)}
+            tintColor={colors.accent}
+          />
+        }
+      >
+        {loading && children.length === 0 ? (
+          <View style={styles.state}>
+            <ActivityIndicator color={colors.accent} />
+            <Text style={styles.muted}>독서 기록을 불러오는 중이에요.</Text>
+          </View>
+        ) : error && children.length === 0 ? (
+          <View style={styles.state} accessibilityRole="alert">
+            <Text style={styles.stateTitle}>기록을 불러오지 못했어요.</Text>
+            <Text style={styles.muted}>{error}</Text>
+            <AppButton onPress={() => void load()}>다시 시도</AppButton>
+          </View>
+        ) : children.length === 0 ? (
+          <View style={styles.state}>
+            <Text style={styles.stateTitle}>연결된 자녀가 없어요.</Text>
+            <Text style={styles.muted}>자녀 연결이 승인되면 독서 기록을 볼 수 있어요.</Text>
+          </View>
+        ) : (
+          <>
+            {children.length > 1 ? (
+              <SectionNav accessibilityLabel="자녀 선택" style={styles.childNav}>
+                {children.map((child) => (
+                  <SectionNavItem
+                    key={child.studentId}
+                    selected={child.studentId === selectedChildId}
+                    onPress={() => {
+                      setSelectedChildId(child.studentId);
+                      setExpandedEntryId(null);
+                    }}
+                    accessibilityLabel={`${child.name} 독서 기록`}
+                  >
+                    {child.name}
+                  </SectionNavItem>
+                ))}
+              </SectionNav>
+            ) : null}
+
+            <View style={styles.heading}>
+              <Text style={styles.childName}>{selectedChild?.name}</Text>
+              <Text style={styles.childMeta}>
+                {selectedChild?.classroom?.name ?? "학급 미배정"}
+                {selectedChild?.number != null ? ` · ${selectedChild.number}번` : ""}
+              </Text>
+            </View>
+
+            <View style={styles.historyColumn}>
+              <SectionHeader
+                title="기록 목록"
+                right={
+                  <SectionNav accessibilityLabel="독서 기록 종류">
+                    <SectionNavItem
+                      selected={bookType === "story"}
+                      onPress={() => setBookType("story")}
+                      accessibilityLabel={`이야기책 ${counts.story}개`}
+                    >
+                      {`이야기책 ${counts.story}`}
+                    </SectionNavItem>
+                    <SectionNavItem
+                      selected={bookType === "comic"}
+                      onPress={() => setBookType("comic")}
+                      accessibilityLabel={`만화책 ${counts.comic}개`}
+                    >
+                      {`만화책 ${counts.comic}`}
+                    </SectionNavItem>
+                  </SectionNav>
+                }
+              />
+
+              {selectedChild?.entries.length === 0 ? (
+                <View style={styles.stateCompact}>
+                  <Text style={styles.stateTitle}>아직 독서 기록이 없어요.</Text>
+                </View>
+              ) : visibleEntries.length === 0 ? (
+                <Text style={styles.emptyType}>
+                  아직 {bookType === "story" ? "이야기책" : "만화책"} 기록이 없어요.
+                </Text>
+              ) : (
+                visibleEntries.map((entry) => {
+                  const expanded = expandedEntryId === entry.id;
+                  return (
+                    <View key={entry.id} style={styles.entry}>
+                      <View style={styles.entryIndex} accessible={false} />
+                      <View style={[styles.entryContent, expanded && styles.entryExpanded]}>
+                        <ControlPressable
+                          style={styles.entryToggle}
+                          onPress={() => setExpandedEntryId((current) => current === entry.id ? null : entry.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`${entry.title} ${expanded ? "접기" : "펼치기"}`}
+                          accessibilityState={{ expanded }}
+                        >
+                          <Text style={styles.entryTitle} numberOfLines={1}>{entry.title}</Text>
+                          {expanded ? (
+                            <ChevronUp size={16} color={colors.textFaint} accessible={false} />
+                          ) : (
+                            <ChevronDown size={16} color={colors.textFaint} accessible={false} />
+                          )}
+                        </ControlPressable>
+                        {expanded ? (
+                          <View style={styles.entryDetails}>
+                            <View style={styles.entryTopline}>
+                              <Text style={styles.entryType}>{entry.bookType === "comic" ? "만화책" : "이야기책"}</Text>
+                              <Text style={styles.entryDate}>{new Date(entry.createdAt).toLocaleDateString("ko-KR")}</Text>
+                            </View>
+                            <Text style={styles.meta}>{entry.author}</Text>
+                            <Text style={styles.body}>{entry.reflection}</Text>
+                            {entry.aiFeedback ? (
+                              <View style={styles.feedbackRow}>
+                                <Text style={styles.feedbackScore}>{entry.aiScore ?? 0}점</Text>
+                                <Text style={styles.feedback}>{entry.aiFeedback}</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+          </>
+        )}
+      </ScrollView>
+      <ParentBottomNav active="reading" />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.bg },
+  content: {
+    flexGrow: 1,
+    paddingHorizontal: spacing.xl,
+    paddingTop: pageChrome.contentStartGap + spacing.lg,
+    paddingBottom: spacing.xxxl + spacing.xxl,
+    gap: spacing.xl,
+  },
+  childNav: { alignSelf: "flex-start" },
+  heading: { gap: spacing.xxs },
+  childName: { ...typography.title, color: colors.text },
+  childMeta: { ...typography.badge, color: colors.textMuted },
+  historyColumn: { gap: spacing.md },
+  state: { flex: 1, minHeight: tapMin * 8 + spacing.sm, alignItems: "center", justifyContent: "center", gap: spacing.md },
+  stateCompact: { paddingVertical: spacing.xxl, alignItems: "center" },
+  stateTitle: { ...typography.section, color: colors.text, textAlign: "center" },
+  muted: { ...typography.body, color: colors.textMuted, textAlign: "center" },
+  emptyType: { ...typography.body, color: colors.textMuted, paddingVertical: spacing.xl, textAlign: "center" },
+  error: { ...typography.body, color: colors.danger, textAlign: "center" },
+  entry: { flexDirection: "row", gap: spacing.sm },
+  entryIndex: { width: borders.medium, borderRadius: radii.pill, backgroundColor: colors.accent },
+  entryContent: {
+    flex: 1,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+    paddingBottom: spacing.md,
+  },
+  entryExpanded: { paddingBottom: spacing.lg },
+  entryToggle: {
+    minHeight: tapMin,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  entryTitle: { ...typography.label, color: colors.text, flex: 1 },
+  entryDetails: { gap: spacing.sm, paddingTop: spacing.xs },
+  entryTopline: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
+  entryType: { ...typography.badge, color: colors.accent },
+  entryDate: { ...typography.badge, color: colors.textFaint },
+  meta: { ...typography.badge, color: colors.textMuted },
+  body: { ...typography.body, color: colors.text, lineHeight: typography.body.lineHeight + spacing.xxs },
+  feedbackRow: {
+    borderRadius: radii.control,
+    backgroundColor: colors.surfaceAlt,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  feedbackScore: { ...typography.label, color: colors.accent },
+  feedback: { ...typography.badge, color: colors.textMuted },
+});
