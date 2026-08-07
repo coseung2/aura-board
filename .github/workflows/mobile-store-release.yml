@@ -148,7 +148,7 @@ jobs:
         run: |
           test -n "$GOOGLE_SERVICES_JSON_BASE64"
           GOOGLE_SERVICES_PATH="$RUNNER_TEMP/google-services.json"
-          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > "$GOOGLE_SERVICES_PATH"
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > "$GOOGLE_SERVICES_PATH"
           chmod 600 "$GOOGLE_SERVICES_PATH"
           node - "$GOOGLE_SERVICES_PATH" <<'NODE'
           const fs = require("node:fs");
