@@ -489,6 +489,20 @@ model Account {
   @@index([userId])
 }
 
+// First-party username/password identity. The credential maps to the same
+// normalized email principal used by teacher and parent role switching, while
+// the password is stored only as a salted scrypt hash.
+model PasswordCredential {
+  id             String   @id @default(cuid())
+  username       String   @unique
+  passwordHash   String
+  principalEmail String   @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([principalEmail])
+}
+
 model Session {
   id String @id @default(cuid())
 
@@ -655,13 +669,13 @@ model Student {
 
   vibeReviews VibeReview[] @relation("VibeReviewer")
 
-  vibePlaySessions VibePlaySession[] @relation("VibePlayer")
+  vibePlaySessions         VibePlaySession[]         @relation("VibePlayer")
   // BC-2: back-relation for Kordle attempts without a play session.
-  kordleAttempts   KordleAttempt[]
-  playParticipants PlayParticipant[]
+  kordleAttempts           KordleAttempt[]
+  playParticipants         PlayParticipant[]
   speedGameRunParticipants SpeedGameRunParticipant[]
-  speedGameRunAnswers SpeedGameRunAnswer[]
-  gameResults GameResult[]
+  speedGameRunAnswers      SpeedGameRunAnswer[]
+  gameResults              GameResult[]
 
   boardResponses BoardResponse[] @relation("StudentBoardResponses")
 
@@ -734,9 +748,9 @@ model Student {
   titles            StudentTitle[]
 
   // UGC safety (App Store guideline 1.2).
-  contentReportsFiled   ContentReport[]      @relation("ContentReportReporterStudent")
-  contentReportsAgainst ContentReport[]      @relation("ContentReportAuthorStudent")
-  hiddenContent         HiddenContent[]      @relation("HiddenContentStudent")
+  contentReportsFiled   ContentReport[]       @relation("ContentReportReporterStudent")
+  contentReportsAgainst ContentReport[]       @relation("ContentReportAuthorStudent")
+  hiddenContent         HiddenContent[]       @relation("HiddenContentStudent")
   hiddenByStudents      HiddenContentAuthor[] @relation("HiddenContentAuthorHider")
   hiddenAsAuthor        HiddenContentAuthor[] @relation("HiddenContentAuthorTarget")
 
@@ -819,20 +833,20 @@ model DailyBannerPublication {
 model StudentWalkingDailyStat {
   id String @id
 
-  studentId      String
-  day            DateTime @db.Date
-  steps          Int      @default(0)
-  distanceMeters Float    @default(0)
-  source         String   @default("health_connect")
-  syncedAt       DateTime @default(now())
+  studentId             String
+  day                   DateTime  @db.Date
+  steps                 Int       @default(0)
+  distanceMeters        Float     @default(0)
+  source                String    @default("health_connect")
+  syncedAt              DateTime  @default(now())
   // Legacy shadow fields retained only for the rolling deployment. New
   // attendance writes use StudentAttendance exclusively.
   attendanceVisitedAt   DateTime?
   attendanceMonth       String?
   attendanceOrdinal     Int?
   attendanceCompletedAt DateTime?
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -848,12 +862,12 @@ model StudentAttendance {
   id String @id @default(cuid())
 
   studentId String
-  day       DateTime @db.Date
+  day       DateTime  @db.Date
   month     String
   ordinal   Int
-  visitedAt DateTime @default(now())
+  visitedAt DateTime  @default(now())
   claimedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -921,25 +935,25 @@ model ContentReport {
   reporterStudentId String
   // Denormalized so the teacher queue still names the author after the
   // reported card or comment is deleted.
-  authorStudentId String?
-  authorLabel     String?
+  authorStudentId   String?
+  authorLabel       String?
 
-  reason ContentReportReason
+  reason          ContentReportReason
   // Only populated for reason=other; capped in the API layer.
-  detail String?
+  detail          String?
   // Snapshot of the reported text so the teacher can judge after deletion.
   contentSnapshot String?
 
-  status     ContentReportStatus @default(pending)
-  createdAt  DateTime            @default(now())
-  resolvedAt DateTime?
+  status           ContentReportStatus @default(pending)
+  createdAt        DateTime            @default(now())
+  resolvedAt       DateTime?
   // Teacher who resolved the report.
   resolvedByUserId String?
 
-  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  reporter  Student   @relation("ContentReportReporterStudent", fields: [reporterStudentId], references: [id], onDelete: Cascade)
-  author    Student?  @relation("ContentReportAuthorStudent", fields: [authorStudentId], references: [id], onDelete: SetNull)
-  resolvedBy User?    @relation("ContentReportResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  classroom  Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  reporter   Student   @relation("ContentReportReporterStudent", fields: [reporterStudentId], references: [id], onDelete: Cascade)
+  author     Student?  @relation("ContentReportAuthorStudent", fields: [authorStudentId], references: [id], onDelete: SetNull)
+  resolvedBy User?     @relation("ContentReportResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
 
   // One report per student per item; re-reporting is a no-op upsert.
   @@unique([reporterStudentId, targetKind, targetId])
@@ -957,8 +971,8 @@ model HiddenContent {
   targetKind ContentTargetKind
   targetId   String
   // True when the hide was applied automatically as part of filing a report.
-  viaReport Boolean  @default(false)
-  createdAt DateTime @default(now())
+  viaReport  Boolean           @default(false)
+  createdAt  DateTime          @default(now())
 
   student Student @relation("HiddenContentStudent", fields: [studentId], references: [id], onDelete: Cascade)
 
@@ -975,8 +989,8 @@ model HiddenContentAuthor {
   studentId       String
   hiddenStudentId String
   // Report that prompted the block, when it came from the report flow.
-  reportId  String?
-  createdAt DateTime @default(now())
+  reportId        String?
+  createdAt       DateTime @default(now())
 
   student       Student @relation("HiddenContentAuthorHider", fields: [studentId], references: [id], onDelete: Cascade)
   hiddenStudent Student @relation("HiddenContentAuthorTarget", fields: [hiddenStudentId], references: [id], onDelete: Cascade)
@@ -1069,7 +1083,7 @@ model StudentNotification {
   href       String
   content    String?
 
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   readAt    DateTime?
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -1087,16 +1101,16 @@ model NotificationOutbox {
 
   eventType String
   sourceId  String
-  status    String   @default("pending")
-  attempts  Int      @default(0)
+  status    String @default("pending")
+  attempts  Int    @default(0)
 
-  nextAttemptAt DateTime @default(now())
+  nextAttemptAt DateTime  @default(now())
   lockedAt      DateTime?
   lockToken     String?
   lastError     String?
   processedAt   DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @default(now()) @updatedAt
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @default(now()) @updatedAt
 
   @@unique([eventType, sourceId])
   @@index([status, nextAttemptAt, createdAt])
@@ -1457,9 +1471,9 @@ model Board {
 
   // Authoritative Rust play sessions. Browser/mobile clients never write these
   // rows directly; the play service owns commands, versions, receipts, and outbox.
-  playSessions PlaySession[]
+  playSessions  PlaySession[]
   speedGameRuns SpeedGameRun[]
-  gameResults GameResult[]
+  gameResults   GameResult[]
 
   songGuessGame SongGuessGame?
 
@@ -1473,10 +1487,10 @@ model Board {
 
   activityEvents BoardActivityEvent[]
 
+  @@unique([classroomId, systemGameKind])
   // BC-1: speeds up the lesson/play split in the dashboard filter.
   @@index([classroomId, category])
   @@index([communityPublishedAt, updatedAt])
-  @@unique([classroomId, systemGameKind])
 }
 
 // Authoritative multiplayer play platform. Full aggregate state is stored in
@@ -1545,7 +1559,7 @@ model PlayParticipant {
   createdAt DateTime @default(now())
 
   session PlaySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
-  student Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  student Student?    @relation(fields: [studentId], references: [id], onDelete: SetNull)
 
   @@unique([sessionId, actorSubject])
   @@unique([sessionId, slot])
@@ -1667,17 +1681,17 @@ model OmokMatchTicket {
   id String @id @default(cuid())
 
   lobbyBoardId String
-  classroomId String
-  studentId String
+  classroomId  String
+  studentId    String
 
-  status String @default("waiting")
+  status            String  @default("waiting")
   opponentStudentId String?
-  matchBoardId String?
-  sessionId String?
+  matchBoardId      String?
+  sessionId         String?
 
-  requestedAt DateTime @default(now())
-  matchedAt DateTime?
-  updatedAt DateTime @updatedAt
+  requestedAt DateTime  @default(now())
+  matchedAt   DateTime?
+  updatedAt   DateTime  @updatedAt
 
   @@unique([lobbyBoardId, studentId])
   @@index([lobbyBoardId, status, requestedAt])
@@ -2662,10 +2676,10 @@ model AssignmentSubmissionAttempt {
   id String @id @default(cuid())
 
   assignmentSlotId String
-  idempotencyKey String
-  revision Int
-  submittedAt DateTime @default(now())
-  submittedOnTime Boolean
+  idempotencyKey   String
+  revision         Int
+  submittedAt      DateTime @default(now())
+  submittedOnTime  Boolean
 
   assignmentSlot AssignmentSlot @relation(fields: [assignmentSlotId], references: [id], onDelete: Cascade)
 
@@ -4139,11 +4153,11 @@ model Transaction {
 
   createdAt DateTime @default(now())
 
-  account             StudentAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  account             StudentAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
   // Avatar customization MVP (2026-07-02)
   avatarPurchase      AvatarPurchase?
-  creatureEggPurchase StudentCreature? @relation("CreatureEggPurchase")
-  slimePurchase       StudentSlime?     @relation("SlimePurchase")
+  creatureEggPurchase StudentCreature?     @relation("CreatureEggPurchase")
+  slimePurchase       StudentSlime?        @relation("SlimePurchase")
   slimeItemPurchase   StudentCreatureItem? @relation("SlimeItemPurchase")
 
   storeItem StoreItem? @relation(fields: [storeItemId], references: [id], onDelete: SetNull)
@@ -4206,13 +4220,13 @@ model StudentCreature {
 model StudentSlime {
   id String @id @default(cuid())
 
-  studentId   String
-  classroomId String
-  color       String
+  studentId             String
+  classroomId           String
+  color                 String
   // Only equipped slimes contribute their server-calculated reward effect.
-  isEquipped Boolean @default(true)
+  isEquipped            Boolean  @default(true)
   // Exactly one owned slime is shown as the student's representative.
-  isRepresentative Boolean @default(false)
+  isRepresentative      Boolean  @default(false)
   // Passive slime growth is an effective wall-clock timer.  The service
   // settles growthSeconds using growthAppliedSpeedBps before changing either
   // the equipped state or the applied rate.
@@ -4223,21 +4237,21 @@ model StudentSlime {
   growthAppliedSpeedBps Int      @default(0)
   // Shop cosmetics are assigned per owned slime. Each category is kept to one
   // item by the slime equipment service.
-  equippedItemKeys String[] @default([])
+  equippedItemKeys      String[] @default([])
   // Equipped cosmetics can remain active for buffs while omitted by renderers.
   // This list is always constrained to keys in equippedItemKeys by mutations.
-  hiddenItemKeys String[] @default([])
+  hiddenItemKeys        String[] @default([])
   // Claimed title worn by this specific pet. Titles are owned per student, so
   // several pets can each wear a different one.
-  equippedTitleKey String?
+  equippedTitleKey      String?
 
   purchaseTransactionId String @unique
 
   createdAt DateTime @default(now())
 
-  student             Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  classroom           Classroom    @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  purchaseTransaction Transaction  @relation("SlimePurchase", fields: [purchaseTransactionId], references: [id], onDelete: Restrict)
+  student             Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom           Classroom   @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  purchaseTransaction Transaction @relation("SlimePurchase", fields: [purchaseTransactionId], references: [id], onDelete: Restrict)
 
   @@unique([studentId, color])
   @@index([studentId, createdAt])
@@ -4280,18 +4294,18 @@ model StudentCreatureItem {
   studentId   String
   classroomId String
 
-  itemKey    String
-  itemKind   String
-  quantity   Int      @default(0)
-  isEquipped Boolean  @default(false)
-  purchaseTransactionId String? @unique
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  itemKey               String
+  itemKind              String
+  quantity              Int      @default(0)
+  isEquipped            Boolean  @default(false)
+  purchaseTransactionId String?  @unique
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
-  student   Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  classroom Classroom         @relation(fields: [classroomId], references: [id], onDelete: Cascade)
-  purchaseTransaction Transaction? @relation("SlimeItemPurchase", fields: [purchaseTransactionId], references: [id], onDelete: Restrict)
-  itemUses  CreatureItemUse[] @relation("CreatureItemUseInventory")
+  student             Student           @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classroom           Classroom         @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  purchaseTransaction Transaction?      @relation("SlimeItemPurchase", fields: [purchaseTransactionId], references: [id], onDelete: Restrict)
+  itemUses            CreatureItemUse[] @relation("CreatureItemUseInventory")
 
   @@unique([studentId, itemKey])
   @@index([studentId, itemKind])
@@ -4474,14 +4488,14 @@ model CleaningDuty {
 // 기록은 먼저 저장하고 별도 평가 API가 상태를 pending → processing → generated/failed
 // 로 갱신한다. morning-summary 의 readingChampions 집계는 aiScore 의 단순 합 (v1).
 model ReadingLog {
-  id          String    @id @default(cuid())
-  classroomId String
-  studentId   String
+  id               String    @id @default(cuid())
+  classroomId      String
+  studentId        String
   // "comic" | "story" — 추후 enum 승격 가능
-  bookType    String
-  title       String
-  author      String
-  reflection  String    @db.Text
+  bookType         String
+  title            String
+  author           String
+  reflection       String    @db.Text
   aiScore          Int?
   aiFeedback       String?   @db.Text
   aiFeedbackStatus String    @default("pending")
@@ -4489,7 +4503,7 @@ model ReadingLog {
   aiFeedbackError  String?
   evaluatedAt      DateTime?
   createdAt        DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  updatedAt        DateTime  @updatedAt
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -5366,11 +5380,11 @@ model SpeedGameRunParticipant {
 
   student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
+  createdAt DateTime @default(now())
+
   @@unique([runId, studentId])
   @@index([groupId, joinedAt])
   @@index([studentId, createdAt])
-
-  createdAt DateTime @default(now())
 }
 
 model SpeedGameRunRound {

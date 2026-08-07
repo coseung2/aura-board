@@ -131,6 +131,10 @@ export function Landing() {
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentError, setStudentError] = useState<string | null>(null);
   const [parentLoading, setParentLoading] = useState(false);
+  const [parentAuthMode, setParentAuthMode] = useState<"social" | "login" | "signup">("social");
+  const [parentUsername, setParentUsername] = useState("");
+  const [parentPassword, setParentPassword] = useState("");
+  const [parentPasswordConfirm, setParentPasswordConfirm] = useState("");
   const [parentReviewCode, setParentReviewCode] = useState("");
   const [parentError, setParentError] = useState<string | null>(() =>
     parentAuthErrorMessage(routeError),
@@ -362,6 +366,68 @@ export function Landing() {
     }
   }
 
+  async function handleParentPasswordSubmit() {
+    const username = parentUsername.trim().toLowerCase();
+    if (username.length < 4 || parentPassword.length < 8) {
+      setParentError("아이디는 4자 이상, 비밀번호는 8자 이상 입력해 주세요.");
+      return;
+    }
+    if (parentAuthMode === "signup" && parentPassword !== parentPasswordConfirm) {
+      setParentError("비밀번호가 서로 일치하지 않아요.");
+      return;
+    }
+
+    setParentLoading(true);
+    setParentError(null);
+    let tokenStored = false;
+    try {
+      if (parentAuthMode === "signup") {
+        await parentApiFetch("/api/account/credentials/signup", {
+          method: "POST",
+          json: { role: "parent", username, password: parentPassword },
+          skipAuth: true,
+        });
+      }
+
+      const result = await parentApiFetch<{
+        success: boolean;
+        sessionToken: string;
+      }>("/api/parent/credentials/login", {
+        method: "POST",
+        json: { username, password: parentPassword },
+        skipAuth: true,
+      });
+      if (!result.success || !result.sessionToken) throw new Error("password_login_failed");
+
+      await saveParentToken(result.sessionToken);
+      tokenStored = true;
+      const profile = await apiFetch<ParentChildrenResponse>(
+        "/api/parent/children",
+        { parentAuth: true },
+      );
+      await saveParentCache({
+        id: profile.parent.id,
+        name: profile.parent.name || "학부모",
+        email: profile.parent.email,
+        linkedStudentIds: profile.children.map((child) => child.studentId),
+      });
+      router.replace("/(parent)");
+    } catch (error) {
+      if (tokenStored) await clearParentSession();
+      if (error instanceof ApiError && error.status === 409) {
+        setParentError("이미 사용 중인 아이디예요.");
+      } else if (error instanceof ApiError && error.status === 429) {
+        setParentError("시도 횟수가 많아요. 잠시 후 다시 시도해 주세요.");
+      } else if (parentAuthMode === "signup") {
+        setParentError("회원가입을 완료하지 못했어요. 입력 내용을 확인해 주세요.");
+      } else {
+        setParentError("아이디 또는 비밀번호를 확인해 주세요.");
+      }
+    } finally {
+      setParentLoading(false);
+    }
+  }
+
   if (booting) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
@@ -474,6 +540,7 @@ export function Landing() {
           <View
             style={[
               styles.roleCard,
+              styles.parentRoleCard,
               isNarrow && styles.roleCardNarrow,
               activeRole !== "parent" && styles.hiddenRoleCard,
             ]}
@@ -488,28 +555,118 @@ export function Landing() {
                 {parentError}
               </Text>
             ) : null}
-            <View style={styles.oauthActions}>
-              <ControlPressable
-                style={styles.oauthGoogle}
-                onPress={() => handleParentOAuth("google")}
-                disabled={parentLoading}
-                accessibilityLabel="Google로 로그인"
-                accessibilityState={{ busy: parentLoading }}
-              >
-                <GoogleGlyph />
-                <Text style={styles.oauthGoogleText}>Google로 로그인</Text>
-              </ControlPressable>
-              <ControlPressable
-                style={styles.oauthKakao}
-                onPress={() => handleParentOAuth("kakao")}
-                disabled={parentLoading}
-                accessibilityLabel="Kakao로 로그인"
-                accessibilityState={{ busy: parentLoading }}
-              >
-                <KakaoGlyph />
-                <Text style={styles.oauthKakaoText}>Kakao로 로그인</Text>
-              </ControlPressable>
-            </View>
+            {parentAuthMode === "social" ? (
+              <View style={styles.oauthActions}>
+                <ControlPressable
+                  style={styles.oauthGoogle}
+                  onPress={() => handleParentOAuth("google")}
+                  disabled={parentLoading}
+                  accessibilityLabel="Google로 로그인"
+                  accessibilityState={{ busy: parentLoading }}
+                >
+                  <GoogleGlyph />
+                  <Text style={styles.oauthGoogleText}>Google로 로그인</Text>
+                </ControlPressable>
+                <ControlPressable
+                  style={styles.oauthKakao}
+                  onPress={() => handleParentOAuth("kakao")}
+                  disabled={parentLoading}
+                  accessibilityLabel="Kakao로 로그인"
+                  accessibilityState={{ busy: parentLoading }}
+                >
+                  <KakaoGlyph />
+                  <Text style={styles.oauthKakaoText}>Kakao로 로그인</Text>
+                </ControlPressable>
+                <TextActionPressable
+                  style={styles.credentialTextAction}
+                  onPress={() => {
+                    setParentAuthMode("login");
+                    setParentError(null);
+                  }}
+                  accessibilityLabel="아이디로 로그인"
+                >
+                  <Text style={styles.credentialTextActionLabel}>아이디로 로그인</Text>
+                </TextActionPressable>
+              </View>
+            ) : (
+              <View style={styles.credentialForm}>
+                <TextField
+                  value={parentUsername}
+                  onChangeText={(value) => {
+                    setParentUsername(value.toLowerCase());
+                    setParentError(null);
+                  }}
+                  placeholder="아이디"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete="username"
+                  editable={!parentLoading}
+                  accessibilityLabel="학부모 아이디"
+                />
+                <TextField
+                  value={parentPassword}
+                  onChangeText={(value) => {
+                    setParentPassword(value);
+                    setParentError(null);
+                  }}
+                  placeholder="비밀번호"
+                  secureTextEntry
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  autoComplete={parentAuthMode === "signup" ? "new-password" : "current-password"}
+                  editable={!parentLoading}
+                  accessibilityLabel="학부모 비밀번호"
+                />
+                {parentAuthMode === "signup" ? (
+                  <TextField
+                    value={parentPasswordConfirm}
+                    onChangeText={(value) => {
+                      setParentPasswordConfirm(value);
+                      setParentError(null);
+                    }}
+                    placeholder="비밀번호 확인"
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="new-password"
+                    editable={!parentLoading}
+                    onSubmitEditing={handleParentPasswordSubmit}
+                    accessibilityLabel="학부모 비밀번호 확인"
+                  />
+                ) : null}
+                <AppButton
+                  style={styles.studentLoginButton}
+                  onPress={handleParentPasswordSubmit}
+                  disabled={!parentUsername.trim() || !parentPassword}
+                  loading={parentLoading}
+                >
+                  {parentAuthMode === "signup" ? "회원가입" : "로그인"}
+                </AppButton>
+                <View style={styles.credentialModeActions}>
+                  <TextActionPressable
+                    style={styles.credentialTextAction}
+                    onPress={() => {
+                      setParentAuthMode(parentAuthMode === "signup" ? "login" : "signup");
+                      setParentPasswordConfirm("");
+                      setParentError(null);
+                    }}
+                  >
+                    <Text style={styles.credentialTextActionLabel}>
+                      {parentAuthMode === "signup" ? "이미 계정이 있나요? 로그인" : "계정이 없나요? 회원가입"}
+                    </Text>
+                  </TextActionPressable>
+                  <TextActionPressable
+                    style={styles.credentialTextAction}
+                    onPress={() => {
+                      setParentAuthMode("social");
+                      setParentError(null);
+                    }}
+                  >
+                    <Text style={styles.credentialTextActionLabel}>소셜 로그인으로 돌아가기</Text>
+                  </TextActionPressable>
+                </View>
+              </View>
+            )}
           </View>
 
           {PARENT_REVIEW_UI_ENABLED ? (
@@ -722,6 +879,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: spacing.md,
   },
+  parentRoleCard: {
+    width: layout.roleCardNarrowMaxWidth,
+  },
   roleCardNarrow: {
     width: "100%",
   },
@@ -787,6 +947,26 @@ const styles = StyleSheet.create({
   oauthActions: {
     width: "100%",
     gap: spacing.sm,
+  },
+  credentialForm: {
+    width: "100%",
+    gap: spacing.sm,
+  },
+  credentialModeActions: {
+    width: "100%",
+    alignItems: "center",
+    gap: spacing.xs,
+  },
+  credentialTextAction: {
+    minHeight: tapMin,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: spacing.sm,
+  },
+  credentialTextActionLabel: {
+    ...typography.body,
+    color: colors.accent,
+    textAlign: "center",
   },
   oauthGoogle: {
     width: "100%",

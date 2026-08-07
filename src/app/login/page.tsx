@@ -15,6 +15,8 @@ import {
 // OAuth button styling. Student stays code-based.
 
 type LoginRole = "teacher" | "student" | "parent";
+type PasswordRole = "teacher" | "parent";
+type PasswordMode = "social" | "login" | "signup";
 
 const LOGIN_ROLES: Array<{
   id: LoginRole;
@@ -79,6 +81,12 @@ export default function LoginPage() {
   const [reviewerBusy, setReviewerBusy] = useState(false);
   const [activeRole, setActiveRole] = useState<LoginRole>("teacher");
   const [loginError, setLoginError] = useState("");
+  const [passwordMode, setPasswordMode] = useState<PasswordMode>("social");
+  const [passwordUsername, setPasswordUsername] = useState("");
+  const [passwordValue, setPasswordValue] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [passwordBusy, setPasswordBusy] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -177,6 +185,166 @@ export default function LoginPage() {
     }
   }
 
+  async function handlePasswordSubmit(e: FormEvent, role: PasswordRole) {
+    e.preventDefault();
+    const username = passwordUsername.trim().toLowerCase();
+    if (username.length < 4 || passwordValue.length < 8) {
+      setPasswordError("아이디는 4자 이상, 비밀번호는 8자 이상 입력해 주세요.");
+      return;
+    }
+    if (passwordMode === "signup" && passwordValue !== passwordConfirm) {
+      setPasswordError("비밀번호가 서로 일치하지 않습니다.");
+      return;
+    }
+
+    setPasswordBusy(true);
+    setPasswordError("");
+    try {
+      if (passwordMode === "signup") {
+        const signup = await fetch("/api/account/credentials/signup", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ role, username, password: passwordValue }),
+        });
+        if (!signup.ok) {
+          const body = (await signup.json().catch(() => null)) as { error?: string } | null;
+          if (signup.status === 409 || body?.error === "username_taken") {
+            setPasswordError("이미 사용 중인 아이디입니다.");
+          } else if (signup.status === 429) {
+            setPasswordError("시도 횟수가 많습니다. 잠시 후 다시 시도해 주세요.");
+          } else {
+            setPasswordError("회원가입을 완료하지 못했습니다. 입력 내용을 확인해 주세요.");
+          }
+          return;
+        }
+      }
+
+      if (role === "teacher") {
+        await signOut({ redirect: false });
+        const redirectTo = safeTeacherReturnTarget();
+        const result = await signIn("password", {
+          username,
+          password: passwordValue,
+          redirect: false,
+          redirectTo,
+        });
+        if (result?.error) {
+          setPasswordError("아이디 또는 비밀번호를 확인해 주세요.");
+          return;
+        }
+        window.location.assign(result?.url ?? redirectTo);
+        return;
+      }
+
+      const response = await fetch("/api/parent/credentials/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ username, password: passwordValue }),
+      });
+      const body = (await response.json().catch(() => null)) as {
+        error?: string;
+        redirect?: string;
+      } | null;
+      if (!response.ok) {
+        setPasswordError(
+          response.status === 429
+            ? "시도 횟수가 많습니다. 잠시 후 다시 시도해 주세요."
+            : "아이디 또는 비밀번호를 확인해 주세요.",
+        );
+        return;
+      }
+      window.location.assign(body?.redirect ?? "/parent/feed");
+    } catch {
+      setPasswordError("네트워크 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+    } finally {
+      setPasswordBusy(false);
+    }
+  }
+
+  function passwordForm(role: PasswordRole) {
+    return (
+      <form className="login-password-form" onSubmit={(event) => handlePasswordSubmit(event, role)}>
+        <label className="login-password-label">
+          <span>아이디</span>
+          <input
+            className="login-password-input"
+            value={passwordUsername}
+            onChange={(event) => {
+              setPasswordUsername(event.target.value.toLowerCase());
+              setPasswordError("");
+            }}
+            autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
+            maxLength={32}
+            required
+          />
+        </label>
+        <label className="login-password-label">
+          <span>비밀번호</span>
+          <input
+            className="login-password-input"
+            type="password"
+            value={passwordValue}
+            onChange={(event) => {
+              setPasswordValue(event.target.value);
+              setPasswordError("");
+            }}
+            autoComplete={passwordMode === "signup" ? "new-password" : "current-password"}
+            minLength={8}
+            maxLength={72}
+            required
+          />
+        </label>
+        {passwordMode === "signup" ? (
+          <label className="login-password-label">
+            <span>비밀번호 확인</span>
+            <input
+              className="login-password-input"
+              type="password"
+              value={passwordConfirm}
+              onChange={(event) => {
+                setPasswordConfirm(event.target.value);
+                setPasswordError("");
+              }}
+              autoComplete="new-password"
+              minLength={8}
+              maxLength={72}
+              required
+            />
+          </label>
+        ) : null}
+        {passwordError ? <p className="login-role-error" role="alert">{passwordError}</p> : null}
+        <button type="submit" className="login-role-cta" disabled={passwordBusy}>
+          {passwordBusy ? "처리 중..." : passwordMode === "signup" ? "회원가입" : "로그인"}
+        </button>
+        <div className="login-password-switches">
+          <button
+            type="button"
+            className="login-inline-action"
+            onClick={() => {
+              setPasswordMode(passwordMode === "signup" ? "login" : "signup");
+              setPasswordConfirm("");
+              setPasswordError("");
+            }}
+          >
+            {passwordMode === "signup" ? "이미 계정이 있나요? 로그인" : "계정이 없나요? 회원가입"}
+          </button>
+          <button
+            type="button"
+            className="login-inline-action"
+            onClick={() => {
+              setPasswordMode("social");
+              setPasswordError("");
+            }}
+          >
+            소셜 로그인으로 돌아가기
+          </button>
+        </div>
+      </form>
+    );
+  }
+
   const activeRoleMeta =
     LOGIN_ROLES.find((role) => role.id === activeRole) ?? LOGIN_ROLES[0];
 
@@ -215,7 +383,11 @@ export default function LoginPage() {
                 aria-controls={`login-panel-${role.id}`}
                 tabIndex={selected ? 0 : -1}
                 className={`login-role-tab${selected ? " is-active" : ""}`}
-                onClick={() => setActiveRole(role.id)}
+                onClick={() => {
+                  setActiveRole(role.id);
+                  setPasswordMode("social");
+                  setPasswordError("");
+                }}
               >
                 {role.title}
               </button>
@@ -237,7 +409,7 @@ export default function LoginPage() {
 
           {activeRole === "teacher" ? (
             <>
-              <div className="login-role-oauth-actions">
+              {passwordMode === "social" ? <div className="login-role-oauth-actions">
                 <button
                   type="button"
                   className="login-role-oauth login-role-oauth-google"
@@ -256,7 +428,17 @@ export default function LoginPage() {
                   <KakaoGlyph />
                   <span>Kakao로 로그인</span>
                 </button>
-              </div>
+                <button
+                  type="button"
+                  className="login-inline-action"
+                  onClick={() => {
+                    setPasswordMode("login");
+                    setPasswordError("");
+                  }}
+                >
+                  아이디로 로그인
+                </button>
+              </div> : passwordForm("teacher")}
               {showReviewerLogin ? (
                 <>
                   <div className="login-reviewer-separator" role="separator">
@@ -346,7 +528,7 @@ export default function LoginPage() {
           ) : null}
 
           {activeRole === "parent" ? (
-            <div className="login-role-oauth-actions">
+            passwordMode === "social" ? <div className="login-role-oauth-actions">
               <a
                 href="/api/parent/auth/google"
                 className="login-role-oauth login-role-oauth-google"
@@ -363,7 +545,17 @@ export default function LoginPage() {
                 <KakaoGlyph />
                 <span>Kakao로 로그인</span>
               </a>
-            </div>
+              <button
+                type="button"
+                className="login-inline-action"
+                onClick={() => {
+                  setPasswordMode("login");
+                  setPasswordError("");
+                }}
+              >
+                아이디로 로그인
+              </button>
+            </div> : passwordForm("parent")
           ) : null}
         </section>
 

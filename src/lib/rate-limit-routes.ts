@@ -219,3 +219,29 @@ export async function limitParentReviewLogin(
   if (!ip.ok) return ip;
   return code;
 }
+
+/** First-party password login: independent IP and normalized username limits. */
+export async function limitPasswordLogin(
+  ipKey: string,
+  usernameKey: string,
+): Promise<LimitVerdict> {
+  const [ip, username] = await Promise.all([
+    runLimit("rl:password-login:ip", ipKey, 30, "1 h", true),
+    runLimit("rl:password-login:username", usernameKey, 10, "1 h", true),
+  ]);
+  if (!ip.ok) return ip;
+  return username;
+}
+
+/** First-party account creation: throttle both source IP and requested ID. */
+export async function limitPasswordSignup(
+  ipKey: string,
+  usernameKey: string,
+): Promise<LimitVerdict> {
+  const [ip, username] = await Promise.all([
+    runLimit("rl:password-signup:ip", ipKey, 10, "1 h", true),
+    runLimit("rl:password-signup:username", usernameKey, 5, "1 h", true),
+  ]);
+  if (!ip.ok) return ip;
+  return username;
+}

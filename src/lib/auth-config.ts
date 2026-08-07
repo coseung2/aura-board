@@ -20,7 +20,14 @@ import {
   verifyConfiguredCanvaReviewer,
 } from "./canva-reviewer-credentials";
 import { extractIp, hashIp } from "./rate-limit";
-import { limitCanvaReviewerLogin } from "./rate-limit-routes";
+import {
+  limitCanvaReviewerLogin,
+  limitPasswordLogin,
+} from "./rate-limit-routes";
+import {
+  normalizePasswordUsername,
+  verifyPasswordCredential,
+} from "./password-credentials";
 
 const googleClientId = process.env.AUTH_GOOGLE_ID;
 const googleClientSecret = process.env.AUTH_GOOGLE_SECRET;
@@ -64,6 +71,37 @@ if (kakaoClientId && kakaoClientSecret) {
     }),
   );
 }
+
+providers.push(
+  Credentials({
+    id: "password",
+    name: "Aura Board username and password",
+    credentials: {
+      username: { label: "ID", type: "text" },
+      password: { label: "Password", type: "password" },
+    },
+    async authorize(credentials, request) {
+      const username = normalizePasswordUsername(
+        typeof credentials.username === "string" ? credentials.username : "",
+      );
+      const password =
+        typeof credentials.password === "string" ? credentials.password : "";
+      const rateLimit = await limitPasswordLogin(
+        hashIp(extractIp(request)),
+        hashIp(username),
+      );
+      if (!rateLimit.ok) return null;
+
+      const verified = await verifyPasswordCredential(username, password);
+      if (!verified) return null;
+      const user = await db.user.findUnique({
+        where: { email: verified.principalEmail },
+      });
+      if (!user) return null;
+      return { id: user.id, email: user.email, name: user.name, image: user.image };
+    },
+  }),
+);
 
 const reviewerConfig = getCanvaReviewerCredentialConfig();
 
@@ -114,7 +152,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
      * only if both role sessions resolve to the same email account; otherwise
      * this is an account switch, so revoke the previous parent session.
      */
-    async signIn({ user }) {
+    async signIn({ user, account, profile }) {
+      if (
+        account?.provider === "google" &&
+        (profile as { email_verified?: unknown } | undefined)?.email_verified !== true
+      ) {
+        return false;
+      }
       const parentContext = await getCurrentParent().catch(() => null);
       if (
         parentContext &&

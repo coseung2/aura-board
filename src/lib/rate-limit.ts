@@ -120,7 +120,11 @@ export function hashIp(ip: string): string {
 
 export function extractIp(req: Request): string {
   const hdrs = req.headers;
-  const forwarded = hdrs.get("x-forwarded-for");
+  // Vercel overwrites this platform header, preventing client spoofing. Keep
+  // the conventional proxy header for local/self-hosted development only.
+  const forwarded = process.env.VERCEL
+    ? hdrs.get("x-vercel-forwarded-for")
+    : hdrs.get("x-forwarded-for");
   if (forwarded) return forwarded.split(",")[0].trim();
   const real = hdrs.get("x-real-ip");
   if (real) return real;
