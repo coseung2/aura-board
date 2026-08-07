@@ -18,7 +18,10 @@ const requiredMobileFiles = [
 
 const errors = [];
 
-if (process.env.EAS_BUILD_PROFILE === "production") {
+if (
+  process.env.EAS_BUILD_PROFILE === "production" &&
+  process.env.EAS_BUILD_PLATFORM === "android"
+) {
   const googleServicesPath = process.env.GOOGLE_SERVICES_JSON?.trim();
   if (!googleServicesPath) {
     errors.push(

@@ -142,6 +142,27 @@ jobs:
       - name: Install mobile dependencies
         run: npm ci --legacy-peer-deps
 
+      - name: Materialize Firebase Android config
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.AURA_BOARD_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          test -n "$GOOGLE_SERVICES_JSON_BASE64"
+          GOOGLE_SERVICES_PATH="$RUNNER_TEMP/google-services.json"
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > "$GOOGLE_SERVICES_PATH"
+          chmod 600 "$GOOGLE_SERVICES_PATH"
+          node - "$GOOGLE_SERVICES_PATH" <<'NODE'
+          const fs = require("node:fs");
+          const config = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const packageNames = (config.client ?? []).flatMap((client) => {
+            const packageName = client?.client_info?.android_client_info?.package_name;
+            return typeof packageName === "string" ? [packageName] : [];
+          });
+          if (!packageNames.includes("com.auraboard.app")) {
+            throw new Error("Firebase config does not belong to com.auraboard.app");
+          }
+          NODE
+          echo "GOOGLE_SERVICES_JSON=$GOOGLE_SERVICES_PATH" >> "$GITHUB_ENV"
+
       - name: Materialize Google Play service account
         run: |
           node - <<'NODE'
@@ -195,7 +216,7 @@ jobs:
 
       - name: Remove Google Play service account
         if: always()
-        run: rm -f "$RUNNER_TEMP/google-play-service-account.json"
+        run: rm -f "$RUNNER_TEMP/google-play-service-account.json" "$RUNNER_TEMP/google-services.json"
 
   ios:
     name: iOS production submission
