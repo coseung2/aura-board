@@ -3,6 +3,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 export type PublicSupabaseClient = SupabaseClient;
 
 const clientCache = new Map<string, PublicSupabaseClient>();
+let isolatedClientSequence = 0;
 
 function hashClientCacheKey(value: string): string {
   let hash = 5381;
@@ -14,6 +15,7 @@ function hashClientCacheKey(value: string): string {
 
 function createConfiguredPublicSupabaseClient(
   headers?: Record<string, string>,
+  storageKeySuffix = "",
 ): PublicSupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key =
@@ -39,7 +41,7 @@ function createConfiguredPublicSupabaseClient(
             a.localeCompare(b),
           ),
         }),
-      )}`,
+      )}${storageKeySuffix}`,
     },
     global: {
       headers,
@@ -80,9 +82,11 @@ export function createPublicSupabaseClient(
 export function createIsolatedPublicSupabaseClient(
   headers?: Record<string, string>,
 ): PublicSupabaseClient {
-  return createConfiguredPublicSupabaseClient(headers);
+  isolatedClientSequence += 1;
+  return createConfiguredPublicSupabaseClient(headers, `-isolated-${isolatedClientSequence}`);
 }
 
 export function clearPublicSupabaseClientCacheForTests(): void {
   clientCache.clear();
+  isolatedClientSequence = 0;
 }

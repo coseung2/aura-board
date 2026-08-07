@@ -35,5 +35,12 @@ describe("public Supabase client ownership", () => {
     expect(isolatedB).not.toBe(cached);
     expect(isolatedB).not.toBe(isolatedA);
     expect(createClientMock).toHaveBeenCalledTimes(3);
+
+    const storageKeys = createClientMock.mock.calls.map(
+      ([, , options]) => options.auth.storageKey as string,
+    );
+    expect(new Set(storageKeys).size).toBe(3);
+    expect(storageKeys[1]).toMatch(/-isolated-1$/);
+    expect(storageKeys[2]).toMatch(/-isolated-2$/);
   });
 });

@@ -9,6 +9,7 @@ export const BOARD_REALTIME_EVENTS = [
   "board_changed",
   "queue_changed",
   "play_session_changed",
+  "omok_matchmaking_changed",
 ] as const;
 
 export const BOARD_REALTIME_DEBOUNCE_MS = 100;

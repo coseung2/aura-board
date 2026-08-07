@@ -6,6 +6,7 @@ export type BoardMeta = {
   slug: string;
   title: string;
   layout: string;
+  systemGameKind?: string | null;
   description?: string | null;
   classroomId?: string | null;
   anonymousAuthor: boolean;

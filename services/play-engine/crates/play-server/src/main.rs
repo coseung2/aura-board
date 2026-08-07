@@ -6,6 +6,7 @@ use play_server::{AppState, AssertionVerifier, PlayRepository, PostgresRepositor
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    eprintln!("play-server: loading configuration");
     let database_url = required_env("DATABASE_URL")?;
     let assertion_secret = required_env("PLAY_ENGINE_ASSERTION_SECRET")?;
     let internal_secret = required_env("PLAY_ENGINE_INTERNAL_SECRET")?;
@@ -16,15 +17,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .unwrap_or_else(|_| "127.0.0.1:8081".to_owned())
         .parse()?;
 
+    eprintln!("play-server: initializing repository");
     let repository: Arc<dyn PlayRepository> =
         Arc::new(PostgresRepository::connect(&database_url).await?);
+    eprintln!("play-server: initializing assertion verifier");
     let verifier = AssertionVerifier::new(assertion_secret.as_bytes())?;
     let app = router(AppState::new(
         repository,
         verifier,
         Arc::<str>::from(internal_secret),
     ));
+    eprintln!("play-server: binding {bind}");
     let listener = tokio::net::TcpListener::bind(bind).await?;
+    eprintln!("play-server: listening on {bind}");
     axum::serve(listener, app).await?;
     Ok(())
 }

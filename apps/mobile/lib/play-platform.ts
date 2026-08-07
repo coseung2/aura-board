@@ -66,6 +66,13 @@ export type PendingOmokCommand = {
   sessionId: string;
   request: PlayCommandRequest;
 };
+export type OmokMatchmakingStatus = {
+  status: "idle" | "waiting" | "matched";
+  playerCount: number;
+  sessionId?: string;
+  boardSlug?: string;
+  href?: string | null;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object";
@@ -181,6 +188,34 @@ export async function fetchCurrentOmokSession(
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
   }
+}
+
+export async function fetchOmokMatchmaking(
+  boardId: string,
+): Promise<OmokMatchmakingStatus> {
+  return apiFetch<OmokMatchmakingStatus>(
+    `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,
+    { timeoutMs: 5_000, forceRefresh: true },
+  );
+}
+
+export async function requestOmokMatch(
+  boardId: string,
+  opponent: "human" | "computer" = "human",
+): Promise<OmokMatchmakingStatus> {
+  return apiFetch<OmokMatchmakingStatus>(
+    `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,
+    { method: "POST", json: { opponent }, timeoutMs: 8_000 },
+  );
+}
+
+export async function cancelOmokMatch(
+  boardId: string,
+): Promise<OmokMatchmakingStatus> {
+  return apiFetch<OmokMatchmakingStatus>(
+    `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,
+    { method: "DELETE", timeoutMs: 5_000 },
+  );
 }
 
 export function makeOmokCommand(

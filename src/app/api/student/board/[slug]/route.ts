@@ -40,6 +40,7 @@ export async function GET(
         slug: true,
         title: true,
         layout: true,
+        systemGameKind: true,
         description: true,
         classroomId: true,
         anonymousAuthor: true,

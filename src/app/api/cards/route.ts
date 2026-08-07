@@ -603,10 +603,17 @@ export async function POST(req: Request) {
           classroomId: boardClassroomId,
         });
       } else if (studentAuthorId && externalAuthorName) {
-        await setCardAuthors(tx, c.id, [
-          { studentId: studentAuthorId, displayName: externalAuthorName },
-        ], {
-          classroomId: boardClassroomId,
+        // The student and classroom membership were already authenticated
+        // above. A new card cannot have stale author rows, so the generic
+        // replace-all helper would add four unnecessary DB round trips here
+        // (membership lookup, delete, insert, mirror update).
+        await tx.cardAuthor.create({
+          data: {
+            cardId: c.id,
+            studentId: studentAuthorId,
+            displayName: externalAuthorName.trim(),
+            order: 0,
+          },
         });
       }
       // multi-attachment: 여러 첨부 일괄 저장. order는 배열 인덱스.
@@ -624,7 +631,7 @@ export async function POST(req: Request) {
           })),
         });
       }
-      return (await tx.card.findUnique({ where: { id: c.id } })) ?? c;
+      return c;
     });
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 생성으로 부모 board touch.
@@ -636,7 +643,7 @@ export async function POST(req: Request) {
     });
     void announceCardChange(input.boardId, "insert");
     if (studentAuthorId && student) {
-      await dispatchLinkedParentCardPush({
+      void dispatchLinkedParentCardPush({
         eventKey: `card:${card.id}`,
         studentId: studentAuthorId,
         studentName: student.name,
@@ -646,25 +653,27 @@ export async function POST(req: Request) {
     }
 
     // 응답에 저장된 attachments 포함 (클라이언트 상태 즉시 반영).
-    const attachments = await db.cardAttachment.findMany({
-      where: { cardId: card.id },
-      orderBy: { order: "asc" },
-      select: {
-        id: true,
-        kind: true,
-        url: true,
-        previewUrl: true,
-        fileName: true,
-        fileSize: true,
-        mimeType: true,
-        order: true,
-      },
-    });
-    const authors = await db.cardAuthor.findMany({
-      where: { cardId: card.id },
-      orderBy: { order: "asc" },
-      select: { id: true, studentId: true, displayName: true, order: true },
-    });
+    const [attachments, authors] = await Promise.all([
+      db.cardAttachment.findMany({
+        where: { cardId: card.id },
+        orderBy: { order: "asc" },
+        select: {
+          id: true,
+          kind: true,
+          url: true,
+          previewUrl: true,
+          fileName: true,
+          fileSize: true,
+          mimeType: true,
+          order: true,
+        },
+      }),
+      db.cardAuthor.findMany({
+        where: { cardId: card.id },
+        orderBy: { order: "asc" },
+        select: { id: true, studentId: true, displayName: true, order: true },
+      }),
+    ]);
 
     // Mirror the server-side cardProps mapping (board/[id]/page.tsx) so
     // the client can drop the response straight into state and keep the

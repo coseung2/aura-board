@@ -176,6 +176,7 @@ describe("Omok matchmaking", () => {
       status: "matched",
       playerCount: 2,
       sessionId: "session-1",
+      boardSlug: "omok-match-room",
       href: "/board/omok-match-room?view=student",
     });
   });
@@ -226,6 +227,7 @@ describe("Omok matchmaking", () => {
       status: "matched",
       playerCount: 1,
       sessionId: "session-bot",
+      boardSlug: "omok-match-room",
       href: "/board/omok-match-room?view=student",
     });
   });

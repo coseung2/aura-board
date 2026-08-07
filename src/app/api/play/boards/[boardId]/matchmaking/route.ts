@@ -167,6 +167,7 @@ async function responseFor(boardId: string, studentId: string) {
       status: "matched",
       playerCount: await activePlayerCount(boardId),
       sessionId: ticket.sessionId,
+      boardSlug: board.slug,
       href: `/board/${encodeURIComponent(board.slug)}?view=student`,
     });
   }

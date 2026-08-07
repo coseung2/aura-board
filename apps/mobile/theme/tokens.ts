@@ -249,6 +249,7 @@ export const omokTokens = {
   errorBg: "#fff0ed",
   loadingMinHeight: 300,
   emptyMinHeight: 360,
+  matchMaxWidth: 520,
   playerRowMinHeight: 48,
   emptyIconSize: 42,
   versionSubtextSize: 10,

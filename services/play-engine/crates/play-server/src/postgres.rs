@@ -43,9 +43,7 @@ impl PostgresRepository {
             .statement_cache_capacity(0);
         let pool = PgPoolOptions::new()
             .max_connections(10)
-            .connect_with(options)
-            .await
-            .map_err(storage)?;
+            .connect_lazy_with(options);
         Ok(Self::new(pool))
     }
 }

@@ -70,7 +70,9 @@ export function shouldAwardWalkingReward(
   );
 }
 
-const MAX_ACTIVITY_REWARD_TRANSACTION_ATTEMPTS = 3;
+const MAX_ACTIVITY_REWARD_TRANSACTION_ATTEMPTS = 5;
+const ACTIVITY_REWARD_RETRY_BASE_DELAY_MS = 25;
+const ACTIVITY_REWARD_RETRY_MAX_DELAY_MS = 400;
 
 function isActivityRewardSourceType(value: string): value is ActivityRewardSourceType {
   return (ACTIVITY_REWARD_SOURCE_TYPES as readonly string[]).includes(value);
@@ -216,6 +218,16 @@ export async function retryActivityRewardTransaction<T>(
       ) {
         throw error;
       }
+      // Immediate retries make every request in a classroom collide again at
+      // the same time. A short exponential delay with jitter lets one
+      // serializable transaction commit before the next attempt begins.
+      const backoffMs = Math.min(
+        ACTIVITY_REWARD_RETRY_MAX_DELAY_MS,
+        ACTIVITY_REWARD_RETRY_BASE_DELAY_MS * 2 ** (attempts - 1),
+      );
+      await new Promise((resolve) =>
+        setTimeout(resolve, backoffMs + Math.floor(Math.random() * 25)),
+      );
     }
   }
 }
