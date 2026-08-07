@@ -631,105 +631,401 @@
 .shadow-alliance-new-game { justify-self: end; width: fit-content; }
 
 .shadow-alliance-student {
+  --sa-black: #0a0a0c;
+  --sa-panel: #121217;
+  --sa-panel-soft: #171720;
+  --sa-line: #2a2a33;
+  --sa-line-soft: rgba(42, 42, 51, 0.72);
+  --sa-text: #f4f1ea;
+  --sa-muted: #8a8a93;
+  --sa-muted-2: #5c5c66;
+  --sa-gold: #c9a24b;
+  --sa-gold-bright: #e8c878;
+  --sa-gold-dim: #7a6430;
+  --sa-black-team: #9aa0ad;
+  --sa-white-team: #e6e2d6;
+  --sa-shadow-panel: 0 18px 50px rgba(0, 0, 0, 0.55);
+  position: relative;
+  isolation: isolate;
   width: 100%;
   max-width: none;
+  min-height: calc(100dvh - 84px);
   margin: 0;
+  overflow: hidden;
+  padding: 18px;
+  background: var(--sa-black);
 }
 
-.shadow-alliance-student-lobby {
-  width: min(100%, 1120px);
-  max-width: 1120px;
+.shadow-alliance-student::before,
+.shadow-alliance-student::after {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: "";
+  pointer-events: none;
+}
+
+.shadow-alliance-student::before {
+  background:
+    radial-gradient(900px 600px at 80% -10%, rgba(201, 162, 75, 0.1), transparent 60%),
+    radial-gradient(700px 500px at -10% 100%, rgba(201, 162, 75, 0.06), transparent 60%);
+}
+
+.shadow-alliance-student::after {
+  opacity: 0.52;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.012) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+.shadow-alliance-student-shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 480px);
+  min-height: calc(100dvh - 120px);
   margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: var(--sa-space-5);
 }
 
-.shadow-alliance-student-preparing-row {
-  width: 100%;
-  display: grid;
-  justify-items: start;
-  align-content: start;
-  min-height: 0;
-  padding: 8px 0 4px;
+.shadow-alliance-join-shell {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
-.shadow-alliance-preparing {
-  margin: 0;
-  color: var(--sa-text);
+.shadow-alliance-join-mark {
+  display: grid;
+  width: 90px;
+  height: 90px;
+  margin-bottom: 20px;
+  place-items: center;
+  border: 1px solid var(--sa-gold-dim);
+  border-radius: 50%;
+  color: var(--sa-gold-bright);
   font-family: var(--sa-font-display);
-  font-size: clamp(28px, 4vw, 42px);
+  font-size: 54px;
+  line-height: 1;
+  box-shadow: 0 0 34px rgba(201, 162, 75, 0.14);
+}
+
+.shadow-alliance-join-title {
+  color: var(--sa-gold-bright);
+  font-family: var(--sa-font-body);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.3em;
+}
+
+.shadow-alliance-student-reveal-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.shadow-alliance-student-peek {
+  min-width: 0;
+  min-height: 48px;
+  flex: 1;
+  overflow: hidden;
+  padding: 12px 6px;
+  border: 1px solid var(--sa-line);
+  border-radius: 10px;
+  color: var(--sa-muted);
+  background: #0e0e13;
+  cursor: pointer;
+  font-family: var(--sa-font-body);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  user-select: none;
+  touch-action: none;
+  transition: 0.12s ease;
+}
+
+.shadow-alliance-student-peek:hover,
+.shadow-alliance-student-peek:focus-visible {
+  border-color: var(--sa-gold-dim);
+  color: var(--sa-text);
+}
+
+.shadow-alliance-student-peek:focus-visible {
+  outline: 2px solid var(--sa-gold);
+  outline-offset: 2px;
+}
+
+.shadow-alliance-student-peek.is-on {
+  border-color: var(--sa-gold-bright);
+  color: #1a1407;
+  background: linear-gradient(180deg, var(--sa-gold-bright), var(--sa-gold));
+  font-weight: 800;
+  transform: scale(0.98);
+}
+
+.shadow-alliance-student-card {
+  position: relative;
+  display: flex;
+  min-height: 390px;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--sa-line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, var(--sa-panel), var(--sa-panel-soft));
+  box-shadow: var(--sa-shadow-panel);
+}
+
+.shadow-alliance-student-card::before {
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  padding: 1px;
+  background: linear-gradient(
+    140deg,
+    rgba(201, 162, 75, 0.5),
+    transparent 38%,
+    transparent 62%,
+    rgba(201, 162, 75, 0.22)
+  );
+  content: "";
+  pointer-events: none;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.shadow-alliance-student .shadow-alliance-eyebrow {
+  color: var(--sa-gold);
+  font-family: var(--sa-font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.42em;
+}
+
+.shadow-alliance-student-command-panel {
+  display: grid;
+  justify-items: center;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.shadow-alliance-student-command-panel.is-lobby,
+.shadow-alliance-student-command-panel.is-revealing {
+  margin: auto 0;
+}
+
+.shadow-alliance-student-command {
+  margin-top: 10px;
+  color: transparent;
+  background: linear-gradient(180deg, #fff, var(--sa-gold-bright), var(--sa-gold));
+  background-clip: text;
+  -webkit-background-clip: text;
+  font-family: var(--sa-font-display);
+  font-size: clamp(64px, 18vw, 74px);
+  font-weight: 900;
+  line-height: 1;
+  text-shadow: none;
+}
+
+.shadow-alliance-student-command.is-small {
+  font-size: clamp(48px, 14vw, 54px);
+}
+
+.shadow-alliance-student-notice {
+  margin: 14px 0 0;
+  color: var(--sa-muted);
+  font-family: var(--sa-font-body);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.shadow-alliance-student-notice.is-centered {
+  text-align: center;
+}
+
+.shadow-alliance-student-timer {
+  margin-top: 8px;
+}
+
+.shadow-alliance-student-input-area {
+  display: grid;
+  gap: 14px;
+  margin-top: auto;
+  padding: 20px 16px 18px;
+}
+
+.shadow-alliance-student .shadow-alliance-answer-form {
+  display: grid;
+  gap: 14px;
+  width: 100%;
+}
+
+.shadow-alliance-student-input-label {
+  color: var(--sa-muted);
+  font-family: var(--sa-font-body);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.shadow-alliance-student .shadow-alliance-answer-form input {
+  width: 100%;
+  border: 1px solid var(--sa-line);
+  border-radius: 9px;
+  padding: 18px;
+  color: var(--sa-text);
+  background: #0d0d11;
+  outline: none;
+  font-family: var(--sa-font-mono);
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-align: center;
+}
+
+.shadow-alliance-student .shadow-alliance-answer-form input:focus {
+  border-color: var(--sa-gold);
+  box-shadow: 0 0 0 1px rgba(201, 162, 75, 0.18);
+}
+
+.shadow-alliance-student .shadow-alliance-answer-form input::placeholder {
+  color: var(--sa-muted-2);
+}
+
+.shadow-alliance-student .shadow-alliance-button {
+  min-height: 46px;
+  border: 1px solid var(--sa-gold-dim);
+  border-radius: 10px;
+  padding: 12px 20px;
+  color: var(--sa-gold-bright);
+  background: #16151a;
+  font-family: var(--sa-font-body);
+  font-size: 15px;
+  font-weight: 700;
   letter-spacing: 0.04em;
 }
 
-.shadow-alliance-preparing-dots {
-  display: inline-block;
-  min-width: 1.5em;
-  text-align: left;
+.shadow-alliance-student .shadow-alliance-button.primary {
+  border-color: var(--sa-gold-bright);
+  color: #1a1407;
+  background: linear-gradient(180deg, var(--sa-gold-bright), var(--sa-gold));
+  font-weight: 800;
 }
 
-.shadow-alliance-student .shadow-alliance-topbar,
-.shadow-alliance-student .shadow-alliance-student-stage,
-.shadow-alliance-student .shadow-alliance-student-play,
-.shadow-alliance-student .shadow-alliance-student-lobby {
-  width: min(100%, 1120px);
-  max-width: 1120px;
-  margin-left: auto;
-  margin-right: auto;
+.shadow-alliance-student .shadow-alliance-button.ghost {
+  border-color: var(--sa-line);
+  color: var(--sa-muted);
+  background: transparent;
 }
 
-.shadow-alliance-student-team-grid {
+.shadow-alliance-student .shadow-alliance-button:hover:not(:disabled) {
+  border-color: var(--sa-gold);
+  box-shadow: 0 0 0 1px rgba(201, 162, 75, 0.2);
+}
+
+.shadow-alliance-student .shadow-alliance-button.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.shadow-alliance-wide-button {
   width: 100%;
-  margin-top: 0;
 }
 
-.shadow-alliance-student-stage {
-  display: grid;
-  gap: 16px;
-  justify-items: start;
-  text-align: left;
-  min-height: 0;
-  align-content: start;
-}
-
-.shadow-alliance-student-stage h2 {
-  max-width: none;
-  font-size: clamp(28px, 4vw, 42px);
-}
-
-.shadow-alliance-student-power {
-  color: var(--sa-gold);
-  font-family: var(--sa-font-mono);
-  font-size: 16px;
-  white-space: nowrap;
-}
-
-.shadow-alliance-student-play {
-  display: grid;
-  gap: var(--sa-space-4);
-}
-
-.shadow-alliance-student-focus {
-  transform: none;
-  min-height: clamp(280px, 42vh, 420px);
-  padding: 28px 24px;
-}
-
-.shadow-alliance-answer-form {
-  display: grid;
-  gap: 10px;
-  width: min(100%, 320px);
-}
-
-.shadow-alliance-answer-form input {
+.shadow-alliance-student-submitted-panel {
+  padding: 30px 16px;
   text-align: center;
-  font-size: 32px;
+}
+
+.shadow-alliance-student-submitted-big {
+  margin-bottom: 8px;
+  color: var(--sa-gold-bright);
+  font-family: var(--sa-font-display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+}
+
+.shadow-alliance-student-submitted-panel b {
+  color: var(--sa-gold-bright);
+  font-family: var(--sa-font-mono);
+  font-size: 18px;
+}
+
+.shadow-alliance-student-result-panel {
+  display: grid;
+  justify-items: center;
+  margin: auto 0;
+  padding: 30px 16px;
+  text-align: center;
+}
+
+.shadow-alliance-gain-pop {
+  margin-top: 8px;
+  color: var(--sa-gold-bright);
+  font-family: var(--sa-font-display);
+  font-size: clamp(40px, 12vw, 80px);
+  font-weight: 900;
+  line-height: 1.1;
+  text-shadow: 0 0 40px rgba(201, 162, 75, 0.5);
+  animation: shadow-alliance-gain-pop 1s cubic-bezier(0.2, 1.4, 0.3, 1) both;
+}
+
+.shadow-alliance-gain-pop.is-rank {
+  font-size: 54px;
+}
+
+.shadow-alliance-student-result-note {
+  margin-top: 18px;
+}
+
+.shadow-alliance-student-rule {
+  width: 100%;
+  height: 1px;
+  margin: 18px 0;
+  background: linear-gradient(90deg, transparent, var(--sa-gold-dim), transparent);
+}
+
+.shadow-alliance-student-final-team-value {
+  margin-top: 8px;
+  color: var(--sa-gold-bright);
+  font-family: var(--sa-font-body);
+  font-size: 24px;
   font-weight: 700;
 }
 
-.shadow-alliance-submitted {
-  color: #9ce2bd;
-  font-weight: 700;
+.shadow-alliance-student-connection-state {
+  margin: 10px 0 0;
+  color: var(--sa-muted-2);
+  font-family: var(--sa-font-mono);
+  font-size: 10px;
+  text-align: center;
+}
+
+.shadow-alliance-student-connection-state.is-offline {
+  color: #e9a6a6;
+}
+
+.shadow-alliance-student-connection-state.is-reconnecting {
+  color: var(--sa-gold);
+}
+
+.shadow-alliance-student-exit {
+  align-self: center;
+  min-height: 38px !important;
+  margin-top: 12px;
+  padding: 7px 12px !important;
+  font-size: 12px !important;
+}
+
+@keyframes shadow-alliance-gain-pop {
+  0% { opacity: 0; transform: scale(0.3) translateY(30px); }
+  60% { transform: scale(1.1); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 @media (max-width: 760px) {
@@ -777,7 +1073,8 @@
   .shadow-alliance-reveal-team,
   .shadow-alliance-reveal-current { transition: none; animation: none; }
   .shadow-alliance-reveal-winner,
-  .shadow-alliance-reveal-log p { animation: none; }
+  .shadow-alliance-reveal-log p,
+  .shadow-alliance-gain-pop { animation: none; }
 }
 
 body:has(.shadow-alliance-game) .app-footer {

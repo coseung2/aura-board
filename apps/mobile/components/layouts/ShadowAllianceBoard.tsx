@@ -1,6 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "expo-router";
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import { useFonts } from "expo-font";
 import { ApiError, apiFetch } from "../../lib/api";
 import type {
   ShadowAllianceSnapshot,
@@ -8,23 +20,39 @@ import type {
 } from "../../lib/shadow-alliance";
 import type { BoardDetailResponse } from "../../lib/types";
 import {
-  borders,
-  colors,
-  controls,
-  gamePlatform,
-  radii,
-  spacing,
-  tapMin,
-  typography,
-} from "../../theme/tokens";
-import { AppButton, TextField } from "../ui";
-import { GameAreaShell } from "../game-platform/GameAreaShell";
-import { GameExitDialog } from "../game-platform/GameExitDialog";
-import { GameLobby } from "../game-platform/GameLobby";
-import { GameResultPanel } from "../game-platform/GameResultPanel";
+  shadowAllianceColors as SHADOW,
+  shadowAllianceStyles as styles,
+} from "../../theme/shadow-alliance";
+import { ControlPressable, TextField } from "../ui";
+
+const { Cinzel_500Medium } = require("@expo-google-fonts/cinzel/500Medium") as {
+  Cinzel_500Medium: number;
+};
+const { Cinzel_700Bold } = require("@expo-google-fonts/cinzel/700Bold") as {
+  Cinzel_700Bold: number;
+};
+const { Cinzel_900Black } = require("@expo-google-fonts/cinzel/900Black") as {
+  Cinzel_900Black: number;
+};
+const { JetBrainsMono_500Medium } = require(
+  "@expo-google-fonts/jetbrains-mono/500Medium",
+) as { JetBrainsMono_500Medium: number };
+const { JetBrainsMono_700Bold } = require(
+  "@expo-google-fonts/jetbrains-mono/700Bold",
+) as { JetBrainsMono_700Bold: number };
+const { NanumMyeongjo_400Regular } = require(
+  "@expo-google-fonts/nanum-myeongjo/400Regular",
+) as { NanumMyeongjo_400Regular: number };
+const { NanumMyeongjo_700Bold } = require(
+  "@expo-google-fonts/nanum-myeongjo/700Bold",
+) as { NanumMyeongjo_700Bold: number };
+const { NanumMyeongjo_800ExtraBold } = require(
+  "@expo-google-fonts/nanum-myeongjo/800ExtraBold",
+) as { NanumMyeongjo_800ExtraBold: number };
 
 type Props = { data: BoardDetailResponse };
 type ParticipantAction = "join" | "ready" | "forfeit" | "submit";
+type RevealKey = "nick" | "team" | "power";
 
 type PendingCommand = {
   requestId: string;
@@ -56,14 +84,10 @@ function errorLabel(code: string | undefined): string {
       return "다른 기기에서 상태가 바뀌어 최신 게임을 반영했어요.";
     case "already_submitted":
       return "이번 라운드 숫자는 이미 제출됐어요.";
-    case "participant_forfeited":
-      return "이미 게임에서 나간 참가자예요.";
     case "round_expired":
-      return "제출 시간이 끝났어요. 결과 공개를 기다려 주세요.";
+      return "제출 시간이 끝났어요.";
     case "invalid_number":
       return "1부터 100 사이의 정수를 입력해 주세요.";
-    case "invalid_state":
-      return "현재 단계에서는 이 조작을 할 수 없어요.";
     case "storage_error":
     case "play_engine_unavailable":
       return "게임 서버 연결이 불안정해요. 잠시 후 다시 시도해 주세요.";
@@ -72,54 +96,94 @@ function errorLabel(code: string | undefined): string {
   }
 }
 
-function participantState(
-  participant: ShadowAllianceSnapshot["participants"][number],
-) {
-  if (participant.forfeitedAt != null) return "forfeited" as const;
-  if (participant.readyAt != null) return "ready" as const;
-  if (participant.joinedAt != null) return "joined" as const;
-  return "invited" as const;
-}
-
 function teamLabel(team: ShadowAllianceTeam): string {
-  if (team === "black") return "검정 팀";
-  if (team === "white") return "흰색 팀";
-  return "팀 배정 전";
+  if (team === "black") return "블랙 연합";
+  if (team === "white") return "화이트 연합";
+  return "배정 대기";
 }
 
-function phaseLabel(snapshot: ShadowAllianceSnapshot): string {
-  switch (snapshot.phase) {
-    case "lobby":
-      return "대기실";
-    case "playing":
-      return `${snapshot.round}/${snapshot.totalRounds} 입력`;
-    case "revealing":
-      return `${snapshot.round}/${snapshot.totalRounds} 결과`;
-    case "postround":
-      return `${snapshot.round}/${snapshot.totalRounds} 정리`;
-    case "finished":
-      return "완료";
-    case "host-ended":
-      return "진행자 종료";
-  }
+function teamRevealLabel(team: ShadowAllianceTeam): string {
+  if (team === "black") return `⚫ ${teamLabel(team)}`;
+  if (team === "white") return `⚪ ${teamLabel(team)}`;
+  return "◌ 배정 대기";
+}
+
+function connectionLabel(connection: string): string {
+  if (connection === "connected") return "실시간 연결";
+  if (connection === "reconnecting") return "연결 복구 중";
+  if (connection === "offline") return "연결 끊김";
+  return "연결 중";
+}
+
+function ShadowActionButton({
+  label,
+  onPress,
+  disabled = false,
+  variant = "primary",
+}: {
+  label: string;
+  onPress: () => void;
+  disabled?: boolean;
+  variant?: "primary" | "ghost";
+}) {
+  return (
+    <ControlPressable
+      accessibilityState={{ disabled }}
+      disabled={disabled}
+      onPress={onPress}
+      style={[
+        styles.actionButton,
+        variant === "primary" ? styles.actionPrimary : styles.actionGhost,
+        disabled ? styles.actionDisabled : null,
+      ]}
+    >
+      <Text
+        style={[
+          styles.actionText,
+          variant === "primary" ? styles.actionPrimaryText : styles.actionGhostText,
+        ]}
+      >
+        {label}
+      </Text>
+    </ControlPressable>
+  );
+}
+
+function formatTime(ms: number) {
+  const seconds = Math.max(0, Math.ceil(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 }
 
 export function ShadowAllianceBoard({ data }: Props) {
-  const router = useRouter();
+  const [gameFontsLoaded, gameFontError] = useFonts({
+    Cinzel_500Medium,
+    Cinzel_700Bold,
+    Cinzel_900Black,
+    JetBrainsMono_500Medium,
+    JetBrainsMono_700Bold,
+    NanumMyeongjo_400Regular,
+    NanumMyeongjo_700Bold,
+    NanumMyeongjo_800ExtraBold,
+  });
   const [snapshot, setSnapshot] = useState<ShadowAllianceSnapshot | null>(null);
   const [loading, setLoading] = useState(true);
   const [reconnecting, setReconnecting] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [exitVisible, setExitVisible] = useState(false);
-  const [numberDraft, setNumberDraft] = useState("50");
+  const [numberDraft, setNumberDraft] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [submittedNumber, setSubmittedNumber] = useState<number | null>(null);
+  const [revealed, setRevealed] = useState<RevealKey | null>(null);
   const [receivedAt, setReceivedAt] = useState(Date.now());
   const [clockNow, setClockNow] = useState(Date.now());
   const commandRef = useRef<PendingCommand | null>(null);
   const joinedRunRef = useRef<string | null>(null);
+  const readyRunRef = useRef<string | null>(null);
   const snapshotRef = useRef(snapshot);
   snapshotRef.current = snapshot;
 
   const acceptSnapshot = useCallback((next: ShadowAllianceSnapshot) => {
+    snapshotRef.current = next;
     setSnapshot(next);
     const now = Date.now();
     setReceivedAt(now);
@@ -127,64 +191,29 @@ export function ShadowAllianceBoard({ data }: Props) {
   }, []);
 
   const load = useCallback(
-    async (initial = false) => {
-      initial ? setLoading(true) : setReconnecting(true);
+    async (mode: "initial" | "refresh" | "retry" = "refresh") => {
+      if (mode === "initial") setLoading(true);
+      else if (mode === "retry") setReconnecting(true);
       try {
         const response = await apiFetch<{ snapshot: ShadowAllianceSnapshot }>(
           `/api/shadow-alliance/boards/${encodeURIComponent(data.board.id)}`,
         );
         acceptSnapshot(response.snapshot);
         setError(null);
-        if (
-          commandRef.current &&
-          response.snapshot.version !== commandRef.current.expectedVersion
-        ) {
-          commandRef.current = null;
-        }
         return response.snapshot;
       } catch (caught) {
         const body = commandError(caught);
-        if (caught instanceof ApiError && caught.status === 404) {
-          setSnapshot(null);
-          setError(null);
-          return null;
-        }
-        if (initial || !snapshotRef.current) {
+        if (mode !== "refresh" || !snapshotRef.current) {
           setError(errorLabel(body.error));
         }
         return null;
       } finally {
         setLoading(false);
-        setReconnecting(false);
+        if (mode === "retry") setReconnecting(false);
       }
     },
     [acceptSnapshot, data.board.id],
   );
-
-  useEffect(() => {
-    setSnapshot(null);
-    setError(null);
-    setExitVisible(false);
-    commandRef.current = null;
-    joinedRunRef.current = null;
-    void load(true);
-  }, [load]);
-
-  useEffect(() => {
-    const timer = setInterval(() => void load(false), 2_500);
-    return () => clearInterval(timer);
-  }, [load]);
-
-  useEffect(() => {
-    if (snapshot?.phase !== "playing" || !snapshot.timerRunning) return;
-    const timer = setInterval(() => setClockNow(Date.now()), 250);
-    return () => clearInterval(timer);
-  }, [snapshot?.phase, snapshot?.timerRunning]);
-
-  const ownParticipant = useMemo(() => {
-    if (!snapshot) return null;
-    return snapshot.participants.find((participant) => participant.isSelf) ?? null;
-  }, [snapshot]);
 
   const command = useCallback(
     async (action: ParticipantAction, number?: number) => {
@@ -210,7 +239,7 @@ export function ShadowAllianceBoard({ data }: Props) {
               fingerprint,
             };
       commandRef.current = envelope;
-      setLoading(true);
+      setBusy(true);
       setError(null);
       try {
         const response = await apiFetch<{ snapshot: ShadowAllianceSnapshot }>(
@@ -231,20 +260,45 @@ export function ShadowAllianceBoard({ data }: Props) {
         return response.snapshot;
       } catch (caught) {
         const body = commandError(caught);
-        if (body.snapshot) {
-          acceptSnapshot(body.snapshot);
-          if (body.snapshot.version !== envelope.expectedVersion) {
-            commandRef.current = null;
-          }
+        if (body.snapshot) acceptSnapshot(body.snapshot);
+        if (body.error === "version_conflict") {
+          commandRef.current = null;
+          setError(null);
+          return body.snapshot ?? null;
         }
         setError(errorLabel(body.error));
         return null;
       } finally {
-        setLoading(false);
+        setBusy(false);
       }
     },
     [acceptSnapshot, data.board.id],
   );
+
+  useEffect(() => {
+    setSnapshot(null);
+    setError(null);
+    commandRef.current = null;
+    joinedRunRef.current = null;
+    readyRunRef.current = null;
+    void load("initial");
+  }, [load]);
+
+  useEffect(() => {
+    const timer = setInterval(() => void load("refresh"), 10_000);
+    return () => clearInterval(timer);
+  }, [load]);
+
+  useEffect(() => {
+    if (snapshot?.phase !== "playing" || !snapshot.timerRunning) return;
+    const timer = setInterval(() => setClockNow(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [snapshot?.phase, snapshot?.timerRunning]);
+
+  const ownParticipant = useMemo(() => {
+    if (!snapshot) return null;
+    return snapshot.participants.find((participant) => participant.isSelf) ?? null;
+  }, [snapshot]);
 
   useEffect(() => {
     if (
@@ -261,534 +315,339 @@ export function ShadowAllianceBoard({ data }: Props) {
     });
   }, [command, ownParticipant, snapshot]);
 
-  const rankedParticipants = useMemo(() => {
-    if (!snapshot) return [];
-    return [...snapshot.participants]
-      .filter((participant) => participant.joinedAt != null)
-      .sort(
-        (left, right) =>
-          right.power - left.power ||
-          left.name.localeCompare(right.name, "ko-KR"),
-      );
-  }, [snapshot]);
+  useEffect(() => {
+    if (
+      !snapshot ||
+      !ownParticipant ||
+      ownParticipant.joinedAt == null ||
+      ownParticipant.readyAt != null ||
+      readyRunRef.current === snapshot.id
+    ) {
+      return;
+    }
+    readyRunRef.current = snapshot.id;
+    void command("ready").then((next) => {
+      if (!next) readyRunRef.current = null;
+    });
+  }, [command, ownParticipant, snapshot]);
+
+  useEffect(() => {
+    setRevealed(null);
+    if (snapshot?.phase !== "playing") return;
+    setNumberDraft("");
+    setEditing(false);
+    setSubmittedNumber(null);
+  }, [snapshot?.phase, snapshot?.round]);
 
   const displayedTimeLeft = useMemo(() => {
-    if (!snapshot) return null;
+    if (!snapshot) return 0;
     if (snapshot.phase !== "playing" || !snapshot.timerRunning) {
       return snapshot.timeLeftMs;
     }
     return Math.max(0, snapshot.timeLeftMs - (clockNow - receivedAt));
   }, [clockNow, receivedAt, snapshot]);
 
+  const connection = reconnecting
+    ? "reconnecting"
+    : error
+      ? "offline"
+      : snapshot
+        ? "connected"
+        : "connecting";
+
+  const atmosphere = (
+    <>
+      <View pointerEvents="none" style={styles.glowTop} />
+      <View pointerEvents="none" style={styles.glowBottom} />
+    </>
+  );
+
+  if (!gameFontsLoaded && !gameFontError) {
+    return (
+      <View style={styles.screen} accessibilityState={{ busy: true }}>
+        {atmosphere}
+        <View style={styles.centeredRoot}>
+          <ActivityIndicator color={SHADOW.goldBright} />
+        </View>
+      </View>
+    );
+  }
+
   if (loading && !snapshot) {
     return (
-      <View style={styles.stateBox} accessibilityState={{ busy: true }}>
-        <ActivityIndicator color={colors.accent} />
-        <Text selectable style={styles.muted}>
-          그림자연합 게임을 불러오는 중이에요.
-        </Text>
+      <View style={styles.screen} accessibilityState={{ busy: true }}>
+        {atmosphere}
+        <View style={styles.centeredRoot}>
+          <Text style={styles.eyebrow}>본부 연결 중</Text>
+          <Text style={styles.joinTitle}>그림자 연합</Text>
+          <ActivityIndicator color={SHADOW.goldBright} />
+          <Text style={styles.notice}>게임 상태를 불러오고 있습니다.</Text>
+        </View>
       </View>
     );
   }
 
   if (!snapshot) {
-    if (!error) {
-      return (
-        <View style={styles.waitingRoot} accessibilityLiveRegion="polite">
-          <Text selectable style={styles.waitingEyebrow}>
-            익명 대기실
-          </Text>
-          <Text selectable style={styles.waitingTitle}>
-            그림자연합
-          </Text>
-          <Text selectable style={styles.waitingCopy}>
-            익명 공작원으로 합류할 준비가 됐어요. 진행자가 본부를 열면 첫 지령이 도착합니다.
-          </Text>
-          <Text selectable style={styles.waitingMeta}>
-            닉네임과 소속은 게임 안에서만 쓰이며, 실제 이름은 표시되지 않습니다.
-          </Text>
-          <ActionButton label="다시 확인" onPress={() => void load(true)} />
-        </View>
-      );
-    }
     return (
-      <View style={styles.stateBox}>
-        <Text selectable style={styles.error} accessibilityLiveRegion="assertive">
-          {error ?? "게임 상태를 불러오지 못했어요."}
-        </Text>
-        <ActionButton label="다시 시도" onPress={() => void load(true)} />
+      <View style={styles.screen}>
+        {atmosphere}
+        <View style={styles.centeredRoot}>
+          <View style={styles.joinMark}>
+            <Text style={styles.joinMarkText}>⟡</Text>
+          </View>
+          <Text style={styles.eyebrow}>연결 오류</Text>
+          <Text style={styles.joinTitle}>그림자 연합</Text>
+          <Text style={styles.errorText}>{error ?? "게임 상태를 불러오지 못했어요."}</Text>
+          <ShadowActionButton label="⟡ 다시 시도" onPress={() => void load("retry")} />
+        </View>
       </View>
     );
   }
 
-  const terminal = snapshot.phase === "finished" || snapshot.phase === "host-ended";
-  const connection = reconnecting ? "reconnecting" : error ? "offline" : "online";
-
-  return (
-    <>
-      <GameAreaShell
-        title={data.board.title}
-        roundLabel={phaseLabel(snapshot)}
-        timeLeftMs={snapshot.phase === "playing" ? displayedTimeLeft : null}
-        score={ownParticipant?.power ?? null}
-        scoreLabel="파워"
-        rulesLabel="목표에 가까운 팀이 10,000 파워 획득"
-        connection={connection}
-        inputLocked={loading || reconnecting}
-        statusMessage={error}
-        onExit={
-          terminal || ownParticipant?.forfeitedAt != null
-            ? null
-            : () => setExitVisible(true)
-        }
-        exitLabel="게임 나가기"
-      >
-        <View style={styles.root}>
-          {error ? (
-            <Text selectable style={styles.error} accessibilityLiveRegion="assertive">
-              {error}
-            </Text>
-          ) : null}
-
-          {snapshot.phase === "lobby" ? (
-            <GameLobby
-              title={`${data.board.title} 대기실`}
-              description="입장 후 준비하기를 누르고 진행자의 시작을 기다려 주세요."
-              participants={snapshot.participants.map((participant) => ({
-                id: participant.studentId,
-                name: participant.name,
-                state: participantState(participant),
-              }))}
-              error={error}
-              participantMessage={
-                ownParticipant?.readyAt != null
-                  ? "준비가 완료됐어요."
-                  : "준비하기를 누르면 시작 명단에 포함됩니다."
-              }
-              actions={
-                ownParticipant ? (
-                  <ActionButton
-                    label={ownParticipant.readyAt != null ? "준비 완료" : "준비하기"}
-                    disabled={
-                      loading ||
-                      ownParticipant.joinedAt == null ||
-                      ownParticipant.readyAt != null
-                    }
-                    onPress={() => void command("ready")}
-                  />
-                ) : null
-              }
-            />
-          ) : null}
-
-          {snapshot.phase === "playing" ? (
-            <>
-              <View style={styles.commandCard} accessibilityLabel="이번 라운드 목표 숫자">
-                <Text selectable style={styles.eyebrow}>TARGET COMMAND</Text>
-                <Text selectable style={[styles.commandNumber, styles.tabular]}>
-                  {snapshot.command ?? "미공개"}
-                </Text>
-                <Text selectable style={styles.muted}>
-                  팀 평균이 목표에 가까우면 10,000 파워를 제출 숫자 비율대로 나눠 받아요.
-                </Text>
-              </View>
-              <View style={styles.inputPanel}>
-                <Text selectable style={styles.subtitle}>1부터 100 사이 숫자 제출</Text>
-                <View style={styles.submitRow}>
-                  <TextField
-                    accessibilityLabel="제출할 숫자"
-                    value={numberDraft}
-                    editable={
-                      !loading &&
-                      !reconnecting &&
-                      (displayedTimeLeft ?? 0) > 0 &&
-                      ownParticipant?.forfeitedAt == null
-                    }
-                    keyboardType="number-pad"
-                    maxLength={3}
-                    onChangeText={setNumberDraft}
-                    style={styles.numberInput}
-                  />
-                  <ActionButton
-                    label={ownParticipant?.submitted ? "숫자 수정" : "숫자 제출"}
-                    disabled={
-                      loading ||
-                      reconnecting ||
-                      (displayedTimeLeft ?? 0) <= 0 ||
-                      ownParticipant?.joinedAt == null ||
-                      ownParticipant?.forfeitedAt != null ||
-                      (ownParticipant?.submitted === true && !snapshot.editable)
-                    }
-                    onPress={() => {
-                      const number = Number(numberDraft);
-                      if (!Number.isInteger(number) || number < 1 || number > 100) {
-                        setError("1부터 100 사이의 정수를 입력해 주세요.");
-                        return;
-                      }
-                      void command("submit", number);
-                    }}
-                  />
-                </View>
-                {ownParticipant?.submitted ? (
-                  <Text selectable style={styles.submitted} accessibilityLiveRegion="polite">
-                    {ownParticipant.ownNumber != null
-                      ? `${ownParticipant.ownNumber}을(를) 제출했어요.`
-                      : "숫자를 제출했어요."}
-                    {snapshot.editable ? " 제한 시간 전까지 수정할 수 있어요." : ""}
-                  </Text>
-                ) : null}
-              </View>
-            </>
-          ) : null}
-
-          {snapshot.phase === "revealing" || snapshot.phase === "postround" ? (
-            <RoundReveal snapshot={snapshot} />
-          ) : null}
-
-          {terminal ? (
-            <TerminalResult
-              snapshot={snapshot}
-              ownParticipant={ownParticipant}
-              rankedParticipants={rankedParticipants}
-              onBack={() => router.back()}
-            />
-          ) : (
-            <Scoreboard participants={rankedParticipants} />
-          )}
-
-          <Text selectable style={styles.runtimeMeta}>
-            session {snapshot.id} · v{snapshot.version}
+  if (!ownParticipant) {
+    return (
+      <View style={styles.screen}>
+        {atmosphere}
+        <View style={styles.centeredRoot}>
+          <View style={styles.joinMark}>
+            <Text style={styles.joinMarkText}>⟡</Text>
+          </View>
+          <Text style={styles.joinTitle}>그림자 연합</Text>
+          <Text style={styles.notice}>
+            {busy || reconnecting
+              ? "본부에 익명 공작원 합류 요청을 보내는 중입니다."
+              : "본부와 연결이 끊겼습니다. 다시 연결해 주세요."}
           </Text>
+          {busy || reconnecting ? <ActivityIndicator color={SHADOW.goldBright} /> : null}
+          {!busy && !reconnecting ? (
+            <ShadowActionButton
+              label="⟡ 다시 연결"
+              onPress={() => {
+                joinedRunRef.current = null;
+                readyRunRef.current = null;
+                void load("retry");
+              }}
+            />
+          ) : null}
+          <Text style={styles.connectionState}>{connectionLabel(connection)}</Text>
         </View>
-      </GameAreaShell>
+      </View>
+    );
+  }
 
-      <GameExitDialog
-        visible={exitVisible}
-        title="그림자연합에서 나갈까요?"
-        description="나가면 현재 파워로 기권 결과가 확정되고 다른 참가자의 게임은 계속됩니다."
-        confirmLabel="기권하고 나가기"
-        busy={loading}
-        onCancel={() => setExitVisible(false)}
-        onConfirm={async () => {
-          const next = await command("forfeit");
-          if (next) setExitVisible(false);
-        }}
-      />
-    </>
-  );
-}
-
-function RoundReveal({ snapshot }: { snapshot: ShadowAllianceSnapshot }) {
   const result = snapshot.lastResult;
-  if (!result) {
-    return (
-      <Text selectable style={styles.notice} accessibilityLiveRegion="polite">
-        공개된 결과를 불러오는 중이에요.
-      </Text>
+  const ownGain =
+    result?.players.find((player) => player.studentId === ownParticipant.studentId)
+      ?.gain ?? ownParticipant.lastGain;
+  const rankedParticipants = snapshot.participants
+    .filter((participant) => participant.joinedAt != null)
+    .sort(
+      (left, right) =>
+        right.power - left.power || left.name.localeCompare(right.name, "ko-KR"),
+    );
+  const ownRankIndex = rankedParticipants.findIndex(
+    (participant) => participant.studentId === ownParticipant.studentId,
+  );
+  const ownRank = ownRankIndex >= 0 ? ownRankIndex + 1 : 1;
+  const visibleSubmittedNumber = ownParticipant.ownNumber ?? submittedNumber;
+  const showSubmitted =
+    (ownParticipant.submitted || (busy && submittedNumber != null)) && !editing;
+  const revealItems: Array<{ key: RevealKey; label: string; value: string }> = [
+    { key: "nick", label: "👁 내 닉네임", value: ownParticipant.name },
+    {
+      key: "team",
+      label: "👁 내 팀",
+      value: teamRevealLabel(ownParticipant.team),
+    },
+    {
+      key: "power",
+      label: "👁 내 세력",
+      value: `${ownParticipant.power.toLocaleString()} 세력`,
+    },
+  ];
+
+  const submitNumber = () => {
+    const number = Number(numberDraft);
+    if (!Number.isInteger(number) || number < 1 || number > 100) {
+      setError("1부터 100 사이의 정수를 입력해 주세요.");
+      return;
+    }
+    setSubmittedNumber(number);
+    setEditing(false);
+    void command("submit", number);
+  };
+
+  let phaseContent: ReactNode = null;
+
+  if (snapshot.phase === "lobby") {
+    phaseContent = (
+      <View style={[styles.commandPanel, styles.centerPhase]}>
+        <Text style={styles.eyebrow}>대기 중</Text>
+        <Text style={styles.notice}>
+          본부의 지령을 기다리는 중입니다.{"\n"}곧 첫 라운드가 시작됩니다.
+        </Text>
+      </View>
+    );
+  } else if (snapshot.phase === "playing") {
+    phaseContent = (
+      <>
+        <View style={styles.commandPanel}>
+          <Text style={styles.eyebrow}>중앙 지령</Text>
+          <Text style={styles.command}>{snapshot.command ?? "-"}</Text>
+          <Text style={[styles.notice, styles.timerNotice]}>
+            남은 협상 시간 · {formatTime(displayedTimeLeft)}
+          </Text>
+        </View>
+        <View style={styles.inputArea}>
+          {showSubmitted ? (
+            <>
+              <View style={styles.submittedPanel}>
+                <Text style={styles.submittedBig}>✓ 제출 완료</Text>
+                <Text style={styles.notice}>
+                  내 숫자 ·{" "}
+                  <Text style={styles.submittedNumber}>
+                    {visibleSubmittedNumber?.toLocaleString() ?? "?"}
+                  </Text>
+                </Text>
+              </View>
+              {snapshot.editable ? (
+                <ShadowActionButton
+                  variant="ghost"
+                  label="숫자 수정하기"
+                  onPress={() => {
+                    setNumberDraft(
+                      String(ownParticipant.ownNumber ?? submittedNumber ?? ""),
+                    );
+                    setEditing(true);
+                  }}
+                />
+              ) : (
+                <Text style={[styles.notice, styles.centerText]}>
+                  교사 설정: 제출 후 수정 불가
+                </Text>
+              )}
+            </>
+          ) : (
+            <View style={styles.form}>
+              <Text style={styles.inputLabel}>1 ~ 100 사이 숫자를 직접 입력하세요</Text>
+              <TextField
+                accessibilityLabel="제출 숫자"
+                autoComplete="off"
+                inputMode="numeric"
+                keyboardType="number-pad"
+                maxLength={3}
+                placeholder="00"
+                placeholderTextColor={SHADOW.muted2}
+                value={numberDraft}
+                onChangeText={(value) =>
+                  setNumberDraft(value.replace(/[^0-9]/g, "").slice(0, 3))
+                }
+                style={styles.input}
+              />
+              <ShadowActionButton
+                label="⟡ 제출"
+                disabled={
+                  busy ||
+                  reconnecting ||
+                  displayedTimeLeft <= 0 ||
+                  ownParticipant.forfeitedAt != null
+                }
+                onPress={submitNumber}
+              />
+              <Text style={[styles.notice, styles.centerText]}>
+                높을수록 더 많은 세력 — 단, 팀 평균이 무너지면 패배합니다.
+              </Text>
+            </View>
+          )}
+        </View>
+      </>
+    );
+  } else if (snapshot.phase === "revealing") {
+    phaseContent = (
+      <View style={[styles.commandPanel, styles.centerPhase]}>
+        <Text style={styles.eyebrow}>결과 공개 중</Text>
+        <Text style={[styles.command, styles.commandSmall]}>
+          {snapshot.command ?? result?.command ?? "-"}
+        </Text>
+        <Text style={styles.notice}>교실 화면을 주목하세요…</Text>
+      </View>
+    );
+  } else if (snapshot.phase === "postround") {
+    phaseContent = (
+      <View style={[styles.resultPanel, styles.centerPhase]}>
+        <Text style={styles.eyebrow}>이번 라운드 획득</Text>
+        <Text style={styles.gainPop}>
+          {ownGain > 0 ? `+${ownGain.toLocaleString()}` : "±0"}
+        </Text>
+        <Text style={styles.notice}>세력</Text>
+        <Text style={[styles.notice, styles.resultNote]}>다음 지령을 기다리세요.</Text>
+      </View>
+    );
+  } else {
+    phaseContent = (
+      <View style={[styles.resultPanel, styles.centerPhase]}>
+        <Text style={styles.eyebrow}>게임 종료</Text>
+        <Text style={[styles.gainPop, styles.rank]}>{ownRank}위</Text>
+        <Text style={styles.notice}>전체 {rankedParticipants.length}명 중</Text>
+        <View style={styles.rule} />
+        <Text style={styles.eyebrow}>내 진영</Text>
+        <Text style={styles.finalTeam}>{teamRevealLabel(ownParticipant.team)}</Text>
+      </View>
     );
   }
+
   return (
-    <View style={styles.resultCard} accessibilityLabel="라운드 결과">
-      <View style={styles.resultHeader}>
-        <View style={styles.resultTitleBlock}>
-          <Text selectable style={styles.eyebrow}>ROUND {result.round}</Text>
-          <Text selectable style={styles.title}>
-            {result.winner === "tie"
-              ? "무승부"
-              : `${teamLabel(result.winner)} 승리`}
-          </Text>
+    <View style={styles.screen}>
+      {atmosphere}
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.student}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.revealRow}>
+          {revealItems.map((item) => {
+            const isRevealed = revealed === item.key;
+            return (
+              <ControlPressable
+                key={item.key}
+                accessibilityLabel={`${item.label.replace("👁 ", "")}, 누르고 있는 동안 공개`}
+                onPressIn={() => setRevealed(item.key)}
+                onPressOut={() => setRevealed(null)}
+                style={[styles.peek, isRevealed ? styles.peekActive : null]}
+              >
+                <Text
+                  numberOfLines={1}
+                  style={[styles.peekText, isRevealed ? styles.peekTextActive : null]}
+                >
+                  {isRevealed ? item.value : item.label}
+                </Text>
+              </ControlPressable>
+            );
+          })}
         </View>
-        <Text selectable style={styles.commandBadge}>목표 {result.command}</Text>
-      </View>
-      <View style={styles.averageGrid}>
-        <Metric label="검정 평균" value={result.blackAverage ?? "제출 없음"} />
-        <Metric label="검정 거리" value={result.blackDifference ?? "없음"} />
-        <Metric label="흰색 평균" value={result.whiteAverage ?? "제출 없음"} />
-        <Metric label="흰색 거리" value={result.whiteDifference ?? "없음"} />
-      </View>
-      <View style={styles.revealList}>
-        {result.players.map((player) => (
-          <View style={styles.revealRow} key={player.studentId}>
-            <View style={styles.scoreMain}>
-              <Text selectable style={styles.scoreName}>{player.name}</Text>
-              <Text selectable style={styles.team}>{teamLabel(player.team)}</Text>
-            </View>
-            <Text selectable style={styles.muted}>제출 {player.number ?? "없음"}</Text>
-            <Text selectable style={[styles.score, styles.tabular]}>
-              +{player.gain.toLocaleString("ko-KR")}
-            </Text>
-          </View>
-        ))}
-      </View>
-    </View>
-  );
-}
 
-function TerminalResult({
-  snapshot,
-  ownParticipant,
-  rankedParticipants,
-  onBack,
-}: {
-  snapshot: ShadowAllianceSnapshot;
-  ownParticipant: ShadowAllianceSnapshot["participants"][number] | null;
-  rankedParticipants: ShadowAllianceSnapshot["participants"];
-  onBack: () => void;
-}) {
-  const ownRank = ownParticipant
-    ? rankedParticipants.findIndex(
-        (participant) => participant.studentId === ownParticipant.studentId,
-      ) + 1
-    : 0;
-  return (
-    <GameResultPanel
-      outcome={
-        ownParticipant?.forfeitedAt != null
-          ? "forfeit"
-          : snapshot.phase === "host-ended"
-            ? "host-ended"
-            : "completed"
-      }
-      score={ownParticipant?.power ?? null}
-      durationMs={
-        snapshot.startedAt != null && snapshot.completedAt != null
-          ? snapshot.completedAt - snapshot.startedAt
-          : null
-      }
-      metrics={[
-        ...(ownRank > 0 ? [{ label: "개인 순위", value: `${ownRank}위` }] : []),
-        ...(ownParticipant
-          ? [
-              { label: "라운드 승리", value: `${ownParticipant.roundWins}회` },
-              { label: "팀", value: teamLabel(ownParticipant.team) },
-            ]
-          : []),
-      ]}
-      message="서버가 확정한 파워와 순위만 나의 전적에 기록됩니다."
-      actions={<ActionButton label="게임 목록" onPress={onBack} />}
-    />
-  );
-}
-
-function Scoreboard({
-  participants,
-}: {
-  participants: ShadowAllianceSnapshot["participants"];
-}) {
-  return (
-    <View style={styles.scoreboard} accessibilityLabel="파워 순위">
-      <Text selectable style={styles.subtitle}>파워 순위</Text>
-      {participants.map((participant, index) => (
-        <View style={styles.scoreRow} key={participant.studentId}>
-          <View style={styles.scoreMain}>
-            <Text selectable style={styles.scoreName}>
-              {index + 1}위 · {participant.name}
-            </Text>
-            <Text selectable style={styles.team}>{teamLabel(participant.team)}</Text>
-          </View>
-          <Text selectable style={[styles.score, styles.tabular]}>
-            {participant.power.toLocaleString("ko-KR")} 파워
-            {participant.lastGain > 0
-              ? ` (+${participant.lastGain.toLocaleString("ko-KR")})`
-              : ""}
-          </Text>
+        <View style={styles.card}>
+          <View pointerEvents="none" style={styles.cardGlow} />
+          {phaseContent}
         </View>
-      ))}
+
+        {error ? <Text style={styles.errorBanner}>{error}</Text> : null}
+        {connection !== "connected" ? (
+          <Text style={styles.connectionState}>{connectionLabel(connection)}</Text>
+        ) : null}
+
+        {ownParticipant.forfeitedAt == null &&
+        snapshot.phase !== "finished" &&
+        snapshot.phase !== "host-ended" ? (
+          <ControlPressable
+            onPress={() => void command("forfeit")}
+            style={styles.leaveButton}
+          >
+            <Text style={styles.leaveLabel}>기권하고 나가기</Text>
+          </ControlPressable>
+        ) : null}
+      </ScrollView>
     </View>
   );
 }
-
-function Metric({ label, value }: { label: string; value: string | number }) {
-  return (
-    <View style={styles.metric}>
-      <Text selectable style={styles.metricLabel}>{label}</Text>
-      <Text selectable style={[styles.metricValue, styles.tabular]}>{value}</Text>
-    </View>
-  );
-}
-
-function ActionButton({
-  label,
-  disabled = false,
-  onPress,
-}: {
-  label: string;
-  disabled?: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <AppButton disabled={disabled} onPress={onPress} style={styles.actionButton}>
-      {label}
-    </AppButton>
-  );
-}
-
-const styles = StyleSheet.create({
-  root: { gap: spacing.lg },
-  stateBox: {
-    alignItems: "center",
-    gap: spacing.md,
-    paddingVertical: spacing.xxl,
-  },
-  waitingRoot: {
-    flex: 1,
-    justifyContent: "center",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xxl,
-    backgroundColor: colors.gameFrame,
-  },
-  waitingEyebrow: {
-    ...typography.micro,
-    color: colors.rankingGold,
-    textTransform: "uppercase",
-  },
-  waitingTitle: {
-    ...typography.display,
-    color: colors.gamePlayfield,
-  },
-  waitingCopy: {
-    ...typography.body,
-    color: colors.gamePlayfield,
-  },
-  waitingMeta: {
-    ...typography.label,
-    color: colors.gameHudBorder,
-  },
-  eyebrow: { ...typography.micro, color: colors.textMuted },
-  title: { ...typography.title, color: colors.text },
-  subtitle: { ...typography.subtitle, color: colors.text },
-  muted: { ...typography.body, color: colors.textMuted },
-  notice: {
-    ...typography.body,
-    color: colors.warningTintedText,
-    padding: spacing.md,
-    borderRadius: radii.control,
-    backgroundColor: colors.warningTintedBg,
-  },
-  error: { ...typography.body, color: colors.danger },
-  commandCard: {
-    alignItems: "center",
-    gap: spacing.sm,
-    padding: spacing.xl,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderCurve: "continuous",
-    backgroundColor: colors.surface,
-  },
-  commandNumber: { ...typography.display, color: colors.text },
-  inputPanel: {
-    gap: spacing.md,
-    padding: spacing.lg,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderCurve: "continuous",
-    backgroundColor: colors.surface,
-  },
-  submitRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  numberInput: {
-    minWidth: gamePlatform.metricMinWidth,
-    flexGrow: 1,
-    fontVariant: ["tabular-nums"],
-  },
-  submitted: {
-    ...typography.label,
-    color: colors.plantActive,
-    padding: spacing.lg,
-    borderRadius: radii.control,
-    backgroundColor: colors.noticeSuccessBg,
-  },
-  resultCard: {
-    gap: spacing.lg,
-    padding: spacing.lg,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderCurve: "continuous",
-    backgroundColor: colors.surface,
-  },
-  resultHeader: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  resultTitleBlock: { flex: 1, gap: spacing.xs },
-  commandBadge: {
-    ...typography.label,
-    color: colors.onAccent,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: radii.pill,
-    backgroundColor: colors.gameFrame,
-  },
-  averageGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: spacing.md,
-  },
-  metric: {
-    minWidth: gamePlatform.metricMinWidth,
-    flexGrow: 1,
-    gap: spacing.xs,
-    padding: spacing.md,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.control,
-    backgroundColor: colors.bg,
-  },
-  metricLabel: { ...typography.micro, color: colors.textMuted },
-  metricValue: { ...typography.subtitle, color: colors.text },
-  revealList: { gap: spacing.sm },
-  revealRow: {
-    minHeight: controls.fab,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.control,
-    backgroundColor: colors.bg,
-  },
-  scoreboard: {
-    gap: spacing.sm,
-    padding: spacing.lg,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.card,
-    borderCurve: "continuous",
-    backgroundColor: colors.surface,
-  },
-  scoreRow: {
-    minHeight: controls.fab,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.control,
-    backgroundColor: colors.bg,
-  },
-  scoreMain: { flex: 1, gap: spacing.xs },
-  scoreName: { ...typography.label, color: colors.text },
-  team: { ...typography.micro, color: colors.textMuted },
-  score: { ...typography.label, color: colors.text },
-  actionButton: {
-    minHeight: tapMin,
-    alignSelf: "flex-start",
-    justifyContent: "center",
-    paddingHorizontal: spacing.lg,
-    borderRadius: radii.control,
-    borderCurve: "continuous",
-  },
-  runtimeMeta: { ...typography.micro, color: colors.textFaint },
-  tabular: { fontVariant: ["tabular-nums"] },
-});

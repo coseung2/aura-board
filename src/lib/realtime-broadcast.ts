@@ -28,6 +28,7 @@ import type {
 import {
   boardChannelKey,
   classroomMorningChannelKey,
+  OMOK_MATCHMAKING_CHANGED_EVENT,
   PLAY_SESSION_CHANGED_EVENT,
   SPEED_GAME_CHANGED_EVENT,
   speedGameChannelKey,
@@ -338,6 +339,20 @@ export async function announceSpeedGameChange(
   await broadcastBestEffort(speedGameChannelKey(gameId), SPEED_GAME_CHANGED_EVENT, {
     type: SPEED_GAME_CHANGED_EVENT,
   });
+}
+
+/** Broadcast a committed Omok lobby ticket change; clients refetch status. */
+export async function announceOmokMatchmakingChange(boardId: string): Promise<void> {
+  if (!boardId) return;
+  await broadcastBestEffort(
+    boardChannelKey(boardId),
+    OMOK_MATCHMAKING_CHANGED_EVENT,
+    {
+      type: OMOK_MATCHMAKING_CHANGED_EVENT,
+      boardId,
+      updatedAt: new Date().toISOString(),
+    },
+  );
 }
 
 /**

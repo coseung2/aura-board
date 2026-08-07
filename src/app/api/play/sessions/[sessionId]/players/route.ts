@@ -25,16 +25,24 @@ export async function GET(_request: Request, { params }: Params) {
       select: {
         startedAtMs: true,
         participants: {
-          where: { studentId: { not: null } },
           orderBy: { slot: "asc" },
-          select: { studentId: true, displayName: true, slot: true },
+          select: { actorSubject: true, studentId: true, displayName: true, slot: true },
         },
       },
     });
     if (!session) return jsonPrivateNoStore({ error: "not_found" }, { status: 404 });
-    const studentIds = session.participants.flatMap((participant) =>
-      participant.studentId ? [participant.studentId] : [],
-    );
+    const studentIdFor = (participant: { actorSubject: string; studentId: string | null }) => {
+      if (participant.studentId) return participant.studentId;
+      return participant.actorSubject.startsWith("student:")
+        ? participant.actorSubject.slice("student:".length)
+        : null;
+    };
+    const studentIds = [
+      ...new Set(session.participants.flatMap((participant) => {
+        const studentId = studentIdFor(participant);
+        return studentId ? [studentId] : [];
+      })),
+    ];
     const [students, slimes, results] = await Promise.all([
       db.student.findMany({
         where: { id: { in: studentIds } },
@@ -54,14 +62,15 @@ export async function GET(_request: Request, { params }: Params) {
 
     return jsonPrivateNoStore({
       startedAtMs: session.startedAtMs == null ? null : Number(session.startedAtMs),
-      players: session.participants.flatMap((participant) => {
-        const studentId = participant.studentId;
-        if (!studentId) return [];
-        const student = studentById.get(studentId);
-        const slime = slimeById.get(studentId);
-        const records = results.filter((result) => result.studentId === studentId);
-        return [{
-          studentId,
+      players: session.participants.map((participant) => {
+        const studentId = studentIdFor(participant);
+        const student = studentId ? studentById.get(studentId) : null;
+        const slime = studentId ? slimeById.get(studentId) : null;
+        const records = studentId
+          ? results.filter((result) => result.studentId === studentId)
+          : [];
+        return {
+          studentId: studentId ?? participant.actorSubject,
           slot: participant.slot,
           name: student?.name ?? participant.displayName,
           number: student?.number ?? null,
@@ -77,7 +86,7 @@ export async function GET(_request: Request, { params }: Params) {
             losses: records.filter((result) => result.outcome === "loss").length,
             draws: records.filter((result) => result.outcome === "draw").length,
           },
-        }];
+        };
       }),
     });
   } catch (error) {

@@ -42,6 +42,7 @@ export function classroomMorningChannelKey(classroomId: string): string {
 
 export const SPEED_GAME_CHANGED_EVENT = "speed_game_changed";
 export const PLAY_SESSION_CHANGED_EVENT = "play_session_changed";
+export const OMOK_MATCHMAKING_CHANGED_EVENT = "omok_matchmaking_changed";
 
 export type PlaySessionRealtimeEvent = {
   type: typeof PLAY_SESSION_CHANGED_EVENT;
@@ -49,6 +50,12 @@ export type PlaySessionRealtimeEvent = {
   sessionId: string;
   boardId: string;
   version: number;
+};
+
+export type OmokMatchmakingRealtimeEvent = {
+  type: typeof OMOK_MATCHMAKING_CHANGED_EVENT;
+  boardId: string;
+  updatedAt: string;
 };
 
 export function speedGameChannelKey(gameId: string): string {

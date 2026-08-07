@@ -137,6 +137,16 @@ export async function requestOmokMatch(boardId: string): Promise<OmokMatchmaking
   );
 }
 
+export async function requestOmokComputerMatch(boardId: string): Promise<OmokMatchmakingStatus> {
+  return requestJson<OmokMatchmakingStatus>(
+    `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,
+    {
+      method: "POST",
+      body: JSON.stringify({ opponent: "computer" }),
+    },
+  );
+}
+
 export async function cancelOmokMatch(boardId: string): Promise<OmokMatchmakingStatus> {
   return requestJson<OmokMatchmakingStatus>(
     `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,

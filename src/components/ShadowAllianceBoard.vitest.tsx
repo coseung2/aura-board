@@ -164,13 +164,22 @@ describe("ShadowAllianceBoard legacy presentation adapter", () => {
       />,
     );
 
-    expect(await screen.findByRole("heading", { level: 1, name: "그림자 1" })).toBeTruthy();
-    expect(screen.getAllByText("익명 공작원").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("블랙 연합").length).toBeGreaterThan(0);
-    expect(screen.getByText(/게임 준비중/)).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 3, name: "화이트 연합" })).toBeTruthy();
-    expect(screen.getByText("그림자 2")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "다음에 이어하기" })).toBeTruthy();
+    expect(await screen.findByText("대기 중")).toBeTruthy();
+    expect(screen.getByText(/본부의 지령을 기다리는 중입니다/)).toBeTruthy();
+    expect(screen.queryByText("그림자 1")).toBeNull();
+    expect(screen.queryByText("그림자 2")).toBeNull();
+    expect(screen.queryByText("블랙 연합")).toBeNull();
+    expect(screen.queryByText("화이트 연합")).toBeNull();
+
+    const nicknamePeek = screen.getByRole("button", {
+      name: "내 닉네임, 누르고 있는 동안 공개",
+    });
+    fireEvent.pointerDown(nicknamePeek);
+    expect(screen.getByText("그림자 1")).toBeTruthy();
+    fireEvent.pointerUp(nicknamePeek);
+    expect(screen.queryByText("그림자 1")).toBeNull();
+
+    expect(screen.getByRole("button", { name: "게임 목록" })).toBeTruthy();
     expect(screen.queryByText("교사가 게임을 시작하면 첫 지령이 도착합니다.")).toBeNull();
     expect(screen.queryByText("Lobby")).toBeNull();
     expect(screen.queryByText("교사 본부")).toBeNull();

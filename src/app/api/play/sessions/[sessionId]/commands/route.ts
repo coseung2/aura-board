@@ -1,7 +1,15 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { resolvePlayActor } from "@/lib/play-platform/actor";
-import { PLAY_COMMAND_SCHEMA_VERSION } from "@/lib/play-platform/contracts";
+import {
+  PLAY_COMMAND_SCHEMA_VERSION,
+  isPlayCommandResponse,
+} from "@/lib/play-platform/contracts";
+import {
+  advanceOmokBotTurn,
+  OmokBotTurnError,
+} from "@/lib/play-platform/omok-bot-server";
 import {
   playEngineFetch,
   proxyPlayEngineResponse,
@@ -52,7 +60,30 @@ export async function POST(request: Request, { params }: Params) {
       `/v1/sessions/${encodeURIComponent(sessionId)}/commands`,
       { actor, method: "POST", body: parsed.data },
     );
-    return proxyPlayEngineResponse(response);
+    if (parsed.data.command.type !== "place_stone" || !response.ok) {
+      return proxyPlayEngineResponse(response);
+    }
+
+    const payload = (await response.clone().json().catch(() => null)) as unknown;
+    if (!isPlayCommandResponse(payload)) return proxyPlayEngineResponse(response);
+
+    try {
+      return jsonPrivateNoStore(await advanceOmokBotTurn(sessionId, payload));
+    } catch (error) {
+      if (!(error instanceof OmokBotTurnError)) throw error;
+      console.error("[omok bot turn] failed", {
+        sessionId,
+        reason: error.message,
+      });
+      return jsonPrivateNoStore(
+        {
+          error: "play_engine_unavailable",
+          detail: "bot_turn_failed",
+          snapshot: payload.snapshot,
+        },
+        { status: 503 },
+      );
+    }
   } catch (error) {
     return playRouteError(error);
   }

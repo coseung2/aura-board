@@ -14,6 +14,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo-google-fonts/cinzel": "^0.4.2",
+    "@expo-google-fonts/jetbrains-mono": "^0.4.1",
+    "@expo-google-fonts/nanum-myeongjo": "^0.4.1",
     "@expo-google-fonts/noto-sans-kr": "^0.4.3",
     "@expo/metro-runtime": "~6.1.2",
     "@react-native-masked-view/masked-view": "0.3.2",

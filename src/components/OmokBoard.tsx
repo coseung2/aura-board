@@ -5,7 +5,11 @@ import { useRouter } from "next/navigation";
 import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { OfficialSlimeSprite } from "@/components/creatures/OfficialSlimeSprite";
 import type { SlimeColor } from "@/lib/pets/slime-assets";
-import { boardChannelKey, PLAY_SESSION_CHANGED_EVENT } from "@/lib/realtime";
+import {
+  boardChannelKey,
+  OMOK_MATCHMAKING_CHANGED_EVENT,
+  PLAY_SESSION_CHANGED_EVENT,
+} from "@/lib/realtime";
 import {
   createOmokRematch,
   cancelOmokMatch,
@@ -17,6 +21,7 @@ import {
   makeOmokCommand,
   PlayClientError,
   submitOmokCommand,
+  requestOmokComputerMatch,
   requestOmokMatch,
 } from "@/lib/play-platform/browser-client";
 import {
@@ -45,6 +50,7 @@ type PendingCommand = {
 };
 
 const STAR_POINTS = new Set(["3:3", "3:11", "7:7", "11:3", "11:11"]);
+const MATCHMAKING_HEARTBEAT_MS = 15_000;
 
 export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = false }: Props) {
   const router = useRouter();
@@ -125,13 +131,18 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
   }, [boardId, matchmakingEnabled, readPending, viewer]);
 
   useEffect(() => {
+    if (matchmakingEnabled) {
+      setLoading(false);
+      return;
+    }
     void refresh();
-  }, [refresh]);
+  }, [matchmakingEnabled, refresh]);
 
   useRealtimeInvalidation({
     channelName: boardChannelKey(boardId),
     event: PLAY_SESSION_CHANGED_EVENT,
     refresh,
+    enabled: !matchmakingEnabled,
     fallbackPollMs: 10_000,
   });
 
@@ -146,14 +157,17 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
     }
   }, [boardId, matchmakingEnabled, router, viewer]);
 
-  useEffect(() => {
-    if (viewer !== "student" || !matchmakingEnabled) return;
-    void refreshMatchmaking();
-  }, [matchmakingEnabled, refreshMatchmaking, viewer]);
+  useRealtimeInvalidation({
+    channelName: boardChannelKey(boardId),
+    event: OMOK_MATCHMAKING_CHANGED_EVENT,
+    refresh: refreshMatchmaking,
+    enabled: viewer === "student" && matchmakingEnabled,
+    fallbackPollMs: 0,
+  });
 
   useEffect(() => {
     if (matchmaking.status !== "waiting") return;
-    const timer = window.setInterval(refreshMatchmaking, 2_000);
+    const timer = window.setInterval(refreshMatchmaking, MATCHMAKING_HEARTBEAT_MS);
     return () => window.clearInterval(timer);
   }, [matchmaking.status, refreshMatchmaking]);
 
@@ -291,6 +305,20 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
     }
   }
 
+  async function startComputerMatch() {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await requestOmokComputerMatch(boardId);
+      setMatchmaking(next);
+      if (next.status === "matched" && next.href) router.replace(next.href);
+    } catch (cause) {
+      setError(messageForError(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function stopMatchmaking() {
     setBusy(true);
     try {
@@ -327,17 +355,27 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
             </div>
             <p className={styles.message} role="status" aria-live="polite">
               {waiting
-                ? `현재 ${matchmaking.playerCount}명이 입장해 있어요.`
-                : "매칭을 잡으면 같은 학급의 상대와 바로 대국을 시작해요."}
+                ? `현재 ${matchmaking.playerCount}명이 입장해 있어요. 기다리는 동안 컴퓨터와 바로 시작할 수도 있어요.`
+                : "같은 학급 친구를 찾거나 컴퓨터와 바로 대국할 수 있어요."}
             </p>
-            <button
-              className={waiting ? styles.secondaryButton : styles.button}
-              type="button"
-              disabled={busy}
-              onClick={() => void (waiting ? stopMatchmaking() : startMatchmaking())}
-            >
-              {busy ? "처리 중…" : waiting ? "매칭 취소" : "매칭 잡기"}
-            </button>
+            <div className={styles.matchActions}>
+              <button
+                className={waiting ? styles.secondaryButton : styles.button}
+                type="button"
+                disabled={busy}
+                onClick={() => void (waiting ? stopMatchmaking() : startMatchmaking())}
+              >
+                {busy ? "처리 중…" : waiting ? "매칭 취소" : "친구 매칭"}
+              </button>
+              <button
+                className={waiting ? styles.button : styles.secondaryButton}
+                type="button"
+                disabled={busy}
+                onClick={() => void startComputerMatch()}
+              >
+                컴퓨터와 대국
+              </button>
+            </div>
             {error ? <p className={styles.error}>{error}</p> : null}
           </div>
         </section>
