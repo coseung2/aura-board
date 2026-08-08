@@ -1,11 +1,29 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const afterCallbacks = vi.hoisted(
+  () => [] as Array<() => void | Promise<void>>,
+);
+
+vi.mock("next/server", () => ({
+  after: vi.fn((callback: () => void | Promise<void>) => {
+    afterCallbacks.push(callback);
+  }),
+}));
+
 import {
   postCommitQueueStateForTests,
   schedulePostCommit,
 } from "./post-commit";
 
+function startAfterCallbacks(): Promise<void>[] {
+  return afterCallbacks
+    .splice(0, afterCallbacks.length)
+    .map((callback) => Promise.resolve(callback()));
+}
+
 describe("schedulePostCommit", () => {
   afterEach(() => {
+    afterCallbacks.length = 0;
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
@@ -17,7 +35,9 @@ describe("schedulePostCommit", () => {
     schedulePostCommit("test", task);
     expect(task).not.toHaveBeenCalled();
 
+    const completions = startAfterCallbacks();
     await vi.runAllTimersAsync();
+    await Promise.all(completions);
     expect(task).toHaveBeenCalledTimes(1);
   });
 
@@ -28,7 +48,9 @@ describe("schedulePostCommit", () => {
     schedulePostCommit("broken", async () => {
       throw new Error("failed");
     });
+    const completions = startAfterCallbacks();
     await vi.runAllTimersAsync();
+    await Promise.all(completions);
 
     expect(error).toHaveBeenCalledWith(
       "[post-commit] broken failed",
@@ -56,6 +78,7 @@ describe("schedulePostCommit", () => {
       });
     }
 
+    const completions = startAfterCallbacks();
     await new Promise<void>((resolve) => setImmediate(resolve));
     expect(peak).toBe(maxConcurrency);
     expect(postCommitQueueStateForTests()).toMatchObject({
@@ -64,7 +87,8 @@ describe("schedulePostCommit", () => {
     });
 
     release();
-    await vi.waitFor(() => expect(completed).toBe(maxConcurrency + 4));
+    await Promise.all(completions);
+    expect(completed).toBe(maxConcurrency + 4);
     expect(postCommitQueueStateForTests()).toMatchObject({ active: 0, queued: 0 });
   });
 });
