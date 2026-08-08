@@ -176,18 +176,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         }
       }
 
-      // Keep the JWT display name in sync with the teacher nickname stored in DB.
+      // Sign-in seeds the display name and the nickname editor calls
+      // `session.update`. Avoid re-reading User on every JWT/session lookup;
+      // only repair legacy/missing names once. Authenticated server routes load
+      // the authoritative User row separately.
       if (trigger === "update" && session && typeof (session as { name?: unknown }).name === "string") {
         const nextName = String((session as { name?: string }).name ?? "").trim();
         if (nextName) token.name = nextName;
-      } else if (token.id) {
+      } else if (
+        token.id &&
+        (typeof token.name !== "string" || !token.name.trim())
+      ) {
         const dbUser = await db.user.findUnique({
           where: { id: String(token.id) },
           select: { name: true },
         });
-        if (dbUser?.name?.trim()) {
-          token.name = dbUser.name.trim();
-        }
+        if (dbUser?.name?.trim()) token.name = dbUser.name.trim();
       }
 
       return token;

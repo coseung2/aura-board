@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
+import { invalidateStudentIdentityCache } from "@/lib/student-auth";
 
 const UpdateStudentSchema = z.object({
   gender: z.enum(["male", "female"]).nullable().optional(),
@@ -74,6 +75,7 @@ export async function DELETE(
     ]);
 
     await db.student.delete({ where: { id: studentId } });
+    invalidateStudentIdentityCache(studentId);
     await enqueueBlobDeletion(blobUrls, "student.delete", "Student", studentId);
     return new NextResponse(null, { status: 204 });
   } catch (e) {

@@ -3,7 +3,7 @@ import "server-only";
 import { createHmac } from "crypto";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { getCurrentStudentRaw } from "@/lib/student-auth";
+import { getCurrentStudentIdentityRaw } from "@/lib/student-auth";
 import type { PlayActorRole } from "./contracts";
 
 export type PlayActor = {
@@ -11,6 +11,7 @@ export type PlayActor = {
   role: PlayActorRole;
   userId: string | null;
   studentId: string | null;
+  classroomId?: string | null;
 };
 
 export class PlayAccessError extends Error {
@@ -32,15 +33,17 @@ export async function resolvePlayActor(): Promise<PlayActor> {
       role: "host",
       userId: user.id,
       studentId: null,
+      classroomId: null,
     };
   }
-  const student = await getCurrentStudentRaw();
+  const student = await getCurrentStudentIdentityRaw();
   if (student) {
     return {
       subject: `student:${student.id}`,
       role: "participant",
       userId: null,
       studentId: student.id,
+      classroomId: student.classroomId,
     };
   }
   throw new PlayAccessError(401, "unauthorized");
@@ -76,14 +79,8 @@ export async function resolvePlayActorForBoard(boardId: string): Promise<{
     if (board.classroom?.teacherId !== actor.userId && !member) {
       throw new PlayAccessError(403, "forbidden");
     }
-  } else {
-    const student = await db.student.findUnique({
-      where: { id: actor.studentId ?? "" },
-      select: { classroomId: true },
-    });
-    if (student?.classroomId !== board.classroomId) {
-      throw new PlayAccessError(403, "forbidden");
-    }
+  } else if (actor.classroomId !== board.classroomId) {
+    throw new PlayAccessError(403, "forbidden");
   }
 
   return {
@@ -122,14 +119,8 @@ export async function resolveSongGuessActorForBoard(boardId: string): Promise<{
     if (board.classroom?.teacherId !== actor.userId && !member) {
       throw new PlayAccessError(403, "forbidden");
     }
-  } else {
-    const student = await db.student.findUnique({
-      where: { id: actor.studentId ?? "" },
-      select: { classroomId: true },
-    });
-    if (student?.classroomId !== board.classroomId) {
-      throw new PlayAccessError(403, "forbidden");
-    }
+  } else if (actor.classroomId !== board.classroomId) {
+    throw new PlayAccessError(403, "forbidden");
   }
 
   return {

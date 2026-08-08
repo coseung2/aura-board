@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { subscribePublicBroadcast } from "@/lib/supabase/realtime-channel-registry";
 
 // Board-level realtime payload for engagement changes. Matches the
 // `engagement_changed` variant of the backend BoardRealtimeEvent union.
@@ -31,14 +32,12 @@ type BoardEntry = {
   engagementListeners: Map<string, Set<EngagementListener>>;
   pollListeners: Map<string, Set<PollListener>>;
   started: boolean;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  channel: any;
   remove: () => void;
 };
 
-// One isolated Supabase client/channel per board, shared by card components on
-// that board. Isolation prevents removing this topic from disrupting another
-// feature that happens to subscribe to the same `board:{boardId}` topic.
+// Card components share one logical listener per board. The underlying public
+// Broadcast registry also shares this topic with snapshot/board hooks, so one
+// screen does not open a separate Supabase WebSocket for engagement counts.
 const boards = new Map<string, BoardEntry>();
 
 function dispatch(boardId: string, event: BoardRealtimeEvent) {
@@ -67,40 +66,18 @@ function dispatch(boardId: string, event: BoardRealtimeEvent) {
   }
 }
 
-async function startBoard(boardId: string, entry: BoardEntry) {
+function startBoard(boardId: string, entry: BoardEntry) {
   if (entry.started) return;
   entry.started = true;
-  try {
-    const { createIsolatedPublicSupabaseClient } = await import(
-      "@/lib/supabase/client"
-    );
-    if (boards.get(boardId) !== entry) return;
-    const supabase = createIsolatedPublicSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const channel = (supabase as any)
-      .channel(`board:${boardId}`)
-      .on(
-        "broadcast",
-        { event: "board_changed" },
-        (msg: { payload?: unknown }) => {
-          const payload = msg?.payload as BoardRealtimeEvent | undefined;
-          if (!payload) return;
-          if (payload.boardId !== boardId) return;
-          dispatch(boardId, payload);
-        },
-      )
-      .subscribe();
-    entry.channel = channel;
-    entry.remove = () => {
-      try {
-        void supabase.removeChannel(channel);
-      } catch {
-        // ignore
-      }
-    };
-  } catch {
-    // Subscription failure is non-fatal; counts still load via fetch.
-  }
+  entry.remove = subscribePublicBroadcast<BoardRealtimeEvent>({
+    channelName: `board:${boardId}`,
+    events: ["board_changed"],
+    onMessage: (message) => {
+      const payload = message.payload;
+      if (!payload || payload.boardId !== boardId) return;
+      dispatch(boardId, payload);
+    },
+  });
 }
 
 function subscribeEngagement(
@@ -114,11 +91,10 @@ function subscribeEngagement(
       engagementListeners: new Map(),
       pollListeners: new Map(),
       started: false,
-      channel: null,
       remove: () => {},
     };
     boards.set(boardId, entry);
-    void startBoard(boardId, entry);
+    startBoard(boardId, entry);
   }
   let set = entry.engagementListeners.get(cardId);
   if (!set) {
@@ -151,11 +127,10 @@ function subscribePoll(
       engagementListeners: new Map(),
       pollListeners: new Map(),
       started: false,
-      channel: null,
       remove: () => {},
     };
     boards.set(boardId, entry);
-    void startBoard(boardId, entry);
+    startBoard(boardId, entry);
   }
   let set = entry.pollListeners.get(cardId);
   if (!set) {

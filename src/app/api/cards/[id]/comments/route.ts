@@ -9,9 +9,15 @@ import { resolveHiddenReason } from "@/lib/content-safety";
 import { emptyHiddenLookup, loadHiddenLookup } from "@/lib/content-safety-service";
 import { announceEngagementChange } from "@/lib/realtime-broadcast";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { schedulePostCommit } from "@/lib/post-commit";
+import { invalidateBoardSnapshotCache } from "@/lib/board-snapshot-cache";
 import { retryActivityRewardTransaction } from "@/lib/creatures/activity-rewards";
 import { isMeaningfulRewardComment, normalizeRewardComment } from "@/lib/reward-policy";
-import { awardCappedPolicyReward, loadRewardPolicy } from "@/lib/reward-service";
+import {
+  awardCappedPolicyReward,
+  loadPreparedCommentRewardContext,
+  loadRewardPolicyCached,
+} from "@/lib/reward-service";
 
 // card-comments-likes (2026-04-26): GET list / POST create.
 
@@ -219,45 +225,58 @@ export async function POST(
   if (!normalizedContent) {
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
-  const accountId = !studentActor
-    ? null
-    : (await ensureAccountFor({ id: studentActor.id, classroomId: studentActor.classroomId })).accountId;
-  const includeAuthors = {
-    authorUser: { select: { id: true, name: true } },
-    authorStudent: { select: { id: true, name: true } },
-    authorParent: { select: { id: true, name: true } },
+  let accountId: string | null = null;
+  let studentRewardPolicy: Awaited<ReturnType<typeof loadRewardPolicyCached>> | null = null;
+  if (studentActor) {
+    const [account, policy] = await Promise.all([
+      ensureAccountFor({
+        id: studentActor.id,
+        classroomId: studentActor.classroomId,
+      }),
+      loadRewardPolicyCached(studentActor.classroomId),
+    ]);
+    accountId = account.accountId;
+    studentRewardPolicy = policy;
+  }
+  const commentSelect = {
+    id: true,
+    parentCommentId: true,
+    content: true,
+    createdAt: true,
+    authorKind: true,
+    audience: true,
+    authorParentId: true,
+    authorStudentId: true,
   } as const;
   let reward: { amount: number; baseAmount: number; buffBps: number } | null = null;
   let created;
   try {
     const result = await retryActivityRewardTransaction(() =>
       db.$transaction(async (tx) => {
-        if ((studentActor || parentActor) && parsed.data.clientRequestId) {
-          const replay = await tx.cardComment.findFirst({
-            where: {
-              cardId,
-              clientRequestId: parsed.data.clientRequestId,
-              deletedAt: null,
-              ...(studentActor
-                ? { authorStudentId: studentActor.id }
-                : { authorParentId: parentActor!.id }),
-            },
-            include: includeAuthors,
-          });
-          if (replay) return { created: replay, reward: null };
-        }
-
-        const recentStudentComments = studentActor
-          ? await tx.cardComment.findMany({
-              where: {
-                authorStudentId: studentActor.id,
-              },
-              select: { content: true },
-            })
-          : [];
-        const duplicate = recentStudentComments.some(
-          (comment) => normalizeRewardComment(comment.content) === normalizedContent,
+        const policy = studentRewardPolicy;
+        const shouldEvaluateReward = Boolean(
+          studentActor &&
+          accountId &&
+          policy &&
+          isMeaningfulRewardComment(
+            normalizedContent,
+            policy.commentMinMeaningfulLength,
+          ),
         );
+        const preparedReward =
+          shouldEvaluateReward && studentActor && accountId && policy
+            ? await loadPreparedCommentRewardContext(tx, {
+                accountId,
+                studentId: studentActor.id,
+                classroomId: studentActor.classroomId,
+                normalizedContent,
+                policy,
+              })
+            : null;
+
+        // The database uniqueness constraint is the retry gate. On a replay,
+        // create raises P2002 and the outer recovery reads the committed row;
+        // the common first-attempt path avoids a preflight SELECT.
         const comment = await tx.cardComment.create({
           data: {
             cardId,
@@ -270,12 +289,16 @@ export async function POST(
             clientRequestId: studentActor || parentActor ? parsed.data.clientRequestId : null,
             content: storedContent,
           },
-          include: includeAuthors,
+          select: commentSelect,
         });
 
-        if (!studentActor || !accountId || duplicate) return { created: comment, reward: null };
-        const policy = await loadRewardPolicy(tx, studentActor.classroomId);
-        if (!isMeaningfulRewardComment(normalizedContent, policy.commentMinMeaningfulLength)) {
+        if (
+          !studentActor ||
+          !accountId ||
+          !policy ||
+          !preparedReward ||
+          preparedReward.duplicate
+        ) {
           return { created: comment, reward: null };
         }
         const paid = await awardCappedPolicyReward({
@@ -288,9 +311,13 @@ export async function POST(
           baseAmount: policy.commentRewardAmount,
           note: `댓글 작성 보상 [comment:${comment.id}]`,
           policy,
+          accountAlreadyVerified: true,
+          sourceAlreadyChecked: true,
+          preparedCounts: preparedReward.counts,
+          preparedRewardContext: preparedReward.rewardContext,
         });
         return { created: comment, reward: paid };
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }),
     );
     created = result.created;
     reward = result.reward
@@ -316,7 +343,7 @@ export async function POST(
             ? { authorStudentId: studentActor.id }
             : { authorParentId: parentActor!.id }),
         },
-        include: includeAuthors,
+        select: commentSelect,
       });
       if (!created) throw error;
     } else {
@@ -325,29 +352,26 @@ export async function POST(
   }
 
   if (audience === "public") {
-    try {
-      const [likeCount, commentCount, card] = await Promise.all([
+    invalidateBoardSnapshotCache(access.ctx.boardId);
+    schedulePostCommit("comment.create engagement", async () => {
+      const [likeCount, commentCount] = await Promise.all([
         db.cardLike.count({ where: { cardId } }),
         db.cardComment.count({ where: { cardId, audience: "public", deletedAt: null } }),
-        db.card.findUnique({ where: { id: cardId }, select: { boardId: true } }),
       ]);
-      if (card) {
-        await touchBoardUpdatedAt(card.boardId, {
-          action: "comment.created",
-          actorType: isTeacher ? "teacher" : studentActor ? "student" : "guest",
-          actorId: actor.id,
-        });
-        await announceEngagementChange(
-          card.boardId,
-          cardId,
-          likeCount,
-          commentCount,
-          "comment",
-        );
-      }
-    } catch {
-      // Broadcast side-effects are non-fatal.
-    }
+      await touchBoardUpdatedAt(access.ctx.boardId, {
+        action: "comment.created",
+        actorType: isTeacher ? "teacher" : studentActor ? "student" : "guest",
+        actorId: actor.id,
+        coalesceMs: 1_000,
+      });
+      await announceEngagementChange(
+        access.ctx.boardId,
+        cardId,
+        likeCount,
+        commentCount,
+        "comment",
+      );
+    });
   }
 
   const createdAuthorKind = created.authorParentId ? "parent" : created.authorKind;

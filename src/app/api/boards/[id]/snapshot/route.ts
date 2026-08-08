@@ -2,9 +2,10 @@ import { createHash } from "crypto";
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { getCurrentStudent } from "@/lib/student-auth";
-import { getEffectiveBoardRole } from "@/lib/rbac";
+import { getCurrentStudentIdentityRaw } from "@/lib/student-auth";
+import { getBoardRole } from "@/lib/rbac";
 import { requireShareAuth } from "@/lib/share/with-share";
+import { loadBoardSnapshotCached } from "@/lib/board-snapshot-cache";
 import type { SectionBreakoutGroupWire } from "@/lib/section-breakout";
 import {
   normalizeStreamActivityTemplateState,
@@ -67,6 +68,8 @@ type CardWire = {
   createdAt: string;
 };
 
+type CardBaseWire = Omit<CardWire, "isLiked" | "canInteract">;
+
 type SectionWire = {
   id: string;
   title: string;
@@ -94,19 +97,23 @@ export async function GET(
     const url = new URL(req.url);
     const clientHash = url.searchParams.get("hash");
 
-    const [user, student] = await Promise.all([
-      getCurrentUser().catch(() => null),
-      getCurrentStudent().catch(() => null),
-    ]);
-    const shareToken = req.headers.get("x-share-token");
     const preferStudent = req.headers.get("x-aura-student-viewer") === "1";
+    const user = preferStudent
+      ? null
+      : await getCurrentUser().catch(() => null);
+    const student = user
+      ? null
+      : await getCurrentStudentIdentityRaw().catch(() => null);
+    const shareToken = req.headers.get("x-share-token");
 
     const board = await db.board.findFirst({
       where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
       select: {
         id: true,
+        classroomId: true,
         layout: true,
         anonymousAuthor: true,
+        updatedAt: true,
         questionPrompt: true,
         questionVizMode: true,
       },
@@ -126,16 +133,22 @@ export async function GET(
       if (shareResult.identity.boardId !== board.id) {
         return NextResponse.json({ error: "board_mismatch" }, { status: 403 });
       }
-    } else {
-      const role = await getEffectiveBoardRole(board.id, {
-        userId: user?.id,
-        studentId: student?.id,
-      });
+    } else if (user) {
+      const role = await getBoardRole(board.id, user.id);
       if (!role) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
+    } else if (!student || board.classroomId !== student.classroomId) {
+      // The verified student identity already carries its authoritative
+      // classroom. Snapshot reads need only the classroom baseline role; role
+      // grants affect mutation controls, not whether the class board is visible.
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const common = await loadBoardSnapshotCached(
+      board.id,
+      board.updatedAt.toISOString(),
+      async () => {
     const [
       cardsRaw,
       sectionsRaw,
@@ -176,18 +189,6 @@ export async function GET(
               likes: true,
               comments: { where: { audience: "public", deletedAt: null } },
             },
-          },
-          likes: {
-            where:
-              preferStudent && student
-                ? { likerStudentId: student.id }
-                : user
-                  ? { likerUserId: user.id }
-                  : student
-                    ? { likerStudentId: student.id }
-                    : { id: "" },
-            select: { id: true },
-            take: 1,
           },
         },
       }),
@@ -237,7 +238,7 @@ export async function GET(
       breakoutGroupsBySection.set(group.sectionId, list);
     }
 
-    const cards: CardWire[] = cardsRaw.map((c) => ({
+    const cards: CardBaseWire[] = cardsRaw.map((c) => ({
       id: c.id,
       title: c.title,
       content: c.content,
@@ -270,8 +271,6 @@ export async function GET(
       anonymousAuthor: board.anonymousAuthor,
       likeCount: c._count.likes,
       commentCount: c._count.comments,
-      isLiked: c.likes.length > 0,
-      canInteract: Boolean(user || student),
       commentVoteOptionCount: c.commentVoteOptionCount ?? null,
       commentVoteOptionLabels: Array.isArray(c.commentVoteOptionLabels)
         ? c.commentVoteOptionLabels.filter(
@@ -335,7 +334,36 @@ export async function GET(
           }
         : null;
 
-    const payload = { cards, sections, question };
+        return { cards, sections, question };
+      },
+    );
+
+    const canInteract = Boolean(user || student);
+    const likeableCardIds = common.cards
+      .filter((card) => card.likeCount > 0)
+      .map((card) => card.id);
+    const likedRows =
+      canInteract && likeableCardIds.length > 0
+        ? await db.cardLike.findMany({
+            where: {
+              cardId: { in: likeableCardIds },
+              ...(user
+                ? { likerUserId: user.id }
+                : { likerStudentId: student?.id ?? "" }),
+            },
+            select: { cardId: true },
+          })
+        : [];
+    const likedCardIds = new Set(likedRows.map((row) => row.cardId));
+    const payload = {
+      cards: common.cards.map<CardWire>((card) => ({
+        ...card,
+        isLiked: likedCardIds.has(card.id),
+        canInteract,
+      })),
+      sections: common.sections,
+      question: common.question,
+    };
     const hash = hashStable(payload);
     if (clientHash && clientHash === hash) {
       return new NextResponse(null, {

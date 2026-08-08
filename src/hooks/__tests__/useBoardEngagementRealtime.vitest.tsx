@@ -5,51 +5,46 @@ import {
   type BoardEngagementEvent,
 } from "../useBoardEngagementRealtime";
 
-const createIsolatedClientMock = vi.hoisted(() => vi.fn());
+const subscribeMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/supabase/client", () => ({
-  createIsolatedPublicSupabaseClient: createIsolatedClientMock,
+vi.mock("@/lib/supabase/realtime-channel-registry", () => ({
+  subscribePublicBroadcast: subscribeMock,
 }));
 
 function createRealtimeHarness() {
   let broadcast:
-    | ((message: { payload?: BoardEngagementEvent }) => void)
+    | ((message: { event: string; payload?: BoardEngagementEvent }) => void)
     | null = null;
-  const channel = {
-    on: vi.fn(
-      (
-        _kind: string,
-        _filter: { event: string },
-        callback: (message: { payload?: BoardEngagementEvent }) => void,
-      ) => {
-        broadcast = callback;
-        return channel;
-      },
-    ),
-    subscribe: vi.fn(() => channel),
-  };
-  const client = {
-    channel: vi.fn(() => channel),
-    removeChannel: vi.fn(async () => "ok"),
-  };
-  createIsolatedClientMock.mockReturnValue(client);
+  const unsubscribe = vi.fn();
+  subscribeMock.mockImplementation(
+    (options: {
+      channelName: string;
+      events: string[];
+      onMessage: (message: { event: string; payload?: BoardEngagementEvent }) => void;
+    }) => {
+      expect(options.channelName).toBe("board:board-a");
+      expect(options.events).toEqual(["board_changed"]);
+      broadcast = options.onMessage;
+      return unsubscribe;
+    },
+  );
   return {
-    channel,
-    client,
-    broadcast: (event: BoardEngagementEvent) => broadcast?.({ payload: event }),
+    unsubscribe,
+    broadcast: (event: BoardEngagementEvent) =>
+      broadcast?.({ event: "board_changed", payload: event }),
   };
 }
 
 describe("useBoardEngagement realtime ownership", () => {
   beforeEach(() => {
-    createIsolatedClientMock.mockReset();
+    subscribeMock.mockReset();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("shares one isolated board client and removes it after the last listener", async () => {
+  it("shares one logical board listener and releases it after the last card", async () => {
     const realtime = createRealtimeHarness();
     const firstListener = vi.fn();
     const secondListener = vi.fn();
@@ -60,10 +55,7 @@ describe("useBoardEngagement realtime ownership", () => {
       useBoardEngagement("board-a", "card-b", secondListener),
     );
 
-    await waitFor(() => {
-      expect(createIsolatedClientMock).toHaveBeenCalledTimes(1);
-      expect(realtime.client.channel).toHaveBeenCalledWith("board:board-a");
-    });
+    await waitFor(() => expect(subscribeMock).toHaveBeenCalledTimes(1));
 
     act(() => {
       realtime.broadcast({
@@ -80,9 +72,8 @@ describe("useBoardEngagement realtime ownership", () => {
     expect(secondListener).not.toHaveBeenCalled();
 
     first.unmount();
-    expect(realtime.client.removeChannel).not.toHaveBeenCalled();
+    expect(realtime.unsubscribe).not.toHaveBeenCalled();
     second.unmount();
-    expect(realtime.client.removeChannel).toHaveBeenCalledTimes(1);
-    expect(realtime.client.removeChannel).toHaveBeenCalledWith(realtime.channel);
+    expect(realtime.unsubscribe).toHaveBeenCalledTimes(1);
   });
 });

@@ -4,7 +4,6 @@ import {
 } from "./slime-wearables.generated";
 import { SLIME_MOBILE_WEARABLE_ACTION_REGISTRY } from "./slime-wearable-actions.generated";
 import type { SlimeColor, SlimeSheetAction } from "./slime-assets";
-import { apiFetch } from "./api";
 
 export { SLIME_WEARABLE_LAYER_ORDER };
 
@@ -178,10 +177,13 @@ export function ensureRemoteSlimeWearable(
   const inFlight = remoteLoads.get(key);
   if (inFlight) return inFlight;
 
-  const request = apiFetch<{ asset?: unknown }>(assetPath, {
-    skipAuth: true,
-    cacheTtlMs: 24 * 60 * 60_000,
-  })
+  const request = import("./api")
+    .then(({ apiFetch }) =>
+      apiFetch<{ asset?: unknown }>(assetPath, {
+        skipAuth: true,
+        cacheTtlMs: 24 * 60 * 60_000,
+      }),
+    )
     .then((response) => {
       const entry = remoteEntry(response.asset, key);
       if (!entry) return false;

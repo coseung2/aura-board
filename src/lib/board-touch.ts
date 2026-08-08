@@ -1,10 +1,13 @@
 import { db } from "@/lib/db";
+import { invalidateBoardSnapshotCache } from "@/lib/board-snapshot-cache";
 
 type BoardActivityDetails = {
   action?: string;
   actorType?: "teacher" | "student" | "guest" | "system";
   actorId?: string | null;
   metadata?: Record<string, unknown>;
+  /** Coalesce the mutable Board row while preserving every activity event. */
+  coalesceMs?: number;
 };
 
 /**
@@ -15,13 +18,13 @@ export async function touchBoardUpdatedAt(
   boardId: string,
   activity: BoardActivityDetails = {},
 ): Promise<void> {
+  invalidateBoardSnapshotCache(boardId);
   try {
     const now = new Date();
+    const coalesceMs = Math.max(0, Math.floor(activity.coalesceMs ?? 0));
     await db.$transaction(async (tx) => {
-      await tx.board.update({
-        where: { id: boardId },
-        data: { updatedAt: now },
-      });
+      // Append first so the shared Board row is locked for the shortest
+      // possible tail of the transaction. Every action remains observable.
       await tx.boardActivityEvent.create({
         data: {
           boardId,
@@ -32,6 +35,20 @@ export async function touchBoardUpdatedAt(
           createdAt: now,
         },
       });
+      if (coalesceMs > 0) {
+        await tx.board.updateMany({
+          where: {
+            id: boardId,
+            updatedAt: { lt: new Date(now.getTime() - coalesceMs) },
+          },
+          data: { updatedAt: now },
+        });
+      } else {
+        await tx.board.update({
+          where: { id: boardId },
+          data: { updatedAt: now },
+        });
+      }
     });
   } catch (error) {
     // The original mutation has already committed. Do not misreport it as a

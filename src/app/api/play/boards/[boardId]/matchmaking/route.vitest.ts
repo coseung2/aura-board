@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
 
 const mocks = vi.hoisted(() => ({
-  getCurrentStudent: vi.fn(),
+  getCurrentStudentIdentity: vi.fn(),
   playEngineFetch: vi.fn(),
   announceMatchmaking: vi.fn(),
   boardFindFirst: vi.fn(),
@@ -22,7 +22,9 @@ const mocks = vi.hoisted(() => ({
   transaction: vi.fn(),
 }));
 
-vi.mock("@/lib/student-auth", () => ({ getCurrentStudent: mocks.getCurrentStudent }));
+vi.mock("@/lib/student-auth", () => ({
+  getCurrentStudentIdentity: mocks.getCurrentStudentIdentity,
+}));
 vi.mock("@/lib/play-platform/server-client", () => ({
   playEngineFetch: mocks.playEngineFetch,
 }));
@@ -84,7 +86,7 @@ function engineResponse(body: unknown, status = 200) {
 describe("Omok matchmaking", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCurrentStudent.mockResolvedValue({
+    mocks.getCurrentStudentIdentity.mockResolvedValue({
       id: "student-2",
       name: "학생 2",
       classroomId: "classroom-1",
@@ -124,7 +126,7 @@ describe("Omok matchmaking", () => {
   });
 
   it("requires a signed-in student", async () => {
-    mocks.getCurrentStudent.mockResolvedValue(null);
+    mocks.getCurrentStudentIdentity.mockResolvedValue(null);
     const response = await GET(request, context);
     expect(response.status).toBe(401);
     expect(mocks.boardFindFirst).not.toHaveBeenCalled();

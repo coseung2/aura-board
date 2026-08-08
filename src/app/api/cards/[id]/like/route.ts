@@ -5,6 +5,8 @@ import { applyCardLikeMutation, getPrismaErrorCode } from "@/lib/card-like-toggl
 import { authorizeCardAccess, getCurrentCardActor } from "@/lib/card-engagement-actor";
 import { announceEngagementChange } from "@/lib/realtime-broadcast";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { schedulePostCommit } from "@/lib/post-commit";
+import { invalidateBoardSnapshotCache } from "@/lib/board-snapshot-cache";
 
 // card-comments-likes (2026-04-26): POST toggle like / GET state.
 
@@ -47,11 +49,6 @@ export async function POST(
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
 
-  const card = await db.card.findUnique({
-    where: { id: cardId },
-    select: { boardId: true },
-  });
-
   let liked: boolean;
   try {
     liked = await applyCardLikeMutation(
@@ -76,23 +73,25 @@ export async function POST(
     return NextResponse.json({ error: "like_failed" }, { status: 500 });
   }
 
-  const [count, commentCount] = await Promise.all([
-    db.cardLike.count({ where: { cardId } }),
-    db.cardComment.count({ where: { cardId, audience: "public", deletedAt: null } }),
-  ]);
-  if (card) {
-    await touchBoardUpdatedAt(card.boardId, {
+  invalidateBoardSnapshotCache(access.ctx.boardId);
+  const count = await db.cardLike.count({ where: { cardId } });
+  schedulePostCommit("card.like engagement", async () => {
+    const commentCount = await db.cardComment.count({
+      where: { cardId, audience: "public", deletedAt: null },
+    });
+    await touchBoardUpdatedAt(access.ctx.boardId, {
       action: liked ? "like.created" : "like.deleted",
       actorType: actor.kind === "teacher" ? "teacher" : actor.kind === "student" ? "student" : "guest",
       actorId: actor.id,
+      coalesceMs: 1_000,
     });
     await announceEngagementChange(
-      card.boardId,
+      access.ctx.boardId,
       cardId,
       count,
       commentCount,
       "like",
     );
-  }
+  });
   return NextResponse.json({ liked, count });
 }

@@ -40,6 +40,8 @@ export type ApplyVerifiedRewardProgressInput = {
   sourceRef: string;
   /** The amount computed by the upstream reward verifier, persisted for audit. */
   currencyAmount: number;
+  /** The enclosing wallet transaction already proved this source is new. */
+  sourceAlreadyChecked?: boolean;
 };
 
 type EventLike = {
@@ -170,16 +172,18 @@ export async function applyVerifiedRewardProgress(
 
   // Replay lookup comes first so an evolved/closed creature can still return
   // the original event without attempting another transition.
-  const existing = await tx.creatureProgressEvent.findFirst({
-    where: {
-      studentId: input.studentId,
-      sourceType: input.sourceType,
-      sourceRef: input.sourceRef,
-    },
-    include: { creature: true },
-  });
-  if (existing) {
-    return resultFromEvent(existing as EventLike, (existing as { creature?: CreatureLike | null }).creature ?? null, true);
+  if (!input.sourceAlreadyChecked) {
+    const existing = await tx.creatureProgressEvent.findFirst({
+      where: {
+        studentId: input.studentId,
+        sourceType: input.sourceType,
+        sourceRef: input.sourceRef,
+      },
+      include: { creature: true },
+    });
+    if (existing) {
+      return resultFromEvent(existing as EventLike, (existing as { creature?: CreatureLike | null }).creature ?? null, true);
+    }
   }
 
   // `isActive` is the authoritative slot flag. The stage guard keeps a

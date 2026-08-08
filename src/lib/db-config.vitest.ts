@@ -16,7 +16,7 @@ describe("withApplicationPoolLimits", () => {
     const result = new URL(
       withApplicationPoolLimits("postgresql://user:pass@db.example.test/app")!,
     );
-    expect(result.searchParams.get("connection_limit")).toBe("15");
+    expect(result.searchParams.get("connection_limit")).toBe("30");
     expect(result.searchParams.get("pool_timeout")).toBe("30");
   });
 

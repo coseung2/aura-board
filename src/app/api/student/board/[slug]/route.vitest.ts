@@ -11,7 +11,11 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/student-auth", () => ({
-  getCurrentStudent: vi.fn(async () => ({ id: "student-viewer", classroomId: "classroom-1" })),
+  getCurrentStudentIdentityRaw: vi.fn(async () => ({
+    id: "student-viewer",
+    name: "학생",
+    classroomId: "classroom-1",
+  })),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -85,6 +89,7 @@ describe("student board hidden card serialization", () => {
       slug: "board-1",
       title: "보드",
       layout: "cards",
+      systemGameKind: null,
       description: null,
       classroomId: "classroom-1",
       anonymousAuthor: false,
@@ -133,5 +138,7 @@ describe("student board hidden card serialization", () => {
     expect(body.cards[0].fileName).toBeNull();
     expect(body.cards[0].canvaDesignId).toBeNull();
     expect(body.cards[0].commentVoteOptionLabels).toBeNull();
+    expect(mocks.boardFindFirst).toHaveBeenCalledTimes(1);
+    expect(mocks.boardFindUnique).not.toHaveBeenCalled();
   });
 });

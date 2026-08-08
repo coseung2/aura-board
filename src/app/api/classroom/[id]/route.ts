@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { dispatchParentNotification } from "@/lib/parent-email";
+import { invalidateStudentIdentityCache } from "@/lib/student-auth";
 
 const UpdateSchema = z.object({
   name: z.string().min(1).max(100),
@@ -107,6 +108,10 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       await tx.classroom.delete({ where: { id } });
       return { affectedEmails: cascaded.map((c) => c.parent.email) };
     });
+
+    // The classroom cascade removed every student row. This deployment runs a
+    // single application process on Oracle, so clear its bounded identity cache.
+    invalidateStudentIdentityCache();
 
     await Promise.allSettled(
       affectedEmails.map((email) =>

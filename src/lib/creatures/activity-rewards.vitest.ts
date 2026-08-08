@@ -29,6 +29,7 @@ function fakeTx(existing: StoredTransaction | null = null) {
   let balance = 10;
   let transaction = existing;
   const tx = {
+    $queryRaw: vi.fn(async () => [{ id: "transaction-fast" }]),
     studentAccount: {
       findUnique: vi.fn(async () => ({
         id: "account-1",
@@ -131,6 +132,35 @@ describe("activity reward source policy", () => {
         }),
       ).rejects.toThrow("positive integer");
     }
+  });
+
+  it("combines a verified wallet update and deposit into one query", async () => {
+    applyProgress.mockReset();
+    const tx = fakeTx();
+
+    const result = await awardActivityReward({
+      tx,
+      studentId: "student-1",
+      classroomId: "classroom-1",
+      accountId: "account-1",
+      sourceType: "comment_reward",
+      sourceRef: "comment-1",
+      amount: 20,
+      accountAlreadyVerified: true,
+      sourceAlreadyChecked: true,
+      skipCreatureProgress: true,
+    });
+
+    expect(result).toMatchObject({
+      transactionId: "transaction-fast",
+      amount: 20,
+      idempotent: false,
+      progress: { progressDelta: 0, progressEventId: null },
+    });
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(1);
+    expect(tx.studentAccount.update).not.toHaveBeenCalled();
+    expect(tx.transaction.create).not.toHaveBeenCalled();
+    expect(applyProgress).not.toHaveBeenCalled();
   });
 
   it("replays an existing source deposit without retroactive creature progress", async () => {

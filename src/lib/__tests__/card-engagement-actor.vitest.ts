@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
     studentAuthorId: "student-1",
     authors: [{ studentId: "student-1" }] as Array<{ studentId: string | null }>,
     board: {
+      id: "board-1",
       classroomId: "classroom-1",
       anonymousAuthor: false,
       classroom: { teacherId: "teacher-1" },
@@ -20,8 +21,7 @@ vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({ headers: vi.fn(), cookies: vi.fn() }));
 vi.mock("@/lib/auth", () => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/lib/student-auth", () => ({
-  getCurrentStudent: vi.fn(),
-  getCurrentStudentRaw: vi.fn(),
+  getCurrentStudentIdentityRaw: vi.fn(),
 }));
 vi.mock("@/lib/parent-session", () => ({ getCurrentParent: vi.fn() }));
 vi.mock("@/lib/db", () => ({
@@ -55,6 +55,7 @@ describe("authorizeCardAccess guardian scope", () => {
       expect.objectContaining({
         ok: true,
         ctx: expect.objectContaining({
+          boardId: "board-1",
           studentAuthorId: "student-1",
           guardianAvailable: true,
         }),

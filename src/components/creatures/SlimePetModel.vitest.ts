@@ -100,14 +100,14 @@ describe("slime shop model", () => {
     expect(wardrobe.map((item) => item.key)).toContain("background");
   });
 
-  it("routes wardrobe filters for drink and scene backgrounds", () => {
+  it("routes wardrobe filters for props and scene backgrounds", () => {
     const drink = SLIME_SHOP_CATALOG.find((item) => item.category === "drink");
     const background = SLIME_SHOP_CATALOG.find(
       (item) => item.category === "background" && item.floor === null,
     );
     expect(drink).toBeTruthy();
     expect(background).toBeTruthy();
-    expect(wardrobeFilterForItem(drink!)).toBe("drink");
+    expect(wardrobeFilterForItem(drink!)).toBe("prop");
     expect(wardrobeFilterForItem(background!)).toBe("background");
   });
 });

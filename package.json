@@ -12,6 +12,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "loadtest:classroom": "node scripts/loadtest-classroom-concurrency.mjs",
     "test:song-guess:browser": "node scripts/verify-song-guess-browser.mjs",
     "test:watch": "vitest",
     "db:push": "prisma db push",

@@ -2,45 +2,42 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useBoardStream } from "../useBoardStream";
 
-const createIsolatedClientMock = vi.hoisted(() => vi.fn());
+const subscribeMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/supabase/client", () => ({
-  createIsolatedPublicSupabaseClient: createIsolatedClientMock,
+vi.mock("@/lib/supabase/realtime-channel-registry", () => ({
+  subscribePublicBroadcast: subscribeMock,
 }));
 
 function createRealtimeHarness() {
-  let subscribeCallback: ((status: string) => void) | null = null;
-  const broadcastHandlers = new Map<string, () => void>();
-  const channel = {
-    on: vi.fn(
-      (
-        _type: string,
-        filter: { event: string },
-        callback: () => void,
-      ) => {
-        broadcastHandlers.set(filter.event, callback);
-        return channel;
-      },
-    ),
-    subscribe: vi.fn((callback: (status: string) => void) => {
-      subscribeCallback = callback;
-      queueMicrotask(() => subscribeCallback?.("SUBSCRIBED"));
-      return channel;
-    }),
-    track: vi.fn(),
-    untrack: vi.fn(),
-    presenceState: vi.fn(),
-  };
-  const client = {
-    channel: vi.fn(() => channel),
-    removeChannel: vi.fn(async () => "ok"),
-  };
-  createIsolatedClientMock.mockReturnValue(client);
+  let subscription:
+    | {
+        channelName: string;
+        events: string[];
+        onMessage: (message: { event: string }) => void;
+        onStatus: (status: string) => void;
+      }
+    | null = null;
+  const unsubscribe = vi.fn();
+  subscribeMock.mockImplementation(
+    (options: {
+      channelName: string;
+      events: string[];
+      onMessage: (message: { event: string }) => void;
+      onStatus: (status: string) => void;
+    }) => {
+      subscription = options;
+      queueMicrotask(() => options.onStatus("SUBSCRIBED"));
+      return unsubscribe;
+    },
+  );
   return {
-    channel,
-    client,
+    unsubscribe,
     emit(event = "card_changed") {
-      broadcastHandlers.get(event)?.();
+      subscription?.onMessage({ event });
+    },
+    get subscription() {
+      if (!subscription) throw new Error("subscription not registered");
+      return subscription;
     },
   };
 }
@@ -63,7 +60,7 @@ function renderBoardStream(
 
 describe("useBoardStream Broadcast lifecycle", () => {
   beforeEach(() => {
-    createIsolatedClientMock.mockReset();
+    subscribeMock.mockReset();
   });
 
   afterEach(() => {
@@ -71,15 +68,17 @@ describe("useBoardStream Broadcast lifecycle", () => {
     vi.unstubAllGlobals();
   });
 
-  it("keeps Presence hidden and removes its isolated Broadcast channel", async () => {
+  it("keeps Presence hidden and releases its shared Broadcast subscription", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({ status: 304, ok: false })),
     );
-    const { channel, client } = createRealtimeHarness();
+    const realtime = createRealtimeHarness();
     const hook = renderBoardStream();
 
-    await waitFor(() => expect(channel.subscribe).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(subscribeMock).toHaveBeenCalledTimes(1));
+    expect(realtime.subscription.channelName).toBe("board:board-a");
+    expect(realtime.subscription.events).toEqual(["card_changed"]);
     expect(hook.result.current).toEqual({
       status: "unavailable",
       presence: {
@@ -88,11 +87,9 @@ describe("useBoardStream Broadcast lifecycle", () => {
         remoteWorkingCount: 0,
       },
     });
-    expect(channel.track).not.toHaveBeenCalled();
-    expect(channel.untrack).not.toHaveBeenCalled();
 
     hook.unmount();
-    await waitFor(() => expect(client.removeChannel).toHaveBeenCalledWith(channel));
+    expect(realtime.unsubscribe).toHaveBeenCalledTimes(1);
   });
 
   it("coalesces a burst and keeps one trailing snapshot during an inflight read", async () => {
@@ -160,7 +157,7 @@ describe("useBoardStream Broadcast lifecycle", () => {
       resolveSnapshot = resolve;
     });
     vi.stubGlobal("fetch", vi.fn(() => snapshot));
-    const { channel, client } = createRealtimeHarness();
+    const realtime = createRealtimeHarness();
     const setCards = vi.fn();
     const setSections = vi.fn();
     const hook = renderBoardStream(setCards, setSections);
@@ -171,12 +168,12 @@ describe("useBoardStream Broadcast lifecycle", () => {
       ok: false,
       json: async () => ({ cards: [{ id: "stale" }], sections: [] }),
     });
-    await waitFor(() => expect(client.removeChannel).toHaveBeenCalledWith(channel));
+    await waitFor(() => expect(realtime.unsubscribe).toHaveBeenCalledTimes(1));
     expect(setCards).not.toHaveBeenCalled();
     expect(setSections).not.toHaveBeenCalled();
 
     hook.unmount();
     await act(async () => undefined);
-    expect(client.removeChannel).toHaveBeenCalledTimes(1);
+    expect(realtime.unsubscribe).toHaveBeenCalledTimes(1);
   });
 });

@@ -1,4 +1,7 @@
-const DEFAULT_CONNECTION_LIMIT = 15;
+// Measured with the classroom concurrency harness: 30 client slots reduced
+// p95 queueing materially while Supabase's transaction pooler kept backend
+// activity bounded and the Oracle app stayed well below its memory envelope.
+const DEFAULT_CONNECTION_LIMIT = 30;
 const DEFAULT_POOL_TIMEOUT_SECONDS = 30;
 
 function positiveInteger(value: string | undefined, fallback: number): number {

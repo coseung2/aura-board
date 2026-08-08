@@ -3,7 +3,10 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { getCurrentStudent, getCurrentStudentRaw } from "@/lib/student-auth";
+import {
+  getCurrentStudentIdentity,
+  getCurrentStudentIdentityRaw,
+} from "@/lib/student-auth";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import {
   deriveCanvaThumbnailUrl,
@@ -24,6 +27,8 @@ import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from 
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { announceCardChange } from "@/lib/realtime-broadcast";
 import { dispatchLinkedParentCardPush } from "@/lib/parent-push";
+import { schedulePostCommit } from "@/lib/post-commit";
+import { invalidateBoardSnapshotCache } from "@/lib/board-snapshot-cache";
 import { resizeRemoteImageToWebPPreviewUrl, extractVideoThumbnail } from "@/lib/blob";
 import {
   normalizeCommentVoteOptionCount,
@@ -208,7 +213,7 @@ export async function POST(req: Request) {
     let studentAuthorId: string | null = null;
     let externalAuthorName: string | null = null;
     let currentUserName: string | null = null;
-    let student: Awaited<ReturnType<typeof getCurrentStudent>> = null;
+    let student: Awaited<ReturnType<typeof getCurrentStudentIdentity>> = null;
     let boardClassroomId: string | null = null;
     let boardAnonymousAuthor = false;
     let boardLayout: string | null = null;
@@ -226,8 +231,8 @@ export async function POST(req: Request) {
       boardLayout = board?.layout ?? null;
     } else {
       student = preferStudentSession
-        ? await getCurrentStudentRaw()
-        : await getCurrentStudent();
+        ? await getCurrentStudentIdentityRaw()
+        : await getCurrentStudentIdentity();
       if (student) {
         const board = await db.board.findUnique({
           where: { id: input.boardId },
@@ -560,7 +565,7 @@ export async function POST(req: Request) {
         )
       : [];
 
-    const card = await db.$transaction(async (tx) => {
+    const { card, createdStudentAuthor } = await db.$transaction(async (tx) => {
       const c = await tx.card.create({
         data: {
           boardId: input.boardId,
@@ -598,6 +603,12 @@ export async function POST(req: Request) {
       // source of truth for authorship lives in the join table from the
       // start. Teacher-created cards (no studentAuthorId) get no initial
       // CardAuthor rows — teacher can open the editor to attribute.
+      let createdStudentAuthor: {
+        id: string;
+        studentId: string | null;
+        displayName: string;
+        order: number;
+      } | null = null;
       if (teacherUser && input.authors && input.authors.length > 0) {
         await setCardAuthors(tx, c.id, input.authors, {
           classroomId: boardClassroomId,
@@ -607,13 +618,14 @@ export async function POST(req: Request) {
         // above. A new card cannot have stale author rows, so the generic
         // replace-all helper would add four unnecessary DB round trips here
         // (membership lookup, delete, insert, mirror update).
-        await tx.cardAuthor.create({
+        createdStudentAuthor = await tx.cardAuthor.create({
           data: {
             cardId: c.id,
             studentId: studentAuthorId,
             displayName: externalAuthorName.trim(),
             order: 0,
           },
+          select: { id: true, studentId: true, displayName: true, order: true },
         });
       }
       // multi-attachment: 여러 첨부 일괄 저장. order는 배열 인덱스.
@@ -631,48 +643,62 @@ export async function POST(req: Request) {
           })),
         });
       }
-      return c;
+      return { card: c, createdStudentAuthor };
     });
 
-    // classroom-boards-tab "🟢 새 활동" 배지 — 카드 생성으로 부모 board touch.
-    // 본 트랜잭션 바깥에서 best-effort로 실행해 실패해도 create는 성공 유지.
-    await touchBoardUpdatedAt(input.boardId, {
-      action: "card.created",
-      actorType: teacherUser ? "teacher" : studentAuthorId ? "student" : "guest",
-      actorId: teacherUser?.id ?? studentAuthorId,
-    });
-    void announceCardChange(input.boardId, "insert");
-    if (studentAuthorId && student) {
-      void dispatchLinkedParentCardPush({
-        eventKey: `card:${card.id}`,
-        studentId: studentAuthorId,
-        studentName: student.name,
-        boardId: input.boardId,
-        cardId: card.id,
+    invalidateBoardSnapshotCache(input.boardId);
+
+    // The mutation is durable at this point. Operational activity, Realtime
+    // invalidation, and linked-parent notifications must not extend the student
+    // publish response under a simultaneous classroom wave.
+    schedulePostCommit("card.create side effects", async () => {
+      await touchBoardUpdatedAt(input.boardId, {
+        action: "card.created",
+        actorType: teacherUser ? "teacher" : studentAuthorId ? "student" : "guest",
+        actorId: teacherUser?.id ?? studentAuthorId,
+        coalesceMs: 1_000,
       });
-    }
+      await announceCardChange(input.boardId, "insert");
+      if (studentAuthorId && student) {
+        await dispatchLinkedParentCardPush({
+          eventKey: `card:${card.id}`,
+          studentId: studentAuthorId,
+          studentName: student.name,
+          boardId: input.boardId,
+          cardId: card.id,
+        });
+      }
+    });
 
-    // 응답에 저장된 attachments 포함 (클라이언트 상태 즉시 반영).
+    // Common classroom cards have no normalized attachments and exactly one
+    // student author. Reuse the committed rows instead of issuing two response-
+    // only reads for every simultaneous student post.
     const [attachments, authors] = await Promise.all([
-      db.cardAttachment.findMany({
-        where: { cardId: card.id },
-        orderBy: { order: "asc" },
-        select: {
-          id: true,
-          kind: true,
-          url: true,
-          previewUrl: true,
-          fileName: true,
-          fileSize: true,
-          mimeType: true,
-          order: true,
-        },
-      }),
-      db.cardAuthor.findMany({
-        where: { cardId: card.id },
-        orderBy: { order: "asc" },
-        select: { id: true, studentId: true, displayName: true, order: true },
-      }),
+      attachmentRows.length > 0
+        ? db.cardAttachment.findMany({
+            where: { cardId: card.id },
+            orderBy: { order: "asc" },
+            select: {
+              id: true,
+              kind: true,
+              url: true,
+              previewUrl: true,
+              fileName: true,
+              fileSize: true,
+              mimeType: true,
+              order: true,
+            },
+          })
+        : Promise.resolve([]),
+      createdStudentAuthor
+        ? Promise.resolve([createdStudentAuthor])
+        : teacherUser && input.authors && input.authors.length > 0
+          ? db.cardAuthor.findMany({
+              where: { cardId: card.id },
+              orderBy: { order: "asc" },
+              select: { id: true, studentId: true, displayName: true, order: true },
+            })
+          : Promise.resolve([]),
     ]);
 
     // Mirror the server-side cardProps mapping (board/[id]/page.tsx) so

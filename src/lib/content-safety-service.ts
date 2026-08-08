@@ -1,6 +1,8 @@
 import "server-only";
+import { Prisma } from "@prisma/client";
 import { db } from "./db";
 import {
+  CONTENT_TARGET_KINDS,
   buildHiddenLookup,
   buildContentSnapshot,
   type ContentTargetKind,
@@ -18,20 +20,58 @@ import {
  * every request and keeps the caller free to render any list.
  */
 export async function loadHiddenLookup(studentId: string): Promise<HiddenLookup> {
-  const [targets, authors] = await Promise.all([
-    db.hiddenContent.findMany({
-      where: { studentId },
-      select: { targetKind: true, targetId: true },
-    }),
-    db.hiddenContentAuthor.findMany({
-      where: { studentId },
-      select: { hiddenStudentId: true },
-    }),
-  ]);
-  return buildHiddenLookup({
-    hiddenTargets: targets,
-    hiddenAuthorStudentIds: authors.map((row) => row.hiddenStudentId),
-  });
+  const rows = await db.$queryRaw<
+    Array<{ targets: unknown; hidden_author_ids: unknown }>
+  >(Prisma.sql`
+    SELECT
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'targetKind', target."targetKind",
+              'targetId', target."targetId"
+            )
+          )
+          FROM "HiddenContent" AS target
+          WHERE target."studentId" = ${studentId}
+        ),
+        '[]'::jsonb
+      ) AS "targets",
+      COALESCE(
+        (
+          SELECT jsonb_agg(author."hiddenStudentId")
+          FROM "HiddenContentAuthor" AS author
+          WHERE author."studentId" = ${studentId}
+        ),
+        '[]'::jsonb
+      ) AS "hidden_author_ids"
+  `);
+  const targetKinds = new Set<string>(CONTENT_TARGET_KINDS);
+  const hiddenTargets = Array.isArray(rows[0]?.targets)
+    ? rows[0].targets.flatMap((value) => {
+        if (!value || typeof value !== "object") return [];
+        const target = value as Record<string, unknown>;
+        if (
+          typeof target.targetKind !== "string" ||
+          !targetKinds.has(target.targetKind) ||
+          typeof target.targetId !== "string"
+        ) {
+          return [];
+        }
+        return [
+          {
+            targetKind: target.targetKind as ContentTargetKind,
+            targetId: target.targetId,
+          },
+        ];
+      })
+    : [];
+  const hiddenAuthorStudentIds = Array.isArray(rows[0]?.hidden_author_ids)
+    ? rows[0].hidden_author_ids.filter(
+        (value): value is string => typeof value === "string",
+      )
+    : [];
+  return buildHiddenLookup({ hiddenTargets, hiddenAuthorStudentIds });
 }
 
 /**

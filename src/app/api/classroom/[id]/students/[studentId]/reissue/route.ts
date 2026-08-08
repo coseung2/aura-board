@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { generateQrToken, generateTextCode } from "@/lib/classroom-utils";
+import { invalidateStudentIdentityCache } from "@/lib/student-auth";
 
 export async function POST(
   _req: Request,
@@ -28,6 +29,7 @@ export async function POST(
       where: { id: studentId },
       data: { qrToken: newToken, textCode: newCode, sessionVersion: { increment: 1 } },
     });
+    invalidateStudentIdentityCache(studentId);
 
     return NextResponse.json({
       student: { id: updated.id, name: updated.name, qrToken: updated.qrToken, textCode: updated.textCode },

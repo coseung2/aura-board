@@ -2,7 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { db } from "./db";
 import { getCurrentUser } from "./auth";
-import { getCurrentStudent, getCurrentStudentRaw } from "./student-auth";
+import { getCurrentStudentIdentityRaw } from "./student-auth";
 import { getCurrentParent } from "./parent-session";
 
 // card-comments-likes (2026-04-26): 카드 engagement (댓글/좋아요) 의 actor
@@ -23,7 +23,7 @@ export async function getCurrentCardActor(): Promise<CardActor | null> {
   const preferStudent =
     headerList.get("x-aura-student-viewer") === "1";
   if (preferStudent) {
-    const s = await getCurrentStudentRaw().catch(() => null);
+    const s = await getCurrentStudentIdentityRaw().catch(() => null);
     if (s) return { kind: "student", id: s.id, name: s.name, classroomId: s.classroomId };
   }
 
@@ -33,7 +33,7 @@ export async function getCurrentCardActor(): Promise<CardActor | null> {
   } catch {
     /* not teacher */
   }
-  const s = await getCurrentStudent().catch(() => null);
+  const s = await getCurrentStudentIdentityRaw().catch(() => null);
   if (s) return { kind: "student", id: s.id, name: s.name, classroomId: s.classroomId };
   const p = await getCurrentParent().catch(() => null);
   if (p) return { kind: "parent", id: p.parent.id, name: p.parent.name };
@@ -42,6 +42,7 @@ export async function getCurrentCardActor(): Promise<CardActor | null> {
 
 export interface CardAccessContext {
   cardId: string;
+  boardId: string;
   classroomId: string | null;
   anonymousAuthor: boolean;
   studentAuthorId: string | null;
@@ -66,16 +67,26 @@ export async function authorizeCardAccess(
     select: {
       id: true,
       studentAuthorId: true,
-      authors: { select: { studentId: true } },
+      authors: {
+        ...(actor.kind === "student"
+          ? { where: { studentId: actor.id } }
+          : {}),
+        select: { studentId: true },
+      },
       board: {
         select: {
+          id: true,
           classroomId: true,
           anonymousAuthor: true,
-          classroom: { select: { teacherId: true } },
-          members: {
-            where: { userId: actor.kind === "teacher" ? actor.id : "" },
-            select: { userId: true },
-          },
+          ...(actor.kind === "teacher"
+            ? {
+                classroom: { select: { teacherId: true } },
+                members: {
+                  where: { userId: actor.id },
+                  select: { userId: true },
+                },
+              }
+            : {}),
         },
       },
     },
@@ -92,7 +103,8 @@ export async function authorizeCardAccess(
 
   if (actor.kind === "teacher") {
     const isClassroomTeacher = card.board.classroom?.teacherId === actor.id;
-    const isBoardMember = card.board.members.some((m) => m.userId === actor.id);
+    const isBoardMember =
+      card.board.members?.some((m) => m.userId === actor.id) ?? false;
     if (!isClassroomTeacher && !isBoardMember) {
       return { ok: false, reason: "forbidden" };
     }
@@ -122,6 +134,7 @@ export async function authorizeCardAccess(
     ok: true,
     ctx: {
       cardId: card.id,
+      boardId: card.board.id,
       classroomId,
       anonymousAuthor: card.board.anonymousAuthor,
       studentAuthorId: card.studentAuthorId,

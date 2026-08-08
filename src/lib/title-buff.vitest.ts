@@ -6,8 +6,19 @@ function fakeTx(
   slimes: Array<{ color: string; isEquipped: boolean; growthStage: number; equippedTitleKey: string | null }>,
 ) {
   return {
-    studentSlime: { findMany: vi.fn().mockResolvedValue(slimes) },
-    studentCreatureItem: { findMany: vi.fn().mockResolvedValue([]) },
+    $queryRaw: vi.fn().mockResolvedValue([
+      {
+        slimes: slimes
+          .filter((slime) => slime.isEquipped)
+          .map(({ color, growthStage, equippedTitleKey }) => ({
+            color,
+            growthStage,
+            equippedTitleKey,
+          })),
+        item_keys: [],
+        has_active_creature: false,
+      },
+    ]),
   } as never;
 }
 

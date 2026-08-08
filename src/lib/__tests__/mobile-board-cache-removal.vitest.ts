@@ -1,4 +1,11 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../../apps/mobile/lib/persistent-json-cache", () => ({
+  readPersistentJson: vi.fn(async () => null),
+  removePersistentJson: vi.fn(async () => undefined),
+  writePersistentJson: vi.fn(async () => undefined),
+}));
+
 import {
   boardDetailCacheKey,
   clearBoardCache,

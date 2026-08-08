@@ -2,17 +2,44 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useBoardSnapshotRealtime } from "../useBoardSnapshotRealtime";
 
-const createIsolatedClientMock = vi.hoisted(() => vi.fn());
+const subscribeMock = vi.hoisted(() => vi.fn());
 
-vi.mock("@/lib/supabase/client", () => ({
-  createIsolatedPublicSupabaseClient: createIsolatedClientMock,
+vi.mock("@/lib/supabase/realtime-channel-registry", () => ({
+  subscribePublicBroadcast: subscribeMock,
 }));
 
 const EVENTS = ["queue_changed"];
 
+type Subscription = {
+  channelName: string;
+  events: string[];
+  onMessage: (message: { event: string; payload?: unknown }) => void;
+  onStatus: (status: string) => void;
+};
+
+function createRealtimeHarness() {
+  const subscriptions: Subscription[] = [];
+  const unsubscriptions: ReturnType<typeof vi.fn>[] = [];
+  subscribeMock.mockImplementation((options: Subscription) => {
+    subscriptions.push(options);
+    const unsubscribe = vi.fn();
+    unsubscriptions.push(unsubscribe);
+    return unsubscribe;
+  });
+  return {
+    subscriptions,
+    unsubscriptions,
+    latest() {
+      const subscription = subscriptions.at(-1);
+      if (!subscription) throw new Error("subscription not registered");
+      return subscription;
+    },
+  };
+}
+
 describe("useBoardSnapshotRealtime ownership", () => {
   beforeEach(() => {
-    createIsolatedClientMock.mockReset();
+    subscribeMock.mockReset();
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({ status: 304, ok: false })),
@@ -24,42 +51,23 @@ describe("useBoardSnapshotRealtime ownership", () => {
     vi.useRealTimers();
   });
 
-  it("owns and cleans up an isolated client for the board topic", async () => {
-    const channel = {
-      on: vi.fn(() => channel),
-      subscribe: vi.fn(() => channel),
-    };
-    const client = {
-      channel: vi.fn(() => channel),
-      removeChannel: vi.fn(async () => "ok"),
-    };
-    createIsolatedClientMock.mockReturnValue(client);
+  it("owns and cleans up a shared board-topic subscription", async () => {
+    const realtime = createRealtimeHarness();
 
     const hook = renderHook(() =>
       useBoardSnapshotRealtime("board-a", EVENTS, vi.fn()),
     );
 
-    await waitFor(() => {
-      expect(createIsolatedClientMock).toHaveBeenCalledTimes(1);
-      expect(client.channel).toHaveBeenCalledWith("board:board-a");
-      expect(channel.subscribe).toHaveBeenCalledTimes(1);
-    });
+    await waitFor(() => expect(subscribeMock).toHaveBeenCalledTimes(1));
+    expect(realtime.latest().channelName).toBe("board:board-a");
+    expect(realtime.latest().events).toEqual(EVENTS);
 
     hook.unmount();
-    expect(client.removeChannel).toHaveBeenCalledTimes(1);
-    expect(client.removeChannel).toHaveBeenCalledWith(channel);
+    expect(realtime.unsubscriptions[0]).toHaveBeenCalledTimes(1);
   });
 
   it("fetches and applies the initial snapshot without waiting for Realtime", async () => {
-    const channel = {
-      on: vi.fn(() => channel),
-      subscribe: vi.fn(() => channel),
-    };
-    const client = {
-      channel: vi.fn(() => channel),
-      removeChannel: vi.fn(async () => "ok"),
-    };
-    createIsolatedClientMock.mockReturnValue(client);
+    createRealtimeHarness();
     const snapshot = { hash: "hash-a", cards: [{ id: "card-a" }] };
     const fetchMock = vi.fn(async () => ({
       status: 200,
@@ -85,19 +93,7 @@ describe("useBoardSnapshotRealtime ownership", () => {
 
   it("uses fallback polling only while the board channel is unavailable", async () => {
     vi.useFakeTimers();
-    let statusListener: ((status: string) => void) | undefined;
-    const channel = {
-      on: vi.fn(() => channel),
-      subscribe: vi.fn((listener: (status: string) => void) => {
-        statusListener = listener;
-        return channel;
-      }),
-    };
-    const client = {
-      channel: vi.fn(() => channel),
-      removeChannel: vi.fn(async () => "ok"),
-    };
-    createIsolatedClientMock.mockReturnValue(client);
+    const realtime = createRealtimeHarness();
     const response = {
       status: 200,
       ok: true,
@@ -112,17 +108,20 @@ describe("useBoardSnapshotRealtime ownership", () => {
     );
     await act(async () => {
       await Promise.resolve();
-      await Promise.resolve();
     });
     expect(fetchMock).toHaveBeenCalledTimes(1);
 
-    act(() => statusListener?.("CHANNEL_ERROR"));
+    act(() => realtime.latest().onStatus("CHANNEL_ERROR"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000);
     });
     expect(fetchMock).toHaveBeenCalledTimes(3);
 
-    act(() => statusListener?.("SUBSCRIBED"));
+    act(() => realtime.latest().onStatus("SUBSCRIBED"));
     await act(async () => {
       await Promise.resolve();
       await vi.advanceTimersByTimeAsync(0);
@@ -137,6 +136,7 @@ describe("useBoardSnapshotRealtime ownership", () => {
   });
 
   it("does not apply a stale response after boardId changes", async () => {
+    createRealtimeHarness();
     let resolveFirst!: (response: Response) => void;
     const firstResponse = new Promise<Response>((resolve) => {
       resolveFirst = resolve;

@@ -11,6 +11,22 @@ export async function ensureAccountFor(student: {
   id: string;
   classroomId: string;
 }): Promise<{ accountId: string; cardId: string }> {
+  // The common classroom path already has a provisioned account/card. Avoid
+  // opening an interactive upsert transaction for every comment or wallet read.
+  const existingAccount = await db.studentAccount.findUnique({
+    where: { studentId: student.id },
+    select: {
+      id: true,
+      cards: { take: 1, select: { id: true } },
+    },
+  });
+  if (existingAccount?.cards[0]) {
+    return {
+      accountId: existingAccount.id,
+      cardId: existingAccount.cards[0].id,
+    };
+  }
+
   try {
     return await db.$transaction(async (tx) => {
       const account = await tx.studentAccount.upsert({

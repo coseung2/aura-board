@@ -1,5 +1,6 @@
 import "server-only";
 
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 
 import {
@@ -31,6 +32,12 @@ export type ActivityRewardInput = {
   sourceRef: string;
   amount: number;
   note?: string;
+  /** Caller already resolved this account from the authenticated student. */
+  accountAlreadyVerified?: boolean;
+  /** Caller already proved that no source deposit exists in this transaction. */
+  sourceAlreadyChecked?: boolean;
+  /** Reward context already proved there is no active creature to grow. */
+  skipCreatureProgress?: boolean;
 };
 
 export type ActivityRewardProgressSummary = {
@@ -121,68 +128,123 @@ export async function awardActivityReward(
 ): Promise<ActivityRewardResult> {
   assertActivityRewardInput(input);
 
-  const account = await input.tx.studentAccount.findUnique({
-    where: { id: input.accountId },
-    select: { id: true, studentId: true, classroomId: true },
-  });
-  if (
-    !account ||
-    account.studentId !== input.studentId ||
-    account.classroomId !== input.classroomId
-  ) {
-    throw new Error("Activity reward account does not belong to student");
+  if (!input.accountAlreadyVerified) {
+    const account = await input.tx.studentAccount.findUnique({
+      where: { id: input.accountId },
+      select: { id: true, studentId: true, classroomId: true },
+    });
+    if (
+      !account ||
+      account.studentId !== input.studentId ||
+      account.classroomId !== input.classroomId
+    ) {
+      throw new Error("Activity reward account does not belong to student");
+    }
   }
 
   // Source rows are globally unique. Looking them up without accountId also
   // prevents a malformed source namespace from being paid into a second
   // student's account after a source collision.
-  const existing = await input.tx.transaction.findFirst({
-    where: {
-      sourceType: input.sourceType,
-      sourceRef: input.sourceRef,
-      type: "deposit",
-    },
-    select: { id: true, accountId: true, amount: true },
-  });
-  if (existing) {
-    if (existing.accountId !== input.accountId) {
-      throw new Error("Activity reward source belongs to another account");
+  if (!input.sourceAlreadyChecked) {
+    const existing = await input.tx.transaction.findFirst({
+      where: {
+        sourceType: input.sourceType,
+        sourceRef: input.sourceRef,
+        type: "deposit",
+      },
+      select: { id: true, accountId: true, amount: true },
+    });
+    if (existing) {
+      if (existing.accountId !== input.accountId) {
+        throw new Error("Activity reward source belongs to another account");
+      }
+      return {
+        transactionId: existing.id,
+        amount: existing.amount,
+        idempotent: true,
+        progress: progressSummary(null),
+      };
     }
-    return {
-      transactionId: existing.id,
-      amount: existing.amount,
-      idempotent: true,
-      progress: progressSummary(null),
-    };
   }
 
-  const updated = await input.tx.studentAccount.update({
-    where: { id: input.accountId },
-    data: { balance: { increment: input.amount } },
-    select: { balance: true },
-  });
-  const transaction = await input.tx.transaction.create({
-    data: {
-      accountId: input.accountId,
-      type: "deposit",
-      amount: input.amount,
-      balanceAfter: updated.balance,
-      note: input.note ?? `${input.sourceType} reward [${input.sourceRef}]`,
-      sourceType: input.sourceType,
-      sourceRef: input.sourceRef,
-      performedById: input.studentId,
-      performedByKind: "owner",
-    } satisfies Prisma.TransactionUncheckedCreateInput,
-    select: { id: true },
-  });
+  let transaction: { id: string };
+  if (input.accountAlreadyVerified && input.sourceAlreadyChecked) {
+    const transactionId = randomUUID();
+    const note =
+      input.note ?? `${input.sourceType} reward [${input.sourceRef}]`;
+    const rows = await input.tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      WITH updated_account AS (
+        UPDATE "StudentAccount"
+        SET
+          "balance" = "balance" + ${input.amount},
+          "updatedAt" = CURRENT_TIMESTAMP
+        WHERE "id" = ${input.accountId}
+        RETURNING "balance"
+      )
+      INSERT INTO "Transaction" (
+        "id",
+        "accountId",
+        "type",
+        "amount",
+        "balanceAfter",
+        "note",
+        "sourceType",
+        "sourceRef",
+        "performedById",
+        "performedByKind",
+        "createdAt"
+      )
+      SELECT
+        ${transactionId},
+        ${input.accountId},
+        'deposit',
+        ${input.amount},
+        updated_account."balance",
+        ${note},
+        ${input.sourceType},
+        ${input.sourceRef},
+        ${input.studentId},
+        'owner',
+        CURRENT_TIMESTAMP
+      FROM updated_account
+      RETURNING "id"
+    `);
+    if (rows.length !== 1) {
+      throw new Error("Activity reward account update failed");
+    }
+    transaction = rows[0];
+  } else {
+    const updated = await input.tx.studentAccount.update({
+      where: { id: input.accountId },
+      data: { balance: { increment: input.amount } },
+      select: { balance: true },
+    });
+    transaction = await input.tx.transaction.create({
+      data: {
+        accountId: input.accountId,
+        type: "deposit",
+        amount: input.amount,
+        balanceAfter: updated.balance,
+        note: input.note ?? `${input.sourceType} reward [${input.sourceRef}]`,
+        sourceType: input.sourceType,
+        sourceRef: input.sourceRef,
+        performedById: input.studentId,
+        performedByKind: "owner",
+      } satisfies Prisma.TransactionUncheckedCreateInput,
+      select: { id: true },
+    });
+  }
 
-  const creatureProgress = await applyVerifiedRewardProgress(input.tx, {
+  const creatureProgress = input.skipCreatureProgress
+    ? null
+    : await applyVerifiedRewardProgress(input.tx, {
     studentId: input.studentId,
     classroomId: input.classroomId,
     sourceType: input.sourceType,
     sourceRef: input.sourceRef,
     currencyAmount: input.amount,
-  });
+        sourceAlreadyChecked: input.sourceAlreadyChecked,
+      });
 
   return {
     transactionId: transaction.id,

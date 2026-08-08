@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
-import { getCurrentStudent } from "@/lib/student-auth";
-import { getEffectiveBoardRole } from "@/lib/rbac";
-import { resolveCardAuthorLabels } from "@/lib/card-author-labels";
+import { getCurrentStudentIdentityRaw } from "@/lib/student-auth";
 import { resolveHiddenReason } from "@/lib/content-safety";
 import { loadHiddenLookup } from "@/lib/content-safety-service";
 import { loadGameSnapshot } from "@/lib/speed-game/runtime";
@@ -25,36 +23,58 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
-    const student = await getCurrentStudent();
+    // This is a student-only endpoint. Mobile callers authenticate with the
+    // student Bearer token, so checking Auth.js first adds an unrelated teacher
+    // session decode and User lookup to every classroom board open.
+    const student = await getCurrentStudentIdentityRaw();
     if (!student) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const boardMeta = await db.board.findFirst({
+    const board = await db.board.findFirst({
       where: {
         OR: [{ id: slug }, { slug }],
         classroomId: student.classroomId,
       },
-      select: {
-        id: true,
-        slug: true,
-        title: true,
-        layout: true,
-        systemGameKind: true,
-        description: true,
-        classroomId: true,
-        anonymousAuthor: true,
-        assignmentDeadline: true,
-        assignmentAllowLate: true,
-        thumbnailMode: true,
-        thumbnailUrl: true,
-        boardTheme: true,
-        streamSectionsEnabled: true,
+      include: {
+        cards: {
+          // web 의 order 기반 정렬과 동일하게 유지하되 createdAt 으로 안정 정렬.
+          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+          include: {
+            author: { select: { name: true } },
+            studentAuthor: { select: { name: true } },
+            attachments: { orderBy: { order: "asc" } },
+            authors: { orderBy: { displayName: "asc" } },
+            _count: {
+              select: {
+                likes: true,
+                comments: { where: { audience: "public", deletedAt: null } },
+              },
+            },
+          },
+        },
+        sections: { orderBy: { order: "asc" } },
       },
     });
-    if (!boardMeta) {
+    if (!board) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
+    const boardMeta = {
+      id: board.id,
+      slug: board.slug,
+      title: board.title,
+      layout: board.layout,
+      systemGameKind: board.systemGameKind,
+      description: board.description,
+      classroomId: board.classroomId,
+      anonymousAuthor: board.anonymousAuthor,
+      assignmentDeadline: board.assignmentDeadline,
+      assignmentAllowLate: board.assignmentAllowLate,
+      thumbnailMode: board.thumbnailMode,
+      thumbnailUrl: board.thumbnailUrl,
+      boardTheme: board.boardTheme,
+      streamSectionsEnabled: board.streamSectionsEnabled,
+    };
 
     // Official games are metadata-first surfaces. They do not need generic
     // cards, sections, authors, attachments, moderation lookups, or submission
@@ -97,30 +117,6 @@ export async function GET(
         },
         layoutData,
       });
-    }
-
-    const board = await db.board.findUnique({
-      where: { id: boardMeta.id },
-      include: {
-        cards: {
-          // web 의 order 기반 정렬과 동일하게 유지하되 createdAt 으로 안정 정렬.
-          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-          include: {
-            attachments: { orderBy: { order: "asc" } },
-            authors: { orderBy: { displayName: "asc" } },
-            _count: {
-              select: {
-                likes: true,
-                comments: { where: { audience: "public", deletedAt: null } },
-              },
-            },
-          },
-        },
-        sections: { orderBy: { order: "asc" } },
-      },
-    });
-    if (!board) {
-      return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
 
     const hidden = await loadHiddenLookup(student.id);
@@ -344,10 +340,26 @@ export async function GET(
       }
     }
 
-    const role = await getEffectiveBoardRole(board.id, {
-      studentId: student.id,
-    });
-    const canControlQueue = role === "owner" || role === "editor";
+    const queueGrant =
+      board.layout === "dj-queue"
+        ? await db.boardLayoutRoleGrant.findFirst({
+            where: {
+              boardLayout: board.layout,
+              classroomRole: {
+                assignments: {
+                  some: {
+                    classroomId: student.classroomId,
+                    studentId: student.id,
+                  },
+                },
+              },
+            },
+            select: { grantedRole: true },
+          })
+        : null;
+    const canControlQueue =
+      queueGrant?.grantedRole === "owner" ||
+      queueGrant?.grantedRole === "editor";
     const layoutVisibleCards =
       board.layout === "dj-queue"
         ? board.cards.filter((card) => {
@@ -368,9 +380,8 @@ export async function GET(
             allowedBreakoutSectionIds.has(card.sectionId),
         )
       : layoutVisibleCards;
-    const cards = await Promise.all(
-      visibleCards.map(async (card) => {
-        const { _count, ...rest } = card;
+    const cards = visibleCards.map((card) => {
+        const { _count, author, studentAuthor, ...rest } = card;
         const hiddenReason = hidden.hasAnyHide
           ? resolveHiddenReason(hidden, "card", rest.id, rest.studentAuthorId)
           : null;
@@ -434,7 +445,10 @@ export async function GET(
                 studentAuthorName: null,
               }
             : { authorName: null, studentAuthorName: null }
-          : await resolveCardAuthorLabels(card);
+          : {
+              authorName: author?.name ?? null,
+              studentAuthorName: studentAuthor?.name ?? null,
+            };
         return {
           ...rest,
           ...visibleAuthorLabels,
@@ -458,8 +472,7 @@ export async function GET(
           createdAt: card.createdAt.toISOString(),
           updatedAt: card.updatedAt.toISOString(),
         };
-      }),
-    );
+      });
 
     return NextResponse.json({
       board: {

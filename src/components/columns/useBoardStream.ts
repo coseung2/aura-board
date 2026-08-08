@@ -4,7 +4,7 @@ import { useEffect, type MutableRefObject } from "react";
 import type { CardData } from "../DraggableCard";
 import { sortSections } from "@/lib/sort-sections";
 import type { StreamActivityTemplateState } from "@/lib/stream-activity-templates";
-import type { PublicSupabaseClient } from "@/lib/supabase/client";
+import { subscribePublicBroadcast } from "@/lib/supabase/realtime-channel-registry";
 import {
   EMPTY_COLUMNS_PRESENCE_SUMMARY,
   type ColumnsPresenceActivity,
@@ -25,8 +25,6 @@ export type StreamSection = {
   activityTemplate?: string | null;
   activityTemplateState?: StreamActivityTemplateState | null;
 };
-
-type BoardRealtimeChannel = ReturnType<PublicSupabaseClient["channel"]>;
 
 type Options = {
   boardId: string;
@@ -70,8 +68,7 @@ export function useBoardStream({
     let lastHash = "";
     let inflight: Promise<void> | null = null;
     let refreshQueued = false;
-    let supabase: PublicSupabaseClient | null = null;
-    let channel: BoardRealtimeChannel | null = null;
+    let unsubscribeRealtime: (() => void) | null = null;
     let shutdownPromise: Promise<void> | null = null;
 
     function clearRetryTimer() {
@@ -93,18 +90,10 @@ export function useBoardStream({
       window.removeEventListener("focus", catchUpWhenVisible);
       document.removeEventListener("visibilitychange", catchUpWhenVisible);
 
-      const ownedSupabase = supabase;
-      const ownedChannel = channel;
-      supabase = null;
-      channel = null;
-      shutdownPromise = (async () => {
-        if (!ownedSupabase || !ownedChannel) return;
-        try {
-          await ownedSupabase.removeChannel(ownedChannel);
-        } catch {
-          // Realtime cleanup is best effort.
-        }
-      })();
+      const unsubscribe = unsubscribeRealtime;
+      unsubscribeRealtime = null;
+      unsubscribe?.();
+      shutdownPromise = Promise.resolve();
       return shutdownPromise;
     }
 
@@ -224,26 +213,14 @@ export function useBoardStream({
       });
     }
 
-    (async () => {
-      try {
-        const { createIsolatedPublicSupabaseClient } = await import(
-          "@/lib/supabase/client"
-        );
-        if (stopped) return;
-        supabase = createIsolatedPublicSupabaseClient();
-        const nextChannel = supabase.channel(boardChannelKey(boardId));
-        channel = nextChannel;
-        nextChannel
-          .on("broadcast", { event: "card_changed" }, () => {
-            requestRefresh(80);
-          })
-          .subscribe((status: string) => {
-            if (!stopped && status === "SUBSCRIBED") requestRefresh();
-          });
-      } catch {
-        // Realtime is optional. Initial/focus/online snapshots remain active.
-      }
-    })();
+    unsubscribeRealtime = subscribePublicBroadcast({
+      channelName: boardChannelKey(boardId),
+      events: ["card_changed"],
+      onMessage: () => requestRefresh(80),
+      onStatus: (status) => {
+        if (!stopped && status === "SUBSCRIBED") requestRefresh();
+      },
+    });
 
     function catchUpWhenVisible() {
       if (!document.hidden) requestRefresh();

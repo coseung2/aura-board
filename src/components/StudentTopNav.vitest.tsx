@@ -103,14 +103,15 @@ afterEach(() => {
 });
 
 describe("StudentTopNav information architecture", () => {
-  it("renders the five primary destinations in order with canonical links", () => {
+  it("renders the six primary destinations in order with canonical links", () => {
     renderAt("/student");
 
     expect(renderedItems.map(({ label }) => label)).toEqual([
       "홈",
       "보드",
       "펫",
-      "자율활동",
+      "독서",
+      "걷기",
       "더보기",
     ]);
     expect(renderedItems.map(({ href }) => href)).toEqual([
@@ -118,6 +119,7 @@ describe("StudentTopNav information architecture", () => {
       "/student/boards?category=lesson",
       "/student/aura-pet?section=mine",
       "/student/reading",
+      "/student/walking",
       "/my/wallet",
     ]);
 
@@ -131,10 +133,8 @@ describe("StudentTopNav information architecture", () => {
       "/student/aura-pet?section=classroom",
       "/student/aura-pet?section=shop",
     ]);
-    expect(item("self-directed").groups[0].links.map(({ href }) => href)).toEqual([
-      "/student/reading",
-      "/student/walking",
-    ]);
+    expect(item("reading").groups).toEqual([]);
+    expect(item("walking").groups).toEqual([]);
   });
 
   it("keeps wallet, portfolio, duties, and hidden content in More without duplicating notifications", () => {
@@ -167,7 +167,8 @@ describe("StudentTopNav information architecture", () => {
     ["home", "/student", ""],
     ["boards", "/student/boards", "category=all"],
     ["pet", "/student/aura-pet", "section=shop"],
-    ["self-directed", "/student/self-directed", "activity=walking"],
+    ["reading", "/student/reading", ""],
+    ["walking", "/student/walking", ""],
     ["more", "/student/portfolio", ""],
   ])("marks only %s active for its canonical location", (activeId, pathname, search) => {
     renderAt(pathname, search);
@@ -190,13 +191,13 @@ describe("StudentTopNav information architecture", () => {
     cleanup();
 
     renderAt("/student/reading");
-    expect(item("self-directed").active).toBe(true);
-    expect(link("self-directed", "독서").active).toBe(true);
+    expect(item("reading").active).toBe(true);
+    expect(item("walking").active).toBe(false);
     cleanup();
 
-    renderAt("/student/self-directed", "activity=walking");
-    expect(link("self-directed", "걷기").active).toBe(true);
-    expect(link("self-directed", "독서").active).toBe(false);
+    renderAt("/student/walking");
+    expect(item("walking").active).toBe(true);
+    expect(item("reading").active).toBe(false);
   });
 });
 

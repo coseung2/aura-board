@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -17,8 +18,10 @@ const mocks = vi.hoisted(() => ({
   replay: null as Record<string, unknown> | null,
   replyTarget: null as Record<string, unknown> | null,
   award: vi.fn(),
+  loadPreparedRewardContext: vi.fn(),
   create: vi.fn(),
   announce: vi.fn(),
+  schedulePostCommit: vi.fn(),
   guardianAvailable: true,
 }));
 
@@ -27,6 +30,7 @@ vi.mock("@/lib/card-engagement-actor", () => ({
   authorizeCardAccess: vi.fn(async () => ({
     ok: true,
     ctx: {
+      boardId: "board-1",
       classroomId: "classroom-1",
       anonymousAuthor: false,
       guardianAvailable: mocks.guardianAvailable,
@@ -39,11 +43,12 @@ vi.mock("@/lib/bank", () => ({
 }));
 
 vi.mock("@/lib/reward-service", () => ({
-  loadRewardPolicy: vi.fn(async () => ({
+  loadRewardPolicyCached: vi.fn(async () => ({
     commentMinMeaningfulLength: 4,
     commentRewardAmount: 5,
   })),
   awardCappedPolicyReward: mocks.award,
+  loadPreparedCommentRewardContext: mocks.loadPreparedRewardContext,
 }));
 
 vi.mock("@/lib/creatures/activity-rewards", () => ({
@@ -55,6 +60,9 @@ vi.mock("@/lib/card-engagement-format", () => ({
 }));
 vi.mock("@/lib/realtime-broadcast", () => ({ announceEngagementChange: mocks.announce }));
 vi.mock("@/lib/board-touch", () => ({ touchBoardUpdatedAt: vi.fn() }));
+vi.mock("@/lib/post-commit", () => ({
+  schedulePostCommit: mocks.schedulePostCommit,
+}));
 
 vi.mock("@/lib/db", () => {
   const tx = {
@@ -72,9 +80,16 @@ vi.mock("@/lib/db", () => {
           | undefined;
         return mocks.replay?.cardId === key?.cardId ? mocks.replay : null;
       }),
-      findMany: vi.fn(async () => mocks.existingContents.map((content) => ({ content }))),
       create: mocks.create,
     },
+    $queryRaw: vi.fn(async (query: { values?: readonly unknown[] }) => {
+      const normalized = String(query.values?.at(-1) ?? "");
+      const exists = mocks.existingContents.some(
+        (content) =>
+          content.normalize("NFKC").trim().replace(/\s+/g, " ") === normalized,
+      );
+      return [{ exists }];
+    }),
     transaction: { findFirst: vi.fn(), count: vi.fn() },
   };
   return {
@@ -129,10 +144,38 @@ describe("student comment reward transaction", () => {
     mocks.replay = null;
     mocks.replyTarget = null;
     mocks.award.mockReset();
+    mocks.loadPreparedRewardContext.mockReset();
+    mocks.loadPreparedRewardContext.mockImplementation(
+      async (
+        _tx: unknown,
+        input: { normalizedContent: string },
+      ) => ({
+        duplicate: mocks.existingContents.some(
+          (content) =>
+            content.normalize("NFKC").trim().replace(/\s+/g, " ") ===
+            input.normalizedContent,
+        ),
+        counts: { daily: 0, weekly: 0 },
+        rewardContext: { buffBps: 0, hasActiveCreature: false },
+      }),
+    );
     mocks.create.mockReset();
     mocks.announce.mockReset();
+    mocks.schedulePostCommit.mockReset();
     mocks.guardianAvailable = true;
     mocks.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
+      if (
+        mocks.replay &&
+        mocks.replay.cardId === data.cardId &&
+        (mocks.replay.clientRequestId ?? data.clientRequestId) ===
+          data.clientRequestId &&
+        (mocks.replay.deletedAt ?? null) === null
+      ) {
+        throw new Prisma.PrismaClientKnownRequestError("duplicate comment", {
+          code: "P2002",
+          clientVersion: "test",
+        });
+      }
       const row = {
         id: "comment-1",
         ...data,
@@ -145,6 +188,34 @@ describe("student comment reward transaction", () => {
       mocks.comments.push(row);
       return row;
     });
+  });
+
+  it("prepares one locked reward context before creating the comment", async () => {
+    mocks.award.mockResolvedValueOnce({ amount: 5, baseAmount: 5, buffBps: 0 });
+    const database = (await import("@/lib/db")).db;
+    database.$transaction.mockClear();
+
+    const response = await POST(request(), {
+      params: Promise.resolve({ id: "card-1" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.loadPreparedRewardContext).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        accountId: "account-1",
+        studentId: "student-1",
+        classroomId: "classroom-1",
+        normalizedContent: "정말 좋은 글이에요",
+      }),
+    );
+    expect(
+      mocks.loadPreparedRewardContext.mock.invocationCallOrder[0],
+    ).toBeLessThan(mocks.create.mock.invocationCallOrder[0]);
+    expect(database.$transaction).toHaveBeenCalledWith(
+      expect.any(Function),
+      { isolationLevel: "ReadCommitted" },
+    );
   });
 
   it("rolls comment creation back when its atomic reward mutation fails", async () => {
@@ -162,7 +233,7 @@ describe("student comment reward transaction", () => {
     expect(mocks.transactions).toHaveLength(0);
   });
 
-  it("replays a client request without creating or rewarding a second comment", async () => {
+  it("replays a client request through the unique constraint without rewarding twice", async () => {
     mocks.replay = {
       id: "comment-existing",
       cardId: "card-1",
@@ -176,7 +247,7 @@ describe("student comment reward transaction", () => {
     const response = await POST(request(), { params: Promise.resolve({ id: "card-1" }) });
     expect(response.status).toBe(200);
     expect((await response.json()).item.id).toBe("comment-existing");
-    expect(mocks.create).not.toHaveBeenCalled();
+    expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(mocks.award).not.toHaveBeenCalled();
   });
 
@@ -258,11 +329,7 @@ describe("student comment reward transaction", () => {
       { params: Promise.resolve({ id: "card-1" }) },
     );
 
-    const tx = (await import("@/lib/db")).db;
-    expect(tx.cardComment.findMany).toHaveBeenCalledWith({
-      where: { authorStudentId: "student-1" },
-      select: { content: true },
-    });
+    expect(mocks.loadPreparedRewardContext).toHaveBeenCalledTimes(1);
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(mocks.award).not.toHaveBeenCalled();
   });

@@ -57,7 +57,10 @@ export async function createStudentSession(
   studentId: string,
   classroomId: string,
 ): Promise<string> {
-  const student = await db.student.findUniqueOrThrow({ where: { id: studentId } });
+  const student = await db.student.findUniqueOrThrow({
+    where: { id: studentId },
+    select: { sessionVersion: true },
+  });
   const payload: StudentPayload = {
     studentId,
     classroomId,
@@ -79,17 +82,84 @@ export async function createStudentSession(
   return token;
 }
 
-export async function getCurrentStudent() {
-  // Teacher session wins: if a NextAuth user is authenticated, ignore any
-  // stale student cookie. Same browser commonly carries both (teacher tests
-  // a student login) and mis-attribution of actions to the student is the
-  // class of bug that motivated this gate.
-  const user = await getCurrentUser().catch(() => null);
-  if (user) return null;
-  return getCurrentStudentRaw();
+export type CurrentStudentIdentity = {
+  id: string;
+  name: string;
+  classroomId: string;
+};
+
+type StudentIdentityCacheEntry = {
+  value: CurrentStudentIdentity;
+  expiresAt: number;
+};
+
+const STUDENT_IDENTITY_CACHE_TTL_MS = 60_000;
+const STUDENT_IDENTITY_CACHE_MAX = 5_000;
+const studentIdentityCache = new Map<string, StudentIdentityCacheEntry>();
+const studentIdentityInflight = new Map<
+  string,
+  Promise<CurrentStudentIdentity | null>
+>();
+let studentIdentityCacheGeneration = 0;
+
+function studentIdentityCacheKey(payload: StudentPayload): string {
+  return `${payload.studentId}:${payload.sessionVersion}`;
 }
 
-export async function getCurrentStudentRaw() {
+function getCachedStudentIdentity(
+  key: string,
+  now = Date.now(),
+): CurrentStudentIdentity | null {
+  const cached = studentIdentityCache.get(key);
+  if (!cached) return null;
+  if (cached.expiresAt <= now) {
+    studentIdentityCache.delete(key);
+    return null;
+  }
+  // Sliding TTL keeps an actively used classroom session hot while explicit
+  // reissue/delete/admin rotation invalidation preserves revocation semantics.
+  cached.expiresAt = now + STUDENT_IDENTITY_CACHE_TTL_MS;
+  studentIdentityCache.delete(key);
+  studentIdentityCache.set(key, cached);
+  return { ...cached.value };
+}
+
+function storeStudentIdentity(
+  key: string,
+  identity: CurrentStudentIdentity,
+): void {
+  while (studentIdentityCache.size >= STUDENT_IDENTITY_CACHE_MAX) {
+    const oldest = studentIdentityCache.keys().next().value as string | undefined;
+    if (!oldest) break;
+    studentIdentityCache.delete(oldest);
+  }
+  studentIdentityCache.set(key, {
+    value: { ...identity },
+    expiresAt: Date.now() + STUDENT_IDENTITY_CACHE_TTL_MS,
+  });
+}
+
+export function invalidateStudentIdentityCache(studentId?: string): void {
+  studentIdentityCacheGeneration += 1;
+  if (!studentId) {
+    studentIdentityCache.clear();
+    studentIdentityInflight.clear();
+    return;
+  }
+  const prefix = `${studentId}:`;
+  for (const key of studentIdentityCache.keys()) {
+    if (key.startsWith(prefix)) studentIdentityCache.delete(key);
+  }
+  for (const key of studentIdentityInflight.keys()) {
+    if (key.startsWith(prefix)) studentIdentityInflight.delete(key);
+  }
+}
+
+export function clearStudentIdentityCacheForTests(): void {
+  invalidateStudentIdentityCache();
+}
+
+async function getVerifiedStudentPayload(): Promise<StudentPayload | null> {
   // 1순위: Authorization: Bearer <token> (모바일 앱)
   // 2순위: student_session 쿠키 (웹)
   const headerList = await headers();
@@ -103,8 +173,67 @@ export async function getCurrentStudentRaw() {
     token = cookieStore.get(COOKIE_NAME)?.value ?? null;
   }
   if (!token) return null;
+  return verify(token);
+}
 
-  const payload = verify(token);
+/**
+ * Hot-path student identity lookup. Avoids loading the Classroom/teacher graph
+ * when a route only needs the authenticated student's primary identifiers.
+ */
+export async function getCurrentStudentIdentityRaw(): Promise<CurrentStudentIdentity | null> {
+  const payload = await getVerifiedStudentPayload();
+  if (!payload) return null;
+  const key = studentIdentityCacheKey(payload);
+  const cached = getCachedStudentIdentity(key);
+  if (cached) return cached;
+  const inflight = studentIdentityInflight.get(key);
+  if (inflight) return inflight;
+
+  const generation = studentIdentityCacheGeneration;
+  const pending = db.student
+    .findUnique({
+      where: { id: payload.studentId },
+      select: { id: true, name: true, classroomId: true, sessionVersion: true },
+    })
+    .then((student) => {
+      if (!student || student.sessionVersion !== payload.sessionVersion) return null;
+      const identity = {
+        id: student.id,
+        name: student.name,
+        classroomId: student.classroomId,
+      };
+      if (generation === studentIdentityCacheGeneration) {
+        storeStudentIdentity(key, identity);
+      }
+      return { ...identity };
+    })
+    .finally(() => {
+      if (studentIdentityInflight.get(key) === pending) {
+        studentIdentityInflight.delete(key);
+      }
+    });
+  studentIdentityInflight.set(key, pending);
+  return pending;
+}
+
+export async function getCurrentStudentIdentity(): Promise<CurrentStudentIdentity | null> {
+  // Teacher session wins: if a NextAuth user is authenticated, ignore any
+  // stale student cookie. Same browser commonly carries both (teacher tests
+  // a student login) and mis-attribution of actions to the student is the
+  // class of bug that motivated this gate.
+  const user = await getCurrentUser().catch(() => null);
+  if (user) return null;
+  return getCurrentStudentIdentityRaw();
+}
+
+export async function getCurrentStudent() {
+  const user = await getCurrentUser().catch(() => null);
+  if (user) return null;
+  return getCurrentStudentRaw();
+}
+
+export async function getCurrentStudentRaw() {
+  const payload = await getVerifiedStudentPayload();
   if (!payload) return null;
   const student = await db.student.findUnique({
     where: { id: payload.studentId },

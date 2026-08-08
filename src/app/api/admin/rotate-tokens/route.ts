@@ -21,6 +21,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { notifySlack } from "@/lib/ops/slack";
 import { logAudit } from "@/lib/audit";
+import { invalidateStudentIdentityCache } from "@/lib/student-auth";
 
 const Schema = z.discriminatedUnion("scope", [
   z.object({
@@ -75,6 +76,7 @@ export async function POST(req: Request) {
         data: { sessionVersion: { increment: 1 } },
       });
       affected = result.count;
+      invalidateStudentIdentityCache();
       summary = `${input.classroomId} 학급 학생 ${affected}명 세션 무효화`;
       break;
     }

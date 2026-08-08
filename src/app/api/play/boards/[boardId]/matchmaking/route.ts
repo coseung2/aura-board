@@ -10,7 +10,7 @@ import {
 } from "@/lib/play-platform/omok-bot";
 import { playEngineFetch } from "@/lib/play-platform/server-client";
 import { announceOmokMatchmakingChange } from "@/lib/realtime-broadcast";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentStudentIdentity } from "@/lib/student-auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -341,7 +341,7 @@ async function reserveHumanMatch(input: {
 }
 
 export async function GET(_request: Request, { params }: Params) {
-  const student = await getCurrentStudent();
+  const student = await getCurrentStudentIdentity();
   if (!student) return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
   const { boardId } = await params;
   if (!(await resolveLobby(boardId, student.classroomId))) {
@@ -355,7 +355,7 @@ export async function GET(_request: Request, { params }: Params) {
 }
 
 export async function POST(request: Request, { params }: Params) {
-  const student = await getCurrentStudent();
+  const student = await getCurrentStudentIdentity();
   if (!student) return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
   const { boardId } = await params;
   const lobby = await resolveLobby(boardId, student.classroomId);
@@ -440,7 +440,7 @@ export async function POST(request: Request, { params }: Params) {
 }
 
 export async function DELETE(_request: Request, { params }: Params) {
-  const student = await getCurrentStudent();
+  const student = await getCurrentStudentIdentity();
   if (!student) return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
   const { boardId } = await params;
   await db.omokMatchTicket.updateMany({

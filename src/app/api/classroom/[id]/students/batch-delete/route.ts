@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { invalidateStudentIdentityCache } from "@/lib/student-auth";
 
 const BatchDeleteSchema = z.object({
   studentIds: z.array(z.string()).min(1),
@@ -26,6 +27,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         classroomId: id,
       },
     });
+    for (const studentId of studentIds) {
+      invalidateStudentIdentityCache(studentId);
+    }
 
     return NextResponse.json({ deleted: result.count });
   } catch (e) {

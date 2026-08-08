@@ -2,19 +2,19 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
-  getCurrentStudentRaw: vi.fn(),
+  getCurrentStudentIdentityRaw: vi.fn(),
   boardFindUnique: vi.fn(),
   boardMemberFindFirst: vi.fn(),
-  studentFindUnique: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.getCurrentUser }));
-vi.mock("@/lib/student-auth", () => ({ getCurrentStudentRaw: mocks.getCurrentStudentRaw }));
+vi.mock("@/lib/student-auth", () => ({
+  getCurrentStudentIdentityRaw: mocks.getCurrentStudentIdentityRaw,
+}));
 vi.mock("@/lib/db", () => ({
   db: {
     board: { findUnique: mocks.boardFindUnique },
     boardMember: { findFirst: mocks.boardMemberFindFirst },
-    student: { findUnique: mocks.studentFindUnique },
   },
 }));
 
@@ -23,7 +23,7 @@ import { PlayAccessError, resolveSongGuessActorForBoard } from "./actor";
 describe("song-guess board ownership", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCurrentStudentRaw.mockResolvedValue(null);
+    mocks.getCurrentStudentIdentityRaw.mockResolvedValue(null);
     mocks.boardFindUnique.mockResolvedValue({
       id: "board-1",
       classroomId: "class-1",
@@ -54,8 +54,11 @@ describe("song-guess board ownership", () => {
 
   it("requires a student to belong to the board classroom", async () => {
     mocks.getCurrentUser.mockRejectedValue(new Error("Unauthenticated"));
-    mocks.getCurrentStudentRaw.mockResolvedValue({ id: "student-1" });
-    mocks.studentFindUnique.mockResolvedValue({ classroomId: "other-class" });
+    mocks.getCurrentStudentIdentityRaw.mockResolvedValue({
+      id: "student-1",
+      name: "학생",
+      classroomId: "other-class",
+    });
     await expect(resolveSongGuessActorForBoard("board-1")).rejects.toMatchObject({
       status: 403,
       code: "forbidden",

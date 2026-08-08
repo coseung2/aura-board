@@ -1,17 +1,29 @@
 import type { Prisma } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ award: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  award: vi.fn(),
+  cachedPolicyFind: vi.fn(),
+}));
 
 vi.mock("./creatures/activity-rewards", () => ({
   awardActivityReward: mocks.award,
+}));
+
+vi.mock("./db", () => ({
+  db: {
+    avatarRewardConfig: { findUnique: mocks.cachedPolicyFind },
+  },
 }));
 
 import {
   awardCappedPolicyReward,
   awardReadingPolicyReward,
   awardWalkingPolicyReward,
+  invalidateRewardPolicyCache,
   loadRewardPolicy,
+  loadRewardPolicyCached,
+  lockRewardAccount,
 } from "./reward-service";
 import {
   READING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
@@ -23,33 +35,102 @@ function fakeTx(
   colors: string[] = [],
   rewardConfig: Record<string, number> | null = null,
   equippedItemKeys: string[] = [],
+  hasActiveCreature = false,
 ) {
+  const [dailyCount = 0, weeklyCount = 0] = counts;
   return {
     avatarRewardConfig: { findUnique: vi.fn(async () => rewardConfig) },
-    transaction: {
-      findFirst: vi.fn(async () => null),
-      count: vi.fn(async () => counts.shift() ?? 0),
-    },
-    studentSlime: {
-      findMany: vi.fn(async () =>
-        colors.map((color) => ({
+    $queryRaw: vi.fn(async (query: { strings?: readonly string[] }) => {
+      const sql = query.strings?.join(" ") ?? "";
+      if (sql.includes('FROM "Transaction"')) {
+        return [{ daily_count: dailyCount, weekly_count: weeklyCount }];
+      }
+      return [{
+        slimes: colors.map((color) => ({
           color,
-          isEquipped: true,
           growthStage: 1,
           equippedTitleKey: null,
         })),
-      ),
-    },
-    studentCreatureItem: {
-      findMany: vi.fn(async () =>
-        equippedItemKeys.map((itemKey) => ({ itemKey })),
-      ),
+        item_keys: equippedItemKeys,
+        has_active_creature: hasActiveCreature,
+      }];
+    }),
+    transaction: {
+      findFirst: vi.fn(async () => null),
     },
   } as unknown as Prisma.TransactionClient;
 }
 
+describe("reward account locking", () => {
+  it("locks exactly one StudentAccount row for the transaction", async () => {
+    const queryRaw = vi.fn(async () => [{ id: "account-1" }]);
+    const tx = { $queryRaw: queryRaw } as unknown as Prisma.TransactionClient;
+
+    await expect(lockRewardAccount(tx, "account-1")).resolves.toBeUndefined();
+
+    expect(queryRaw).toHaveBeenCalledTimes(1);
+    const query = queryRaw.mock.calls[0][0] as {
+      strings: readonly string[];
+      values: readonly unknown[];
+    };
+    expect(query.strings.join("?")).toContain(
+      'SELECT "id" FROM "StudentAccount" WHERE "id" = ? FOR UPDATE',
+    );
+    expect(query.values).toEqual(["account-1"]);
+  });
+
+  it("fails closed when the reward account disappeared", async () => {
+    const tx = {
+      $queryRaw: vi.fn(async () => []),
+    } as unknown as Prisma.TransactionClient;
+
+    await expect(lockRewardAccount(tx, "missing-account")).rejects.toThrow(
+      "Reward account not found",
+    );
+  });
+});
+
+describe("reward policy cache", () => {
+  beforeEach(() => {
+    invalidateRewardPolicyCache();
+    mocks.cachedPolicyFind.mockReset();
+  });
+
+  it("deduplicates simultaneous classroom policy reads", async () => {
+    mocks.cachedPolicyFind.mockResolvedValue({ commentRewardAmount: 7 });
+
+    const [first, second] = await Promise.all([
+      loadRewardPolicyCached("classroom-1"),
+      loadRewardPolicyCached("classroom-1"),
+    ]);
+    const third = await loadRewardPolicyCached("classroom-1");
+
+    expect(first.commentRewardAmount).toBe(7);
+    expect(second.commentRewardAmount).toBe(7);
+    expect(third.commentRewardAmount).toBe(7);
+    expect(mocks.cachedPolicyFind).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads after explicit invalidation", async () => {
+    mocks.cachedPolicyFind
+      .mockResolvedValueOnce({ commentRewardAmount: 5 })
+      .mockResolvedValueOnce({ commentRewardAmount: 9 });
+
+    await expect(loadRewardPolicyCached("classroom-1")).resolves.toMatchObject({
+      commentRewardAmount: 5,
+    });
+    invalidateRewardPolicyCache("classroom-1");
+    await expect(loadRewardPolicyCached("classroom-1")).resolves.toMatchObject({
+      commentRewardAmount: 9,
+    });
+    expect(mocks.cachedPolicyFind).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("reward service caps and buffs", () => {
   beforeEach(() => {
+    invalidateRewardPolicyCache();
+    mocks.cachedPolicyFind.mockReset();
     mocks.award.mockReset();
     mocks.award.mockImplementation(async (input: { amount: number }) => ({
       transactionId: "transaction-1",
@@ -127,7 +208,7 @@ describe("reward service caps and buffs", () => {
     });
 
     expect(result).toMatchObject({ baseAmount: 100, buffBps: 300, amount: 103 });
-    expect(tx.studentCreatureItem.findMany).toHaveBeenCalledTimes(1);
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
   });
 
   it("hard-clamps configurable frequency and buff guardrails", async () => {
@@ -157,7 +238,7 @@ describe("reward service caps and buffs", () => {
     });
   });
 
-  it("treats zero assignment caps as unlimited while preserving count queries", async () => {
+  it("treats zero assignment caps as unlimited with one combined count query", async () => {
     const tx = fakeTx([10, 20]);
     const policy = await loadRewardPolicy(tx, "classroom-1");
     const result = await awardCappedPolicyReward({
@@ -173,7 +254,11 @@ describe("reward service caps and buffs", () => {
     });
     expect(result).toMatchObject({ amount: 20, baseAmount: 20 });
     expect(mocks.award).toHaveBeenCalledWith(expect.objectContaining({ amount: 20 }));
-    expect(tx.transaction.count).toHaveBeenCalledTimes(2);
+    const sqlCalls = (tx.$queryRaw as ReturnType<typeof vi.fn>).mock.calls.map(
+      ([query]) => (query as { strings?: readonly string[] }).strings?.join(" ") ?? "",
+    );
+    expect(sqlCalls.filter((sql) => sql.includes('FROM "Transaction"'))).toHaveLength(1);
+    expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
   });
 
   it("treats a disabled zero-amount policy as no payout", async () => {
