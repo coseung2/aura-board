@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentStudentIdentityRaw } from "@/lib/student-auth";
-import { resolveHiddenReason } from "@/lib/content-safety";
-import { loadHiddenLookup } from "@/lib/content-safety-service";
+import { loadStudentBoardBaseCached } from "@/lib/student-board-cache";
+import { primeBoardAccessCache } from "@/lib/board-access-cache";
+import {
+  buildHiddenLookup,
+  resolveHiddenReason,
+} from "@/lib/content-safety";
 import { loadGameSnapshot } from "@/lib/speed-game/runtime";
 import { sanitizeGameSnapshotForStudent } from "@/lib/speed-game/student-snapshot";
 import { parseObservationPoints } from "@/lib/plant-schemas";
@@ -31,34 +35,49 @@ export async function GET(
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const board = await db.board.findFirst({
-      where: {
-        OR: [{ id: slug }, { slug }],
-        classroomId: student.classroomId,
-      },
-      include: {
-        cards: {
-          // web 의 order 기반 정렬과 동일하게 유지하되 createdAt 으로 안정 정렬.
-          orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+    const board = await loadStudentBoardBaseCached(
+      student.classroomId,
+      slug,
+      () =>
+        db.board.findFirst({
+          where: {
+            OR: [{ id: slug }, { slug }],
+            classroomId: student.classroomId,
+          },
           include: {
-            author: { select: { name: true } },
-            studentAuthor: { select: { name: true } },
-            attachments: { orderBy: { order: "asc" } },
-            authors: { orderBy: { displayName: "asc" } },
-            _count: {
-              select: {
-                likes: true,
-                comments: { where: { audience: "public", deletedAt: null } },
+            classroom: { select: { teacherId: true } },
+            cards: {
+              // web 의 order 기반 정렬과 동일하게 유지하되 createdAt 으로 안정 정렬.
+              orderBy: [{ order: "asc" }, { createdAt: "asc" }],
+              include: {
+                author: { select: { name: true } },
+                studentAuthor: { select: { name: true } },
+                attachments: { orderBy: { order: "asc" } },
+                authors: { orderBy: { displayName: "asc" } },
+                _count: {
+                  select: {
+                    likes: true,
+                    comments: {
+                      where: { audience: "public", deletedAt: null },
+                    },
+                  },
+                },
               },
             },
+            sections: { orderBy: { order: "asc" } },
           },
-        },
-        sections: { orderBy: { order: "asc" } },
-      },
-    });
+        }),
+    );
     if (!board) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
     }
+    primeBoardAccessCache({
+      id: board.id,
+      classroomId: board.classroomId,
+      anonymousAuthor: board.anonymousAuthor,
+      layout: board.layout,
+      teacherId: board.classroom?.teacherId ?? null,
+    });
     const boardMeta = {
       id: board.id,
       slug: board.slug,
@@ -119,7 +138,10 @@ export async function GET(
       });
     }
 
-    const hidden = await loadHiddenLookup(student.id);
+    const hidden = buildHiddenLookup({
+      hiddenTargets: student.hiddenTargets ?? [],
+      hiddenAuthorStudentIds: student.hiddenAuthorStudentIds ?? [],
+    });
 
     const layoutData: Record<string, unknown> = {};
     let allowedBreakoutSectionIds: Set<string> | null = null;

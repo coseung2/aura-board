@@ -3,6 +3,7 @@ import { cookies, headers } from "next/headers";
 import { createHmac, timingSafeEqual } from "crypto";
 import { db } from "./db";
 import { getCurrentUser } from "./auth";
+import type { ContentTargetKind } from "./content-safety";
 
 const COOKIE_NAME = "student_session";
 const MAX_AGE = 30 * 24 * 60 * 60; // 30 days
@@ -86,6 +87,15 @@ export type CurrentStudentIdentity = {
   id: string;
   name: string;
   classroomId: string;
+  /** Provisioned classroom-wallet identifiers, when they already exist. */
+  accountId?: string | null;
+  accountCardId?: string | null;
+  /** Private per-student UGC visibility state loaded with the identity row. */
+  hiddenTargets?: Array<{
+    targetKind: ContentTargetKind;
+    targetId: string;
+  }>;
+  hiddenAuthorStudentIds?: string[];
 };
 
 type StudentIdentityCacheEntry = {
@@ -106,6 +116,18 @@ function studentIdentityCacheKey(payload: StudentPayload): string {
   return `${payload.studentId}:${payload.sessionVersion}`;
 }
 
+function cloneStudentIdentity(
+  identity: CurrentStudentIdentity,
+): CurrentStudentIdentity {
+  return {
+    ...identity,
+    hiddenTargets: identity.hiddenTargets?.map((target) => ({ ...target })),
+    hiddenAuthorStudentIds: identity.hiddenAuthorStudentIds
+      ? [...identity.hiddenAuthorStudentIds]
+      : undefined,
+  };
+}
+
 function getCachedStudentIdentity(
   key: string,
   now = Date.now(),
@@ -121,7 +143,7 @@ function getCachedStudentIdentity(
   cached.expiresAt = now + STUDENT_IDENTITY_CACHE_TTL_MS;
   studentIdentityCache.delete(key);
   studentIdentityCache.set(key, cached);
-  return { ...cached.value };
+  return cloneStudentIdentity(cached.value);
 }
 
 function storeStudentIdentity(
@@ -134,7 +156,7 @@ function storeStudentIdentity(
     studentIdentityCache.delete(oldest);
   }
   studentIdentityCache.set(key, {
-    value: { ...identity },
+    value: cloneStudentIdentity(identity),
     expiresAt: Date.now() + STUDENT_IDENTITY_CACHE_TTL_MS,
   });
 }
@@ -193,7 +215,24 @@ export async function getCurrentStudentIdentityRaw(): Promise<CurrentStudentIden
   const pending = db.student
     .findUnique({
       where: { id: payload.studentId },
-      select: { id: true, name: true, classroomId: true, sessionVersion: true },
+      select: {
+        id: true,
+        name: true,
+        classroomId: true,
+        sessionVersion: true,
+        account: {
+          select: {
+            id: true,
+            cards: { take: 1, select: { id: true } },
+          },
+        },
+        hiddenContent: {
+          select: { targetKind: true, targetId: true },
+        },
+        hiddenByStudents: {
+          select: { hiddenStudentId: true },
+        },
+      },
     })
     .then((student) => {
       if (!student || student.sessionVersion !== payload.sessionVersion) return null;
@@ -201,11 +240,20 @@ export async function getCurrentStudentIdentityRaw(): Promise<CurrentStudentIden
         id: student.id,
         name: student.name,
         classroomId: student.classroomId,
+        accountId: student.account?.id ?? null,
+        accountCardId: student.account?.cards[0]?.id ?? null,
+        hiddenTargets: student.hiddenContent.map((target) => ({
+          targetKind: target.targetKind,
+          targetId: target.targetId,
+        })),
+        hiddenAuthorStudentIds: student.hiddenByStudents.map(
+          (author) => author.hiddenStudentId,
+        ),
       };
       if (generation === studentIdentityCacheGeneration) {
         storeStudentIdentity(key, identity);
       }
-      return { ...identity };
+      return cloneStudentIdentity(identity);
     })
     .finally(() => {
       if (studentIdentityInflight.get(key) === pending) {

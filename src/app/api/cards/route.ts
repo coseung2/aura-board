@@ -24,16 +24,38 @@ import {
 } from "@/lib/card-authors-service";
 import { requireShareAuth } from "@/lib/share/with-share";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
-import { touchBoardUpdatedAt } from "@/lib/board-touch";
-import { announceCardChange } from "@/lib/realtime-broadcast";
-import { dispatchLinkedParentCardPush } from "@/lib/parent-push";
-import { schedulePostCommit } from "@/lib/post-commit";
-import { invalidateBoardSnapshotCache } from "@/lib/board-snapshot-cache";
+import { scheduleLinkedParentCardPush } from "@/lib/parent-card-push-queue";
+import { scheduleBoardActivity } from "@/lib/board-activity-queue";
+import { scheduleCardChangeBroadcast } from "@/lib/card-broadcast-queue";
+import { loadBoardAccessBaseCached } from "@/lib/board-access-cache";
 import { resizeRemoteImageToWebPPreviewUrl, extractVideoThumbnail } from "@/lib/blob";
 import {
   normalizeCommentVoteOptionCount,
   normalizeCommentVoteOptionLabels,
 } from "./poll-shared";
+
+async function loadCardCreateBoard(boardId: string) {
+  return loadBoardAccessBaseCached(boardId, async () => {
+    const board = await db.board.findUnique({
+      where: { id: boardId },
+      select: {
+        id: true,
+        classroomId: true,
+        anonymousAuthor: true,
+        layout: true,
+        classroom: { select: { teacherId: true } },
+      },
+    });
+    if (!board) return null;
+    return {
+      id: board.id,
+      classroomId: board.classroomId,
+      anonymousAuthor: board.anonymousAuthor,
+      layout: board.layout,
+      teacherId: board.classroom?.teacherId ?? null,
+    };
+  });
+}
 
 const CreateCardSchema = z.object({
   boardId: z.string().min(1),
@@ -222,10 +244,7 @@ export async function POST(req: Request) {
       await requirePermission(input.boardId, teacherUser.id, "edit");
       authorId = teacherUser.id;
       currentUserName = teacherUser.name;
-      const board = await db.board.findUnique({
-        where: { id: input.boardId },
-        select: { classroomId: true, anonymousAuthor: true, layout: true },
-      });
+      const board = await loadCardCreateBoard(input.boardId);
       boardClassroomId = board?.classroomId ?? null;
       boardAnonymousAuthor = board?.anonymousAuthor ?? false;
       boardLayout = board?.layout ?? null;
@@ -234,16 +253,8 @@ export async function POST(req: Request) {
         ? await getCurrentStudentIdentityRaw()
         : await getCurrentStudentIdentity();
       if (student) {
-        const board = await db.board.findUnique({
-          where: { id: input.boardId },
-          select: {
-            classroomId: true,
-            anonymousAuthor: true,
-            layout: true,
-            classroom: { select: { teacherId: true } },
-          },
-        });
-        if (!board || !board.classroom) {
+        const board = await loadCardCreateBoard(input.boardId);
+        if (!board || !board.teacherId) {
           return NextResponse.json({ error: "board_not_accessible" }, { status: 403 });
         }
         if (board.classroomId !== student.classroomId) {
@@ -252,7 +263,7 @@ export async function POST(req: Request) {
         boardClassroomId = board.classroomId;
         boardAnonymousAuthor = board.anonymousAuthor;
         boardLayout = board.layout;
-        authorId = board.classroom.teacherId;
+        authorId = board.teacherId;
         studentAuthorId = student.id;
         externalAuthorName = student.name;
         currentUserName = student.name;
@@ -271,10 +282,7 @@ export async function POST(req: Request) {
         if (shareResult.identity.boardId !== input.boardId) {
           return NextResponse.json({ error: "board_mismatch" }, { status: 403 });
         }
-        const board = await db.board.findUnique({
-          where: { id: input.boardId },
-          select: { anonymousAuthor: true },
-        });
+        const board = await loadCardCreateBoard(input.boardId);
         boardAnonymousAuthor = board?.anonymousAuthor ?? false;
         authorId = null;
         externalAuthorName = shareResult.identity.authorName;
@@ -646,29 +654,25 @@ export async function POST(req: Request) {
       return { card: c, createdStudentAuthor };
     });
 
-    invalidateBoardSnapshotCache(input.boardId);
-
-    // The mutation is durable at this point. Operational activity, Realtime
-    // invalidation, and linked-parent notifications must not extend the student
-    // publish response under a simultaneous classroom wave.
-    schedulePostCommit("card.create side effects", async () => {
-      await touchBoardUpdatedAt(input.boardId, {
-        action: "card.created",
-        actorType: teacherUser ? "teacher" : studentAuthorId ? "student" : "guest",
-        actorId: teacherUser?.id ?? studentAuthorId,
-        coalesceMs: 1_000,
-      });
-      await announceCardChange(input.boardId, "insert");
-      if (studentAuthorId && student) {
-        await dispatchLinkedParentCardPush({
-          eventKey: `card:${card.id}`,
-          studentId: studentAuthorId,
-          studentName: student.name,
-          boardId: input.boardId,
-          cardId: card.id,
-        });
-      }
+    // The mutation is durable at this point. High-frequency board activity and
+    // Realtime invalidation are batched independently; parent push remains a
+    // low-priority post-commit task and cannot hold either batch open.
+    scheduleBoardActivity(input.boardId, {
+      action: "card.created",
+      actorType: teacherUser ? "teacher" : studentAuthorId ? "student" : "guest",
+      actorId: teacherUser?.id ?? studentAuthorId,
+      coalesceMs: 1_000,
     });
+    scheduleCardChangeBroadcast(input.boardId, "insert");
+    if (studentAuthorId && student) {
+      scheduleLinkedParentCardPush({
+        eventKey: `card:${card.id}`,
+        studentId: studentAuthorId,
+        studentName: student.name,
+        boardId: input.boardId,
+        cardId: card.id,
+      });
+    }
 
     // Common classroom cards have no normalized attachments and exactly one
     // student author. Reuse the committed rows instead of issuing two response-

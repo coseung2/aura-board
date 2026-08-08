@@ -21,6 +21,7 @@ import {
   resizeRemoteImageToWebPPreviewUrl,
 } from "@/lib/blob";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
+import { invalidateCardAccessCache } from "@/lib/card-access-cache";
 import {
   normalizeCommentVoteOptionCount,
   normalizeCommentVoteOptionLabels,
@@ -471,6 +472,8 @@ export async function PATCH(
       }
     }
 
+    invalidateCardAccessCache(id);
+
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 수정으로 부모 board touch.
     await touchBoardUpdatedAt(card.boardId, {
       action: "card.updated",
@@ -578,6 +581,7 @@ export async function DELETE(
     }
 
     await db.card.delete({ where: { id } });
+    invalidateCardAccessCache(id);
     await enqueueBlobDeletion(
       [
         card.imageUrl,

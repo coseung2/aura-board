@@ -6,10 +6,12 @@ const mocks = vi.hoisted(() => ({
   targetUpsert: vi.fn(),
   authorUpsert: vi.fn(),
   resolveTarget: vi.fn(),
+  invalidateStudentIdentityCache: vi.fn(),
 }));
 
 vi.mock("@/lib/student-auth", () => ({
   getCurrentStudent: vi.fn(async () => ({ id: "student-1", classroomId: "classroom-1" })),
+  invalidateStudentIdentityCache: mocks.invalidateStudentIdentityCache,
 }));
 
 vi.mock("@/lib/content-safety-service", () => ({
@@ -44,6 +46,7 @@ describe("student content reports", () => {
     mocks.targetUpsert.mockReset();
     mocks.authorUpsert.mockReset();
     mocks.resolveTarget.mockReset();
+    mocks.invalidateStudentIdentityCache.mockReset();
     mocks.resolveTarget.mockResolvedValue({
       classroomId: "classroom-1",
       authorStudentId: "student-2",
@@ -79,6 +82,9 @@ describe("student content reports", () => {
       update: { viaReport: true },
       create: { studentId: "student-1", targetKind: "card", targetId: "card-1", viaReport: true },
     });
+    expect(mocks.invalidateStudentIdentityCache).toHaveBeenCalledWith(
+      "student-1",
+    );
     expect(mocks.authorUpsert).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { studentId_hiddenStudentId: { studentId: "student-1", hiddenStudentId: "student-2" } },

@@ -60,6 +60,52 @@ describe("server realtime broadcasts", () => {
     expect(supabaseMocks.removeChannel).toHaveBeenCalledWith(channel);
   });
 
+  it("sends a board engagement batch in one HTTP broadcast", async () => {
+    configureClient();
+    const { announceEngagementBatchChange } = await import(
+      "../realtime-broadcast"
+    );
+
+    await announceEngagementBatchChange("board-1", [
+      {
+        cardId: "card-1",
+        likeCount: 3,
+        commentCount: 2,
+        changeType: "comment",
+      },
+      {
+        cardId: "card-2",
+        likeCount: 4,
+        commentCount: 5,
+        changeType: "like",
+      },
+    ]);
+
+    expect(supabaseMocks.httpSend).toHaveBeenCalledTimes(1);
+    expect(supabaseMocks.httpSend).toHaveBeenCalledWith(
+      "board_changed",
+      expect.objectContaining({
+        type: "engagement_batch_changed",
+        boardId: "board-1",
+        changes: [
+          {
+            cardId: "card-1",
+            likeCount: 3,
+            commentCount: 2,
+            changeType: "comment",
+          },
+          {
+            cardId: "card-2",
+            likeCount: 4,
+            commentCount: 5,
+            changeType: "like",
+          },
+        ],
+      }),
+      { timeout: 1500 },
+    );
+  });
+
   it("publishes the classroom morning contract", async () => {
     const channel = configureClient();
     const { announceClassroomMorningChange } = await import(

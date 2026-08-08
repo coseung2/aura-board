@@ -62,6 +62,9 @@ describe("getCurrentStudentIdentityRaw", () => {
       name: "학생",
       classroomId: "classroom-1",
       sessionVersion: 3,
+      account: { id: "account-1", cards: [{ id: "bank-card-1" }] },
+      hiddenContent: [{ targetKind: "card", targetId: "card-hidden" }],
+      hiddenByStudents: [{ hiddenStudentId: "student-blocked" }],
     });
   });
 
@@ -74,10 +77,31 @@ describe("getCurrentStudentIdentityRaw", () => {
       id: "student-1",
       name: "학생",
       classroomId: "classroom-1",
+      accountId: "account-1",
+      accountCardId: "bank-card-1",
+      hiddenTargets: [{ targetKind: "card", targetId: "card-hidden" }],
+      hiddenAuthorStudentIds: ["student-blocked"],
     });
     expect(mocks.studentFindUnique).toHaveBeenCalledWith({
       where: { id: "student-1" },
-      select: { id: true, name: true, classroomId: true, sessionVersion: true },
+      select: {
+        id: true,
+        name: true,
+        classroomId: true,
+        sessionVersion: true,
+        account: {
+          select: {
+            id: true,
+            cards: { take: 1, select: { id: true } },
+          },
+        },
+        hiddenContent: {
+          select: { targetKind: true, targetId: true },
+        },
+        hiddenByStudents: {
+          select: { hiddenStudentId: true },
+        },
+      },
     });
     expect(mocks.cookies).not.toHaveBeenCalled();
   });
@@ -93,6 +117,10 @@ describe("getCurrentStudentIdentityRaw", () => {
       id: "student-1",
       name: "학생",
       classroomId: "classroom-1",
+      accountId: "account-1",
+      accountCardId: "bank-card-1",
+      hiddenTargets: [{ targetKind: "card", targetId: "card-hidden" }],
+      hiddenAuthorStudentIds: ["student-blocked"],
     });
     expect(second).toEqual(first);
     expect(third).toEqual(first);
@@ -107,6 +135,9 @@ describe("getCurrentStudentIdentityRaw", () => {
       name: "바뀐 학생",
       classroomId: "classroom-1",
       sessionVersion: 3,
+      account: null,
+      hiddenContent: [],
+      hiddenByStudents: [],
     });
 
     await expect(getCurrentStudentIdentityRaw()).resolves.toMatchObject({
@@ -121,6 +152,9 @@ describe("getCurrentStudentIdentityRaw", () => {
       name: "학생",
       classroomId: "classroom-1",
       sessionVersion: 4,
+      account: null,
+      hiddenContent: [],
+      hiddenByStudents: [],
     });
 
     await expect(getCurrentStudentIdentityRaw()).resolves.toBeNull();
@@ -138,6 +172,10 @@ describe("getCurrentStudentIdentityRaw", () => {
       id: "student-1",
       name: "학생",
       classroomId: "classroom-1",
+      accountId: "account-1",
+      accountCardId: "bank-card-1",
+      hiddenTargets: [{ targetKind: "card", targetId: "card-hidden" }],
+      hiddenAuthorStudentIds: ["student-blocked"],
     });
     expect(mocks.getCurrentUser).toHaveBeenCalledTimes(1);
     expect(mocks.studentFindUnique).toHaveBeenCalledTimes(1);

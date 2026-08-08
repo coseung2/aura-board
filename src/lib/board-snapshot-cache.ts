@@ -1,5 +1,8 @@
 import "server-only";
 
+import { invalidateStudentBoardCache } from "./student-board-cache";
+import { invalidateBoardSnapshotMetaCache } from "./board-snapshot-meta-cache";
+
 type SnapshotCacheEntry<T> = {
   revision: string;
   value: T | null;
@@ -82,6 +85,8 @@ export function invalidateBoardSnapshotCache(boardId?: string): void {
   generation += 1;
   if (boardId) entries.delete(boardId);
   else entries.clear();
+  invalidateStudentBoardCache(boardId);
+  invalidateBoardSnapshotMetaCache(boardId);
 }
 
 export function clearBoardSnapshotCacheForTests(): void {

@@ -12,6 +12,20 @@ export type BoardEngagementEvent = {
   likeCount: number;
   commentCount: number;
   changeType?: "like" | "comment";
+  changeCount?: number;
+  updatedAt: string;
+};
+
+export type BoardEngagementBatchEvent = {
+  type: "engagement_batch_changed";
+  boardId: string;
+  changes: Array<{
+    cardId: string;
+    likeCount: number;
+    commentCount: number;
+    changeType?: "like" | "comment";
+    changeCount?: number;
+  }>;
   updatedAt: string;
 };
 
@@ -23,7 +37,10 @@ export type BoardPollEvent = {
   updatedAt: string;
 };
 
-export type BoardRealtimeEvent = BoardEngagementEvent | BoardPollEvent;
+export type BoardRealtimeEvent =
+  | BoardEngagementEvent
+  | BoardEngagementBatchEvent
+  | BoardPollEvent;
 
 type EngagementListener = (event: BoardEngagementEvent) => void;
 type PollListener = (event: BoardPollEvent) => void;
@@ -51,6 +68,24 @@ function dispatch(boardId: string, event: BoardRealtimeEvent) {
         fn(event);
       } catch {
         // listener errors are non-fatal
+      }
+    }
+  } else if (event.type === "engagement_batch_changed") {
+    for (const change of event.changes) {
+      const set = entry.engagementListeners.get(change.cardId);
+      if (!set) continue;
+      const individual: BoardEngagementEvent = {
+        type: "engagement_changed",
+        boardId: event.boardId,
+        ...change,
+        updatedAt: event.updatedAt,
+      };
+      for (const fn of set) {
+        try {
+          fn(individual);
+        } catch {
+          // listener errors are non-fatal
+        }
       }
     }
   } else if (event.type === "poll_changed") {

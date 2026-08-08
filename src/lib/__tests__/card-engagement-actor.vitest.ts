@@ -33,10 +33,12 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+import { clearCardAccessCacheForTests } from "@/lib/card-access-cache";
 import { authorizeCardAccess } from "@/lib/card-engagement-actor";
 
 describe("authorizeCardAccess guardian scope", () => {
   beforeEach(() => {
+    clearCardAccessCacheForTests();
     mocks.link = { id: "link-1" };
     mocks.card.studentAuthorId = "student-1";
     mocks.card.authors = [{ studentId: "student-1" }];

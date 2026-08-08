@@ -6,6 +6,7 @@ import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { snapshotClassroomGroupsToBoard } from "@/lib/default-groups";
+import { invalidateBoardAccessCache } from "@/lib/board-access-cache";
 
 const PatchBoardSchema = z.object({
   title: z.string().max(200).optional(),
@@ -117,6 +118,7 @@ export async function DELETE(
     ];
 
     await db.board.delete({ where: { id: board.id } });
+    invalidateBoardAccessCache(board.id);
     await enqueueBlobDeletion(blobUrls, "board.delete", "Board", board.id);
 
     return new NextResponse(null, { status: 204 });
@@ -188,6 +190,7 @@ export async function PATCH(
       }
       return next;
     });
+    invalidateBoardAccessCache(board.id);
     await touchBoardUpdatedAt(board.id, {
       action: "board.settings.updated",
       actorType: "teacher",

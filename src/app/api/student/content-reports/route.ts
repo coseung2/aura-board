@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentStudent } from "@/lib/student-auth";
+import {
+  getCurrentStudent,
+  invalidateStudentIdentityCache,
+} from "@/lib/student-auth";
 import {
   CONTENT_REPORT_REASONS,
   CONTENT_TARGET_KINDS,
@@ -121,6 +124,8 @@ export async function POST(req: Request) {
 
     return createdReport;
   });
+
+  invalidateStudentIdentityCache(student.id);
 
   return NextResponse.json({
     ok: true,

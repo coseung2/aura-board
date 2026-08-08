@@ -12,6 +12,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { authorizeShareAccess } from "@/lib/share/share-auth";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { invalidateCardAccessCache } from "@/lib/card-access-cache";
 
 const PatchSchema = z.object({
   shareToken: z.string().min(1),
@@ -68,6 +69,7 @@ export async function PATCH(
   if (parsed.color !== undefined) data.color = parsed.color;
 
   const updated = await db.card.update({ where: { id: cardId }, data });
+  invalidateCardAccessCache(cardId);
   await touchBoardUpdatedAt(card.boardId);
 
   return NextResponse.json({ ok: true, card: updated });
@@ -109,6 +111,7 @@ export async function DELETE(
   }
 
   await db.card.delete({ where: { id: cardId } });
+  invalidateCardAccessCache(cardId);
   await touchBoardUpdatedAt(card.boardId);
 
   return NextResponse.json({ ok: true });

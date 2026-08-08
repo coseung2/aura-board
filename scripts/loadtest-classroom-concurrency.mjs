@@ -483,8 +483,9 @@ async function seedSyntheticClassrooms() {
   };
 }
 
-function incrementCounter(object, key) {
-  object[key] = (object[key] ?? 0) + 1;
+function incrementCounter(object, key, amount = 1) {
+  const safeAmount = Number.isFinite(amount) && amount > 0 ? amount : 1;
+  object[key] = (object[key] ?? 0) + safeAmount;
 }
 
 async function openRealtimeChannels(actors) {
@@ -522,11 +523,29 @@ async function openRealtimeChannels(actors) {
       });
       const channel = client
         .channel(`board:${actor.boardId}`)
-        .on("broadcast", { event: "card_changed" }, () => {
-          incrementCounter(result.realtime.messageCounts, "card_changed");
+        .on("broadcast", { event: "card_changed" }, (message) => {
+          incrementCounter(
+            result.realtime.messageCounts,
+            "card_changed",
+            Number(message?.payload?.changeCount ?? 1),
+          );
         })
-        .on("broadcast", { event: "board_changed" }, () => {
-          incrementCounter(result.realtime.messageCounts, "board_changed");
+        .on("broadcast", { event: "board_changed" }, (message) => {
+          const payload = message?.payload;
+          const logicalCount =
+            payload?.type === "engagement_batch_changed" &&
+            Array.isArray(payload.changes)
+              ? payload.changes.reduce(
+                  (sum, change) =>
+                    sum + Number(change?.changeCount ?? 1),
+                  0,
+                )
+              : Number(payload?.changeCount ?? 1);
+          incrementCounter(
+            result.realtime.messageCounts,
+            "board_changed",
+            logicalCount,
+          );
         })
         .subscribe((status) => {
           incrementCounter(result.realtime.statusCounts, status);

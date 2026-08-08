@@ -3,10 +3,9 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { applyCardLikeMutation, getPrismaErrorCode } from "@/lib/card-like-toggle";
 import { authorizeCardAccess, getCurrentCardActor } from "@/lib/card-engagement-actor";
-import { announceEngagementChange } from "@/lib/realtime-broadcast";
-import { touchBoardUpdatedAt } from "@/lib/board-touch";
-import { schedulePostCommit } from "@/lib/post-commit";
-import { invalidateBoardSnapshotCache } from "@/lib/board-snapshot-cache";
+import { scheduleBoardActivity } from "@/lib/board-activity-queue";
+import { scheduleEngagementBroadcast } from "@/lib/engagement-broadcast-queue";
+import { updateBoardViewerLikeCache } from "@/lib/board-viewer-like-cache";
 
 // card-comments-likes (2026-04-26): POST toggle like / GET state.
 
@@ -73,25 +72,26 @@ export async function POST(
     return NextResponse.json({ error: "like_failed" }, { status: 500 });
   }
 
-  invalidateBoardSnapshotCache(access.ctx.boardId);
   const count = await db.cardLike.count({ where: { cardId } });
-  schedulePostCommit("card.like engagement", async () => {
-    const commentCount = await db.cardComment.count({
-      where: { cardId, audience: "public", deletedAt: null },
-    });
-    await touchBoardUpdatedAt(access.ctx.boardId, {
-      action: liked ? "like.created" : "like.deleted",
-      actorType: actor.kind === "teacher" ? "teacher" : actor.kind === "student" ? "student" : "guest",
-      actorId: actor.id,
-      coalesceMs: 1_000,
-    });
-    await announceEngagementChange(
+  if (actor.kind === "teacher" || actor.kind === "student") {
+    updateBoardViewerLikeCache(
       access.ctx.boardId,
+      { kind: actor.kind, id: actor.id },
       cardId,
-      count,
-      commentCount,
-      "like",
+      liked,
     );
+  }
+  scheduleBoardActivity(access.ctx.boardId, {
+    action: liked ? "like.created" : "like.deleted",
+    actorType:
+      actor.kind === "teacher"
+        ? "teacher"
+        : actor.kind === "student"
+          ? "student"
+          : "guest",
+    actorId: actor.id,
+    coalesceMs: 1_000,
   });
+  scheduleEngagementBroadcast(access.ctx.boardId, cardId, "like");
   return NextResponse.json({ liked, count });
 }

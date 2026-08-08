@@ -6,6 +6,8 @@ import { getCurrentStudentIdentityRaw } from "@/lib/student-auth";
 import { getBoardRole } from "@/lib/rbac";
 import { requireShareAuth } from "@/lib/share/with-share";
 import { loadBoardSnapshotCached } from "@/lib/board-snapshot-cache";
+import { loadBoardSnapshotMetaCached } from "@/lib/board-snapshot-meta-cache";
+import { loadBoardViewerLikedCardsCached } from "@/lib/board-viewer-like-cache";
 import type { SectionBreakoutGroupWire } from "@/lib/section-breakout";
 import {
   normalizeStreamActivityTemplateState,
@@ -106,18 +108,22 @@ export async function GET(
       : await getCurrentStudentIdentityRaw().catch(() => null);
     const shareToken = req.headers.get("x-share-token");
 
-    const board = await db.board.findFirst({
-      where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
-      select: {
-        id: true,
-        classroomId: true,
-        layout: true,
-        anonymousAuthor: true,
-        updatedAt: true,
-        questionPrompt: true,
-        questionVizMode: true,
-      },
-    });
+    const board = await loadBoardSnapshotMetaCached(
+      boardIdOrSlug,
+      () =>
+        db.board.findFirst({
+          where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },
+          select: {
+            id: true,
+            classroomId: true,
+            layout: true,
+            anonymousAuthor: true,
+            updatedAt: true,
+            questionPrompt: true,
+            questionVizMode: true,
+          },
+        }),
+    );
     if (!board) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
@@ -342,19 +348,31 @@ export async function GET(
     const likeableCardIds = common.cards
       .filter((card) => card.likeCount > 0)
       .map((card) => card.id);
-    const likedRows =
-      canInteract && likeableCardIds.length > 0
-        ? await db.cardLike.findMany({
-            where: {
-              cardId: { in: likeableCardIds },
-              ...(user
-                ? { likerUserId: user.id }
-                : { likerStudentId: student?.id ?? "" }),
+    const viewer = user
+      ? ({ kind: "teacher", id: user.id } as const)
+      : student
+        ? ({ kind: "student", id: student.id } as const)
+        : null;
+    const likedCardIds =
+      canInteract && viewer
+        ? await loadBoardViewerLikedCardsCached(
+            board.id,
+            viewer,
+            async () => {
+              if (likeableCardIds.length === 0) return [];
+              const likedRows = await db.cardLike.findMany({
+                where: {
+                  cardId: { in: likeableCardIds },
+                  ...(viewer.kind === "teacher"
+                    ? { likerUserId: viewer.id }
+                    : { likerStudentId: viewer.id }),
+                },
+                select: { cardId: true },
+              });
+              return likedRows.map((row) => row.cardId);
             },
-            select: { cardId: true },
-          })
-        : [];
-    const likedCardIds = new Set(likedRows.map((row) => row.cardId));
+          )
+        : new Set<string>();
     const payload = {
       cards: common.cards.map<CardWire>((card) => ({
         ...card,

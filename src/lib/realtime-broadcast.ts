@@ -267,11 +267,13 @@ export async function publishValidatedRealtimeEvent(event: unknown): Promise<voi
 export async function announceCardChange(
   boardId: string,
   changeType: "insert" | "update" | "delete" = "insert",
+  changeCount = 1,
 ): Promise<void> {
   if (!boardId) return;
   await broadcastBestEffort(boardChannelKey(boardId), "card_changed", {
     boardId,
     changeType,
+    changeCount: Math.max(1, Math.floor(changeCount)),
     ts: Date.now(),
   });
 }
@@ -296,6 +298,30 @@ export async function announceEngagementChange(
     likeCount,
     commentCount,
     ...(changeType ? { changeType } : {}),
+    updatedAt: new Date().toISOString(),
+  };
+  await broadcastBestEffort(boardChannelKey(boardId), "board_changed", event);
+}
+
+/**
+ * Broadcast several card count changes in one board-level HTTP request. The
+ * browser fan-out converts each item back into the existing per-card contract.
+ */
+export async function announceEngagementBatchChange(
+  boardId: string,
+  changes: Array<{
+    cardId: string;
+    likeCount: number;
+    commentCount: number;
+    changeType?: "like" | "comment";
+    changeCount?: number;
+  }>,
+): Promise<void> {
+  if (!boardId || changes.length === 0) return;
+  const event: BoardRealtimeEvent = {
+    type: "engagement_batch_changed",
+    boardId,
+    changes,
     updatedAt: new Date().toISOString(),
   };
   await broadcastBestEffort(boardChannelKey(boardId), "board_changed", event);

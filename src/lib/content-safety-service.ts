@@ -1,6 +1,7 @@
 import "server-only";
 import { Prisma } from "@prisma/client";
 import { db } from "./db";
+import { invalidateStudentIdentityCache } from "./student-auth";
 import {
   CONTENT_TARGET_KINDS,
   buildHiddenLookup,
@@ -96,6 +97,7 @@ export async function hideTarget(input: {
     update: viaReport ? { viaReport: true } : {},
     create: { studentId, targetKind, targetId, viaReport },
   });
+  invalidateStudentIdentityCache(studentId);
 }
 
 /** Undo a per-item hide. Missing rows are treated as already unhidden. */
@@ -106,6 +108,7 @@ export async function unhideTarget(input: {
 }): Promise<void> {
   const { studentId, targetKind, targetId } = input;
   await db.hiddenContent.deleteMany({ where: { studentId, targetKind, targetId } });
+  invalidateStudentIdentityCache(studentId);
 }
 
 /** Author-level hide. Satisfies the App Store "block abusive users" control. */
@@ -120,6 +123,7 @@ export async function hideAuthor(input: {
     update: reportId ? { reportId } : {},
     create: { studentId, hiddenStudentId, reportId },
   });
+  invalidateStudentIdentityCache(studentId);
 }
 
 export async function unhideAuthor(input: {
@@ -129,6 +133,7 @@ export async function unhideAuthor(input: {
   await db.hiddenContentAuthor.deleteMany({
     where: { studentId: input.studentId, hiddenStudentId: input.hiddenStudentId },
   });
+  invalidateStudentIdentityCache(input.studentId);
 }
 
 /**

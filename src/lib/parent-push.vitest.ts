@@ -30,6 +30,7 @@ vi.mock("@/lib/expo-push", () => ({
 
 import {
   dispatchLinkedParentCardPush,
+  dispatchLinkedParentCardPushBatch,
   dispatchParentNotificationPush,
 } from "./parent-push";
 
@@ -157,6 +158,42 @@ describe("parent push dispatch reservations", () => {
         cardId: "card-1",
       },
     });
+  });
+
+  it("loads linked parents once for a batch of student card events", async () => {
+    const secondInput = {
+      ...linkedInput,
+      eventKey: "card:card-2",
+      studentId: "student-2",
+      studentName: "바다",
+      cardId: "card-2",
+    };
+    mocks.findLinks.mockResolvedValue([
+      {
+        studentId: "student-1",
+        parent: { id: "parent-1", pushDevices: [device] },
+      },
+      {
+        studentId: "student-2",
+        parent: { id: "parent-2", pushDevices: [] },
+      },
+    ]);
+
+    await expect(
+      dispatchLinkedParentCardPushBatch([linkedInput, secondInput]),
+    ).resolves.toEqual({ attempted: 1, skipped: 0 });
+    expect(mocks.findLinks).toHaveBeenCalledTimes(1);
+    expect(mocks.findLinks).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          studentId: { in: ["student-1", "student-2"] },
+          status: "active",
+          deletedAt: null,
+          parent: { parentDeletedAt: null },
+        },
+      }),
+    );
+    expect(mocks.sendExpoPush).toHaveBeenCalledTimes(1);
   });
 
   it("releases a linked-parent reservation after an external send failure", async () => {

@@ -7,10 +7,8 @@ import { authorizeCardAccess, getCurrentCardActor } from "@/lib/card-engagement-
 import { formatEngagementAuthor } from "@/lib/card-engagement-format";
 import { resolveHiddenReason } from "@/lib/content-safety";
 import { emptyHiddenLookup, loadHiddenLookup } from "@/lib/content-safety-service";
-import { announceEngagementChange } from "@/lib/realtime-broadcast";
-import { touchBoardUpdatedAt } from "@/lib/board-touch";
-import { schedulePostCommit } from "@/lib/post-commit";
-import { invalidateBoardSnapshotCache } from "@/lib/board-snapshot-cache";
+import { scheduleBoardActivity } from "@/lib/board-activity-queue";
+import { scheduleEngagementBroadcast } from "@/lib/engagement-broadcast-queue";
 import { retryActivityRewardTransaction } from "@/lib/creatures/activity-rewards";
 import { isMeaningfulRewardComment, normalizeRewardComment } from "@/lib/reward-policy";
 import {
@@ -228,11 +226,18 @@ export async function POST(
   let accountId: string | null = null;
   let studentRewardPolicy: Awaited<ReturnType<typeof loadRewardPolicyCached>> | null = null;
   if (studentActor) {
+    const accountPromise =
+      studentActor.accountId && studentActor.accountCardId
+        ? Promise.resolve({
+            accountId: studentActor.accountId,
+            cardId: studentActor.accountCardId,
+          })
+        : ensureAccountFor({
+            id: studentActor.id,
+            classroomId: studentActor.classroomId,
+          });
     const [account, policy] = await Promise.all([
-      ensureAccountFor({
-        id: studentActor.id,
-        classroomId: studentActor.classroomId,
-      }),
+      accountPromise,
       loadRewardPolicyCached(studentActor.classroomId),
     ]);
     accountId = account.accountId;
@@ -352,26 +357,13 @@ export async function POST(
   }
 
   if (audience === "public") {
-    invalidateBoardSnapshotCache(access.ctx.boardId);
-    schedulePostCommit("comment.create engagement", async () => {
-      const [likeCount, commentCount] = await Promise.all([
-        db.cardLike.count({ where: { cardId } }),
-        db.cardComment.count({ where: { cardId, audience: "public", deletedAt: null } }),
-      ]);
-      await touchBoardUpdatedAt(access.ctx.boardId, {
-        action: "comment.created",
-        actorType: isTeacher ? "teacher" : studentActor ? "student" : "guest",
-        actorId: actor.id,
-        coalesceMs: 1_000,
-      });
-      await announceEngagementChange(
-        access.ctx.boardId,
-        cardId,
-        likeCount,
-        commentCount,
-        "comment",
-      );
+    scheduleBoardActivity(access.ctx.boardId, {
+      action: "comment.created",
+      actorType: isTeacher ? "teacher" : studentActor ? "student" : "guest",
+      actorId: actor.id,
+      coalesceMs: 1_000,
     });
+    scheduleEngagementBroadcast(access.ctx.boardId, cardId, "comment");
   }
 
   const createdAuthorKind = created.authorParentId ? "parent" : created.authorKind;

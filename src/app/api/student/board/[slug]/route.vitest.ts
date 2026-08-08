@@ -3,11 +3,6 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   boardFindFirst: vi.fn(),
   boardFindUnique: vi.fn(),
-  hiddenLookup: {
-    hasAnyHide: true,
-    isTargetHidden: (kind: string, id: string) => kind === "card" && id === "card-hidden",
-    isAuthorHidden: (id: string | null | undefined) => id === "student-hidden",
-  },
 }));
 
 vi.mock("@/lib/student-auth", () => ({
@@ -15,6 +10,8 @@ vi.mock("@/lib/student-auth", () => ({
     id: "student-viewer",
     name: "학생",
     classroomId: "classroom-1",
+    hiddenTargets: [{ targetKind: "card", targetId: "card-hidden" }],
+    hiddenAuthorStudentIds: ["student-hidden"],
   })),
 }));
 
@@ -30,13 +27,11 @@ vi.mock("@/lib/rbac", () => ({ getEffectiveBoardRole: vi.fn(async () => "viewer"
 vi.mock("@/lib/card-author-labels", () => ({
   resolveCardAuthorLabels: vi.fn(async () => ({ authorName: "작성자", studentAuthorName: "학생" })),
 }));
-vi.mock("@/lib/content-safety-service", () => ({
-  loadHiddenLookup: vi.fn(async () => mocks.hiddenLookup),
-}));
 vi.mock("@/lib/speed-game/runtime", () => ({ loadGameSnapshot: vi.fn() }));
 vi.mock("@/lib/speed-game/student-snapshot", () => ({ sanitizeGameSnapshotForStudent: vi.fn() }));
 vi.mock("@/lib/plant-schemas", () => ({ parseObservationPoints: vi.fn((value) => value) }));
 
+import { clearStudentBoardCacheForTests } from "@/lib/student-board-cache";
 import { GET } from "./route";
 
 function card(id: string, studentAuthorId: string | null) {
@@ -82,6 +77,7 @@ function card(id: string, studentAuthorId: string | null) {
 
 describe("student board hidden card serialization", () => {
   beforeEach(() => {
+    clearStudentBoardCacheForTests();
     mocks.boardFindFirst.mockReset();
     mocks.boardFindUnique.mockReset();
     const board = {
@@ -92,6 +88,7 @@ describe("student board hidden card serialization", () => {
       systemGameKind: null,
       description: null,
       classroomId: "classroom-1",
+      classroom: { teacherId: "teacher-1" },
       anonymousAuthor: false,
       assignmentDeadline: null,
       assignmentAllowLate: false,

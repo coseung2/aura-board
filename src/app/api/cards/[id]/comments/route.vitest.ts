@@ -20,8 +20,8 @@ const mocks = vi.hoisted(() => ({
   award: vi.fn(),
   loadPreparedRewardContext: vi.fn(),
   create: vi.fn(),
-  announce: vi.fn(),
-  schedulePostCommit: vi.fn(),
+  scheduleBoardActivity: vi.fn(),
+  scheduleEngagementBroadcast: vi.fn(),
   guardianAvailable: true,
 }));
 
@@ -58,10 +58,22 @@ vi.mock("@/lib/creatures/activity-rewards", () => ({
 vi.mock("@/lib/card-engagement-format", () => ({
   formatEngagementAuthor: ({ name }: { name: string }) => name,
 }));
-vi.mock("@/lib/realtime-broadcast", () => ({ announceEngagementChange: mocks.announce }));
-vi.mock("@/lib/board-touch", () => ({ touchBoardUpdatedAt: vi.fn() }));
-vi.mock("@/lib/post-commit", () => ({
-  schedulePostCommit: mocks.schedulePostCommit,
+vi.mock("@/lib/content-safety-service", () => {
+  const empty = () => ({
+    hasAnyHide: false,
+    isTargetHidden: () => false,
+    isAuthorHidden: () => false,
+  });
+  return {
+    emptyHiddenLookup: empty,
+    loadHiddenLookup: vi.fn(async () => empty()),
+  };
+});
+vi.mock("@/lib/board-activity-queue", () => ({
+  scheduleBoardActivity: mocks.scheduleBoardActivity,
+}));
+vi.mock("@/lib/engagement-broadcast-queue", () => ({
+  scheduleEngagementBroadcast: mocks.scheduleEngagementBroadcast,
 }));
 
 vi.mock("@/lib/db", () => {
@@ -160,8 +172,8 @@ describe("student comment reward transaction", () => {
       }),
     );
     mocks.create.mockReset();
-    mocks.announce.mockReset();
-    mocks.schedulePostCommit.mockReset();
+    mocks.scheduleBoardActivity.mockReset();
+    mocks.scheduleEngagementBroadcast.mockReset();
     mocks.guardianAvailable = true;
     mocks.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => {
       if (
@@ -356,7 +368,8 @@ describe("student comment reward transaction", () => {
     );
     expect((await response.json()).item.authorKind).toBe("parent");
     expect(mocks.award).not.toHaveBeenCalled();
-    expect(mocks.announce).not.toHaveBeenCalled();
+    expect(mocks.scheduleBoardActivity).not.toHaveBeenCalled();
+    expect(mocks.scheduleEngagementBroadcast).not.toHaveBeenCalled();
   });
 
   it("rejects a legacy/default public comment from a parent", async () => {

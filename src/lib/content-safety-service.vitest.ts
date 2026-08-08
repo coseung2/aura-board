@@ -2,11 +2,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   queryRaw: vi.fn(),
+  invalidateStudentIdentityCache: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("./db", () => ({
   db: { $queryRaw: mocks.queryRaw },
+}));
+vi.mock("./student-auth", () => ({
+  invalidateStudentIdentityCache: mocks.invalidateStudentIdentityCache,
 }));
 
 import { loadHiddenLookup } from "./content-safety-service";
@@ -14,6 +18,7 @@ import { loadHiddenLookup } from "./content-safety-service";
 describe("loadHiddenLookup", () => {
   beforeEach(() => {
     mocks.queryRaw.mockReset();
+    mocks.invalidateStudentIdentityCache.mockReset();
   });
 
   it("loads target and author hides in one database round trip", async () => {

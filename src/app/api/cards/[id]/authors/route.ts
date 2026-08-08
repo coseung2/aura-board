@@ -15,6 +15,7 @@ import {
 } from "@/lib/card-authors-service";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { normalizeStudentAuthorInputs } from "@/lib/student-card-authors";
+import { invalidateCardAccessCache } from "@/lib/card-access-cache";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -117,6 +118,8 @@ export async function PUT(
         classroomId: board.classroomId,
       });
     });
+
+    invalidateCardAccessCache(card.id);
 
     const savedAuthors = await db.cardAuthor.findMany({
       where: { cardId: card.id },

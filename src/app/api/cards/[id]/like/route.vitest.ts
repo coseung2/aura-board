@@ -2,12 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   applyLike: vi.fn(),
-  touchBoard: vi.fn(),
-  announce: vi.fn(),
+  scheduleBoardActivity: vi.fn(),
+  scheduleEngagementBroadcast: vi.fn(),
   cardFindUnique: vi.fn(),
   likeCount: vi.fn(),
-  commentCount: vi.fn(),
-  postCommit: [] as Promise<void>[],
 }));
 
 vi.mock("@/lib/card-engagement-actor", () => ({
@@ -34,20 +32,16 @@ vi.mock("@/lib/card-like-toggle", () => ({
   applyCardLikeMutation: mocks.applyLike,
   getPrismaErrorCode: vi.fn(() => undefined),
 }));
-vi.mock("@/lib/board-touch", () => ({ touchBoardUpdatedAt: mocks.touchBoard }));
-vi.mock("@/lib/realtime-broadcast", () => ({
-  announceEngagementChange: mocks.announce,
+vi.mock("@/lib/board-activity-queue", () => ({
+  scheduleBoardActivity: mocks.scheduleBoardActivity,
 }));
-vi.mock("@/lib/post-commit", () => ({
-  schedulePostCommit: (_label: string, task: () => Promise<void>) => {
-    mocks.postCommit.push(task());
-  },
+vi.mock("@/lib/engagement-broadcast-queue", () => ({
+  scheduleEngagementBroadcast: mocks.scheduleEngagementBroadcast,
 }));
 vi.mock("@/lib/db", () => ({
   db: {
     card: { findUnique: mocks.cardFindUnique },
     cardLike: { count: mocks.likeCount },
-    cardComment: { count: mocks.commentCount },
   },
 }));
 
@@ -56,10 +50,8 @@ import { POST } from "./route";
 describe("card like route query shape", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.postCommit.length = 0;
     mocks.applyLike.mockResolvedValue(true);
     mocks.likeCount.mockResolvedValue(7);
-    mocks.commentCount.mockResolvedValue(4);
   });
 
   it("reuses the authorized board id instead of querying the card again", async () => {
@@ -74,19 +66,16 @@ describe("card like route query shape", () => {
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ liked: true, count: 7 });
-    await Promise.all(mocks.postCommit);
     expect(mocks.cardFindUnique).not.toHaveBeenCalled();
-    expect(mocks.touchBoard).toHaveBeenCalledWith("board-1", {
+    expect(mocks.scheduleBoardActivity).toHaveBeenCalledWith("board-1", {
       action: "like.created",
       actorType: "student",
       actorId: "student-1",
       coalesceMs: 1_000,
     });
-    expect(mocks.announce).toHaveBeenCalledWith(
+    expect(mocks.scheduleEngagementBroadcast).toHaveBeenCalledWith(
       "board-1",
       "card-1",
-      7,
-      4,
       "like",
     );
   });

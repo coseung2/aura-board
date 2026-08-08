@@ -4,6 +4,7 @@ import { db } from "./db";
 import { getCurrentUser } from "./auth";
 import { getCurrentStudentIdentityRaw } from "./student-auth";
 import { getCurrentParent } from "./parent-session";
+import { loadCardAccessBaseCached } from "./card-access-cache";
 
 // card-comments-likes (2026-04-26): 카드 engagement (댓글/좋아요) 의 actor
 // 식별 + 카드 가시성 검사 단일 진입점.
@@ -15,28 +16,50 @@ import { getCurrentParent } from "./parent-session";
 
 export type CardActor =
   | { kind: "teacher"; id: string; name: string }
-  | { kind: "student"; id: string; name: string; classroomId: string }
+  | {
+      kind: "student";
+      id: string;
+      name: string;
+      classroomId: string;
+      accountId?: string | null;
+      accountCardId?: string | null;
+    }
   | { kind: "parent"; id: string; name: string };
+
+function studentActorFromIdentity(
+  student: NonNullable<Awaited<ReturnType<typeof getCurrentStudentIdentityRaw>>>,
+): Extract<CardActor, { kind: "student" }> {
+  return {
+    kind: "student",
+    id: student.id,
+    name: student.name,
+    classroomId: student.classroomId,
+    accountId: student.accountId ?? null,
+    accountCardId: student.accountCardId ?? null,
+  };
+}
 
 export async function getCurrentCardActor(): Promise<CardActor | null> {
   const headerList = await headers();
   const preferStudent =
     headerList.get("x-aura-student-viewer") === "1";
   if (preferStudent) {
-    const s = await getCurrentStudentIdentityRaw().catch(() => null);
-    if (s) return { kind: "student", id: s.id, name: s.name, classroomId: s.classroomId };
+    const student = await getCurrentStudentIdentityRaw().catch(() => null);
+    if (student) return studentActorFromIdentity(student);
   }
 
   try {
-    const u = await getCurrentUser();
-    if (u) return { kind: "teacher", id: u.id, name: u.name ?? "선생님" };
+    const user = await getCurrentUser();
+    if (user) return { kind: "teacher", id: user.id, name: user.name ?? "선생님" };
   } catch {
     /* not teacher */
   }
-  const s = await getCurrentStudentIdentityRaw().catch(() => null);
-  if (s) return { kind: "student", id: s.id, name: s.name, classroomId: s.classroomId };
-  const p = await getCurrentParent().catch(() => null);
-  if (p) return { kind: "parent", id: p.parent.id, name: p.parent.name };
+  const student = await getCurrentStudentIdentityRaw().catch(() => null);
+  if (student) return studentActorFromIdentity(student);
+  const parent = await getCurrentParent().catch(() => null);
+  if (parent) {
+    return { kind: "parent", id: parent.parent.id, name: parent.parent.name };
+  }
   return null;
 }
 
@@ -62,66 +85,100 @@ export async function authorizeCardAccess(
   actor: CardActor,
   _mode: "read" | "write"
 ): Promise<{ ok: true; ctx: CardAccessContext } | { ok: false; reason: "not_found" | "forbidden" | "no_classroom" }> {
-  const card = await db.card.findUnique({
-    where: { id: cardId },
-    select: {
-      id: true,
-      studentAuthorId: true,
-      authors: {
-        ...(actor.kind === "student"
-          ? { where: { studentId: actor.id } }
-          : {}),
-        select: { studentId: true },
-      },
-      board: {
-        select: {
-          id: true,
-          classroomId: true,
-          anonymousAuthor: true,
-          ...(actor.kind === "teacher"
-            ? {
-                classroom: { select: { teacherId: true } },
-                members: {
-                  where: { userId: actor.id },
-                  select: { userId: true },
-                },
-              }
-            : {}),
+  if (actor.kind === "teacher") {
+    const card = await db.card.findUnique({
+      where: { id: cardId },
+      select: {
+        id: true,
+        studentAuthorId: true,
+        authors: { select: { studentId: true } },
+        board: {
+          select: {
+            id: true,
+            classroomId: true,
+            anonymousAuthor: true,
+            classroom: { select: { teacherId: true } },
+            members: {
+              where: { userId: actor.id },
+              select: { userId: true },
+            },
+          },
         },
       },
-    },
-  });
-  if (!card) return { ok: false, reason: "not_found" };
-  const classroomId = card.board.classroomId;
-  const studentAuthorIds = Array.from(
-    new Set(
-      [card.studentAuthorId, ...card.authors.map((author) => author.studentId)].filter(
-        (studentId): studentId is string => Boolean(studentId),
+    });
+    if (!card) return { ok: false, reason: "not_found" };
+    const studentAuthorIds = Array.from(
+      new Set(
+        [card.studentAuthorId, ...card.authors.map((author) => author.studentId)].filter(
+          (studentId): studentId is string => Boolean(studentId),
+        ),
       ),
-    ),
-  );
-
-  if (actor.kind === "teacher") {
+    );
     const isClassroomTeacher = card.board.classroom?.teacherId === actor.id;
-    const isBoardMember =
-      card.board.members?.some((m) => m.userId === actor.id) ?? false;
+    const isBoardMember = card.board.members.some((member) => member.userId === actor.id);
     if (!isClassroomTeacher && !isBoardMember) {
       return { ok: false, reason: "forbidden" };
     }
-  } else if (actor.kind === "student") {
-    if (!classroomId) return { ok: false, reason: "no_classroom" };
+    return {
+      ok: true,
+      ctx: {
+        cardId: card.id,
+        boardId: card.board.id,
+        classroomId: card.board.classroomId,
+        anonymousAuthor: card.board.anonymousAuthor,
+        studentAuthorId: card.studentAuthorId,
+        studentAuthorIds,
+        guardianAvailable: studentAuthorIds.length > 0,
+      },
+    };
+  }
+
+  const card = await loadCardAccessBaseCached(cardId, async () => {
+    const row = await db.card.findUnique({
+      where: { id: cardId },
+      select: {
+        id: true,
+        studentAuthorId: true,
+        authors: { select: { studentId: true } },
+        board: {
+          select: {
+            id: true,
+            classroomId: true,
+            anonymousAuthor: true,
+          },
+        },
+      },
+    });
+    if (!row) return null;
+    return {
+      id: row.id,
+      studentAuthorId: row.studentAuthorId,
+      studentAuthorIds: Array.from(
+        new Set(
+          [row.studentAuthorId, ...row.authors.map((author) => author.studentId)].filter(
+            (studentId): studentId is string => Boolean(studentId),
+          ),
+        ),
+      ),
+      board: row.board,
+    };
+  });
+  if (!card) return { ok: false, reason: "not_found" };
+
+  const classroomId = card.board.classroomId;
+  if (!classroomId) return { ok: false, reason: "no_classroom" };
+  if (actor.kind === "student") {
     if (actor.classroomId !== classroomId) {
       return { ok: false, reason: "forbidden" };
     }
   } else {
-    if (!classroomId) return { ok: false, reason: "no_classroom" };
-    if (studentAuthorIds.length === 0) return { ok: false, reason: "forbidden" };
-    // Parent feed includes both primary and CardAuthor co-authors. Engagement
-    // must use the same scope or a visible child post can reject likes/comments.
+    if (card.studentAuthorIds.length === 0) {
+      return { ok: false, reason: "forbidden" };
+    }
     const link = await db.parentChildLink.findFirst({
       where: {
         parentId: actor.id,
-        studentId: { in: studentAuthorIds },
+        studentId: { in: card.studentAuthorIds },
         status: "active",
         deletedAt: null,
       },
@@ -138,12 +195,10 @@ export async function authorizeCardAccess(
       classroomId,
       anonymousAuthor: card.board.anonymousAuthor,
       studentAuthorId: card.studentAuthorId,
-      studentAuthorIds,
+      studentAuthorIds: card.studentAuthorIds,
       guardianAvailable:
-        studentAuthorIds.length > 0 &&
-        (actor.kind === "teacher" ||
-          (actor.kind === "student" && studentAuthorIds.includes(actor.id)) ||
-          actor.kind === "parent"),
+        card.studentAuthorIds.length > 0 &&
+        (actor.kind === "parent" || card.studentAuthorIds.includes(actor.id)),
     },
   };
 }

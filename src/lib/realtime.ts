@@ -103,6 +103,19 @@ export type BoardRealtimeEvent =
       likeCount: number;
       commentCount: number;
       changeType?: "like" | "comment";
+      changeCount?: number;
+      updatedAt: string;
+    }
+  | {
+      type: "engagement_batch_changed";
+      boardId: string;
+      changes: Array<{
+        cardId: string;
+        likeCount: number;
+        commentCount: number;
+        changeType?: "like" | "comment";
+        changeCount?: number;
+      }>;
       updatedAt: string;
     }
   | {
