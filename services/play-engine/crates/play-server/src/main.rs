@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bind: SocketAddr = env::var("PLAY_ENGINE_BIND")
         .unwrap_or_else(|_| "127.0.0.1:8081".to_owned())
         .parse()?;
-    let db_max_connections = bounded_u32_env("PLAY_ENGINE_DB_MAX_CONNECTIONS", 10, 1, 64)?;
+    let db_max_connections = bounded_u32_env("PLAY_ENGINE_DB_MAX_CONNECTIONS", 16, 1, 64)?;
 
     eprintln!("play-server: initializing repository (max_connections={db_max_connections})",);
     let repository: Arc<dyn PlayRepository> = Arc::new(

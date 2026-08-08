@@ -34,7 +34,7 @@ impl PostgresRepository {
     }
 
     pub async fn connect(database_url: &str) -> Result<Self, RepositoryError> {
-        Self::connect_with_max_connections(database_url, 10).await
+        Self::connect_with_max_connections(database_url, 16).await
     }
 
     pub async fn connect_with_max_connections(
