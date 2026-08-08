@@ -91,7 +91,11 @@ describe("Omok matchmaking", () => {
       name: "학생 2",
       classroomId: "classroom-1",
     });
-    mocks.boardFindFirst.mockResolvedValue({ id: "lobby-1", classroomId: "classroom-1" });
+    mocks.boardFindFirst.mockResolvedValue({
+      id: "lobby-1",
+      classroomId: "classroom-1",
+      classroom: { teacherId: "teacher-1" },
+    });
     mocks.boardFindUnique.mockResolvedValue({ slug: "omok-match-room" });
     mocks.boardCreate.mockResolvedValue({ id: "match-board-1" });
     mocks.studentFindMany.mockResolvedValue([
@@ -138,12 +142,33 @@ describe("Omok matchmaking", () => {
       status: "waiting",
       matchBoardId: null,
       sessionId: null,
+      requestedAt: new Date(0),
     });
     const response = await GET(request, context);
     expect(response.status).toBe(200);
     expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
-      where: expect.objectContaining({ status: "waiting", studentId: "student-2" }),
+      where: expect.objectContaining({
+        id: "ticket-2",
+        status: "waiting",
+        requestedAt: { lt: expect.any(Date) },
+      }),
     }));
+    expect(await response.json()).toEqual({ status: "waiting", playerCount: 2 });
+  });
+
+  it("does not write a heartbeat for every fast poll", async () => {
+    mocks.ticketFindUnique.mockResolvedValue({
+      id: "ticket-2",
+      status: "waiting",
+      matchBoardId: null,
+      sessionId: null,
+      requestedAt: new Date(),
+    });
+
+    const response = await GET(request, context);
+
+    expect(response.status).toBe(200);
+    expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
     expect(await response.json()).toEqual({ status: "waiting", playerCount: 2 });
   });
 
@@ -156,11 +181,12 @@ describe("Omok matchmaking", () => {
         matchBoardId: "match-board-1",
         sessionId: "session-1",
       });
-    mocks.playEngineFetch
-      .mockResolvedValueOnce(engineResponse({ snapshot: { sessionId: "session-1", version: 0 } }, 201))
-      .mockResolvedValueOnce(engineResponse({ version: 1 }))
-      .mockResolvedValueOnce(engineResponse({ version: 2 }))
-      .mockResolvedValueOnce(engineResponse({ version: 3 }));
+    mocks.playEngineFetch.mockResolvedValueOnce(
+      engineResponse(
+        { snapshot: { sessionId: "session-1", version: 0, roomStatus: "active" } },
+        201,
+      ),
+    );
 
     const response = await POST(postRequest(), context);
 
@@ -168,10 +194,13 @@ describe("Omok matchmaking", () => {
     expect(mocks.studentFindMany).toHaveBeenCalledWith(expect.objectContaining({
       where: { classroomId: "classroom-1", id: { in: ["student-1", "student-2"] } },
     }));
-    expect(mocks.playEngineFetch).toHaveBeenCalledTimes(4);
-    expect(mocks.playEngineFetch).toHaveBeenLastCalledWith(
-      "/v1/sessions/session-1/commands",
-      expect.objectContaining({ body: expect.objectContaining({ command: { type: "start" } }) }),
+    expect(mocks.classroomFindUnique).not.toHaveBeenCalled();
+    expect(mocks.playEngineFetch).toHaveBeenCalledTimes(1);
+    expect(mocks.playEngineFetch).toHaveBeenCalledWith(
+      "/v1/boards/match-board-1/sessions",
+      expect.objectContaining({
+        body: expect.objectContaining({ autoStart: true }),
+      }),
     );
     expect(mocks.announceMatchmaking).toHaveBeenCalledWith("lobby-1");
     expect(await response.json()).toEqual({
@@ -193,11 +222,12 @@ describe("Omok matchmaking", () => {
         sessionId: "session-bot",
       });
     mocks.ticketCount.mockResolvedValue(1);
-    mocks.playEngineFetch
-      .mockResolvedValueOnce(engineResponse({ snapshot: { sessionId: "session-bot", version: 0 } }, 201))
-      .mockResolvedValueOnce(engineResponse({ version: 1 }))
-      .mockResolvedValueOnce(engineResponse({ version: 2 }))
-      .mockResolvedValueOnce(engineResponse({ version: 3 }));
+    mocks.playEngineFetch.mockResolvedValueOnce(
+      engineResponse(
+        { snapshot: { sessionId: "session-bot", version: 0, roomStatus: "active" } },
+        201,
+      ),
+    );
 
     const response = await POST(postRequest({ opponent: "computer" }), context);
 
@@ -214,17 +244,11 @@ describe("Omok matchmaking", () => {
             { actorSubject: "student:student-2", displayName: "학생 2" },
             { actorSubject: "bot:omok:v1", displayName: "오목봇" },
           ],
+          autoStart: true,
         }),
       }),
     );
-    expect(mocks.playEngineFetch).toHaveBeenNthCalledWith(
-      3,
-      "/v1/sessions/session-bot/commands",
-      expect.objectContaining({
-        actor: expect.objectContaining({ subject: "bot:omok:v1", role: "participant" }),
-        body: expect.objectContaining({ command: { type: "ready" } }),
-      }),
-    );
+    expect(mocks.playEngineFetch).toHaveBeenCalledTimes(1);
     expect(await response.json()).toEqual({
       status: "matched",
       playerCount: 1,

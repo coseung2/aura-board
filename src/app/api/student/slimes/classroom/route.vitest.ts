@@ -13,10 +13,14 @@ vi.mock("@/lib/db", () => ({
   db: { student: { findMany: mocks.findMany } },
 }));
 
+import { resetClassroomSlimeRowsCache } from "@/lib/pets/classroom-gallery-cache";
 import { GET } from "./route";
 
 describe("GET /api/student/slimes/classroom", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetClassroomSlimeRowsCache();
+  });
 
   it("requires an authenticated student", async () => {
     mocks.getCurrentStudent.mockResolvedValue(null);
@@ -110,6 +114,29 @@ describe("GET /api/student/slimes/classroom", () => {
         representative: null,
       },
     ]);
+  });
+
+  it("coalesces simultaneous opens from the same classroom", async () => {
+    mocks.getCurrentStudent.mockResolvedValue({
+      id: "student-1",
+      classroomId: "classroom-1",
+    });
+    let resolveRows: ((rows: unknown[]) => void) | undefined;
+    mocks.findMany.mockReturnValue(
+      new Promise<unknown[]>((resolve) => {
+        resolveRows = resolve;
+      }),
+    );
+
+    const first = GET(new Request("https://example.test/api/student/slimes/classroom"));
+    const second = GET(new Request("https://example.test/api/student/slimes/classroom"));
+    await Promise.resolve();
+
+    expect(mocks.findMany).toHaveBeenCalledTimes(1);
+    resolveRows?.([]);
+    const [firstResponse, secondResponse] = await Promise.all([first, second]);
+    expect(firstResponse.status).toBe(200);
+    expect(secondResponse.status).toBe(200);
   });
 
   it("removes unsupported equipped wearables from legacy bearer gallery rows", async () => {

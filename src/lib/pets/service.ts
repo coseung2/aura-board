@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { walkingTitleForStats, type WalkingTitleStats } from "@/lib/walking-titles";
 import { getTitleDefinition } from "@/lib/title-catalog";
+import { cachedClassroomCurrency } from "./classroom-currency-cache";
 import {
   getSlimeDefinition,
   getEquippedSlimeFloor,
@@ -99,24 +100,25 @@ async function walkingTitleForStudent(studentId: string) {
   // missing raw-query capability as "no title yet" instead of failing the home.
   if (typeof db.$queryRaw !== "function") return null;
   const [stats] = await db.$queryRaw<WalkingTitleStats[]>(Prisma.sql`
-    WITH daily AS (
-      SELECT MAX("steps")::bigint AS "maxDailySteps"
+    WITH stats AS MATERIALIZED (
+      SELECT "day", "steps"
       FROM "StudentWalkingDailyStat"
       WHERE "studentId" = ${studentId}
+    ), daily AS (
+      SELECT MAX("steps")::bigint AS "maxDailySteps"
+      FROM stats
     ), weekly AS (
       SELECT MAX("weeklySteps")::bigint AS "maxWeeklySteps"
       FROM (
         SELECT DATE_TRUNC('week', "day") AS "weekStart", SUM("steps")::bigint AS "weeklySteps"
-        FROM "StudentWalkingDailyStat"
-        WHERE "studentId" = ${studentId}
+        FROM stats
         GROUP BY DATE_TRUNC('week', "day")
       ) totals
     ), monthly AS (
       SELECT MAX("monthlySteps")::bigint AS "maxMonthlySteps"
       FROM (
         SELECT DATE_TRUNC('month', "day") AS "monthStart", SUM("steps")::bigint AS "monthlySteps"
-        FROM "StudentWalkingDailyStat"
-        WHERE "studentId" = ${studentId}
+        FROM stats
         GROUP BY DATE_TRUNC('month', "day")
       ) totals
     )
@@ -213,32 +215,28 @@ async function replayPurchase(
 }
 
 export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome> {
-  const [account, currency, owned, growthRowsResult, ownedItems, walkingTitle] = await Promise.all([
+  const [account, currency, owned, ownedItems, walkingTitle, claimedTitleRows] = await Promise.all([
     db.studentAccount.findUnique({
       where: { studentId: student.id },
       select: { balance: true },
     }),
-    db.classroomCurrency.findUnique({
-      where: { classroomId: student.classroomId },
-      select: { unitLabel: true },
-    }),
+    cachedClassroomCurrency(student.classroomId, () =>
+      db.classroomCurrency.findUnique({
+        where: { classroomId: student.classroomId },
+        select: { unitLabel: true },
+      }),
+    ),
     db.studentSlime.findMany({
       // Slime ownership follows the student if they move classrooms. The
       // classroomId remains an audit snapshot of where it was purchased.
       where: { studentId: student.id },
       select: {
-        color: true,
-        isEquipped: true,
+        ...slimeGrowthSelect,
         isRepresentative: true,
         equippedItemKeys: true,
         hiddenItemKeys: true,
         equippedTitleKey: true,
       },
-      orderBy: { createdAt: "asc" },
-    }),
-    db.studentSlime.findMany({
-      where: { studentId: student.id },
-      select: slimeGrowthSelect,
       orderBy: { createdAt: "asc" },
     }),
     // The inventory delegate was added with the creature system. Keeping the
@@ -250,9 +248,16 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
       orderBy: { createdAt: "asc" },
     }) ?? Promise.resolve([] as { itemKey: string; quantity?: number; isEquipped?: boolean }[]),
     walkingTitleForStudent(student.id),
+    // The title delegate arrived with claimable titles; older isolated fixtures
+    // mock only slime ownership and still expect a usable home response.
+    db.studentTitle?.findMany?.({
+      where: { studentId: student.id },
+      select: { titleKey: true },
+      orderBy: { claimedAt: "asc" },
+    }) ?? Promise.resolve([] as { titleKey: string }[]),
   ]);
   if (!account) throw new SlimeServiceError("account_not_found");
-  const growthRows = Array.isArray(growthRowsResult) ? growthRowsResult : [];
+  const growthRows = Array.isArray(owned) ? owned : [];
   const ownedSet = new Set(owned.map((row) => row.color));
   const equippedSet = new Set(
     owned.filter((row) => row.isEquipped !== false).map((row) => row.color),
@@ -300,13 +305,6 @@ export async function getSlimeHome(student: StudentIdentity): Promise<SlimeHome>
       .filter((slime) => slime.equippedTitleKey)
       .map((slime) => [slime.color, slime.equippedTitleKey as string]),
   ) as Partial<Record<SlimeColor, string>>;
-  // The title delegate arrived with claimable titles; older isolated fixtures
-  // mock only slime ownership and still expect a usable home response.
-  const claimedTitleRows = (await db.studentTitle?.findMany?.({
-    where: { studentId: student.id },
-    select: { titleKey: true },
-    orderBy: { claimedAt: "asc" },
-  })) ?? [];
   const claimedTitles = claimedTitleRows.flatMap((row) => {
     const definition = getTitleDefinition(row.titleKey);
     if (!definition) return [];

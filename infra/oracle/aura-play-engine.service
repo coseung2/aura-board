@@ -8,6 +8,7 @@ Type=simple
 User=aura-app
 Group=aura-app
 Environment=PLAY_ENGINE_BIND=127.0.0.1:8081
+Environment=PLAY_ENGINE_DB_MAX_CONNECTIONS=16
 EnvironmentFile=/etc/aura-board/app.env
 ExecStart=/opt/aura-board-play-engine/current/play-server
 Restart=on-failure
@@ -16,7 +17,7 @@ TimeoutStartSec=30
 TimeoutStopSec=30
 MemoryHigh=1G
 MemoryMax=2G
-CPUQuota=100%
+CPUQuota=150%
 CPUAccounting=true
 MemoryAccounting=true
 TasksMax=256

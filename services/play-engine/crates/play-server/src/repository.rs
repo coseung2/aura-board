@@ -237,7 +237,7 @@ impl PlayRepository for MemoryRepository {
             .try_into()
             .map_err(|_| ModelError::InvalidRequest)?;
         let session_id = Uuid::new_v4().to_string();
-        let record = SessionRecord::new(
+        let mut record = SessionRecord::new(
             session_id.clone(),
             board_id.to_owned(),
             actor.subject.clone(),
@@ -245,6 +245,9 @@ impl PlayRepository for MemoryRepository {
             None,
             now_ms,
         )?;
+        if request.auto_start {
+            record.start_immediately()?;
+        }
         let response = SessionResponse {
             request_id: request.request_id.clone(),
             snapshot: record.snapshot(actor, now_ms)?,
@@ -624,7 +627,9 @@ impl PlayRepository for MemoryRepository {
             .cloned()
             .ok_or(RepositoryError::NotFound)?;
         current.authorize(actor)?;
-        if current.version != request.expected_version {
+        if current.version != request.expected_version
+            && !current.permits_stale_participant_lobby_command(actor, &request.command)?
+        {
             return Err(RepositoryError::ShadowAllianceVersionConflict {
                 current: Box::new(current),
             });
@@ -905,6 +910,7 @@ mod tests {
                     display_name: "둘째".to_owned(),
                 },
             ],
+            auto_start: false,
         }
     }
 
@@ -1006,6 +1012,32 @@ mod tests {
             .await
             .unwrap();
         (repository, created.value.snapshot.id)
+    }
+
+    #[tokio::test]
+    async fn auto_start_create_enters_an_active_room_in_one_write() {
+        let repository = MemoryRepository::new();
+        let mut request = create_request("auto-start-create");
+        request.auto_start = true;
+
+        let created = repository
+            .create_session(&host(), "auto-start-board", &request, 100)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            created.value.snapshot.room_status,
+            crate::model::RoomStatus::Active,
+        );
+        assert!(
+            created
+                .value
+                .snapshot
+                .participants
+                .iter()
+                .all(|participant| participant.ready),
+        );
+        assert_eq!(created.value.snapshot.version, 0);
     }
 
     #[tokio::test]
@@ -1473,6 +1505,116 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn shadow_alliance_accepts_stale_versions_for_independent_lobby_updates() {
+        let (repository, session_id) = setup_shadow_alliance().await;
+
+        let first_join = repository
+            .execute_shadow_alliance_command(
+                &participant("first"),
+                &session_id,
+                &ShadowAllianceCommandRequest {
+                    request_id: "stale-join-first".to_owned(),
+                    expected_version: 0,
+                    command_schema_version: SHADOW_ALLIANCE_COMMAND_SCHEMA_VERSION,
+                    command: ShadowAllianceIntent::Join,
+                },
+                200,
+            )
+            .await
+            .unwrap();
+        assert_eq!(first_join.value.version, 1);
+
+        let second_join = repository
+            .execute_shadow_alliance_command(
+                &participant("second"),
+                &session_id,
+                &ShadowAllianceCommandRequest {
+                    request_id: "stale-join-second".to_owned(),
+                    expected_version: 0,
+                    command_schema_version: SHADOW_ALLIANCE_COMMAND_SCHEMA_VERSION,
+                    command: ShadowAllianceIntent::Join,
+                },
+                210,
+            )
+            .await
+            .unwrap();
+        assert_eq!(second_join.value.previous_version, 1);
+        assert_eq!(second_join.value.version, 2);
+
+        let first_ready = repository
+            .execute_shadow_alliance_command(
+                &participant("first"),
+                &session_id,
+                &ShadowAllianceCommandRequest {
+                    request_id: "stale-ready-first".to_owned(),
+                    expected_version: 1,
+                    command_schema_version: SHADOW_ALLIANCE_COMMAND_SCHEMA_VERSION,
+                    command: ShadowAllianceIntent::Ready,
+                },
+                220,
+            )
+            .await
+            .unwrap();
+        assert_eq!(first_ready.value.previous_version, 2);
+        assert_eq!(first_ready.value.version, 3);
+
+        let second_ready = repository
+            .execute_shadow_alliance_command(
+                &participant("second"),
+                &session_id,
+                &ShadowAllianceCommandRequest {
+                    request_id: "stale-ready-second".to_owned(),
+                    expected_version: 2,
+                    command_schema_version: SHADOW_ALLIANCE_COMMAND_SCHEMA_VERSION,
+                    command: ShadowAllianceIntent::Ready,
+                },
+                230,
+            )
+            .await
+            .unwrap();
+        assert_eq!(second_ready.value.previous_version, 3);
+        assert_eq!(second_ready.value.version, 4);
+
+        let duplicate_join = repository
+            .execute_shadow_alliance_command(
+                &participant("first"),
+                &session_id,
+                &ShadowAllianceCommandRequest {
+                    request_id: "stale-join-first-again".to_owned(),
+                    expected_version: 0,
+                    command_schema_version: SHADOW_ALLIANCE_COMMAND_SCHEMA_VERSION,
+                    command: ShadowAllianceIntent::Join,
+                },
+                240,
+            )
+            .await;
+        assert!(matches!(
+            duplicate_join,
+            Err(RepositoryError::ShadowAllianceVersionConflict { current })
+                if current.version == 4
+        ));
+
+        let stale_host_start = repository
+            .execute_shadow_alliance_command(
+                &host(),
+                &session_id,
+                &ShadowAllianceCommandRequest {
+                    request_id: "stale-host-start".to_owned(),
+                    expected_version: 0,
+                    command_schema_version: SHADOW_ALLIANCE_COMMAND_SCHEMA_VERSION,
+                    command: ShadowAllianceIntent::Start,
+                },
+                250,
+            )
+            .await;
+        assert!(matches!(
+            stale_host_start,
+            Err(RepositoryError::ShadowAllianceVersionConflict { current })
+                if current.version == 4
+        ));
+    }
+
+    #[tokio::test]
     async fn shadow_alliance_replays_terminal_result_without_leaking_choices() {
         let (repository, session_id) = setup_shadow_alliance().await;
         let join_first = ShadowAllianceCommandRequest {
@@ -1746,13 +1888,16 @@ mod tests {
             .unwrap();
         let error = repository
             .execute_shadow_alliance_command(
-                &participant("second"),
+                &host(),
                 &session_id,
                 &ShadowAllianceCommandRequest {
-                    request_id: "stale-join".to_owned(),
+                    request_id: "stale-host-settings".to_owned(),
                     expected_version: 0,
                     command_schema_version: SHADOW_ALLIANCE_COMMAND_SCHEMA_VERSION,
-                    command: ShadowAllianceIntent::Join,
+                    command: ShadowAllianceIntent::UpdateSettings {
+                        editable: false,
+                        timer_sec: 30,
+                    },
                 },
                 300,
             )

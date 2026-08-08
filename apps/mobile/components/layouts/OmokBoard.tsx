@@ -62,6 +62,7 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   const [error, setError] = useState<string | null>(null);
   const [hasPending, setHasPending] = useState(false);
   const sequenceRef = useRef(0);
+  const matchmakingRefreshRef = useRef<Promise<void> | null>(null);
   const retriedRef = useRef<string | null>(null);
   const { width } = useWindowDimensions();
   const cellSize = Math.max(20, Math.min(29, Math.floor((width - 40) / 15)));
@@ -100,23 +101,35 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
     [router],
   );
 
-  const refreshMatchmaking = useCallback(async () => {
-    const sequence = ++sequenceRef.current;
-    setSyncing(true);
-    try {
-      const next = await fetchOmokMatchmaking(boardId);
-      if (sequence !== sequenceRef.current) return;
-      acceptMatchmaking(next);
-      setError(null);
-    } catch (cause) {
-      if (sequence !== sequenceRef.current) return;
-      setError(messageForError(cause));
-    } finally {
-      if (sequence === sequenceRef.current) {
-        setLoading(false);
-        setSyncing(false);
+  const refreshMatchmaking = useCallback(() => {
+    const inFlight = matchmakingRefreshRef.current;
+    if (inFlight) return inFlight;
+
+    const task = (async () => {
+      const sequence = ++sequenceRef.current;
+      setSyncing(true);
+      try {
+        const next = await fetchOmokMatchmaking(boardId);
+        if (sequence !== sequenceRef.current) return;
+        acceptMatchmaking(next);
+        setError(null);
+      } catch (cause) {
+        if (sequence !== sequenceRef.current) return;
+        setError(messageForError(cause));
+      } finally {
+        if (sequence === sequenceRef.current) {
+          setLoading(false);
+          setSyncing(false);
+        }
       }
-    }
+    })();
+    matchmakingRefreshRef.current = task;
+    void task.finally(() => {
+      if (matchmakingRefreshRef.current === task) {
+        matchmakingRefreshRef.current = null;
+      }
+    });
+    return task;
   }, [acceptMatchmaking, boardId]);
 
   useEffect(() => {

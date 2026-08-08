@@ -318,6 +318,29 @@ impl ShadowAllianceSessionRecord {
         }
     }
 
+    pub fn permits_stale_participant_lobby_command(
+        &self,
+        actor: &ActorContext,
+        intent: &ShadowAllianceIntent,
+    ) -> Result<bool, ModelError> {
+        self.authorize(actor)?;
+        if actor.role != ActorRole::Participant || self.state.phase != ShadowAlliancePhase::Lobby {
+            return Ok(false);
+        }
+        let student_id = self.student_id_for_actor(actor)?;
+        let identity = self
+            .participants
+            .get(&student_id)
+            .ok_or(ModelError::InvalidState)?;
+        Ok(match intent {
+            ShadowAllianceIntent::Join => identity.joined_at_ms.is_none(),
+            ShadowAllianceIntent::Ready => {
+                identity.joined_at_ms.is_some() && identity.ready_at_ms.is_none()
+            }
+            _ => false,
+        })
+    }
+
     pub fn apply(
         &mut self,
         actor: &ActorContext,

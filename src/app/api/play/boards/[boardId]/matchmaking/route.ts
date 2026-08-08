@@ -17,39 +17,47 @@ export const runtime = "nodejs";
 
 type Params = { params: Promise<{ boardId: string }> };
 const WAITING_HEARTBEAT_MS = 30_000;
+const WAITING_HEARTBEAT_REFRESH_MS = 10_000;
 const MatchmakingRequestSchema = z
   .object({ opponent: z.enum(["human", "computer"]).optional() })
   .strict();
 
 type ParticipantSeed = { actorSubject: string; displayName: string };
-type MatchReservation = {
-  kind: "human" | "computer";
-  matchBoardId: string;
-  teacherId: string;
-  participants: [ParticipantSeed, ParticipantSeed];
-};
+type MatchReservation =
+  | {
+      kind: "human";
+      matchBoardId: string;
+      classroomId: string;
+      teacherId: string;
+      studentIds: [string, string];
+    }
+  | {
+      kind: "computer";
+      matchBoardId: string;
+      classroomId: string;
+      teacherId: string;
+      participants: [ParticipantSeed, ParticipantSeed];
+    };
 
 async function resolveLobby(boardId: string, classroomId: string) {
-  return db.board.findFirst({
+  const board = await db.board.findFirst({
     where: {
       id: boardId,
       classroomId,
       layout: "omok",
       systemGameKind: "omok",
     },
-    select: { id: true, classroomId: true },
+    select: {
+      id: true,
+      classroomId: true,
+      classroom: { select: { teacherId: true } },
+    },
   });
-}
-
-function participantActor(actorSubject: string): PlayActor {
-  const studentId = actorSubject.startsWith("student:")
-    ? actorSubject.slice("student:".length)
-    : null;
+  if (!board?.classroom) return null;
   return {
-    subject: actorSubject,
-    role: "participant",
-    userId: null,
-    studentId,
+    id: board.id,
+    classroomId: board.classroomId,
+    teacherId: board.classroom.teacherId,
   };
 }
 
@@ -76,51 +84,22 @@ async function createStartedMatch(input: {
       body: {
         requestId: `omok-match-${input.matchBoardId}`,
         participants: input.participants,
+        autoStart: true,
       },
     },
   );
   if (!created.ok) throw new Error(`omok_match_create_${created.status}`);
   const createdBody = await engineJson(created);
-  const snapshot = createdBody?.snapshot as { sessionId?: string; version?: number } | undefined;
-  if (!snapshot?.sessionId || !Number.isSafeInteger(snapshot.version)) {
+  const snapshot = createdBody?.snapshot as
+    | { sessionId?: string; version?: number; roomStatus?: string }
+    | undefined;
+  if (
+    !snapshot?.sessionId ||
+    !Number.isSafeInteger(snapshot.version) ||
+    snapshot.roomStatus !== "active"
+  ) {
     throw new Error("omok_match_invalid_create");
   }
-
-  let version = Number(snapshot.version);
-  for (const participant of input.participants) {
-    const ready = await playEngineFetch(
-      `/v1/sessions/${encodeURIComponent(snapshot.sessionId)}/commands`,
-      {
-        actor: participantActor(participant.actorSubject),
-        method: "POST",
-        body: {
-          requestId: `omok-ready-${input.matchBoardId}-${participant.actorSubject.replaceAll(":", "-")}`,
-          expectedVersion: version,
-          commandSchemaVersion: 1,
-          command: { type: "ready" },
-        },
-      },
-    );
-    if (!ready.ok) throw new Error(`omok_match_ready_${ready.status}`);
-    const readyBody = await engineJson(ready);
-    const nextVersion = Number(readyBody?.version);
-    if (!Number.isSafeInteger(nextVersion)) throw new Error("omok_match_invalid_ready");
-    version = nextVersion;
-  }
-  const started = await playEngineFetch(
-    `/v1/sessions/${encodeURIComponent(snapshot.sessionId)}/commands`,
-    {
-      actor: host,
-      method: "POST",
-      body: {
-        requestId: `omok-start-${input.matchBoardId}`,
-        expectedVersion: version,
-        commandSchemaVersion: 1,
-        command: { type: "start" },
-      },
-    },
-  );
-  if (!started.ok) throw new Error(`omok_match_start_${started.status}`);
   return snapshot.sessionId;
 }
 
@@ -137,7 +116,11 @@ function isFinishedSession(session: { completedAtMs: bigint | null; state: unkno
   return state.roomStatus === "finished";
 }
 
-async function responseFor(boardId: string, studentId: string) {
+async function responseFor(
+  boardId: string,
+  studentId: string,
+  options: { heartbeatWaiting?: boolean } = {},
+) {
   const ticket = await db.omokMatchTicket.findUnique({
     where: { lobbyBoardId_studentId: { lobbyBoardId: boardId, studentId } },
   });
@@ -171,6 +154,21 @@ async function responseFor(boardId: string, studentId: string) {
       href: `/board/${encodeURIComponent(board.slug)}?view=student`,
     });
   }
+  if (
+    options.heartbeatWaiting &&
+    ticket.status === "waiting" &&
+    ticket.requestedAt.getTime() < Date.now() - WAITING_HEARTBEAT_REFRESH_MS
+  ) {
+    const cutoff = new Date(Date.now() - WAITING_HEARTBEAT_REFRESH_MS);
+    await db.omokMatchTicket.updateMany({
+      where: {
+        id: ticket.id,
+        status: "waiting",
+        requestedAt: { lt: cutoff },
+      },
+      data: { requestedAt: new Date() },
+    });
+  }
   return jsonPrivateNoStore({ status: "waiting", playerCount: await activePlayerCount(boardId) });
 }
 
@@ -189,16 +187,12 @@ function activePlayerCount(boardId: string) {
 async function reserveComputerMatch(input: {
   boardId: string;
   classroomId: string;
+  teacherId: string;
   studentId: string;
   studentName: string;
 }): Promise<MatchReservation> {
   return db.$transaction(async (tx) => {
     await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext(${input.boardId}))::text AS "lock"`;
-    const classroom = await tx.classroom.findUnique({
-      where: { id: input.classroomId },
-      select: { teacherId: true },
-    });
-    if (!classroom) throw new Error("classroom_not_found");
     const matchBoard = await tx.board.create({
       data: {
         slug: `omok-match-${randomUUID()}`,
@@ -207,7 +201,7 @@ async function reserveComputerMatch(input: {
         description: "학생과 컴퓨터의 오목 대국",
         category: BoardCategory.PLAY,
         classroomId: input.classroomId,
-        members: { create: { userId: classroom.teacherId, role: "owner" } },
+        members: { create: { userId: input.teacherId, role: "owner" } },
       },
       select: { id: true },
     });
@@ -236,7 +230,8 @@ async function reserveComputerMatch(input: {
     return {
       kind: "computer",
       matchBoardId: matchBoard.id,
-      teacherId: classroom.teacherId,
+      classroomId: input.classroomId,
+      teacherId: input.teacherId,
       participants: [
         { actorSubject: `student:${input.studentId}`, displayName: input.studentName },
         { actorSubject: OMOK_BOT_ACTOR_SUBJECT, displayName: OMOK_BOT_DISPLAY_NAME },
@@ -248,6 +243,7 @@ async function reserveComputerMatch(input: {
 async function reserveHumanMatch(input: {
   boardId: string;
   classroomId: string;
+  teacherId: string;
   studentId: string;
 }): Promise<MatchReservation | null> {
   const reservation = await db.$transaction(async (tx) => {
@@ -280,23 +276,7 @@ async function reserveHumanMatch(input: {
       orderBy: { requestedAt: "asc" },
     });
     if (!opponent) return null;
-    const classroom = await tx.classroom.findUnique({
-      where: { id: input.classroomId },
-      select: { teacherId: true },
-    });
-    if (!classroom) throw new Error("classroom_not_found");
-    const studentIds = [opponent.studentId, input.studentId] as const;
-    const students = await tx.student.findMany({
-      where: { classroomId: input.classroomId, id: { in: [...studentIds] } },
-      select: { id: true, name: true },
-    });
-    if (students.length !== 2) throw new Error("invalid_participants");
-    const byId = new Map(students.map((student) => [student.id, student]));
-    const participants = studentIds.map((studentId) => {
-      const current = byId.get(studentId);
-      if (!current) throw new Error("invalid_participants");
-      return { actorSubject: `student:${current.id}`, displayName: current.name };
-    }) as [ParticipantSeed, ParticipantSeed];
+    const studentIds: [string, string] = [opponent.studentId, input.studentId];
     const matchBoard = await tx.board.create({
       data: {
         slug: `omok-match-${randomUUID()}`,
@@ -305,7 +285,7 @@ async function reserveHumanMatch(input: {
         description: "학생 매칭 대국",
         category: BoardCategory.PLAY,
         classroomId: input.classroomId,
-        members: { create: { userId: classroom.teacherId, role: "owner" } },
+        members: { create: { userId: input.teacherId, role: "owner" } },
       },
       select: { id: true },
     });
@@ -333,11 +313,32 @@ async function reserveHumanMatch(input: {
     return {
       kind: "human" as const,
       matchBoardId: matchBoard.id,
-      teacherId: classroom.teacherId,
-      participants,
+      classroomId: input.classroomId,
+      teacherId: input.teacherId,
+      studentIds,
     };
   });
   return reservation;
+}
+
+async function participantsForReservation(
+  reservation: MatchReservation,
+): Promise<[ParticipantSeed, ParticipantSeed]> {
+  if (reservation.kind === "computer") return reservation.participants;
+  const students = await db.student.findMany({
+    where: {
+      classroomId: reservation.classroomId,
+      id: { in: [...reservation.studentIds] },
+    },
+    select: { id: true, name: true },
+  });
+  if (students.length !== 2) throw new Error("invalid_participants");
+  const byId = new Map(students.map((student) => [student.id, student]));
+  return reservation.studentIds.map((studentId) => {
+    const student = byId.get(studentId);
+    if (!student) throw new Error("invalid_participants");
+    return { actorSubject: `student:${student.id}`, displayName: student.name };
+  }) as [ParticipantSeed, ParticipantSeed];
 }
 
 export async function GET(_request: Request, { params }: Params) {
@@ -347,11 +348,7 @@ export async function GET(_request: Request, { params }: Params) {
   if (!(await resolveLobby(boardId, student.classroomId))) {
     return jsonPrivateNoStore({ error: "board_not_found" }, { status: 404 });
   }
-  await db.omokMatchTicket.updateMany({
-    where: { lobbyBoardId: boardId, studentId: student.id, status: "waiting" },
-    data: { requestedAt: new Date() },
-  });
-  return responseFor(boardId, student.id);
+  return responseFor(boardId, student.id, { heartbeatWaiting: true });
 }
 
 export async function POST(request: Request, { params }: Params) {
@@ -385,12 +382,14 @@ export async function POST(request: Request, { params }: Params) {
         ? await reserveComputerMatch({
             boardId,
             classroomId: student.classroomId,
+            teacherId: lobby.teacherId,
             studentId: student.id,
             studentName: student.name,
           })
         : await reserveHumanMatch({
             boardId,
             classroomId: student.classroomId,
+            teacherId: lobby.teacherId,
             studentId: student.id,
           });
   } catch (error) {
@@ -412,7 +411,12 @@ export async function POST(request: Request, { params }: Params) {
   }
 
   try {
-    const sessionId = await createStartedMatch(reservation);
+    const participants = await participantsForReservation(reservation);
+    const sessionId = await createStartedMatch({
+      matchBoardId: reservation.matchBoardId,
+      teacherId: reservation.teacherId,
+      participants,
+    });
     await db.omokMatchTicket.updateMany({
       where: { lobbyBoardId: boardId, matchBoardId: reservation.matchBoardId },
       data: { sessionId },

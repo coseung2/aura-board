@@ -40,6 +40,7 @@ vi.mock("@/lib/play-platform/server-client", () => {
   };
 });
 
+import { resetShadowSessionBoardCache } from "@/lib/play-platform/shadow-session-board-cache";
 import { GET, PATCH } from "./route";
 
 const snapshot: ShadowAllianceSnapshot = {
@@ -84,6 +85,7 @@ function patch(body: unknown) {
 
 describe("shadow alliance Rust authority proxy", () => {
   beforeEach(() => {
+    resetShadowSessionBoardCache();
     mocks.findBoard.mockReset().mockResolvedValue({
       id: "board-1",
       classroomId: "class-1",
@@ -121,6 +123,42 @@ describe("shadow alliance Rust authority proxy", () => {
           studentId: "student-1",
         },
       },
+    );
+  });
+
+  it("reuses a recent authoritative board check for the next command", async () => {
+    mocks.playEngineFetch
+      .mockResolvedValueOnce(jsonResponse(snapshot))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          snapshot: { ...snapshot, version: 4 },
+          previousVersion: 3,
+          version: 4,
+          resultIds: [],
+        }),
+      );
+
+    const getResponse = await GET(
+      new Request("http://localhost/api/shadow-alliance/boards/board-1"),
+      context,
+    );
+    const patchResponse = await PATCH(
+      patch({
+        requestId: "shadow-join-cached",
+        runId: "run-1",
+        expectedVersion: 3,
+        action: "join",
+      }),
+      context,
+    );
+
+    expect(getResponse.status).toBe(200);
+    expect(patchResponse.status).toBe(200);
+    expect(mocks.playEngineFetch).toHaveBeenCalledTimes(2);
+    expect(mocks.playEngineFetch).toHaveBeenNthCalledWith(
+      2,
+      "/v1/shadow-alliance/sessions/run-1/commands",
+      expect.objectContaining({ method: "POST" }),
     );
   });
 

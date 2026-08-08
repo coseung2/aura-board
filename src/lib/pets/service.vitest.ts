@@ -27,6 +27,7 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+import { resetClassroomCurrencyCache } from "./classroom-currency-cache";
 import {
   getSlimeHome,
   purchaseSlime,
@@ -116,6 +117,7 @@ function installPurchaseState(startingBalance = 600) {
 describe("slime wallet service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetClassroomCurrencyCache();
     mocks.currencyFind.mockResolvedValue({ unitLabel: "별" });
     mocks.slimeFindMany.mockResolvedValue([]);
   });
@@ -135,11 +137,18 @@ describe("slime wallet service", () => {
     expect(home.ownedColors).toEqual(["blue", "red"]);
     expect(home.representativeColor).toBe("blue");
     expect(home.catalog).toHaveLength(5);
+    expect(mocks.slimeFindMany).toHaveBeenCalledTimes(1);
     expect(mocks.slimeFindMany).toHaveBeenCalledWith({
       where: { studentId: student.id },
       select: {
+        id: true,
         color: true,
         isEquipped: true,
+        growthStage: true,
+        growthSeconds: true,
+        growthRemainderBps: true,
+        growthLastSettledAt: true,
+        growthAppliedSpeedBps: true,
         isRepresentative: true,
         equippedItemKeys: true,
         hiddenItemKeys: true,
@@ -147,6 +156,18 @@ describe("slime wallet service", () => {
       },
       orderBy: { createdAt: "asc" },
     });
+  });
+
+  it("coalesces classroom currency lookups across simultaneous pet homes", async () => {
+    mocks.accountFind.mockResolvedValue({ balance: 320 });
+    mocks.slimeFindMany.mockResolvedValue([]);
+
+    await Promise.all([
+      getSlimeHome(student),
+      getSlimeHome({ id: "student-2", classroomId: student.classroomId }),
+    ]);
+
+    expect(mocks.currencyFind).toHaveBeenCalledTimes(1);
   });
 
   it("debits the guarded balance and creates ledger and ownership atomically", async () => {

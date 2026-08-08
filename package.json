@@ -13,6 +13,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "loadtest:classroom": "node scripts/loadtest-classroom-concurrency.mjs",
+    "loadtest:mobile-tenancy": "node scripts/loadtest-mobile-tenancy.mjs",
+    "loadtest:mobile-tenancy:fixture": "tsx scripts/loadtest-mobile-tenancy-fixture.ts",
     "test:song-guess:browser": "node scripts/verify-song-guess-browser.mjs",
     "test:watch": "vitest",
     "db:push": "prisma db push",

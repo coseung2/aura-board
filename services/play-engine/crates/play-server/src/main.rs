@@ -16,10 +16,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bind: SocketAddr = env::var("PLAY_ENGINE_BIND")
         .unwrap_or_else(|_| "127.0.0.1:8081".to_owned())
         .parse()?;
+    let db_max_connections = bounded_u32_env("PLAY_ENGINE_DB_MAX_CONNECTIONS", 10, 1, 64)?;
 
-    eprintln!("play-server: initializing repository");
-    let repository: Arc<dyn PlayRepository> =
-        Arc::new(PostgresRepository::connect(&database_url).await?);
+    eprintln!("play-server: initializing repository (max_connections={db_max_connections})",);
+    let repository: Arc<dyn PlayRepository> = Arc::new(
+        PostgresRepository::connect_with_max_connections(&database_url, db_max_connections).await?,
+    );
     eprintln!("play-server: initializing assertion verifier");
     let verifier = AssertionVerifier::new(assertion_secret.as_bytes())?;
     let app = router(AppState::new(
@@ -32,6 +34,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     eprintln!("play-server: listening on {bind}");
     axum::serve(listener, app).await?;
     Ok(())
+}
+
+fn bounded_u32_env(
+    name: &str,
+    fallback: u32,
+    min: u32,
+    max: u32,
+) -> Result<u32, Box<dyn std::error::Error>> {
+    let Some(raw) = env::var(name).ok() else {
+        return Ok(fallback);
+    };
+    let value: u32 = raw
+        .parse()
+        .map_err(|_| format!("{name} must be an integer between {min} and {max}"))?;
+    if !(min..=max).contains(&value) {
+        return Err(format!("{name} must be between {min} and {max}").into());
+    }
+    Ok(value)
 }
 
 fn required_env(name: &str) -> Result<String, Box<dyn std::error::Error>> {

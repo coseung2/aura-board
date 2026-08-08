@@ -8,6 +8,10 @@ import {
   playEngineFetch,
   proxyPlayEngineResponse,
 } from "@/lib/play-platform/server-client";
+import {
+  hasShadowSessionBoard,
+  rememberShadowSessionBoard,
+} from "@/lib/play-platform/shadow-session-board-cache";
 import { getBoardRole } from "@/lib/rbac";
 import type { ShadowAllianceSnapshot } from "@/lib/shadow-alliance/contracts";
 import { createShadowAllianceNicknames } from "@/lib/shadow-alliance/nicknames";
@@ -147,6 +151,10 @@ async function readUpstreamJson<T>(response: Response): Promise<T | null> {
   return response.json().catch(() => null) as Promise<T | null>;
 }
 
+function rememberSnapshotBoard(snapshot: ShadowAllianceSnapshot) {
+  rememberShadowSessionBoard(snapshot.id, snapshot.boardId);
+}
+
 function playEngineUnavailable(error: unknown): Response | null {
   if (!(error instanceof PlayEngineUnavailableError)) return null;
   return jsonPrivateNoStore(
@@ -196,6 +204,7 @@ async function ensureHostSession(
   if (!body?.snapshot) {
     return jsonPrivateNoStore({ error: "invalid_upstream_response" }, { status: 502 });
   }
+  rememberSnapshotBoard(body.snapshot);
   return jsonPrivateNoStore({
     snapshot: body.snapshot,
     replayed: upstream.headers.get("x-idempotent-replay") === "true",
@@ -221,6 +230,7 @@ async function reopenEndedHostSession(
   if (!body?.snapshot) {
     return jsonPrivateNoStore({ error: "invalid_upstream_response" }, { status: 502 });
   }
+  rememberSnapshotBoard(body.snapshot);
   return jsonPrivateNoStore({
     snapshot: body.snapshot,
     replayed: upstream.headers.get("x-idempotent-replay") === "true",
@@ -232,6 +242,7 @@ async function verifySessionBoard(
   runId: string,
   actor: PlayActor,
 ): Promise<Response | null> {
+  if (hasShadowSessionBoard(runId, board.id)) return null;
   const upstream = await playEngineFetch(
     `/v1/shadow-alliance/sessions/${encodeURIComponent(runId)}/snapshot`,
     { actor },
@@ -241,6 +252,7 @@ async function verifySessionBoard(
   if (!snapshot || snapshot.boardId !== board.id) {
     return jsonPrivateNoStore({ error: "run_not_found" }, { status: 404 });
   }
+  rememberSnapshotBoard(snapshot);
   return null;
 }
 
@@ -266,6 +278,7 @@ export async function GET(_request: Request, { params }: Params) {
     if (!snapshot) {
       return jsonPrivateNoStore({ error: "invalid_upstream_response" }, { status: 502 });
     }
+    rememberSnapshotBoard(snapshot);
     if (
       viewer.canCommandAsHost &&
       (snapshot.phase === "finished" || snapshot.phase === "host-ended")
@@ -362,6 +375,13 @@ export async function PATCH(request: Request, { params }: Params) {
     const body = await readUpstreamJson<Record<string, unknown>>(upstream);
     if (!body) {
       return jsonPrivateNoStore({ error: "invalid_upstream_response" }, { status: 502 });
+    }
+    const responseSnapshot = body.snapshot as Partial<ShadowAllianceSnapshot> | undefined;
+    if (
+      typeof responseSnapshot?.id === "string" &&
+      typeof responseSnapshot.boardId === "string"
+    ) {
+      rememberShadowSessionBoard(responseSnapshot.id, responseSnapshot.boardId);
     }
     return jsonPrivateNoStore({
       ...body,

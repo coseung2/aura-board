@@ -177,6 +177,7 @@ export function ShadowAllianceBoard({ data }: Props) {
   const [receivedAt, setReceivedAt] = useState(Date.now());
   const [clockNow, setClockNow] = useState(Date.now());
   const commandRef = useRef<PendingCommand | null>(null);
+  const loadRef = useRef<Promise<ShadowAllianceSnapshot | null> | null>(null);
   const joinedRunRef = useRef<string | null>(null);
   const readyRunRef = useRef<string | null>(null);
   const snapshotRef = useRef(snapshot);
@@ -191,26 +192,36 @@ export function ShadowAllianceBoard({ data }: Props) {
   }, []);
 
   const load = useCallback(
-    async (mode: "initial" | "refresh" | "retry" = "refresh") => {
-      if (mode === "initial") setLoading(true);
-      else if (mode === "retry") setReconnecting(true);
-      try {
-        const response = await apiFetch<{ snapshot: ShadowAllianceSnapshot }>(
-          `/api/shadow-alliance/boards/${encodeURIComponent(data.board.id)}`,
-        );
-        acceptSnapshot(response.snapshot);
-        setError(null);
-        return response.snapshot;
-      } catch (caught) {
-        const body = commandError(caught);
-        if (mode !== "refresh" || !snapshotRef.current) {
-          setError(errorLabel(body.error));
+    (mode: "initial" | "refresh" | "retry" = "refresh") => {
+      const inFlight = loadRef.current;
+      if (inFlight) return inFlight;
+
+      const task = (async () => {
+        if (mode === "initial") setLoading(true);
+        else if (mode === "retry") setReconnecting(true);
+        try {
+          const response = await apiFetch<{ snapshot: ShadowAllianceSnapshot }>(
+            `/api/shadow-alliance/boards/${encodeURIComponent(data.board.id)}`,
+          );
+          acceptSnapshot(response.snapshot);
+          setError(null);
+          return response.snapshot;
+        } catch (caught) {
+          const body = commandError(caught);
+          if (mode !== "refresh" || !snapshotRef.current) {
+            setError(errorLabel(body.error));
+          }
+          return null;
+        } finally {
+          setLoading(false);
+          if (mode === "retry") setReconnecting(false);
         }
-        return null;
-      } finally {
-        setLoading(false);
-        if (mode === "retry") setReconnecting(false);
-      }
+      })();
+      loadRef.current = task;
+      void task.finally(() => {
+        if (loadRef.current === task) loadRef.current = null;
+      });
+      return task;
     },
     [acceptSnapshot, data.board.id],
   );
@@ -264,7 +275,10 @@ export function ShadowAllianceBoard({ data }: Props) {
         if (body.error === "version_conflict") {
           commandRef.current = null;
           setError(null);
-          return body.snapshot ?? null;
+          // The auto join/ready effects must be allowed to evaluate again
+          // against the authoritative snapshot instead of treating a conflict
+          // as if this command succeeded.
+          return null;
         }
         setError(errorLabel(body.error));
         return null;

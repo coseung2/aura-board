@@ -11,7 +11,14 @@ const mocks = vi.hoisted(() => ({
     name: "학생",
     classroomId: "classroom-1",
   } as
-    | { kind: "student"; id: string; name: string; classroomId: string }
+    | {
+        kind: "student";
+        id: string;
+        name: string;
+        classroomId: string;
+        accountId?: string | null;
+        accountCardId?: string | null;
+      }
     | { kind: "teacher"; id: string; name: string }
     | { kind: "parent"; id: string; name: string },
   existingContents: [] as string[],
@@ -19,6 +26,7 @@ const mocks = vi.hoisted(() => ({
   replyTarget: null as Record<string, unknown> | null,
   award: vi.fn(),
   loadPreparedRewardContext: vi.fn(),
+  ensureAccountFor: vi.fn(),
   create: vi.fn(),
   scheduleBoardActivity: vi.fn(),
   scheduleEngagementBroadcast: vi.fn(),
@@ -39,7 +47,7 @@ vi.mock("@/lib/card-engagement-actor", () => ({
 }));
 
 vi.mock("@/lib/bank", () => ({
-  ensureAccountFor: vi.fn(async () => ({ accountId: "account-1", cardId: "card-1" })),
+  ensureAccountFor: mocks.ensureAccountFor,
 }));
 
 vi.mock("@/lib/reward-service", () => ({
@@ -157,6 +165,10 @@ describe("student comment reward transaction", () => {
     mocks.replyTarget = null;
     mocks.award.mockReset();
     mocks.loadPreparedRewardContext.mockReset();
+    mocks.ensureAccountFor.mockReset().mockResolvedValue({
+      accountId: "account-1",
+      cardId: "card-1",
+    });
     mocks.loadPreparedRewardContext.mockImplementation(
       async (
         _tx: unknown,
@@ -227,6 +239,28 @@ describe("student comment reward transaction", () => {
     expect(database.$transaction).toHaveBeenCalledWith(
       expect.any(Function),
       { isolationLevel: "ReadCommitted" },
+    );
+  });
+
+  it("reuses an existing wallet without provisioning a bank card", async () => {
+    mocks.actor = {
+      kind: "student",
+      id: "student-1",
+      name: "학생",
+      classroomId: "classroom-1",
+      accountId: "existing-account-1",
+      accountCardId: null,
+    };
+
+    const response = await POST(request("request-wallet-only"), {
+      params: Promise.resolve({ id: "card-1" }),
+    });
+
+    expect(response.status).toBe(200);
+    expect(mocks.ensureAccountFor).not.toHaveBeenCalled();
+    expect(mocks.loadPreparedRewardContext).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ accountId: "existing-account-1" }),
     );
   });
 

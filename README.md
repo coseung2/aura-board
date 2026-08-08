@@ -124,6 +124,14 @@ npm run typecheck
 npm run test
 ```
 
+모바일 1,000명 테넌시 부하 러너:
+
+```bash
+npm run loadtest:mobile-tenancy
+```
+
+운영 기준선과 재시험 절차는 `docs/mobile-tenancy-load-test-1000.md`를 참고합니다.
+
 ---
 
 ## 데이터베이스와 시드
@@ -168,6 +176,7 @@ docs/                     아키텍처, 현재 기능, 외부 API, 디자인 시
 - `docs/design-system.md`
 - `docs/mobile-android-build.md`
 - `docs/external-api.md`
+- `docs/mobile-tenancy-load-test-1000.md`
 - `AGENTS.md`
 
 ---

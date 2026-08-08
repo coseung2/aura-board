@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 import { sortClassroomSlimeStudents } from "@/lib/pets/classroom-gallery";
+import { cachedClassroomSlimeRows } from "@/lib/pets/classroom-gallery-cache";
 import { wearableKeysForMobileClient } from "@/lib/pets/mobile-catalog-compat";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getTitleDefinition } from "@/lib/title-catalog";
@@ -18,25 +19,27 @@ export async function GET(request: Request) {
     capabilityHeader: request.headers.get("x-aura-mobile-capabilities"),
   };
 
-  const rows = await db.student.findMany({
-    where: { classroomId: student.classroomId },
-    select: {
-      id: true,
-      number: true,
-      name: true,
-      slimes: {
-        where: { isRepresentative: true },
-        take: 1,
-        select: {
-          color: true,
-          growthStage: true,
-          equippedItemKeys: true,
-          hiddenItemKeys: true,
-          equippedTitleKey: true,
+  const rows = await cachedClassroomSlimeRows(student.classroomId, () =>
+    db.student.findMany({
+      where: { classroomId: student.classroomId },
+      select: {
+        id: true,
+        number: true,
+        name: true,
+        slimes: {
+          where: { isRepresentative: true },
+          take: 1,
+          select: {
+            color: true,
+            growthStage: true,
+            equippedItemKeys: true,
+            hiddenItemKeys: true,
+            equippedTitleKey: true,
+          },
         },
       },
-    },
-  });
+    }),
+  );
 
   const students = sortClassroomSlimeStudents(
     rows.map((row) => {

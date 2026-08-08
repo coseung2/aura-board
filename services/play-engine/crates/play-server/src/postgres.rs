@@ -34,6 +34,13 @@ impl PostgresRepository {
     }
 
     pub async fn connect(database_url: &str) -> Result<Self, RepositoryError> {
+        Self::connect_with_max_connections(database_url, 10).await
+    }
+
+    pub async fn connect_with_max_connections(
+        database_url: &str,
+        max_connections: u32,
+    ) -> Result<Self, RepositoryError> {
         // Supabase transaction poolers (PgBouncer) discard prepared statements
         // between checkouts. Disable statement caching so current-session reads
         // do not fail with "prepared statement does not exist".
@@ -42,7 +49,7 @@ impl PostgresRepository {
             .map_err(storage)?
             .statement_cache_capacity(0);
         let pool = PgPoolOptions::new()
-            .max_connections(10)
+            .max_connections(max_connections.clamp(1, 64))
             .connect_lazy_with(options);
         Ok(Self::new(pool))
     }
@@ -84,7 +91,7 @@ impl PlayRepository for PostgresRepository {
             .clone()
             .try_into()
             .map_err(|_| ModelError::InvalidRequest)?;
-        let record = SessionRecord::new(
+        let mut record = SessionRecord::new(
             Uuid::new_v4().to_string(),
             board_id.to_owned(),
             actor.subject.clone(),
@@ -92,6 +99,9 @@ impl PlayRepository for PostgresRepository {
             None,
             now_ms,
         )?;
+        if request.auto_start {
+            record.start_immediately()?;
+        }
         let response = SessionResponse {
             request_id: request.request_id.clone(),
             snapshot: record.snapshot(actor, now_ms)?,
@@ -582,7 +592,9 @@ impl PlayRepository for PostgresRepository {
         }
         let current = lock_shadow_alliance_session(&mut tx, session_id).await?;
         current.authorize(actor)?;
-        if current.version != request.expected_version {
+        if current.version != request.expected_version
+            && !current.permits_stale_participant_lobby_command(actor, &request.command)?
+        {
             return Err(RepositoryError::ShadowAllianceVersionConflict {
                 current: Box::new(current),
             });

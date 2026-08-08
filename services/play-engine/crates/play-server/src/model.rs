@@ -197,6 +197,8 @@ pub struct CommandResponse {
 pub struct CreateSessionRequest {
     pub request_id: String,
     pub participants: Vec<ParticipantSeed>,
+    #[serde(default)]
+    pub auto_start: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -527,6 +529,19 @@ impl SessionRecord {
             game: self.state.game.clone(),
             outcome: self.state.outcome.clone(),
         })
+    }
+
+    pub fn start_immediately(&mut self) -> Result<(), ModelError> {
+        self.validate()?;
+        if self.state.room_status != RoomStatus::Waiting {
+            return Err(ModelError::InvalidPhase);
+        }
+        for participant in &mut self.state.participants {
+            participant.ready = true;
+        }
+        self.state.room_status = RoomStatus::Active;
+        self.validate()?;
+        Ok(())
     }
 
     pub fn apply(&mut self, actor: &ActorContext, intent: &OmokIntent) -> Result<(), ModelError> {

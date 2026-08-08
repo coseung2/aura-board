@@ -226,16 +226,15 @@ export async function POST(
   let accountId: string | null = null;
   let studentRewardPolicy: Awaited<ReturnType<typeof loadRewardPolicyCached>> | null = null;
   if (studentActor) {
-    const accountPromise =
-      studentActor.accountId && studentActor.accountCardId
-        ? Promise.resolve({
-            accountId: studentActor.accountId,
-            cardId: studentActor.accountCardId,
-          })
-        : ensureAccountFor({
-            id: studentActor.id,
-            classroomId: studentActor.classroomId,
-          });
+    // Comment rewards only need the wallet account. Requiring a bank card here
+    // made the first comment provision a card inside the hot write path even
+    // when the student's account already existed.
+    const accountPromise = studentActor.accountId
+      ? Promise.resolve({ accountId: studentActor.accountId })
+      : ensureAccountFor({
+          id: studentActor.id,
+          classroomId: studentActor.classroomId,
+        });
     const [account, policy] = await Promise.all([
       accountPromise,
       loadRewardPolicyCached(studentActor.classroomId),
