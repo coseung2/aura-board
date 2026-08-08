@@ -72,6 +72,7 @@ const config = {
   likeWindowMs: integerEnv("LOADTEST_LIKE_WINDOW_MS", 15_000, { min: 0, max: 180_000 }),
   requestTimeoutMs: integerEnv("LOADTEST_REQUEST_TIMEOUT_MS", 45_000, { min: 1_000, max: 180_000 }),
   realtimeTimeoutMs: integerEnv("LOADTEST_REALTIME_TIMEOUT_MS", 20_000, { min: 1_000, max: 120_000 }),
+  realtimeSettleTimeoutMs: integerEnv("LOADTEST_REALTIME_SETTLE_TIMEOUT_MS", 15_000, { min: 0, max: 120_000 }),
   realtimeClients: integerEnv("LOADTEST_REALTIME_CLIENTS", -1, { min: -1, max: 5_000 }),
   sampleIntervalMs: integerEnv("LOADTEST_SAMPLE_INTERVAL_MS", 1_000, { min: 250, max: 30_000 }),
   serverPid: integerEnv("LOADTEST_SERVER_PID", 0, { min: 0, max: 4_294_967_295 }),
@@ -134,6 +135,8 @@ const result = {
     failed: 0,
     statusCounts: {},
     messageCounts: {},
+    expectedMessageCounts: {},
+    settle: null,
   },
   samples: [],
   cleanup: null,
@@ -583,6 +586,69 @@ async function openRealtimeChannels(actors) {
   return handles;
 }
 
+function expectedRealtimeMessageCounts(actors) {
+  const subscribersByBoard = new Map();
+  for (const actor of actors.slice(0, config.realtimeClients)) {
+    subscribersByBoard.set(
+      actor.boardId,
+      (subscribersByBoard.get(actor.boardId) ?? 0) + 1,
+    );
+  }
+  const mutationsByBoard = new Map();
+  for (const actor of actors) {
+    mutationsByBoard.set(
+      actor.boardId,
+      (mutationsByBoard.get(actor.boardId) ?? 0) + 1,
+    );
+  }
+
+  let cardChanged = 0;
+  let boardChanged = 0;
+  for (const [boardId, mutationCount] of mutationsByBoard) {
+    const subscribers = subscribersByBoard.get(boardId) ?? 0;
+    cardChanged += mutationCount * subscribers;
+    boardChanged += mutationCount * subscribers * 2;
+  }
+  return {
+    card_changed: cardChanged,
+    board_changed: boardChanged,
+  };
+}
+
+async function settleRealtimeMessages(actors) {
+  if (result.realtime.skipped || config.realtimeClients <= 0) return;
+  const expected = expectedRealtimeMessageCounts(actors);
+  result.realtime.expectedMessageCounts = expected;
+  const started = Date.now();
+  const complete = () =>
+    Number(result.realtime.messageCounts.card_changed ?? 0) >= expected.card_changed &&
+    Number(result.realtime.messageCounts.board_changed ?? 0) >= expected.board_changed;
+
+  while (
+    !complete() &&
+    Date.now() - started < config.realtimeSettleTimeoutMs
+  ) {
+    await sleep(100);
+  }
+
+  const actual = {
+    card_changed: Number(result.realtime.messageCounts.card_changed ?? 0),
+    board_changed: Number(result.realtime.messageCounts.board_changed ?? 0),
+  };
+  const missing = {
+    card_changed: Math.max(0, expected.card_changed - actual.card_changed),
+    board_changed: Math.max(0, expected.board_changed - actual.board_changed),
+  };
+  result.realtime.settle = {
+    durationMs: Date.now() - started,
+    complete: missing.card_changed === 0 && missing.board_changed === 0,
+    expected,
+    actual,
+    missing,
+  };
+  console.log(JSON.stringify({ phase: "realtime-settle", ...result.realtime.settle }));
+}
+
 async function closeRealtimeChannels(handles) {
   for (let offset = 0; offset < handles.length; offset += 100) {
     await Promise.all(
@@ -722,6 +788,9 @@ function aggregateGate() {
   if (writeP95 > config.maxWriteP95Ms) failures.push("write_p95");
   if (result.realtime.failed > Math.ceil(config.realtimeClients * config.maxErrorRate)) {
     failures.push("realtime_subscribe");
+  }
+  if (result.realtime.settle && !result.realtime.settle.complete) {
+    failures.push("realtime_delivery");
   }
 
   const serverSamples = result.samples.map((sample) => sample.server).filter(Boolean);
@@ -916,6 +985,7 @@ try {
         (body) => Array.isArray(body?.cards),
       ),
   );
+  await settleRealtimeMessages(seeded.studentActors);
 
   result.gate = aggregateGate();
   if (!result.gate.passed) process.exitCode = 2;

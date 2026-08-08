@@ -33,6 +33,8 @@ describe("server realtime broadcasts", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
   });
 
@@ -86,14 +88,60 @@ describe("server realtime broadcasts", () => {
     expect(supabaseMocks.removeChannel).toHaveBeenCalledWith(channel);
   });
 
-  it("swallows HTTP delivery failures and still cleans up", async () => {
+  it("retries a transient HTTP result and cleans up every attempt", async () => {
+    vi.useFakeTimers();
     const channel = configureClient();
-    supabaseMocks.httpSend.mockRejectedValueOnce(new Error("timed out"));
+    supabaseMocks.httpSend
+      .mockResolvedValueOnce({ success: false, status: 503, error: "unavailable" })
+      .mockResolvedValueOnce({ success: true });
+    const { announceCardChange } = await import("../realtime-broadcast");
+
+    const request = announceCardChange("board-1", "update");
+    await vi.runAllTimersAsync();
+    await expect(request).resolves.toBeUndefined();
+
+    expect(supabaseMocks.httpSend).toHaveBeenCalledTimes(2);
+    expect(supabaseMocks.removeChannel).toHaveBeenCalledTimes(2);
+    expect(supabaseMocks.removeChannel).toHaveBeenNthCalledWith(1, channel);
+    expect(supabaseMocks.removeChannel).toHaveBeenNthCalledWith(2, channel);
+  });
+
+  it("contains a persistent network failure after three attempts", async () => {
+    vi.useFakeTimers();
+    vi.stubEnv("NODE_ENV", "production");
+    const channel = configureClient();
+    const deliveryError = new Error("Bad Gateway");
+    supabaseMocks.httpSend.mockRejectedValue(deliveryError);
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { announceCardChange } = await import("../realtime-broadcast");
+
+    const request = announceCardChange("board-1", "update");
+    await vi.runAllTimersAsync();
+    await expect(request).resolves.toBeUndefined();
+
+    expect(supabaseMocks.httpSend).toHaveBeenCalledTimes(3);
+    expect(supabaseMocks.removeChannel).toHaveBeenCalledTimes(3);
+    expect(supabaseMocks.removeChannel).toHaveBeenLastCalledWith(channel);
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith(
+      "[realtime broadcast] delivery failed",
+      deliveryError,
+    );
+  });
+
+  it("does not retry a non-transient HTTP 400 result", async () => {
+    configureClient();
+    supabaseMocks.httpSend.mockResolvedValueOnce({
+      success: false,
+      status: 400,
+      error: "invalid payload",
+    });
     const { announceCardChange } = await import("../realtime-broadcast");
 
     await expect(announceCardChange("board-1", "update")).resolves.toBeUndefined();
 
-    expect(supabaseMocks.removeChannel).toHaveBeenCalledWith(channel);
+    expect(supabaseMocks.httpSend).toHaveBeenCalledTimes(1);
+    expect(supabaseMocks.removeChannel).toHaveBeenCalledTimes(1);
   });
 
   it("swallows client initialization failures", async () => {

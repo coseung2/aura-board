@@ -36,6 +36,9 @@ import {
 
 let serverClient: SupabaseClient | null = null;
 
+const REALTIME_BROADCAST_MAX_ATTEMPTS = 3;
+const REALTIME_BROADCAST_RETRY_BASE_MS = 75;
+
 export class RealtimeConfigurationError extends Error {
   constructor() {
     super(
@@ -45,18 +48,41 @@ export class RealtimeConfigurationError extends Error {
   }
 }
 
+class RealtimeClientInitializationError extends Error {
+  constructor(cause: unknown) {
+    super("Supabase Realtime client initialization failed", { cause });
+    this.name = "RealtimeClientInitializationError";
+  }
+}
+
+class RealtimeBroadcastDeliveryError extends Error {
+  readonly status: number | null;
+
+  constructor(status: number | null, detail: unknown) {
+    super(
+      `Supabase Realtime broadcast failed (${status ?? "unknown"}): ${String(detail ?? "unknown")}`,
+    );
+    this.name = "RealtimeBroadcastDeliveryError";
+    this.status = status;
+  }
+}
+
 function getServerClient(): SupabaseClient {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new RealtimeConfigurationError();
   if (serverClient) return serverClient;
-  serverClient = createClient(url, key, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-  return serverClient;
+  try {
+    serverClient = createClient(url, key, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+    return serverClient;
+  } catch (error) {
+    throw new RealtimeClientInitializationError(error);
+  }
 }
 
 export async function sendRealtimeBroadcast(
@@ -70,8 +96,10 @@ export async function sendRealtimeBroadcast(
     channel = client.channel(channelKey);
     const result = await channel.httpSend(event, payload, { timeout: 1500 });
     if (!result.success) {
-      throw new Error(
-        `Supabase Realtime broadcast failed (${result.status}): ${result.error}`,
+      const status = Number(result.status);
+      throw new RealtimeBroadcastDeliveryError(
+        Number.isFinite(status) ? status : null,
+        result.error,
       );
     }
   } finally {
@@ -85,17 +113,63 @@ export async function sendRealtimeBroadcast(
   }
 }
 
+function statusFromRealtimeError(error: unknown): number | null {
+  if (error instanceof RealtimeBroadcastDeliveryError) return error.status;
+  if (!error || typeof error !== "object") return null;
+  const candidate =
+    "status" in error
+      ? (error as { status?: unknown }).status
+      : "statusCode" in error
+        ? (error as { statusCode?: unknown }).statusCode
+        : null;
+  const status = Number(candidate);
+  return Number.isFinite(status) ? status : null;
+}
+
+function shouldRetryRealtimeBroadcast(error: unknown): boolean {
+  if (
+    error instanceof RealtimeConfigurationError ||
+    error instanceof RealtimeClientInitializationError
+  ) {
+    return false;
+  }
+  const status = statusFromRealtimeError(error);
+  return (
+    status === null ||
+    status === 0 ||
+    status === 408 ||
+    status === 429 ||
+    status >= 500
+  );
+}
+
+const delay = (ms: number) =>
+  new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 async function broadcastBestEffort(
   channelKey: string,
   event: string,
   payload: unknown,
 ): Promise<void> {
-  try {
-    await sendRealtimeBroadcast(channelKey, event, payload);
-  } catch (error) {
-    if (process.env.NODE_ENV === "production") {
-      console.error("[realtime broadcast] delivery failed", error);
+  let finalError: unknown = null;
+  for (let attempt = 1; attempt <= REALTIME_BROADCAST_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await sendRealtimeBroadcast(channelKey, event, payload);
+      return;
+    } catch (error) {
+      finalError = error;
+      if (
+        attempt >= REALTIME_BROADCAST_MAX_ATTEMPTS ||
+        !shouldRetryRealtimeBroadcast(error)
+      ) {
+        break;
+      }
+      await delay(REALTIME_BROADCAST_RETRY_BASE_MS * 2 ** (attempt - 1));
     }
+  }
+
+  if (process.env.NODE_ENV === "production") {
+    console.error("[realtime broadcast] delivery failed", finalError);
   }
 }
 
