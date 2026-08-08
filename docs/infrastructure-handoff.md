@@ -1,16 +1,16 @@
 # 4-provider infrastructure handoff
 
-기준일: 2026-08-03
-기준 브랜치: `main` (2026-08-03 실행 기준)
+기준일: 2026-08-08
+기준 브랜치: `main` (2026-08-08 실행 기준)
 
-이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **Oracle A1 Compute와 boot volume, instance-principal dynamic group/IAM policy, ARM64 runtime, backup/restore 검증 및 backup timer 활성화까지 완료했다. 이제 동일 A1에서 Aura Board 애플리케이션과 private play engine을 운영한다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
+이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **Oracle A1에서 Aura Board 애플리케이션과 private play engine을 운영하고 있으며, 2026-08-08 Cloudflare DNS와 HTTPS origin을 실제 `testauram-a1-osaka` 인스턴스에 맞게 현행화했다. 구 A1에서 검증했던 backup timer는 새 운영 A1에서 inactive이므로 재설치·복구 검증 전까지 활성 상태로 간주하지 않는다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
 
 ## 책임과 경계
 
 | 제공자 | 책임 | 책임이 아닌 것 | 현재 상태 |
 | --- | --- | --- | --- |
-| Oracle Cloud | Next.js 앱 호스팅, private play engine, 앱 cron, 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업 | 원본 Postgres, Auth, Realtime, 원본 Storage | `ap-osaka-1`의 A1 2 OCPU/12 GB에서 nginx와 loopback 전용 앱 서비스를 운영. instance principal, private bucket, daily backup timer도 유지 |
-| Cloudflare | Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
+| Oracle Cloud | Next.js 앱 호스팅, private play engine, 앱 cron, 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업 | 원본 Postgres, Auth, Realtime, 원본 Storage | `ap-osaka-1`의 `testauram-a1-osaka` A1 2 OCPU/12 GB에서 nginx와 loopback 전용 앱 서비스를 운영. 현재 public IP는 `129.225.159.251`; daily backup timer는 inactive라 복구 필요 |
+| Cloudflare | 운영 DNS·HTTPS proxy, Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | `aura-board.com` apex A와 `www` CNAME을 Oracle origin으로 proxied 운영. Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
 | Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개를 2026-08-01 적용하고 RLS·권한·함수·트리거·cron job을 검증함 |
 | GitHub Actions | 운영 cron endpoint 수동 실행과 장애 시 대체 호출 | 앱 호스팅, 기본 스케줄러 | 8개 endpoint용 수동 workflow를 비상 운영 경로로 유지 |
 | Vercel | 전환 기간의 마지막 검증 가능한 배포본 | 신규 운영 트래픽, 기본 cron scheduler | DNS 전환과 Oracle 검증 뒤 운영 경로에서 제외 |
@@ -19,14 +19,19 @@
 
 ## 현재 상태와 확인된 기준선
 
-### 2026-08-03 Oracle 운영 전환 완료
+### 2026-08-08 Oracle 운영 origin 현행화 완료
 
-- `aura-board.com`과 `www.aura-board.com`의 운영 트래픽은 Cloudflare를 거쳐 Osaka Oracle A1의 nginx로 전달된다. Cloudflare SSL/TLS는 `Full (strict)`이고 origin 인증서는 Let's Encrypt 자동 갱신 대상으로 등록했다.
-- Next.js 앱은 `aura-board-app` systemd 서비스로 `127.0.0.1:3000`에서, Rust play engine은 `aura-play-engine` 서비스로 `127.0.0.1:8081`에서만 수신한다. 현재 release는 `2a4d7c5-oracle1`이다.
+- `aura-board.com`의 proxied A record는 `129.225.159.251`, `www.aura-board.com`은 apex를 가리키는 proxied CNAME이다. 두 운영 도메인의 Cloudflare 경유 HTTPS `/api/health`가 `200`과 `database: reachable`을 반환하며 Vercel origin header는 없다.
+- 실제 운영 인스턴스는 `testauram-a1-osaka` (`RUNNING`, private IP `10.42.1.207`, public IP `129.225.159.251`)다. 문서에 남아 있던 `aura-board-worker-a1-osaka`/`161.33.30.33`은 더 이상 현재 DNS origin이 아니다.
+- Next.js 앱은 `aura-board-app` systemd 서비스로 `127.0.0.1:3000`에서, Rust play engine은 `aura-play-engine` 서비스로 `127.0.0.1:8081`에서만 수신한다. `nginx`, 두 앱 서비스, `certbot.timer`를 모두 active로 재검증했다.
+- 현재 `/opt/aura-board-app/current`는 release `73cccdd02a919fc4a6f97d03c1af0f5bad6ada59`를 가리킨다.
+- Tailscale이 자체 주소의 `443`을 사용하므로 nginx HTTPS는 Oracle private NIC `10.42.1.207:443`에 명시적으로 bind한다. HTTP는 `0.0.0.0:80`에서 ACME challenge와 HTTPS redirect를 처리한다.
+- Let's Encrypt ECDSA 인증서는 `aura-board.com`과 `www.aura-board.com`을 포함하며 2026-11-06까지 유효하다. `certbot renew --dry-run`, `nginx -t`, origin 직접 HTTPS 및 Cloudflare proxied HTTPS 검증을 통과했다.
 - `/api/health`의 외부 경로와 origin 직접 경로 모두 데이터베이스 연결 성공을 반환했고, `/login`, `/landing`, Google OAuth provider callback URL을 운영 도메인 기준으로 확인했다.
 - 애플리케이션 cron은 `/etc/cron.d/aura-board-app`에서 Oracle loopback endpoint를 호출한다. `notification-push`와 `play-outbox`의 매분 자동 실행 및 세션 정상 종료를 확인했다.
 - Vercel Cron Jobs는 프로젝트 설정에서 `Disabled`로 전환했다. Vercel은 운영 DNS와 기본 scheduler 경로에서 제외되며, 기존 배포본은 rollback 참고용으로만 남긴다.
 - `aura-board-app`, `aura-play-engine`, `nginx`, `cron`, `certbot.timer`, `aura-supabase-backup.timer`는 모두 enabled/active 상태다.
+- 위 2026-08-03 서비스 상태는 구 A1의 당시 증거다. 2026-08-08 새 운영 A1에서는 `cron`은 active지만 `aura-supabase-backup.timer`는 inactive로 확인됐다.
 
 - Supabase 운영 DB: 약 **43.9 MiB**.
 - Supabase Storage: **1,226 objects**, 약 **992.4 MiB**.
@@ -35,8 +40,8 @@
 - `main` 기준 이전 8개 커밋은 `80183f55`까지 push 완료.
 - 기존 Vercel production은 rollback 참고용으로 유지하지만 신규 운영 트래픽과 cron을 처리하지 않는다.
 - Oracle schedule은 `parent-weekly-digest`, `parent-anonymize`, `expire-pending-links`, `fd-maturity`, `role-salary-payout`, `billing-renew`, `blob-cleanup`, `attendance-reminder`, `notification-push`, `play-outbox`를 실행한다.
-- Oracle 테넌시 `dbsk7618`의 홈 리전은 `ap-osaka-1`이다. `aura-board-prod`, `aura-board-vcn`, `aura-board-public-subnet`, `aura-board-worker-nsg`, `aura-board-postgres-backups`가 준비됐다.
-- 2026-08-03 08:35 UTC에 `aura-board-worker-a1-osaka` (`ocid1.instance.oc1.ap-osaka-1.anvwsljrchxbcsic7cnylrup6ozazxn4yoemirdm7ijnkkp2nfnoyraocxwq`)가 `RUNNING`으로 생성됐다. boot volume은 `ocid1.bootvolume.oc1.ap-osaka-1.abvwsljrhwrc3dkxzkmvfj3rd4hbtiue6c47bnhvxrnslfh4q6hjt3molf2a` (`ATTACHED`), public IP는 `161.33.30.33`, private IP는 `10.20.1.83`이다. `aura-board-backup-workers` (`ocid1.dynamicgroup.oc1..aaaaaaaa5bqqhqomenic5ipilrzwzsovpia65gocu6ztp4erodbhnca27wja`)와 `aura-board-backup-object-policy` (`ocid1.policy.oc1..aaaaaaaalisqsnb7bimf4gq2y5dmbnuwx65vnncrerldruhentjhmy23proq`)가 private bucket `aura-board-postgres-backups`에만 권한을 갖도록 검증됐다.
+- 현재 운영 OCI profile은 `testauram`, 홈 리전은 `ap-osaka-1`이다. 운영 인스턴스 `testauram-a1-osaka`는 root compartment의 `VM.Standard.A1.Flex` 2 OCPU/12 GB이며 public subnet security list가 TCP 22/80/443을 허용한다.
+- 2026-08-03에 검증한 구 `aura-board-worker-a1-osaka`와 `161.33.30.33` 관련 backup/IAM 증거는 당시 기록으로만 보존한다. 2026-08-08 DNS 및 웹 origin 기준선은 `testauram-a1-osaka`의 `129.225.159.251`이다.
 - A1 성공 검증 직후 `oci-a1-1` 용량 retry automation은 삭제되어 재실행되지 않는다.
 - `notification-push`는 Oracle의 매분 poller가 담당한다. Supabase `NotificationOutbox` insert event wakeup과 5분 retry sweep 계약은 [`src/app/api/cron/notification-push/HANDOFF.md`](../src/app/api/cron/notification-push/HANDOFF.md)에 남아 있지만, 외부 callback secret이 없더라도 Oracle poller가 backlog를 처리한다.
 - `role-salary-payout`은 `155c7c54`에서 구현·push됐지만 production에는 아직 배포되지 않았고 scheduler도 없다. 2026-08-01 로컬 코드와 운영 DB를 연결한 별무리반 제한 검증에서 24명·16역할·26,300 지급, 동일 키 재호출 차단, 24건 보상 거래 회수와 잔액 원복을 확인했다. 이 테스트로 별무리반의 `2026-08` 자동지급 키는 소비됐으며 다음 정상 자동지급 기간은 2026-09다.
@@ -168,13 +173,16 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 - **NotificationOutbox:** Supabase Vault의 callback secret을 비활성화해 event wakeup을 멈춘다. Vercel 매분 poller를 제거한 뒤라면 schedule을 복원한다. DB trigger/function 제거 절차는 [notification handoff](../src/app/api/cron/notification-push/HANDOFF.md#rollback)를 따른다. outbox table과 enqueue event는 삭제하지 않는다.
 - **Supabase migration:** 적용 전 논리 backup과 migration별 영향 분석을 우선한다. 데이터 손실 가능성이 있는 migration을 임의 down migration으로 되돌리지 말고, forward-fix 또는 검증된 복구 절차를 선택한다.
 - **Cloudflare Stream:** 새 상태 검증/삭제 worker를 중지하고 기존 업로드 경로로 복귀한다. 삭제된 asset은 코드 rollback으로 복원되지 않으므로 삭제 전 참조와 보존 조건을 확인한다.
-- **Oracle:** nginx와 앱·play-engine 서비스를 이전 release로 되돌리고 scheduler/worker를 중지한다. Supabase와 Cloudflare의 원본은 영향을 받지 않아야 한다. 파생 backup 삭제는 별도 승인 대상이다.
+- **Oracle:** 앱 이상 시 Cloudflare apex A record를 이전 Vercel origin `76.76.21.21`로 되돌리고 proxy를 유지한 뒤, nginx와 앱·play-engine 서비스를 이전 release로 되돌리거나 중지한다. `www`는 apex CNAME을 유지한다. 파생 backup 삭제는 별도 승인 대상이다.
 - **Vercel 배포:** 이번 작업에서는 배포하지 않는다. 향후 배포 실패 시 기존 production을 유지하고, 실패한 최신 SHA를 production으로 수동 승격하지 않는다.
 
 ## Residual risks
 
-- OCI A1은 Osaka `ap-osaka-1`에서 `RUNNING`이며 instance principal·private bucket·backup timer까지 검증됐다. 단일 호스트이므로 앱과 job별 systemd 격리, ARM64 패키지 호환, 처리량과 backup 복구 시간을 지속 관찰한다.
-- Oracle 운영 release는 `2a4d7c5-oracle1`이며, 이후 변경은 새 immutable release 배포와 health 검증을 거쳐야 한다. 로컬 코드 검증만으로 운영 반영을 가정하면 안 된다.
+- OCI A1 `testauram-a1-osaka`는 Osaka `ap-osaka-1`에서 `RUNNING`이다. 단일 호스트이므로 앱과 job별 systemd 격리, ARM64 패키지 호환, 처리량과 backup 복구 시간을 지속 관찰한다.
+- 서버에는 새 Oracle Ubuntu kernel이 설치되어 있으나 실행 중 kernel과 달라 재부팅이 남아 있다. 재부팅은 별도 유지보수 창에서 시행하고 nginx, 앱, play engine, cron, backup timer와 외부 HTTPS를 다시 검증한다.
+- `aura-supabase-backup.timer`는 현재 운영 A1에서 inactive다. 구 A1의 backup/restore 증거를 현재 인스턴스에 승계한 것으로 간주하지 말고, unit·credential·bucket IAM을 확인해 dry-run, approved write, object checksum, 격리 restore를 다시 통과한 뒤 활성화한다.
+- Tailscale과 nginx가 동일한 wildcard `443`을 사용할 수 없으므로 nginx의 `10.42.1.207:443` bind를 유지한다. NIC 주소나 Tailscale 설정 변경 뒤에는 `ss -ltnp`, `nginx -t`, origin 직접 HTTPS를 먼저 확인한다.
+- 현재 배포는 `/opt/aura-board-app/current`를 사용하는 immutable release 구조다. 이후 변경은 새 release 배포와 health 검증을 거쳐야 하며 로컬 코드 검증만으로 운영 반영을 가정하면 안 된다.
 - migration 5개는 운영 적용됐지만 신규 consumer가 포함된 최신 앱 배포는 별도다. 배포 SHA를 확인하지 않고 callback을 활성화하면 안 된다.
 - GitHub Actions cron workflow는 수동 비상 경로이며 Infisical의 `CRON_SECRET`이 비어 있어 현재 non-dry-run 복구 호출은 사용할 수 없다.
 - Supabase callback Vault secret은 비어 있다. 현재는 Oracle 매분 poller가 처리하지만, callback을 다시 활성화하려면 Oracle 앱과 Vault의 `CRON_SECRET`을 원자적으로 맞춰야 한다.
@@ -188,6 +196,7 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
+| 2026-08-08 | Cloudflare DNS·Oracle origin 현행화 완료 | 실제 `testauram` 테넌시의 `testauram-a1-osaka`가 `RUNNING`이고 public/private IP가 `129.225.159.251`/`10.42.1.207`임을 확인했다. apex A와 `www` CNAME을 이 origin으로 proxied 전환하고, nginx HTTPS를 Tailscale wildcard 443과 충돌하지 않도록 private NIC에 bind했다. Let's Encrypt ECDSA 인증서 발급, nginx config, origin 직접 HTTP/HTTPS, Cloudflare 경유 두 도메인 `/api/health`, `certbot renew --dry-run`, release `73cccdd0`, 앱·play engine·cron·certbot timer active를 검증했다. `aura-supabase-backup.timer`는 inactive다. | backup unit·credential·IAM을 새 A1에서 재검증해 timer를 복구하고, 유지보수 창에서 pending kernel reboot 후 전체 서비스·cron·backup·외부 HTTPS smoke를 반복. DNS API token은 `aura-board.com` 단일 zone 최소 권한과 짧은 TTL로 유지 |
 | 2026-08-03 | Oracle 앱·play engine·cron 운영 전환 완료 | A1 release `2a4d7c5-oracle1`, systemd/nginx/cron/certbot/backup timer active, 외부·origin `/api/health` DB reachable, Cloudflare proxied + Full strict, Let's Encrypt renewal dry-run 성공, Vercel Cron Jobs Disabled, Oracle 매분 cron 연속 실행 확인 | 운영 로그·백업 복구 시험을 정기 점검하고 새 release마다 health/OAuth/cron smoke를 반복 |
 | 2026-08-01 | 운영 DB migration·Infisical runtime/OIDC 준비 완료, 실제 callback·schedule 보류 | PostgreSQL 17.10 custom-format 운영 backup `2,231,856` bytes와 1,617 archive entries, SHA-256 `ce5501873765d504db76151df8c37e04c7a4022545269ea19af0524bd834a01d`를 확인한 뒤 migration 5개를 모두 적용했다. RLS 4개, anon/authenticated SELECT 차단, `pg_cron 1.6.4`, `pg_net 0.20.0`, 함수 4개, 트리거 6개, 5분 retry job을 운영 SQL로 확인했다. Infisical `prod` `/`에는 URL과 새 cron secret을 등록하고 로컬 env backup을 25키로 갱신했으며, 서버 프로젝트 전용 GitHub OIDC identity를 exact repo/main/workflow/Production claims와 900초 TTL, project `viewer`로 연결했다. workflow의 Infisical action 변경은 local-only이고 Supabase Vault 두 값은 비어 있어 외부 callback은 발생하지 않는다. | local workflow 정적 검증 → 명시적 commit/push → GitHub dry-run → 최신 앱 배포와 Vercel secret 동기화 → Supabase Vault 등록 → 제한된 callback/non-dry-run 검증 → schedule cutover |
 | 2026-08-01 | 1인1역 자동급여 구현·실지급 회수 검증 완료, scheduler cutover 보류 | `155c7c54`에서 학급 단위 지급 정책, 멱등 지급, KST 일/주/월 판정, 학급 제한 cron route와 테스트를 push. 별무리반 실지급·재호출·보상 거래 원복을 검증했다. 이후 `d164e839`에서 GitHub schedule을 성급히 추가했으나, live 확인 결과 `Production` environment의 variables/secrets는 여전히 비어 있고 `20260731` migration 5개도 운영 미적용임을 재확인했다. 따라서 workflow는 수동 dry-run 전용으로 되돌리고 급여 endpoint만 8번째 선택지로 유지한다. | 기존 handoff 순서대로 Supabase notification wakeup 검증 → 최신 앱 배포 복구 → GitHub `Production` 값 설정 → 8개 endpoint dry-run/non-dry-run 검증 → 승인된 schedule cutover |
