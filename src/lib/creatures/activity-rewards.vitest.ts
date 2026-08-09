@@ -163,6 +163,58 @@ describe("activity reward source policy", () => {
     expect(applyProgress).not.toHaveBeenCalled();
   });
 
+  it("writes the supplied activity timestamp into the fast-path deposit", async () => {
+    applyProgress.mockReset();
+    const tx = fakeTx();
+    const occurredAt = new Date("2026-08-01T23:59:00.000Z");
+
+    await awardActivityReward({
+      tx,
+      studentId: "student-1",
+      classroomId: "classroom-1",
+      accountId: "account-1",
+      sourceType: "comment_reward",
+      sourceRef: "comment-1",
+      amount: 5,
+      accountAlreadyVerified: true,
+      sourceAlreadyChecked: true,
+      skipCreatureProgress: true,
+      occurredAt,
+    });
+
+    const query = (tx.$queryRaw as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      strings: readonly string[];
+      values: readonly unknown[];
+    };
+    expect(query.strings.join("?")).toContain('"createdAt"');
+    expect(query.values).toContain(occurredAt);
+  });
+
+  it("keeps database current time for fast-path deposits without an activity timestamp", async () => {
+    applyProgress.mockReset();
+    const tx = fakeTx();
+
+    await awardActivityReward({
+      tx,
+      studentId: "student-1",
+      classroomId: "classroom-1",
+      accountId: "account-1",
+      sourceType: "comment_reward",
+      sourceRef: "comment-default-time",
+      amount: 5,
+      accountAlreadyVerified: true,
+      sourceAlreadyChecked: true,
+      skipCreatureProgress: true,
+    });
+
+    const query = (tx.$queryRaw as ReturnType<typeof vi.fn>).mock.calls[0][0] as {
+      strings: readonly string[];
+      values: readonly unknown[];
+    };
+    expect(query.strings.join("?")).toContain("CURRENT_TIMESTAMP");
+    expect(query.values.some((value) => value instanceof Date)).toBe(false);
+  });
+
   it("replays an existing source deposit without retroactive creature progress", async () => {
     applyProgress.mockReset();
     const tx = fakeTx({

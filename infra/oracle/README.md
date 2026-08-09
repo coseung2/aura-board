@@ -133,6 +133,17 @@ curl --fail -H 'Host: aura-board.com' http://127.0.0.1/api/health
 
 Install `aura-board-app.cron` as `/etc/cron.d/aura-board-app` and keep it root-owned with mode `0644`. The runner calls the loopback Next.js endpoint with the root-owned `CRON_SECRET`, takes a per-job nonblocking lock, and never sends cron traffic through public DNS. `notification-push` and `play-outbox` run once per minute; the remaining schedules preserve the existing UTC production cadence, including `role-salary-payout` at 15:10 UTC.
 
+Keep root deployment state in `/opt/aura-board-app/shared/locks` and application
+cron locks in the separate `/opt/aura-board-app/shared/cron-locks` directory.
+The installer creates the latter as `aura-app:aura-app` mode `0750` and installs
+the matching runner plus `/etc/cron.d/aura-board-app`. Verify it after
+installation with `sudo -u aura-app test -w
+/opt/aura-board-app/shared/cron-locks`. If this check fails, every application
+cron job exits before making its loopback request and durable outboxes will
+build a backlog. Never make the root deployment-state directory writable by
+`aura-app`; its predictable root-opened paths must not share a directory with
+unprivileged lock files.
+
 ## Installation layout
 
 Install the repository backup files at these paths, matching the unit files:

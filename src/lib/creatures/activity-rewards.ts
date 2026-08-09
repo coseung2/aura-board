@@ -38,6 +38,8 @@ export type ActivityRewardInput = {
   sourceAlreadyChecked?: boolean;
   /** Reward context already proved there is no active creature to grow. */
   skipCreatureProgress?: boolean;
+  /** Time the rewarded activity occurred; defaults to the write time. */
+  occurredAt?: Date;
 };
 
 export type ActivityRewardProgressSummary = {
@@ -127,6 +129,9 @@ export async function awardActivityReward(
   input: ActivityRewardInput,
 ): Promise<ActivityRewardResult> {
   assertActivityRewardInput(input);
+  const occurredAtSql = input.occurredAt
+    ? Prisma.sql`${input.occurredAt}`
+    : Prisma.sql`CURRENT_TIMESTAMP`;
 
   if (!input.accountAlreadyVerified) {
     const account = await input.tx.studentAccount.findUnique({
@@ -205,7 +210,7 @@ export async function awardActivityReward(
         ${input.sourceRef},
         ${input.studentId},
         'owner',
-        CURRENT_TIMESTAMP
+        ${occurredAtSql}
       FROM updated_account
       RETURNING "id"
     `);
@@ -230,6 +235,7 @@ export async function awardActivityReward(
         sourceRef: input.sourceRef,
         performedById: input.studentId,
         performedByKind: "owner",
+        ...(input.occurredAt ? { createdAt: input.occurredAt } : {}),
       } satisfies Prisma.TransactionUncheckedCreateInput,
       select: { id: true },
     });

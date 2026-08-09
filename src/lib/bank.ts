@@ -4,6 +4,30 @@ import { db } from "./db";
 import { generateCardNumber, generateCardSecret } from "./qr-token";
 
 /**
+ * Resolve the wallet account needed by server-owned rewards without creating a
+ * bank card. The database upsert is the concurrency gate for first use.
+ */
+export async function ensureAccountOnlyFor(student: {
+  id: string;
+  classroomId: string;
+}): Promise<{ accountId: string }> {
+  const account = await db.studentAccount.upsert({
+    where: { studentId: student.id },
+    create: {
+      studentId: student.id,
+      classroomId: student.classroomId,
+      balance: 0,
+    },
+    update: {},
+    select: { id: true, classroomId: true },
+  });
+  if (account.classroomId !== student.classroomId) {
+    throw new Error("Student account classroom mismatch");
+  }
+  return { accountId: account.id };
+}
+
+/**
  * Lazy-create a StudentAccount + StudentCard for a student on first access.
  * Idempotent under concurrent wallet/avatar requests.
  */

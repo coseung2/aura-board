@@ -25,7 +25,7 @@ case "${job}:${method}" in
     ;;
 esac
 
-exec 9>"/opt/aura-board-app/shared/locks/cron-${job}.lock"
+exec 9>"/opt/aura-board-app/shared/cron-locks/cron-${job}.lock"
 if ! flock --nonblock 9; then
   exit 0
 fi

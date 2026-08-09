@@ -3,6 +3,14 @@ import "server-only";
 import { randomUUID } from "crypto";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { ensureAccountOnlyFor } from "@/lib/bank";
+import { isMeaningfulRewardComment } from "@/lib/reward-policy";
+import {
+  awardCappedPolicyReward,
+  lockRewardAccount,
+  loadPreparedCommentRewardContext,
+  loadRewardPolicyCached,
+} from "@/lib/reward-service";
 import { dispatchParentNotificationPush } from "@/lib/parent-push";
 import { dispatchStudentNotificationPush } from "@/lib/student-push";
 import { getWalletTransactionDisplay } from "@/lib/wallet-transaction-display";
@@ -26,6 +34,7 @@ export type ClaimedNotificationOutbox = {
   id: string;
   eventType: string;
   sourceId: string;
+  payload: unknown;
   attempts: number;
   lockToken: string;
 };
@@ -36,6 +45,8 @@ export type NotificationOutboxRun = {
   retried: number;
   dead: number;
 };
+
+let activeConsumeBatch: Promise<NotificationOutboxRun> | null = null;
 
 export async function claimNotificationOutbox(
   batchSize = DEFAULT_BATCH_SIZE,
@@ -81,7 +92,7 @@ export async function claimNotificationOutbox(
       FROM candidates
       WHERE outbox."id" = candidates."id"
       RETURNING outbox."id", outbox."eventType", outbox."sourceId",
-                outbox."attempts", outbox."lockToken"
+                outbox."payload", outbox."attempts", outbox."lockToken"
     `,
   ));
 }
@@ -91,6 +102,21 @@ export async function consumeNotificationOutbox(options: {
   concurrency?: number;
   now?: Date;
 } = {}): Promise<NotificationOutboxRun> {
+  if (activeConsumeBatch) return activeConsumeBatch;
+  const batch = consumeNotificationOutboxBatch(options);
+  activeConsumeBatch = batch;
+  try {
+    return await batch;
+  } finally {
+    if (activeConsumeBatch === batch) activeConsumeBatch = null;
+  }
+}
+
+async function consumeNotificationOutboxBatch(options: {
+  batchSize?: number;
+  concurrency?: number;
+  now?: Date;
+}): Promise<NotificationOutboxRun> {
   const now = options.now ?? new Date();
   const claimed = await claimNotificationOutbox(options.batchSize, now);
   const result: NotificationOutboxRun = {
@@ -156,6 +182,9 @@ async function processNotificationOutboxEvent(
       return;
     case "card_comment":
       await processCardComment(event.sourceId);
+      return;
+    case "comment_reward":
+      await processCardCommentReward(event.sourceId, event.payload);
       return;
     case "transaction":
       await processTransaction(event.sourceId);
@@ -256,7 +285,9 @@ async function processCardComment(sourceId: string): Promise<void> {
       },
     },
   });
-  if (!comment || comment.deletedAt) return;
+  if (!comment) return;
+
+  if (comment.deletedAt) return;
 
   const actorLabel = actorLabelFor(
     comment.authorKind,
@@ -294,6 +325,116 @@ async function processCardComment(sourceId: string): Promise<void> {
       createdAt: comment.createdAt,
     }, { propagateFailure: true }),
   ));
+}
+
+type CommentRewardPayload = {
+  version: 1;
+  claimId: string;
+  commentId: string;
+  authorKind: string;
+  authorStudentId: string | null;
+  normalizedContent: string;
+  occurredAt: Date;
+};
+
+function parseCommentRewardPayload(
+  sourceId: string,
+  payload: unknown,
+): CommentRewardPayload {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error("invalid_comment_reward_payload");
+  }
+  const value = payload as Record<string, unknown>;
+  const occurredAt = typeof value.occurredAt === "string"
+    ? new Date(value.occurredAt)
+    : null;
+  if (
+    value.version !== 1
+    || typeof value.claimId !== "string"
+    || value.claimId.length === 0
+    || typeof value.commentId !== "string"
+    || value.commentId !== sourceId
+    || typeof value.authorKind !== "string"
+    || (value.authorStudentId !== null && typeof value.authorStudentId !== "string")
+    || typeof value.normalizedContent !== "string"
+    // NFKC can expand compatibility characters beyond the route's 1,000-code
+    // unit input limit. Keep a defensive server-owned payload bound without
+    // dead-lettering a valid normalized comment.
+    || value.normalizedContent.length > 32_000
+    || !occurredAt
+    || Number.isNaN(occurredAt.getTime())
+  ) {
+    throw new Error("invalid_comment_reward_payload");
+  }
+  return {
+    version: 1,
+    claimId: value.claimId,
+    commentId: value.commentId,
+    authorKind: value.authorKind,
+    authorStudentId: value.authorStudentId as string | null,
+    normalizedContent: value.normalizedContent,
+    occurredAt,
+  };
+}
+
+async function processCardCommentReward(
+  sourceId: string,
+  rawPayload: unknown,
+): Promise<void> {
+  const event = parseCommentRewardPayload(sourceId, rawPayload);
+  if (event.authorKind !== "student" || !event.authorStudentId) return;
+  const student = await db.student.findUnique({
+    where: { id: event.authorStudentId },
+    select: {
+      id: true,
+      classroomId: true,
+      account: { select: { id: true, classroomId: true } },
+    },
+  });
+  if (!student) return;
+
+  const policy = await loadRewardPolicyCached(student.classroomId);
+  if (!isMeaningfulRewardComment(
+    event.normalizedContent,
+    policy.commentMinMeaningfulLength,
+  )) return;
+
+  if (student.account && student.account.classroomId !== student.classroomId) {
+    throw new Error("Student account classroom mismatch");
+  }
+  const accountId = student.account?.id
+    ?? (await ensureAccountOnlyFor(student)).accountId;
+  await db.$transaction(async (tx) => {
+    // Acquire the per-wallet serialization lock in its own statement. Under
+    // READ COMMITTED, the following statement then receives a fresh snapshot
+    // that includes the preceding worker's committed cap/idempotency writes.
+    await lockRewardAccount(tx, accountId);
+    const prepared = await loadPreparedCommentRewardContext(tx, {
+      accountId,
+      studentId: student.id,
+      classroomId: student.classroomId,
+      normalizedContent: event.normalizedContent,
+      policy,
+      now: event.occurredAt,
+      duplicateAlreadyClaimed: true,
+    });
+    if (prepared.duplicate) return;
+    await awardCappedPolicyReward({
+      tx,
+      studentId: student.id,
+      classroomId: student.classroomId,
+      accountId,
+      area: "comment",
+      sourceRef: event.commentId,
+      baseAmount: policy.commentRewardAmount,
+      note: `댓글 작성 보상 [comment:${event.commentId}]`,
+      policy,
+      accountAlreadyVerified: true,
+      preparedCounts: prepared.counts,
+      preparedRewardContext: prepared.rewardContext,
+      occurredAt: event.occurredAt,
+    });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted });
 }
 
 async function processTransaction(sourceId: string): Promise<void> {

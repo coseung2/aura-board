@@ -298,6 +298,8 @@ export async function loadPreparedCommentRewardContext(
     normalizedContent: string;
     policy: RewardPolicy;
     now?: Date;
+    currentComment?: { id: string; createdAt: Date };
+    duplicateAlreadyClaimed?: boolean;
   },
 ): Promise<PreparedCommentRewardContext> {
   const bounds = getKstRewardBounds(input.now);
@@ -322,17 +324,27 @@ export async function loadPreparedCommentRewardContext(
     )
     SELECT
       EXISTS(SELECT 1 FROM locked_account) AS "account_found",
-      EXISTS(
-        SELECT 1
-        FROM "CardComment"
-        WHERE "authorStudentId" = ${input.studentId}
-          AND regexp_replace(
-            btrim(normalize("content", NFKC)),
-            '[[:space:]]+',
-            ' ',
-            'g'
-          ) = ${input.normalizedContent}
-      ) AS "duplicate",
+      ${input.duplicateAlreadyClaimed
+        ? Prisma.sql`FALSE`
+        : Prisma.sql`EXISTS(
+            SELECT 1
+            FROM "CardComment"
+            WHERE "authorStudentId" = ${input.studentId}
+              AND regexp_replace(
+                btrim(normalize("content", NFKC)),
+                '[[:space:]]+',
+                ' ',
+                'g'
+              ) = ${input.normalizedContent}
+              AND (
+                ${input.currentComment?.id ?? null}::text IS NULL
+                OR "createdAt" < ${input.currentComment?.createdAt ?? null}
+                OR (
+                  "createdAt" = ${input.currentComment?.createdAt ?? null}
+                  AND "id" < ${input.currentComment?.id ?? null}
+                )
+              )
+          )`} AS "duplicate",
       (
         SELECT COUNT(*)::int
         FROM "Transaction"
@@ -409,6 +421,7 @@ export async function awardCappedPolicyReward(input: {
   baseAmount: number;
   note: string;
   now?: Date;
+  occurredAt?: Date;
   policy?: RewardPolicy;
   accountAlreadyVerified?: boolean;
   sourceAlreadyChecked?: boolean;
@@ -443,7 +456,7 @@ export async function awardCappedPolicyReward(input: {
   // unlimited, so only positive configured dimensions participate in the
   // count gate below.
   if (input.area !== "assignment" && (caps.daily <= 0 || caps.weekly <= 0)) return null;
-  const bounds = getKstRewardBounds(input.now);
+  const bounds = getKstRewardBounds(input.occurredAt ?? input.now);
   const counts = input.preparedCounts ?? await loadPolicyRewardCounts(input.tx, {
     accountId: input.accountId,
     sourceType,
@@ -475,6 +488,7 @@ export async function awardCappedPolicyReward(input: {
     accountAlreadyVerified: input.accountAlreadyVerified,
     sourceAlreadyChecked: true,
     skipCreatureProgress: !rewardContext.hasActiveCreature,
+    occurredAt: input.occurredAt,
   });
   return { ...result, baseAmount: input.baseAmount, buffBps };
 }

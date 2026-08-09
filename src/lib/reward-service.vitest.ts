@@ -23,6 +23,7 @@ import {
   invalidateRewardPolicyCache,
   loadRewardPolicy,
   loadRewardPolicyCached,
+  loadPreparedCommentRewardContext,
   lockRewardAccount,
 } from "./reward-service";
 import {
@@ -87,6 +88,64 @@ describe("reward account locking", () => {
     await expect(lockRewardAccount(tx, "missing-account")).rejects.toThrow(
       "Reward account not found",
     );
+  });
+});
+
+describe("prepared comment reward ordering", () => {
+  it("uses the current comment boundary so only an earlier duplicate wins", async () => {
+    const queryRaw = vi.fn(async () => [{
+      account_found: true,
+      duplicate: true,
+      daily_count: 0,
+      weekly_count: 0,
+      slimes: [],
+      item_keys: [],
+      has_active_creature: false,
+    }]);
+    const tx = { $queryRaw: queryRaw } as unknown as Prisma.TransactionClient;
+    const policy = await loadRewardPolicy(fakeTx(), "classroom-1");
+    const createdAt = new Date("2026-08-06T12:10:00.000Z");
+
+    await expect(loadPreparedCommentRewardContext(tx, {
+      accountId: "account-1",
+      studentId: "student-1",
+      classroomId: "classroom-1",
+      normalizedContent: "정말 좋은 글이에요",
+      policy,
+      now: createdAt,
+      currentComment: { id: "comment-2", createdAt },
+    })).resolves.toMatchObject({ duplicate: true });
+
+    const query = queryRaw.mock.calls[0][0] as { strings: readonly string[]; values: readonly unknown[] };
+    expect(query.strings.join("?")).toContain('"createdAt" < ?');
+    expect(query.strings.join("?")).toContain('AND "id" < ?');
+    expect(query.values).toContain("comment-2");
+  });
+
+  it("skips the mutable comment scan after the insert trigger won the immutable claim", async () => {
+    const queryRaw = vi.fn(async () => [{
+      account_found: true,
+      duplicate: false,
+      daily_count: 0,
+      weekly_count: 0,
+      slimes: [],
+      item_keys: [],
+      has_active_creature: false,
+    }]);
+    const tx = { $queryRaw: queryRaw } as unknown as Prisma.TransactionClient;
+    const policy = await loadRewardPolicy(fakeTx(), "classroom-1");
+
+    await expect(loadPreparedCommentRewardContext(tx, {
+      accountId: "account-1",
+      studentId: "student-1",
+      classroomId: "classroom-1",
+      normalizedContent: "정말 좋은 글이에요",
+      policy,
+      duplicateAlreadyClaimed: true,
+    })).resolves.toMatchObject({ duplicate: false });
+
+    const query = queryRaw.mock.calls[0][0] as { strings: readonly string[] };
+    expect(query.strings.join("?")).not.toContain('FROM "CardComment"');
   });
 });
 
@@ -187,6 +246,23 @@ describe("reward service caps and buffs", () => {
     });
     expect(result).toMatchObject({ baseAmount: 51, buffBps: 200, amount: 52 });
     expect(mocks.award).toHaveBeenCalledWith(expect.objectContaining({ amount: 52 }));
+  });
+
+  it("attributes caps and the deposit to the activity timestamp", async () => {
+    const occurredAt = new Date("2026-08-01T23:59:00.000Z");
+    const tx = fakeTx([0, 0]);
+    await awardCappedPolicyReward({
+      tx,
+      studentId: "student-1",
+      classroomId: "classroom-1",
+      accountId: "account-1",
+      area: "comment",
+      sourceRef: "comment-event-time",
+      baseAmount: 5,
+      note: "댓글 작성 보상",
+      occurredAt,
+    });
+    expect(mocks.award).toHaveBeenCalledWith(expect.objectContaining({ occurredAt }));
   });
 
   it("applies an equipped scene background through the existing item lookup", async () => {
