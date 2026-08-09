@@ -13,7 +13,7 @@ import { retryActivityRewardTransaction } from "@/lib/creatures/activity-rewards
 import { isMeaningfulRewardComment, normalizeRewardComment } from "@/lib/reward-policy";
 import {
   awardCappedPolicyReward,
-  loadPreparedCommentRewardContext,
+  createCommentWithPreparedRewardContext,
   loadRewardPolicyCached,
 } from "@/lib/reward-service";
 
@@ -28,6 +28,12 @@ const CreateSchema = z.object({
   audience: z.enum(["public", "guardian"]).default("public"),
   parentCommentId: z.string().trim().min(1).max(191).nullable().optional(),
 });
+
+function isCommentReplayConflict(error: unknown): boolean {
+  if (!(error instanceof Prisma.PrismaClientKnownRequestError)) return false;
+  if (error.code === "P2002") return true;
+  return error.code === "P2010" && error.meta?.code === "23505";
+}
 
 const AudienceSchema = z.enum(["public", "guardian"]);
 
@@ -267,9 +273,14 @@ export async function POST(
             policy.commentMinMeaningfulLength,
           ),
         );
-        const preparedReward =
+        const combinedComment =
           shouldEvaluateReward && studentActor && accountId && policy
-            ? await loadPreparedCommentRewardContext(tx, {
+            ? await createCommentWithPreparedRewardContext(tx, {
+                cardId,
+                parentCommentId: threadRootId,
+                audience,
+                clientRequestId: parsed.data.clientRequestId ?? null,
+                content: storedContent,
                 accountId,
                 studentId: studentActor.id,
                 classroomId: studentActor.classroomId,
@@ -279,9 +290,9 @@ export async function POST(
             : null;
 
         // The database uniqueness constraint is the retry gate. On a replay,
-        // create raises P2002 and the outer recovery reads the committed row;
-        // the common first-attempt path avoids a preflight SELECT.
-        const comment = await tx.cardComment.create({
+        // Prisma create raises P2002 and the raw combined path raises P2010
+        // with PostgreSQL 23505; outer recovery reads the committed row.
+        const comment = combinedComment?.created ?? await tx.cardComment.create({
           data: {
             cardId,
             parentCommentId: threadRootId,
@@ -295,6 +306,7 @@ export async function POST(
           },
           select: commentSelect,
         });
+        const preparedReward = combinedComment?.preparedReward ?? null;
 
         if (
           !studentActor ||
@@ -321,7 +333,7 @@ export async function POST(
           preparedRewardContext: preparedReward.rewardContext,
         });
         return { created: comment, reward: paid };
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }),
+      }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }),
     );
     created = result.created;
     reward = result.reward
@@ -335,8 +347,7 @@ export async function POST(
     if (
       (studentActor || parentActor) &&
       parsed.data.clientRequestId &&
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
+      isCommentReplayConflict(error)
     ) {
       created = await db.cardComment.findFirst({
         where: {
@@ -349,7 +360,14 @@ export async function POST(
         },
         select: commentSelect,
       });
-      if (!created) throw error;
+      if (
+        !created ||
+        created.content !== storedContent ||
+        created.audience !== audience ||
+        created.parentCommentId !== threadRootId
+      ) {
+        throw error;
+      }
     } else {
       throw error;
     }

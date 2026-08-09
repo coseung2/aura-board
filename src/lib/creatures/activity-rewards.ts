@@ -255,7 +255,10 @@ export async function awardActivityReward(
 }
 
 export function isSerializableTransactionConflict(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2034";
+  return error instanceof Prisma.PrismaClientKnownRequestError && (
+    error.code === "P2034" ||
+    (error.code === "P2010" && error.meta?.code === "40001")
+  );
 }
 
 /** Retry the complete activity transaction on bounded serializable conflicts. */
