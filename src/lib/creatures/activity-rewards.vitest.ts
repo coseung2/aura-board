@@ -88,27 +88,6 @@ describe("activity reward source policy", () => {
     expect(unrelatedAttempts).toBe(1);
   });
 
-  it("retries PostgreSQL 40001 surfaced through a raw-query P2010", async () => {
-    const serializationConflict = new Prisma.PrismaClientKnownRequestError(
-      "raw serialization conflict",
-      {
-        code: "P2010",
-        clientVersion: "test",
-        meta: { code: "40001" },
-      },
-    );
-    let attempts = 0;
-
-    const result = await retryActivityRewardTransaction(async () => {
-      attempts += 1;
-      if (attempts === 1) throw serializationConflict;
-      return "committed";
-    });
-
-    expect(result).toBe("committed");
-    expect(attempts).toBe(2);
-  });
-
   it("keeps walking and assignment source namespaces distinct", () => {
     expect(ACTIVITY_REWARD_SOURCE_TYPES).toEqual([
       "reading_reward",

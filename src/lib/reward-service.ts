@@ -1,6 +1,5 @@
 import "server-only";
 
-import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 
 import { db } from "./db";
@@ -285,48 +284,14 @@ export type PreparedCommentRewardContext = {
   rewardContext: PreparedRewardContext;
 };
 
-export type PreparedCommentWriteResult = {
-  created: {
-    id: string;
-    parentCommentId: string | null;
-    content: string;
-    createdAt: Date;
-    authorKind: "student";
-    audience: "public" | "guardian";
-    authorParentId: string | null;
-    authorStudentId: string | null;
-  };
-  preparedReward: PreparedCommentRewardContext;
-};
-
-type RawPreparedCommentWriteRow = RawRewardContextRow & {
-  account_found: boolean;
-  duplicate: boolean;
-  daily_count: number | bigint;
-  weekly_count: number | bigint;
-  comment_id: string | null;
-  comment_parent_comment_id: string | null;
-  comment_content: string | null;
-  comment_created_at: Date | null;
-  comment_author_kind: string | null;
-  comment_audience: string | null;
-  comment_author_parent_id: string | null;
-  comment_author_student_id: string | null;
-};
-
 /**
- * Create an eligible student comment while collecting its reward gates in the
- * same database round trip. The INSERT still raises the normal unique error on
- * a clientRequestId replay; the route's existing P2002 recovery handles it.
+ * Lock one student's wallet and collect every read-only comment reward gate in
+ * a single PostgreSQL round trip. This replaces four sequential queries during
+ * a synchronized classroom response wave.
  */
-export async function createCommentWithPreparedRewardContext(
+export async function loadPreparedCommentRewardContext(
   tx: Prisma.TransactionClient,
   input: {
-    cardId: string;
-    parentCommentId: string | null;
-    audience: "public" | "guardian";
-    clientRequestId: string | null;
-    content: string;
     accountId: string;
     studentId: string;
     classroomId: string;
@@ -334,11 +299,19 @@ export async function createCommentWithPreparedRewardContext(
     policy: RewardPolicy;
     now?: Date;
   },
-): Promise<PreparedCommentWriteResult> {
+): Promise<PreparedCommentRewardContext> {
   const bounds = getKstRewardBounds(input.now);
   const sourceType = REWARD_SOURCE_TYPES.comment;
-  const commentId = randomUUID();
-  const rows = await tx.$queryRaw<Array<RawPreparedCommentWriteRow>>(Prisma.sql`
+  const rows = await tx.$queryRaw<
+    Array<
+      RawRewardContextRow & {
+        account_found: boolean;
+        duplicate: boolean;
+        daily_count: number | bigint;
+        weekly_count: number | bigint;
+      }
+    >
+  >(Prisma.sql`
     WITH locked_account AS MATERIALIZED (
       SELECT "id"
       FROM "StudentAccount"
@@ -346,162 +319,83 @@ export async function createCommentWithPreparedRewardContext(
         AND "studentId" = ${input.studentId}
         AND "classroomId" = ${input.classroomId}
       FOR UPDATE
-    ),
-    prepared AS MATERIALIZED (
-      SELECT
-        EXISTS(SELECT 1 FROM locked_account) AS "account_found",
-        EXISTS(
-          SELECT 1
-          FROM "CardComment"
-          WHERE "authorStudentId" = ${input.studentId}
-            AND regexp_replace(
-              btrim(normalize("content", NFKC)),
-              '[[:space:]]+',
-              ' ',
-              'g'
-            ) = ${input.normalizedContent}
-        ) AS "duplicate",
-        (
-          SELECT COUNT(*)::int
-          FROM "Transaction"
-          WHERE "accountId" = ${input.accountId}
-            AND "sourceType" = ${sourceType}
-            AND "type" = 'deposit'
-            AND "createdAt" >= ${bounds.dayStart}
-            AND "createdAt" < ${bounds.dayEnd}
-        ) AS "daily_count",
-        (
-          SELECT COUNT(*)::int
-          FROM "Transaction"
-          WHERE "accountId" = ${input.accountId}
-            AND "sourceType" = ${sourceType}
-            AND "type" = 'deposit'
-            AND "createdAt" >= ${bounds.weekStart}
-            AND "createdAt" < ${bounds.weekEnd}
-        ) AS "weekly_count",
-        COALESCE(
-          (
-            SELECT jsonb_agg(
-              jsonb_build_object(
-                'color', slime."color",
-                'growthStage', slime."growthStage",
-                'equippedTitleKey', slime."equippedTitleKey"
-              )
-            )
-            FROM "StudentSlime" AS slime
-            WHERE slime."studentId" = ${input.studentId}
-              AND slime."isEquipped" = true
-          ),
-          '[]'::jsonb
-        ) AS "slimes",
-        COALESCE(
-          (
-            SELECT jsonb_agg(item."itemKey")
-            FROM "StudentCreatureItem" AS item
-            WHERE item."studentId" = ${input.studentId}
-              AND item."isEquipped" = true
-              AND item."quantity" > 0
-          ),
-          '[]'::jsonb
-        ) AS "item_keys",
-        EXISTS(
-          SELECT 1
-          FROM "StudentCreature" AS creature
-          WHERE creature."studentId" = ${input.studentId}
-            AND creature."isActive" = true
-        ) AS "has_active_creature"
-    ),
-    created_comment AS (
-      INSERT INTO "CardComment" (
-        "id",
-        "cardId",
-        "parentCommentId",
-        "audience",
-        "authorKind",
-        "authorUserId",
-        "authorStudentId",
-        "authorParentId",
-        "clientRequestId",
-        "content"
-      )
-      SELECT
-        ${commentId},
-        ${input.cardId},
-        ${input.parentCommentId},
-        CAST(${input.audience}::text AS "CardCommentAudience"),
-        'student',
-        NULL,
-        ${input.studentId},
-        NULL,
-        ${input.clientRequestId},
-        ${input.content}
-      FROM prepared
-      WHERE "account_found"
-      RETURNING
-        "id",
-        "parentCommentId",
-        "content",
-        "createdAt",
-        "authorKind",
-        "audience",
-        "authorParentId",
-        "authorStudentId"
     )
     SELECT
-      prepared."account_found",
-      prepared."duplicate",
-      prepared."daily_count",
-      prepared."weekly_count",
-      prepared."slimes",
-      prepared."item_keys",
-      prepared."has_active_creature",
-      created_comment."id" AS "comment_id",
-      created_comment."parentCommentId" AS "comment_parent_comment_id",
-      created_comment."content" AS "comment_content",
-      created_comment."createdAt" AS "comment_created_at",
-      created_comment."authorKind" AS "comment_author_kind",
-      created_comment."audience" AS "comment_audience",
-      created_comment."authorParentId" AS "comment_author_parent_id",
-      created_comment."authorStudentId" AS "comment_author_student_id"
-    FROM prepared
-    LEFT JOIN created_comment ON true
+      EXISTS(SELECT 1 FROM locked_account) AS "account_found",
+      EXISTS(
+        SELECT 1
+        FROM "CardComment"
+        WHERE "authorStudentId" = ${input.studentId}
+          AND regexp_replace(
+            btrim(normalize("content", NFKC)),
+            '[[:space:]]+',
+            ' ',
+            'g'
+          ) = ${input.normalizedContent}
+      ) AS "duplicate",
+      (
+        SELECT COUNT(*)::int
+        FROM "Transaction"
+        WHERE "accountId" = ${input.accountId}
+          AND "sourceType" = ${sourceType}
+          AND "type" = 'deposit'
+          AND "createdAt" >= ${bounds.dayStart}
+          AND "createdAt" < ${bounds.dayEnd}
+      ) AS "daily_count",
+      (
+        SELECT COUNT(*)::int
+        FROM "Transaction"
+        WHERE "accountId" = ${input.accountId}
+          AND "sourceType" = ${sourceType}
+          AND "type" = 'deposit'
+          AND "createdAt" >= ${bounds.weekStart}
+          AND "createdAt" < ${bounds.weekEnd}
+      ) AS "weekly_count",
+      COALESCE(
+        (
+          SELECT jsonb_agg(
+            jsonb_build_object(
+              'color', slime."color",
+              'growthStage', slime."growthStage",
+              'equippedTitleKey', slime."equippedTitleKey"
+            )
+          )
+          FROM "StudentSlime" AS slime
+          WHERE slime."studentId" = ${input.studentId}
+            AND slime."isEquipped" = true
+        ),
+        '[]'::jsonb
+      ) AS "slimes",
+      COALESCE(
+        (
+          SELECT jsonb_agg(item."itemKey")
+          FROM "StudentCreatureItem" AS item
+          WHERE item."studentId" = ${input.studentId}
+            AND item."isEquipped" = true
+            AND item."quantity" > 0
+        ),
+        '[]'::jsonb
+      ) AS "item_keys",
+      EXISTS(
+        SELECT 1
+        FROM "StudentCreature" AS creature
+        WHERE creature."studentId" = ${input.studentId}
+          AND creature."isActive" = true
+      ) AS "has_active_creature"
   `);
-
   const row = rows[0];
   if (!row?.account_found) throw new Error("Reward account not found");
-  if (
-    !row.comment_id ||
-    !row.comment_content ||
-    !row.comment_created_at ||
-    row.comment_author_kind !== "student" ||
-    (row.comment_audience !== "public" && row.comment_audience !== "guardian")
-  ) {
-    throw new Error("Comment creation failed");
-  }
-
   return {
-    created: {
-      id: row.comment_id,
-      parentCommentId: row.comment_parent_comment_id,
-      content: row.comment_content,
-      createdAt: row.comment_created_at,
-      authorKind: "student",
-      audience: row.comment_audience,
-      authorParentId: row.comment_author_parent_id,
-      authorStudentId: row.comment_author_student_id,
+    duplicate: row.duplicate === true,
+    counts: {
+      daily: Number(row.daily_count ?? 0),
+      weekly: Number(row.weekly_count ?? 0),
     },
-    preparedReward: {
-      duplicate: row.duplicate === true,
-      counts: {
-        daily: Number(row.daily_count ?? 0),
-        weekly: Number(row.weekly_count ?? 0),
-      },
-      rewardContext: parseRewardContext(
-        row,
-        "comment",
-        input.policy.rewardBuffCapBps,
-      ),
-    },
+    rewardContext: parseRewardContext(
+      row,
+      "comment",
+      input.policy.rewardBuffCapBps,
+    ),
   };
 }
 

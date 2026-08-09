@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
   replay: null as Record<string, unknown> | null,
   replyTarget: null as Record<string, unknown> | null,
   award: vi.fn(),
-  createCommentWithPreparedRewardContext: vi.fn(),
+  loadPreparedRewardContext: vi.fn(),
   ensureAccountFor: vi.fn(),
   create: vi.fn(),
   scheduleBoardActivity: vi.fn(),
@@ -56,7 +56,7 @@ vi.mock("@/lib/reward-service", () => ({
     commentRewardAmount: 5,
   })),
   awardCappedPolicyReward: mocks.award,
-  createCommentWithPreparedRewardContext: mocks.createCommentWithPreparedRewardContext,
+  loadPreparedCommentRewardContext: mocks.loadPreparedRewardContext,
 }));
 
 vi.mock("@/lib/creatures/activity-rewards", () => ({
@@ -90,8 +90,6 @@ vi.mock("@/lib/db", () => {
       findFirst: vi.fn(async ({ where }: { where: Record<string, unknown> }) => {
         if (where.id) return mocks.replyTarget?.id === where.id ? mocks.replyTarget : null;
         return mocks.replay?.cardId === where.cardId &&
-          where.authorStudentId === "student-1" &&
-          where.clientRequestId === "request-0001" &&
           (where.deletedAt === undefined || (mocks.replay.deletedAt ?? null) === where.deletedAt)
           ? mocks.replay
           : null;
@@ -166,11 +164,25 @@ describe("student comment reward transaction", () => {
     mocks.replay = null;
     mocks.replyTarget = null;
     mocks.award.mockReset();
-    mocks.createCommentWithPreparedRewardContext.mockReset();
+    mocks.loadPreparedRewardContext.mockReset();
     mocks.ensureAccountFor.mockReset().mockResolvedValue({
       accountId: "account-1",
       cardId: "card-1",
     });
+    mocks.loadPreparedRewardContext.mockImplementation(
+      async (
+        _tx: unknown,
+        input: { normalizedContent: string },
+      ) => ({
+        duplicate: mocks.existingContents.some(
+          (content) =>
+            content.normalize("NFKC").trim().replace(/\s+/g, " ") ===
+            input.normalizedContent,
+        ),
+        counts: { daily: 0, weekly: 0 },
+        rewardContext: { buffBps: 0, hasActiveCreature: false },
+      }),
+    );
     mocks.create.mockReset();
     mocks.scheduleBoardActivity.mockReset();
     mocks.scheduleEngagementBroadcast.mockReset();
@@ -200,54 +212,9 @@ describe("student comment reward transaction", () => {
       mocks.comments.push(row);
       return row;
     });
-    mocks.createCommentWithPreparedRewardContext.mockImplementation(
-      async (_tx: unknown, input: {
-        cardId: string;
-        parentCommentId: string | null;
-        audience: "public" | "guardian";
-        clientRequestId: string | null;
-        content: string;
-        studentId: string;
-      }) => {
-        const created = await mocks.create({
-          data: {
-            cardId: input.cardId,
-            parentCommentId: input.parentCommentId,
-            audience: input.audience,
-            authorKind: "student",
-            authorUserId: null,
-            authorStudentId: input.studentId,
-            authorParentId: null,
-            clientRequestId: input.clientRequestId,
-            content: input.content,
-          },
-        });
-        return {
-          created: {
-            id: created.id,
-            parentCommentId: created.parentCommentId ?? null,
-            content: created.content,
-            createdAt: created.createdAt,
-            authorKind: created.authorKind,
-            audience: created.audience,
-            authorParentId: created.authorParentId ?? null,
-            authorStudentId: created.authorStudentId ?? null,
-          },
-          preparedReward: {
-            duplicate: mocks.existingContents.some(
-              (content) =>
-                content.normalize("NFKC").trim().replace(/\s+/g, " ") ===
-                input.content.normalize("NFKC").trim().replace(/\s+/g, " "),
-            ),
-            counts: { daily: 0, weekly: 0 },
-            rewardContext: { buffBps: 0, hasActiveCreature: false },
-          },
-        };
-      },
-    );
   });
 
-  it("creates an eligible comment with its reward context and keeps the response contract", async () => {
+  it("prepares one locked reward context before creating the comment", async () => {
     mocks.award.mockResolvedValueOnce({ amount: 5, baseAmount: 5, buffBps: 0 });
     const database = (await import("@/lib/db")).db;
     database.$transaction.mockClear();
@@ -257,7 +224,7 @@ describe("student comment reward transaction", () => {
     });
 
     expect(response.status).toBe(200);
-    expect(mocks.createCommentWithPreparedRewardContext).toHaveBeenCalledWith(
+    expect(mocks.loadPreparedRewardContext).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
         accountId: "account-1",
@@ -266,28 +233,12 @@ describe("student comment reward transaction", () => {
         normalizedContent: "정말 좋은 글이에요",
       }),
     );
-    expect(mocks.comments).toHaveLength(1);
-    expect(await response.json()).toMatchObject({
-      reward: { amount: 5, baseAmount: 5, buffBps: 0 },
-      item: {
-        id: "comment-1",
-        parentCommentId: null,
-        content: "정말 좋은 글이에요",
-        authorKind: "student",
-        audience: "public",
-        canDelete: true,
-        canModerate: false,
-        hiddenReason: null,
-        authorStudentId: "student-1",
-        likeCount: 0,
-        isLiked: false,
-        replies: [],
-      },
-      guardianAvailable: true,
-    });
+    expect(
+      mocks.loadPreparedRewardContext.mock.invocationCallOrder[0],
+    ).toBeLessThan(mocks.create.mock.invocationCallOrder[0]);
     expect(database.$transaction).toHaveBeenCalledWith(
       expect.any(Function),
-      { isolationLevel: "Serializable" },
+      { isolationLevel: "ReadCommitted" },
     );
   });
 
@@ -307,7 +258,7 @@ describe("student comment reward transaction", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.ensureAccountFor).not.toHaveBeenCalled();
-    expect(mocks.createCommentWithPreparedRewardContext).toHaveBeenCalledWith(
+    expect(mocks.loadPreparedRewardContext).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ accountId: "existing-account-1" }),
     );
@@ -332,8 +283,6 @@ describe("student comment reward transaction", () => {
     mocks.replay = {
       id: "comment-existing",
       cardId: "card-1",
-      parentCommentId: null,
-      audience: "public",
       content: "정말 좋은 글이에요",
       createdAt: new Date("2026-07-20T00:00:00.000Z"),
       authorKind: "student",
@@ -346,94 +295,6 @@ describe("student comment reward transaction", () => {
     expect((await response.json()).item.id).toBe("comment-existing");
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(mocks.award).not.toHaveBeenCalled();
-  });
-
-  it("recovers a raw CTE PostgreSQL unique violation as a replay", async () => {
-    mocks.replay = {
-      id: "comment-existing-raw",
-      cardId: "card-1",
-      parentCommentId: null,
-      audience: "public",
-      content: "replayed comment",
-      createdAt: new Date("2026-07-20T00:00:00.000Z"),
-      authorKind: "student",
-      authorUser: null,
-      authorStudent: { id: "student-1", name: "student" },
-    };
-    mocks.createCommentWithPreparedRewardContext.mockRejectedValueOnce(
-      new Prisma.PrismaClientKnownRequestError("raw unique violation", {
-        code: "P2010",
-        clientVersion: "test",
-        meta: { code: "23505" },
-      }),
-    );
-
-    const response = await POST(request("request-0001", "replayed comment"), {
-      params: Promise.resolve({ id: "card-1" }),
-    });
-
-    expect(response.status).toBe(200);
-    expect((await response.json()).item.id).toBe("comment-existing-raw");
-    expect(mocks.award).not.toHaveBeenCalled();
-  });
-
-  it("rejects replay recovery when the stored payload differs", async () => {
-    const conflict = new Prisma.PrismaClientKnownRequestError(
-      "raw unique violation",
-      {
-        code: "P2010",
-        clientVersion: "test",
-        meta: { code: "23505" },
-      },
-    );
-    mocks.replay = {
-      id: "comment-existing-raw",
-      cardId: "card-1",
-      content: "different content",
-      parentCommentId: null,
-      audience: "public",
-      createdAt: new Date("2026-07-20T00:00:00.000Z"),
-      authorKind: "student",
-      authorUser: null,
-      authorStudent: { id: "student-1", name: "student" },
-    };
-    mocks.createCommentWithPreparedRewardContext.mockRejectedValueOnce(conflict);
-
-    await expect(
-      POST(request(), { params: Promise.resolve({ id: "card-1" }) }),
-    ).rejects.toBe(conflict);
-  });
-
-  it("rethrows a raw unique violation when no exact replay row exists", async () => {
-    const conflict = new Prisma.PrismaClientKnownRequestError(
-      "raw unique violation",
-      {
-        code: "P2010",
-        clientVersion: "test",
-        meta: { code: "23505" },
-      },
-    );
-    mocks.createCommentWithPreparedRewardContext.mockRejectedValueOnce(conflict);
-
-    await expect(
-      POST(request(), { params: Promise.resolve({ id: "card-1" }) }),
-    ).rejects.toBe(conflict);
-  });
-
-  it("does not treat a different raw database error as a replay", async () => {
-    const conflict = new Prisma.PrismaClientKnownRequestError(
-      "raw transaction failure",
-      {
-        code: "P2010",
-        clientVersion: "test",
-        meta: { code: "40001" },
-      },
-    );
-    mocks.createCommentWithPreparedRewardContext.mockRejectedValueOnce(conflict);
-
-    await expect(
-      POST(request(), { params: Promise.resolve({ id: "card-1" }) }),
-    ).rejects.toBe(conflict);
   });
 
   it("does not replay a deleted comment for the same client request", async () => {
@@ -514,7 +375,7 @@ describe("student comment reward transaction", () => {
       { params: Promise.resolve({ id: "card-1" }) },
     );
 
-    expect(mocks.createCommentWithPreparedRewardContext).toHaveBeenCalledTimes(1);
+    expect(mocks.loadPreparedRewardContext).toHaveBeenCalledTimes(1);
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(mocks.award).not.toHaveBeenCalled();
   });

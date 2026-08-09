@@ -20,14 +20,12 @@ import {
   awardCappedPolicyReward,
   awardReadingPolicyReward,
   awardWalkingPolicyReward,
-  createCommentWithPreparedRewardContext,
   invalidateRewardPolicyCache,
   loadRewardPolicy,
   loadRewardPolicyCached,
   lockRewardAccount,
 } from "./reward-service";
 import {
-  DEFAULT_REWARD_POLICY,
   READING_CLASSROOM_RANK_REWARD_SOURCE_TYPE,
   WALKING_WEEKLY_REWARD_SOURCE_TYPE,
 } from "./reward-policy";
@@ -89,73 +87,6 @@ describe("reward account locking", () => {
     await expect(lockRewardAccount(tx, "missing-account")).rejects.toThrow(
       "Reward account not found",
     );
-  });
-});
-
-describe("combined student comment preparation", () => {
-  it("maps the inserted comment and locked reward gates from one CTE result", async () => {
-    const queryRaw = vi.fn(async () => [
-      {
-        account_found: true,
-        duplicate: false,
-        daily_count: 2,
-        weekly_count: 7,
-        slimes: [],
-        item_keys: [],
-        has_active_creature: true,
-        comment_id: "comment-1",
-        comment_parent_comment_id: null,
-        comment_content: "정말 좋은 글이에요",
-        comment_created_at: new Date("2026-07-20T00:00:00.000Z"),
-        comment_author_kind: "student",
-        comment_audience: "public",
-        comment_author_parent_id: null,
-        comment_author_student_id: "student-1",
-      },
-    ]);
-    const tx = { $queryRaw: queryRaw } as unknown as Prisma.TransactionClient;
-
-    const result = await createCommentWithPreparedRewardContext(tx, {
-      cardId: "card-1",
-      parentCommentId: null,
-      audience: "public",
-      clientRequestId: "request-0001",
-      content: "정말 좋은 글이에요",
-      accountId: "account-1",
-      studentId: "student-1",
-      classroomId: "classroom-1",
-      normalizedContent: "정말 좋은 글이에요",
-      policy: {
-        ...DEFAULT_REWARD_POLICY,
-        commentMinMeaningfulLength: 4,
-        commentRewardAmount: 5,
-        rewardBuffCapBps: Number.MAX_SAFE_INTEGER,
-      },
-    });
-
-    expect(result).toEqual({
-      created: {
-        id: "comment-1",
-        parentCommentId: null,
-        content: "정말 좋은 글이에요",
-        createdAt: new Date("2026-07-20T00:00:00.000Z"),
-        authorKind: "student",
-        audience: "public",
-        authorParentId: null,
-        authorStudentId: "student-1",
-      },
-      preparedReward: {
-        duplicate: false,
-        counts: { daily: 2, weekly: 7 },
-        rewardContext: { buffBps: 0, hasActiveCreature: true },
-      },
-    });
-    const sql = String(
-      (queryRaw.mock.calls[0][0] as { strings: readonly string[] }).strings.join(" "),
-    );
-    expect(sql).toContain('WITH locked_account AS MATERIALIZED');
-    expect(sql).toContain('FOR UPDATE');
-    expect(sql).toContain('INSERT INTO "CardComment"');
   });
 });
 
