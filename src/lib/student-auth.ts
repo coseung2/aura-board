@@ -215,6 +215,7 @@ export async function getCurrentStudentIdentityRaw(): Promise<CurrentStudentIden
   const pending = db.student
     .findUnique({
       where: { id: payload.studentId },
+      relationLoadStrategy: "join",
       select: {
         id: true,
         name: true,

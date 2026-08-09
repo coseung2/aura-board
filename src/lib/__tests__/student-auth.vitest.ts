@@ -84,6 +84,7 @@ describe("getCurrentStudentIdentityRaw", () => {
     });
     expect(mocks.studentFindUnique).toHaveBeenCalledWith({
       where: { id: "student-1" },
+      relationLoadStrategy: "join",
       select: {
         id: true,
         name: true,
