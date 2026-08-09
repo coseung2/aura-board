@@ -33,6 +33,10 @@ import {
   SPEED_GAME_CHANGED_EVENT,
   speedGameChannelKey,
 } from "./realtime";
+import {
+  getRuntimeSupabaseServiceRoleKey,
+  getRuntimeSupabaseUrl,
+} from "./supabase/runtime-config";
 
 let serverClient: SupabaseClient | null = null;
 
@@ -42,7 +46,7 @@ const REALTIME_BROADCAST_RETRY_BASE_MS = 75;
 export class RealtimeConfigurationError extends Error {
   constructor() {
     super(
-      "Supabase Realtime is not configured. Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
+      "Supabase Realtime is not configured. Set SUPABASE_URL or NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY.",
     );
     this.name = "RealtimeConfigurationError";
   }
@@ -68,8 +72,8 @@ class RealtimeBroadcastDeliveryError extends Error {
 }
 
 function getServerClient(): SupabaseClient {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const url = getRuntimeSupabaseUrl();
+  const key = getRuntimeSupabaseServiceRoleKey();
   if (!url || !key) throw new RealtimeConfigurationError();
   if (serverClient) return serverClient;
   try {

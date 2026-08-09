@@ -28,6 +28,7 @@ describe("server realtime broadcasts", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    vi.stubEnv("SUPABASE_URL", "");
     vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service-role-key");
   });
@@ -58,6 +59,56 @@ describe("server realtime broadcasts", () => {
       { timeout: 1500 },
     );
     expect(supabaseMocks.removeChannel).toHaveBeenCalledWith(channel);
+  });
+
+  it("prefers the runtime SUPABASE_URL for server broadcasts", async () => {
+    vi.stubEnv("SUPABASE_URL", "https://runtime.example.supabase.co");
+    configureClient();
+    const { sendRealtimeBroadcast } = await import("../realtime-broadcast");
+
+    await sendRealtimeBroadcast("board:board-1", "board_changed", {
+      type: "board_changed",
+    });
+
+    expect(supabaseMocks.createClient).toHaveBeenCalledWith(
+      "https://runtime.example.supabase.co",
+      "service-role-key",
+      expect.objectContaining({
+        auth: { autoRefreshToken: false, persistSession: false },
+      }),
+    );
+  });
+
+  it("dynamically falls back to the runtime public URL", async () => {
+    configureClient();
+    const { sendRealtimeBroadcast } = await import("../realtime-broadcast");
+
+    await sendRealtimeBroadcast("board:board-1", "board_changed", {
+      type: "board_changed",
+    });
+
+    expect(supabaseMocks.createClient).toHaveBeenCalledWith(
+      "https://example.supabase.co",
+      "service-role-key",
+      expect.any(Object),
+    );
+  });
+
+  it("reads runtime URL and service credentials when broadcasting after import", async () => {
+    const { sendRealtimeBroadcast } = await import("../realtime-broadcast");
+    vi.stubEnv("SUPABASE_URL", "https://late-runtime.example.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "late-service-role-key");
+    configureClient();
+
+    await sendRealtimeBroadcast("board:board-1", "board_changed", {
+      type: "board_changed",
+    });
+
+    expect(supabaseMocks.createClient).toHaveBeenCalledWith(
+      "https://late-runtime.example.supabase.co",
+      "late-service-role-key",
+      expect.any(Object),
+    );
   });
 
   it("sends a board engagement batch in one HTTP broadcast", async () => {
