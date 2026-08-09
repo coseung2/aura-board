@@ -1,5 +1,3 @@
-import "server-only";
-
 type RuntimeEnvironment = Record<string, string | undefined>;
 
 function readRuntimeEnvironment(name: string): string | undefined {
