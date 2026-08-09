@@ -214,32 +214,19 @@ describe("student comment reward transaction", () => {
     });
   });
 
-  it("prepares one locked reward context before creating the comment", async () => {
-    mocks.award.mockResolvedValueOnce({ amount: 5, baseAmount: 5, buffBps: 0 });
-    const database = (await import("@/lib/db")).db;
-    database.$transaction.mockClear();
-
+  it("persists and returns the comment without reward or account work", async () => {
     const response = await POST(request(), {
       params: Promise.resolve({ id: "card-1" }),
     });
 
     expect(response.status).toBe(200);
-    expect(mocks.loadPreparedRewardContext).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        accountId: "account-1",
-        studentId: "student-1",
-        classroomId: "classroom-1",
-        normalizedContent: "정말 좋은 글이에요",
-      }),
-    );
-    expect(
-      mocks.loadPreparedRewardContext.mock.invocationCallOrder[0],
-    ).toBeLessThan(mocks.create.mock.invocationCallOrder[0]);
-    expect(database.$transaction).toHaveBeenCalledWith(
-      expect.any(Function),
-      { isolationLevel: "ReadCommitted" },
-    );
+    expect(await response.json()).toMatchObject({
+      reward: null,
+      item: { id: "comment-1", content: "정말 좋은 글이에요" },
+    });
+    expect(mocks.ensureAccountFor).not.toHaveBeenCalled();
+    expect(mocks.loadPreparedRewardContext).not.toHaveBeenCalled();
+    expect(mocks.award).not.toHaveBeenCalled();
   });
 
   it("reuses an existing wallet without provisioning a bank card", async () => {
@@ -258,25 +245,16 @@ describe("student comment reward transaction", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.ensureAccountFor).not.toHaveBeenCalled();
-    expect(mocks.loadPreparedRewardContext).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({ accountId: "existing-account-1" }),
-    );
+    expect(mocks.loadPreparedRewardContext).not.toHaveBeenCalled();
   });
 
-  it("rolls comment creation back when its atomic reward mutation fails", async () => {
-    mocks.award.mockImplementationOnce(async () => {
-      mocks.balance += 5;
-      mocks.transactions.push({ sourceType: "comment_reward", amount: 5 });
-      throw new Error("wallet write failed");
-    });
+  it("keeps comment creation independent from a failing reward worker", async () => {
+    mocks.award.mockRejectedValueOnce(new Error("wallet write failed"));
 
-    await expect(POST(request(), { params: Promise.resolve({ id: "card-1" }) })).rejects.toThrow(
-      "wallet write failed",
-    );
-    expect(mocks.comments).toHaveLength(0);
-    expect(mocks.balance).toBe(0);
-    expect(mocks.transactions).toHaveLength(0);
+    const response = await POST(request(), { params: Promise.resolve({ id: "card-1" }) });
+    expect(response.status).toBe(200);
+    expect(mocks.comments).toHaveLength(1);
+    expect(mocks.award).not.toHaveBeenCalled();
   });
 
   it("replays a client request through the unique constraint without rewarding twice", async () => {
@@ -346,7 +324,7 @@ describe("student comment reward transaction", () => {
         data: expect.objectContaining({ content: "정말\n  좋은 글이에요" }),
       }),
     );
-    expect(mocks.award).toHaveBeenCalledTimes(1);
+    expect(mocks.award).not.toHaveBeenCalled();
   });
 
   it("preserves a teacher comment's internal whitespace without applying a reward", async () => {
@@ -375,7 +353,7 @@ describe("student comment reward transaction", () => {
       { params: Promise.resolve({ id: "card-1" }) },
     );
 
-    expect(mocks.loadPreparedRewardContext).toHaveBeenCalledTimes(1);
+    expect(mocks.loadPreparedRewardContext).not.toHaveBeenCalled();
     expect(mocks.create).toHaveBeenCalledTimes(1);
     expect(mocks.award).not.toHaveBeenCalled();
   });

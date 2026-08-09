@@ -2,20 +2,13 @@ import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { ensureAccountFor } from "@/lib/bank";
 import { authorizeCardAccess, getCurrentCardActor } from "@/lib/card-engagement-actor";
 import { formatEngagementAuthor } from "@/lib/card-engagement-format";
 import { resolveHiddenReason } from "@/lib/content-safety";
 import { emptyHiddenLookup, loadHiddenLookup } from "@/lib/content-safety-service";
 import { scheduleBoardActivity } from "@/lib/board-activity-queue";
 import { scheduleEngagementBroadcast } from "@/lib/engagement-broadcast-queue";
-import { retryActivityRewardTransaction } from "@/lib/creatures/activity-rewards";
-import { isMeaningfulRewardComment, normalizeRewardComment } from "@/lib/reward-policy";
-import {
-  awardCappedPolicyReward,
-  loadPreparedCommentRewardContext,
-  loadRewardPolicyCached,
-} from "@/lib/reward-service";
+import { normalizeRewardComment } from "@/lib/reward-policy";
 
 // card-comments-likes (2026-04-26): GET list / POST create.
 
@@ -223,25 +216,6 @@ export async function POST(
   if (!normalizedContent) {
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
-  let accountId: string | null = null;
-  let studentRewardPolicy: Awaited<ReturnType<typeof loadRewardPolicyCached>> | null = null;
-  if (studentActor) {
-    // Comment rewards only need the wallet account. Requiring a bank card here
-    // made the first comment provision a card inside the hot write path even
-    // when the student's account already existed.
-    const accountPromise = studentActor.accountId
-      ? Promise.resolve({ accountId: studentActor.accountId })
-      : ensureAccountFor({
-          id: studentActor.id,
-          classroomId: studentActor.classroomId,
-        });
-    const [account, policy] = await Promise.all([
-      accountPromise,
-      loadRewardPolicyCached(studentActor.classroomId),
-    ]);
-    accountId = account.accountId;
-    studentRewardPolicy = policy;
-  }
   const commentSelect = {
     id: true,
     parentCommentId: true,
@@ -252,85 +226,24 @@ export async function POST(
     authorParentId: true,
     authorStudentId: true,
   } as const;
-  let reward: { amount: number; baseAmount: number; buffBps: number } | null = null;
   let created;
   try {
-    const result = await retryActivityRewardTransaction(() =>
-      db.$transaction(async (tx) => {
-        const policy = studentRewardPolicy;
-        const shouldEvaluateReward = Boolean(
-          studentActor &&
-          accountId &&
-          policy &&
-          isMeaningfulRewardComment(
-            normalizedContent,
-            policy.commentMinMeaningfulLength,
-          ),
-        );
-        const preparedReward =
-          shouldEvaluateReward && studentActor && accountId && policy
-            ? await loadPreparedCommentRewardContext(tx, {
-                accountId,
-                studentId: studentActor.id,
-                classroomId: studentActor.classroomId,
-                normalizedContent,
-                policy,
-              })
-            : null;
-
-        // The database uniqueness constraint is the retry gate. On a replay,
-        // create raises P2002 and the outer recovery reads the committed row;
-        // the common first-attempt path avoids a preflight SELECT.
-        const comment = await tx.cardComment.create({
-          data: {
-            cardId,
-            parentCommentId: threadRootId,
-            audience,
-            authorKind: isTeacher ? "teacher" : studentActor ? "student" : "external",
-            authorUserId: isTeacher ? actor.id : null,
-            authorStudentId: studentActor?.id ?? null,
-            authorParentId: parentActor?.id ?? null,
-            clientRequestId: studentActor || parentActor ? parsed.data.clientRequestId : null,
-            content: storedContent,
-          },
-          select: commentSelect,
-        });
-
-        if (
-          !studentActor ||
-          !accountId ||
-          !policy ||
-          !preparedReward ||
-          preparedReward.duplicate
-        ) {
-          return { created: comment, reward: null };
-        }
-        const paid = await awardCappedPolicyReward({
-          tx,
-          studentId: studentActor.id,
-          classroomId: studentActor.classroomId,
-          accountId,
-          area: "comment",
-          sourceRef: comment.id,
-          baseAmount: policy.commentRewardAmount,
-          note: `댓글 작성 보상 [comment:${comment.id}]`,
-          policy,
-          accountAlreadyVerified: true,
-          sourceAlreadyChecked: true,
-          preparedCounts: preparedReward.counts,
-          preparedRewardContext: preparedReward.rewardContext,
-        });
-        return { created: comment, reward: paid };
-      }, { isolationLevel: Prisma.TransactionIsolationLevel.ReadCommitted }),
-    );
-    created = result.created;
-    reward = result.reward
-      ? {
-          amount: result.reward.amount,
-          baseAmount: result.reward.baseAmount,
-          buffBps: result.reward.buffBps,
-        }
-      : null;
+    // The database trigger transactionally enqueues the asynchronous reward
+    // and notification work with this insert.
+    created = await db.cardComment.create({
+      data: {
+        cardId,
+        parentCommentId: threadRootId,
+        audience,
+        authorKind: isTeacher ? "teacher" : studentActor ? "student" : "external",
+        authorUserId: isTeacher ? actor.id : null,
+        authorStudentId: studentActor?.id ?? null,
+        authorParentId: parentActor?.id ?? null,
+        clientRequestId: studentActor || parentActor ? parsed.data.clientRequestId : null,
+        content: storedContent,
+      },
+      select: commentSelect,
+    });
   } catch (error) {
     if (
       (studentActor || parentActor) &&
@@ -368,7 +281,7 @@ export async function POST(
   const createdAuthorKind = created.authorParentId ? "parent" : created.authorKind;
   const rawName = actor.name;
   return NextResponse.json({
-    reward,
+    reward: null,
     item: {
       id: created.id,
       parentCommentId: created.parentCommentId ?? threadRootId,
