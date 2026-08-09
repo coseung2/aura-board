@@ -83,6 +83,7 @@ describe("notification outbox leases and retries", () => {
     const query = mocks.queryRaw.mock.calls[0][0] as { sql?: string; strings?: string[] };
     const sql = query.sql ?? query.strings?.join("?") ?? "";
     expect(sql).toContain("FOR UPDATE SKIP LOCKED");
+    expect(sql).toContain("CASE WHEN \"eventType\" = 'comment_reward' THEN 0 ELSE 1 END");
     expect(sql).toContain("WITH terminalized AS");
     expect(sql).toContain("'LeaseExpired'");
     expect(sql).toContain("LIMIT");

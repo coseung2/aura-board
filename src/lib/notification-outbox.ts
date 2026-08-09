@@ -79,7 +79,11 @@ export async function claimNotificationOutbox(
             ("status" = 'pending' AND "nextAttemptAt" <= ${now})
             OR ("status" = 'processing' AND "lockedAt" <= ${leaseExpiredBefore})
           )
-        ORDER BY "createdAt" ASC
+        -- Reward events are user-visible balance work. Prioritize them ahead
+        -- of push-notification fanout so a classroom comment wave completes
+        -- rewards within the bounded webhook drain window.
+        ORDER BY CASE WHEN "eventType" = 'comment_reward' THEN 0 ELSE 1 END,
+                 "createdAt" ASC
         FOR UPDATE SKIP LOCKED
         LIMIT ${take}
       )
