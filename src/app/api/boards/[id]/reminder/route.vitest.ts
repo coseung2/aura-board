@@ -18,7 +18,9 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("@/lib/realtime", () => ({
   assignmentChannelKey: (boardId: string) => `board:${boardId}:assignment`,
-  publish: mocks.publish,
+}));
+vi.mock("@/lib/realtime-server", () => ({
+  publishRealtimeEvent: mocks.publish,
 }));
 vi.mock("@/lib/distributed-cooldown", () => ({
   claimDistributedCooldown: mocks.claimCooldown,

@@ -6,6 +6,8 @@
  * is strict; committed mutation routes explicitly opt into best-effort use.
  */
 
+import "server-only";
+
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import {

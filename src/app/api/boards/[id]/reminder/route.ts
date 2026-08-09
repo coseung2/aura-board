@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ReminderSchema } from "@/lib/assignment-schemas";
-import { assignmentChannelKey, publish } from "@/lib/realtime";
+import { assignmentChannelKey } from "@/lib/realtime";
+import { publishRealtimeEvent } from "@/lib/realtime-server";
 import {
   claimDistributedCooldown,
   releaseDistributedCooldown,
@@ -79,7 +80,7 @@ export async function POST(
   const now = Date.now();
 
   try {
-    await publish({
+    await publishRealtimeEvent({
       channel: assignmentChannelKey(boardId),
       type: "reminder.issued",
       payload: {

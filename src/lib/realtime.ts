@@ -172,9 +172,3 @@ export type RealtimeEvent = {
   type: string;
   payload: unknown;
 };
-
-/** Validate and deliver an event through Supabase Broadcast. */
-export async function publish(event: RealtimeEvent): Promise<void> {
-  const { publishValidatedRealtimeEvent } = await import("./realtime-broadcast");
-  await publishValidatedRealtimeEvent(event);
-}
