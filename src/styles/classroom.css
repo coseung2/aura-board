@@ -1368,94 +1368,133 @@
 .walking-student-delete-status--success { color: var(--color-plant-active); }
 .walking-student-delete-status--error { color: var(--color-danger); }
 
-.classroom-role-mini-grid {
+.classroom-role-mini-column-layout {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 32px;
 }
 
-.classroom-role-mini-card {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-height: 88px;
-  padding: 12px;
-  border-radius: var(--radius-btn);
+.classroom-role-mini-list {
+  min-width: 0;
+}
+
+.classroom-role-mini-columns,
+.classroom-role-mini-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(82px, 0.75fr) minmax(0, 1.25fr);
+  align-items: center;
+  column-gap: 14px;
+}
+
+.classroom-role-mini-columns {
+  min-height: 36px;
+  padding: 6px 12px;
+  border-bottom: 2px solid var(--color-text);
+  color: var(--color-text-faint);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.classroom-role-mini-row {
+  width: 100%;
+  min-height: 54px;
+  padding: 10px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.classroom-role-mini-row:hover {
   background: var(--color-surface-alt);
-  font-size: 13px;
+}
+
+.classroom-role-mini-row:focus-visible {
+  position: relative;
+  outline: 2px solid var(--color-accent-tinted-text, var(--color-accent));
+  outline-offset: -2px;
 }
 
 .classroom-role-mini-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
+  display: contents;
 }
 
-.classroom-role-mini-label {
+.classroom-role-mini-label,
+.classroom-role-mini-salary {
   min-width: 0;
-  color: var(--color-text);
-  font-size: 14px;
-  font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.classroom-role-mini-label {
+  font-size: 14px;
+  font-weight: 650;
+}
+
 .classroom-role-mini-salary {
-  flex: 0 0 auto;
   color: var(--color-text-muted);
-  font-size: 11px;
-  font-weight: 700;
-  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .classroom-role-mini-students {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px 8px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  color: var(--color-text);
-  font-size: 12px;
-  white-space: pre-wrap;
-}
-
-.classroom-role-mini-unassigned {
-  margin: 0;
-  color: var(--color-text-faint);
-  font-size: 12px;
-}
-
-/* Transparent placeholder tile that doubles as the 역할 추가 entry point,
-   mirroring the board columns' dashed "+ 카드 추가" affordance. */
-.classroom-role-mini-add {
-  display: flex;
   align-items: center;
-  justify-content: center;
-  min-height: 88px;
-  padding: 12px;
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-btn);
+  gap: 3px 16px;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.classroom-role-mini-student {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.classroom-role-mini-student--empty {
+  color: var(--color-text-muted);
+}
+
+.classroom-role-mini-add {
+  width: 100%;
+  min-height: 48px;
+  padding: 10px 12px;
+  border: 0;
   background: transparent;
-  color: var(--color-text-faint);
-  font-family: var(--font-body);
+  color: var(--color-accent-tinted-text, var(--color-accent));
+  font: inherit;
   font-size: 13px;
   font-weight: 600;
-  text-decoration: none;
+  text-align: left;
   cursor: pointer;
-  transition:
-    border-color 150ms ease,
-    color 150ms ease,
-    background 150ms ease;
 }
 
 .classroom-role-mini-add:hover,
 .classroom-role-mini-add:focus-visible {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-  background: var(--color-accent-tinted-bg);
+  background: var(--color-surface-alt);
+}
+
+.classroom-role-mini-add:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text, var(--color-accent));
+  outline-offset: -2px;
+}
+
+@media (max-width: 900px) {
+  .classroom-role-mini-column-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
 }
 
 .classroom-role-add-modal .modal-body {
@@ -1501,19 +1540,6 @@
 .classroom-role-add-modal .classroom-role-select {
   width: 100%;
   min-height: 40px;
-}
-
-.classroom-role-mini-card {
-  border: 0;
-  font-family: var(--font-body);
-  text-align: left;
-  cursor: pointer;
-  transition: background 150ms ease;
-}
-
-.classroom-role-mini-card:hover,
-.classroom-role-mini-card:focus-visible {
-  background: var(--color-accent-tinted-bg);
 }
 
 /* Pay controls render inside the section divider row, right-aligned. */
@@ -1700,8 +1726,107 @@
   font-size: 13px;
 }
 
-/* Dashboard section switcher (2026-07-27): KPI strip + one active section.
-   Reuses the shared strong section nav so the classroom pages stay aligned. */
+/* Read-only classroom overview: a flat metric row, not a feature card grid. */
+.classroom-overview {
+  padding-top: 20px;
+}
+
+.classroom-overview h2 {
+  margin: 0 0 12px;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.classroom-overview-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+}
+
+.classroom-overview-summary-item {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  padding: 16px 20px;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.classroom-overview-summary-item:first-child {
+  padding-left: 0;
+}
+
+.classroom-overview-summary-item:last-child {
+  border-right: 0;
+}
+
+.classroom-overview-summary-item dt {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.classroom-overview-summary-item dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+@media (max-width: 960px) {
+  .classroom-overview-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .classroom-overview-summary-item:nth-child(3n) {
+    border-right: 0;
+  }
+
+  .classroom-overview-summary-item:nth-child(3n + 1) {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .classroom-overview-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .classroom-overview-summary-item:nth-child(3n) {
+    border-right: 1px solid var(--color-border);
+  }
+
+  .classroom-overview-summary-item:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .classroom-overview-summary-item:nth-child(2n + 1) {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .classroom-overview-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .classroom-overview-summary-item,
+  .classroom-overview-summary-item:first-child {
+    padding-inline: 0;
+    border-right: 0;
+  }
+
+  .classroom-overview-summary-item:last-child {
+    border-bottom: 0;
+  }
+}
+
+/* Classroom finance summary keeps the shared flat KPI strip. */
 .classroom-section-page .classroom-dashboard-kpis {
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, 1fr);
@@ -1784,40 +1909,6 @@
   background: var(--color-accent-active);
 }
 
-.classroom-dashboard-section-body {
-  display: grid;
-  gap: 12px;
-  padding-top: 20px;
-}
-
-/* 금융 관리 renders its own KPI strip as the first child, so the body drops its
-   top padding to keep the column dividers touching the header rule. */
-.classroom-dashboard-section-body.is-flush {
-  padding-top: 0;
-  gap: 0;
-}
-
-/* The dashboard lists every student, so the rows run in two columns. */
-.classroom-dashboard-section-body .classroom-dashboard-list {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.classroom-dashboard-panel-nav {
-  display: flex;
-  align-items: flex-end;
-  flex-wrap: wrap;
-  gap: 0;
-  min-height: 44px;
-  border-bottom: 2px solid var(--color-text);
-}
-
-/* Right-aligned slot in the divider row for section-level actions. */
-.classroom-dashboard-panel-nav-slot {
-  display: flex;
-  align-items: center;
-  margin-left: auto;
-}
-
 /* 은행 panel groups savings and fixed deposits side by side on wide screens. */
 .classroom-dashboard-bank {
   display: grid;
@@ -1884,13 +1975,19 @@
     flex-direction: column;
   }
 
-  .classroom-showcase-strip,
-  .classroom-role-mini-grid {
+  .classroom-showcase-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .classroom-dashboard-section-body .classroom-dashboard-list {
-    grid-template-columns: 1fr;
+  .classroom-role-mini-columns,
+  .classroom-role-mini-row {
+    grid-template-columns: minmax(0, 1.05fr) minmax(72px, 0.7fr) minmax(0, 1.3fr);
+    column-gap: 10px;
+    padding-inline: 6px;
+  }
+
+  .classroom-role-mini-students {
+    gap: 2px 8px;
   }
 
   .walking-student-row {
@@ -6725,7 +6822,7 @@
   display: flex;
   align-items: flex-end;
   flex-wrap: wrap;
-  gap: 2px;
+  gap: 0;
   min-height: 44px;
 }
 
@@ -6737,10 +6834,10 @@
 .classroom-name-edit {
   display: inline-flex;
   align-items: flex-end;
-  justify-content: center;
+  justify-content: flex-start;
   width: 44px;
   height: 44px;
-  padding: 0 0 2px;
+  padding: 0 0 2px 14px;
   border: 0;
   background: transparent;
   color: var(--color-text-muted);
@@ -6760,7 +6857,7 @@
 .classroom-name-delete {
   display: inline-flex;
   align-items: flex-end;
-  justify-content: center;
+  justify-content: flex-start;
   width: 44px;
   height: 44px;
   margin-left: 0;

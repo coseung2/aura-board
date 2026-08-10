@@ -36,10 +36,22 @@ describe("GameHubCatalog teacher mode", () => {
     { id: "classroom-2", name: "별빛반", studentCount: 18 },
   ];
 
-  it("shows Jam Live and the same five official game entries as the student hub", () => {
+  it("renders six uniform cards with Jam Live first and the five official games after it", () => {
     render(<GameHubCatalog viewer="teacher" classrooms={classrooms} />);
 
-    expect(screen.getByRole("heading", { level: 3, name: "잼라이브" })).toBeTruthy();
+    const cards = screen.getAllByRole("article");
+    expect(cards).toHaveLength(6);
+    expect(
+      within(cards[0]).getByRole("heading", { level: 3, name: "잼라이브" }),
+    ).toBeTruthy();
+    expect(within(cards[0]).getByText("LIVE")).toBeTruthy();
+    expect(
+      within(cards[0]).getByRole("button", { name: "잼라이브 게임 열기" }),
+    ).toBeTruthy();
+    for (const card of cards) {
+      expect(within(card).getByRole("heading", { level: 3 })).toBeTruthy();
+      expect(within(card).getByRole("button")).toBeTruthy();
+    }
     expect(screen.queryByRole("link", { name: "나의 전적" })).toBeNull();
     expect(screen.queryByLabelText("놀이 학급")).toBeNull();
     expect(screen.queryByRole("dialog", { name: "학급 선택" })).toBeNull();
@@ -160,7 +172,25 @@ describe("GameHubCatalog teacher mode", () => {
       expect(button.hasAttribute("disabled")).toBe(true);
     }
 
-    fireEvent.click(screen.getByRole("button", { name: "잼라이브 입장" }));
+    fireEvent.click(screen.getByRole("button", { name: "잼라이브 게임 열기" }));
     expect(push).toHaveBeenCalledWith("/live-quiz");
+  });
+});
+
+describe("GameHubCatalog student mode", () => {
+  it("keeps Jam Live first, omits the records link, and routes students to student live quiz", () => {
+    render(<GameHubCatalog />);
+
+    const cards = screen.getAllByRole("article");
+    expect(cards).toHaveLength(6);
+    expect(
+      within(cards[0]).getByRole("heading", { level: 3, name: "잼라이브" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "나의 전적" })).toBeNull();
+
+    fireEvent.click(
+      within(cards[0]).getByRole("button", { name: "잼라이브 입장" }),
+    );
+    expect(push).toHaveBeenCalledWith("/student/live-quiz");
   });
 });

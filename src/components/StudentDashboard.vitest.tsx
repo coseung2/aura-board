@@ -230,13 +230,13 @@ describe("student home and board hub separation", () => {
     expect(screen.queryByRole("tab", { name: /수업/ })).toBeNull();
   });
 
-  it("renders the canonical five games with generated art even with zero teacher boards", () => {
+  it("renders the canonical six play entries with generated art even with zero teacher boards", () => {
     const { container } = renderBoardHub(
       [],
       new URLSearchParams("category=play"),
     );
 
-    expect(screen.getByRole("tab", { name: /놀이\s*5/ }).getAttribute("aria-selected"))
+    expect(screen.getByRole("tab", { name: /놀이\s*6/ }).getAttribute("aria-selected"))
       .toBe("true");
     for (const title of ["그림자연합", "꼬들", "스피드게임", "오목", "노래 맞히기"]) {
       expect(screen.getByRole("heading", { level: 3, name: title })).toBeTruthy();
@@ -244,6 +244,30 @@ describe("student home and board hub separation", () => {
     }
     expect(screen.getAllByRole("button", { name: "입장" })).toHaveLength(5);
     expect(container.querySelector(".student-board-card")).toBeNull();
+  });
+
+  it("uses shared segmented tabs without search, nested play tabs, or an all tab", () => {
+    const { unmount } = renderBoardHub(
+      [board({ id: "lesson", slug: "lesson", title: "우리 반 수업", category: "LESSON" })],
+      new URLSearchParams("category=lesson&q=수업"),
+    );
+
+    const tablist = screen.getByRole("tablist", { name: "보드 구분" });
+    expect(tablist.classList.contains("board-section-tabs")).toBe(true);
+    expect(tablist.querySelector(".board-section-tabs-list")).not.toBeNull();
+    expect(within(tablist).getAllByRole("tab")).toHaveLength(3);
+    expect(within(tablist).getByRole("tab", { name: /수업\s*1/ })).toBeTruthy();
+    expect(within(tablist).getByRole("tab", { name: /놀이\s*6/ })).toBeTruthy();
+    expect(within(tablist).getByRole("tab", { name: "전적" })).toBeTruthy();
+    expect(screen.queryByRole("searchbox", { name: "보드 검색" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /전체/ })).toBeNull();
+    expect(screen.queryByRole("tablist", { name: "놀이 보기" })).toBeNull();
+
+    unmount();
+    renderBoardHub([], new URLSearchParams("category=play"));
+
+    expect(screen.getByRole("tablist", { name: "보드 구분" })).toBeTruthy();
+    expect(screen.queryByRole("tablist", { name: "놀이 보기" })).toBeNull();
   });
 
   it("enters a canonical server-owned room from the catalog action", async () => {
@@ -288,13 +312,15 @@ describe("student home and board hub separation", () => {
     );
 
     expect(screen.getByText("우리 반 수업")).toBeTruthy();
+    expect(screen.getByRole("tab", { name: /수업\s*1/ }).getAttribute("aria-selected"))
+      .toBe("true");
     expect(screen.queryByText("교사가 만든 오목")).toBeNull();
   });
 
-  it("keeps the game catalog and personal records as the only play sub-tabs", async () => {
+  it("selects records directly and canonicalizes the URL while preserving filters", async () => {
     vi.stubGlobal("fetch", vi.fn(() => json({
       schemaVersion: 1,
-      appliedFilter: { gameKind: "all", range: "30d", limit: 20 },
+      appliedFilter: { gameKind: "omok", range: "7d", limit: 20 },
       summary: {
         totalPlays: 0,
         completedCount: 0,
@@ -305,19 +331,53 @@ describe("student home and board hub separation", () => {
       records: [],
       nextCursor: null,
     })));
-    renderBoardHub(
-      [board({ id: "lesson", slug: "lesson", title: "우리 반 수업", category: "LESSON" })],
-      new URLSearchParams("category=play&keep=yes"),
+    const { rerender } = renderBoardHub(
+      [],
+      new URLSearchParams("category=play&q=오목&playTab=games&game=omok&range=7d"),
     );
 
-    expect(screen.getByRole("tab", { name: "게임" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("tab", { name: "나의 전적" }));
+    fireEvent.click(screen.getByRole("tab", { name: "전적" }));
     expect(await screen.findByRole("heading", { level: 2, name: "나의 전적" })).toBeTruthy();
     expect(screen.queryByRole("searchbox", { name: "보드 검색" })).toBeNull();
     expect(replace).toHaveBeenLastCalledWith(
-      "/student/boards?category=play&keep=yes&playTab=records",
+      "/student/boards?category=records&game=omok&range=7d",
       { scroll: false },
     );
+
+    mockSearchParams = new URLSearchParams("category=records&game=omok&range=7d");
+    rerender(<StudentBoardHub boards={[]} />);
+    fireEvent.click(screen.getByRole("button", { name: "90d" }));
+    expect(replace).toHaveBeenLastCalledWith(
+      "/student/boards?category=records&game=omok&range=90d",
+      { scroll: false },
+    );
+  });
+
+  it("renders records for the legacy playTab deep link", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => json({
+      schemaVersion: 1,
+      appliedFilter: { gameKind: "speed-game", range: "all", limit: 20 },
+      summary: {
+        totalPlays: 0,
+        completedCount: 0,
+        bestScore: null,
+        latestCompletedAt: null,
+      },
+      facets: {},
+      records: [],
+      nextCursor: null,
+    })));
+
+    renderBoardHub(
+      [],
+      new URLSearchParams("category=play&playTab=records&game=speed-game&range=all"),
+    );
+
+    expect(await screen.findByRole("heading", { level: 2, name: "나의 전적" })).toBeTruthy();
+    expect(screen.getByRole("tab", { name: "전적" }).getAttribute("aria-selected"))
+      .toBe("true");
+    expect(screen.queryByRole("tablist", { name: "놀이 보기" })).toBeNull();
+    expect(replace).not.toHaveBeenCalled();
   });
 
   it("opens the existing breakout selection behavior from the lesson board", () => {

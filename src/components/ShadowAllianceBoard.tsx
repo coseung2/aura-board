@@ -526,7 +526,7 @@ export function ShadowAllianceBoard({ boardId, boardTitle, viewer }: Props) {
           joinPending={busy || reconnecting || ownParticipant?.joinedAt == null}
           player={ownLegacyPlayer}
           snapshot={legacySnapshot}
-          onContinue={() => router.push("/student/boards?category=play&playTab=games")}
+          onContinue={() => router.push("/student/boards?category=play")}
           onRetryJoin={() => {
             joinedRunRef.current = null;
             readyRunRef.current = null;

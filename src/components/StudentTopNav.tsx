@@ -6,6 +6,7 @@ import { useRef, useState } from "react";
 import { Logo } from "./Logo";
 import { MegaNav, type MegaNavItem } from "./MegaNav";
 import { StudentNotificationBell } from "./StudentNotificationBell";
+import { parseStudentBoardCategory } from "./student/student-board-navigation";
 
 type Duty = {
   classroomId: string;
@@ -47,16 +48,37 @@ export function StudentTopNav({
   }));
 
   const legacyBoard = searchParams.get("board");
-  const boardCategory = searchParams.get("category");
+  const rawBoardCategory = searchParams.get("category");
+  const boardCategory = parseStudentBoardCategory(rawBoardCategory);
+  const boardPlayTab = searchParams.get("playTab");
   const petSection = searchParams.get("section");
 
   const legacyLessonActive = pathname === "/student" && legacyBoard === "lesson";
-  const legacyPlayActive = pathname === "/student" && legacyBoard === "play";
+  const legacyPlayActive =
+    pathname === "/student" &&
+    legacyBoard === "play" &&
+    boardPlayTab !== "records";
+  const legacyRecordsActive =
+    pathname === "/student" &&
+    legacyBoard === "play" &&
+    boardPlayTab === "records";
   const boardsActive =
     pathMatches(pathname, "/student/boards") ||
     legacyLessonActive ||
-    legacyPlayActive;
+    legacyPlayActive ||
+    legacyRecordsActive;
   const homeActive = pathname === "/student" && !boardsActive;
+
+  const lessonBoardActive =
+    pathname === "/student/boards" && boardCategory === "lesson";
+  const playBoardActive =
+    pathname === "/student/boards" &&
+    boardCategory === "play" &&
+    boardPlayTab !== "records";
+  const recordsBoardActive =
+    pathname === "/student/boards" &&
+    (rawBoardCategory === "records" ||
+      (rawBoardCategory === "play" && boardPlayTab === "records"));
 
   const petActive = pathMatches(pathname, "/student/aura-pet");
   const petMineActive =
@@ -96,22 +118,17 @@ export function StudentTopNav({
             {
               href: "/student/boards?category=lesson",
               label: "수업보드",
-              active:
-                (pathname === "/student/boards" && boardCategory === "lesson") ||
-                legacyLessonActive,
+              active: lessonBoardActive || legacyLessonActive,
             },
             {
               href: "/student/boards?category=play",
               label: "놀이보드",
-              active:
-                (pathname === "/student/boards" && boardCategory === "play") ||
-                legacyPlayActive,
+              active: playBoardActive || legacyPlayActive,
             },
             {
-              href: "/student/boards?category=all",
-              label: "전체 보드",
-              active:
-                pathname === "/student/boards" && boardCategory === "all",
+              href: "/student/boards?category=records",
+              label: "나의 전적",
+              active: recordsBoardActive || legacyRecordsActive,
             },
           ],
         },

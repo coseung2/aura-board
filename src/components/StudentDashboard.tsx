@@ -39,12 +39,6 @@ import {
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 const STUDENT_ASSIGNMENT_VISIBLE_LIMIT = 4;
 
-const PLAY_TABS = [
-  { id: "games", label: "게임" },
-  { id: "records", label: "나의 전적" },
-] as const;
-type PlayTab = (typeof PLAY_TABS)[number]["id"];
-
 type BreakoutGroup = {
   groupIndex: number;
   entrySectionId: string;
@@ -595,7 +589,7 @@ function StudentBoardHighlights({ boards }: { boards: BoardItem[] }) {
     <section className="student-home-boards" aria-labelledby="student-home-boards-title">
       <div className="student-flat-section-heading">
         <h2 id="student-home-boards-title">지금 확인할 보드</h2>
-        <Link href="/student/boards?category=all">전체 보드</Link>
+        <Link href="/student/boards?category=lesson">수업 보드</Link>
       </div>
       {priorityBoards.length > 0 ? (
         <div className="student-board-highlight-list">
@@ -604,7 +598,7 @@ function StudentBoardHighlights({ boards }: { boards: BoardItem[] }) {
             return (
               <Link
                 key={board.id}
-                href="/student/boards?category=all"
+                href="/student/boards?category=lesson"
                 className="student-board-highlight"
               >
                 <span>
@@ -634,10 +628,6 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
     sourceTitle: string;
     breakout: StudentBreakout;
   } | null>(null);
-  const [query, setQuery] = useState(() => searchParams.get("q") ?? "");
-  const requestedPlayTab: PlayTab =
-    searchParams.get("playTab") === "records" ? "records" : "games";
-  const [playTab, setPlayTab] = useState<PlayTab>(requestedPlayTab);
   const requestedRecordKind: OfficialGameKind | "all" = isOfficialGameKind(
     searchParams.get("game"),
   )
@@ -649,29 +639,18 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
     ? (searchParams.get("range") as GameRecordRange)
     : "30d";
   const categoryTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const playTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const requestedCategory = parseStudentBoardCategory(searchParams.get("category"));
+  const requestedCategory =
+    searchParams.get("category") === "play" &&
+    searchParams.get("playTab") === "records"
+      ? "records"
+      : parseStudentBoardCategory(searchParams.get("category"));
   const [activeCategory, setActiveCategory] =
     useState<StudentBoardCategory>(requestedCategory);
-  const contentBoards = boards.filter(
-    (board) => !isOfficialGameKind(board.layout),
-  );
-  const lessonBoards = contentBoards.filter((b) => b.category === "LESSON");
-  const normalizedQuery = query.trim().toLocaleLowerCase("ko");
-  const categoryBoards =
-    activeCategory === "lesson"
-      ? lessonBoards
-      : activeCategory === "play"
-        ? []
-        : contentBoards;
-  const activeBoards = categoryBoards
-    .filter((board) =>
-      normalizedQuery
-        ? `${board.title} ${layoutLabel(board.layout)}`
-            .toLocaleLowerCase("ko")
-            .includes(normalizedQuery)
-        : true,
-    )
+  const lessonBoards = boards
+    .filter((board) => !isOfficialGameKind(board.layout))
+    .filter((board) => board.category === "LESSON");
+  const activeBoards = lessonBoards
+    .slice()
     .sort(
       (left, right) =>
         Number(boardListState(right).live) - Number(boardListState(left).live),
@@ -681,35 +660,15 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
     setActiveCategory(requestedCategory);
   }, [requestedCategory]);
 
-  useEffect(() => {
-    setQuery(searchParams.get("q") ?? "");
-  }, [searchParams]);
-
-  useEffect(() => {
-    setPlayTab(requestedPlayTab);
-  }, [requestedPlayTab]);
-
-  function replaceBoardQuery(updates: Record<string, string | null>) {
+  function replaceBoardQuery(category: StudentBoardCategory) {
     const nextSearchParams = new URLSearchParams(searchParams.toString());
-    if (!("category" in updates)) {
-      nextSearchParams.set("category", activeCategory);
-    }
-    for (const [key, value] of Object.entries(updates)) {
-      if (value) nextSearchParams.set(key, value);
-      else nextSearchParams.delete(key);
-    }
-
-    const nextCategory = parseStudentBoardCategory(
-      nextSearchParams.get("category"),
-    );
-    nextSearchParams.set("category", nextCategory);
+    nextSearchParams.set("category", category);
+    nextSearchParams.delete("q");
+    nextSearchParams.delete("playTab");
     nextSearchParams.delete("playType");
-    if (nextCategory !== "play") {
-      nextSearchParams.delete("playTab");
+    if (category !== "records") {
       nextSearchParams.delete("game");
       nextSearchParams.delete("range");
-    } else if (nextSearchParams.get("playTab") !== "records") {
-      nextSearchParams.delete("playTab");
     }
 
     router.replace(`/student/boards?${nextSearchParams.toString()}`, { scroll: false });
@@ -717,16 +676,7 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
 
   function selectCategory(category: StudentBoardCategory) {
     setActiveCategory(category);
-    replaceBoardQuery({ category });
-  }
-
-  function selectPlayTab(tab: PlayTab) {
-    setPlayTab(tab);
-    replaceBoardQuery({
-      category: "play",
-      playTab: tab,
-      playType: null,
-    });
+    replaceBoardQuery(category);
   }
 
   function handleRovingKeys(
@@ -835,44 +785,50 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
   const categoryTabs: Array<{
     id: StudentBoardCategory;
     label: string;
-    count: number;
+    count?: number;
   }> = [
     { id: "lesson", label: "수업", count: lessonBoards.length },
-    { id: "play", label: "놀이", count: GAME_HUB_ORDER.length },
-    { id: "all", label: "전체", count: contentBoards.length },
+    { id: "play", label: "놀이", count: GAME_HUB_ORDER.length + 1 },
+    { id: "records", label: "전적" },
   ];
 
   return (
     <>
-      <div className="student-content-tabs" role="tablist" aria-label="보드 구분">
-        {categoryTabs.map((tab, index) => (
-          <button
-            key={tab.id}
-            type="button"
-            role="tab"
-            id={`student-board-tab-${tab.id}`}
-            aria-controls="student-board-panel"
-            aria-selected={activeCategory === tab.id}
-            tabIndex={activeCategory === tab.id ? 0 : -1}
-            ref={(element) => {
-              categoryTabRefs.current[index] = element;
-            }}
-            className={activeCategory === tab.id ? "is-active" : ""}
-            onClick={() => selectCategory(tab.id)}
-            onKeyDown={(event) =>
-              handleRovingKeys(
-                event,
-                index,
-                STUDENT_BOARD_CATEGORIES.length,
-                categoryTabRefs,
-                (nextIndex) => selectCategory(categoryTabs[nextIndex].id),
-              )
-            }
-          >
-            {tab.label}
-            <span>{tab.count}</span>
-          </button>
-        ))}
+      <div className="board-section-tabs" role="tablist" aria-label="보드 구분">
+        <div className="board-section-tabs-list">
+          {categoryTabs.map((tab, index) => (
+            <button
+              key={tab.id}
+              type="button"
+              role="tab"
+              id={`student-board-tab-${tab.id}`}
+              aria-controls="student-board-panel"
+              aria-selected={activeCategory === tab.id}
+              tabIndex={activeCategory === tab.id ? 0 : -1}
+              ref={(element) => {
+                categoryTabRefs.current[index] = element;
+              }}
+              className={`board-section-tab ${
+                activeCategory === tab.id ? "is-active" : ""
+              }`}
+              onClick={() => selectCategory(tab.id)}
+              onKeyDown={(event) =>
+                handleRovingKeys(
+                  event,
+                  index,
+                  STUDENT_BOARD_CATEGORIES.length,
+                  categoryTabRefs,
+                  (nextIndex) => selectCategory(categoryTabs[nextIndex].id),
+                )
+              }
+            >
+              {tab.label}
+              {tab.count !== undefined ? (
+                <span className="board-section-tab-count">{tab.count}</span>
+              ) : null}
+            </button>
+          ))}
+        </div>
       </div>
       <section
         id="student-board-panel"
@@ -880,36 +836,7 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
         role="tabpanel"
         aria-labelledby={`student-board-tab-${activeCategory}`}
       >
-        {activeCategory === "play" ? (
-          <div className="student-board-filters student-play-tabs" role="tablist" aria-label="놀이 보기">
-            {PLAY_TABS.map((tab, index) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={playTab === tab.id}
-                tabIndex={playTab === tab.id ? 0 : -1}
-                ref={(element) => {
-                  playTabRefs.current[index] = element;
-                }}
-                className={playTab === tab.id ? "is-active" : ""}
-                onClick={() => selectPlayTab(tab.id)}
-                onKeyDown={(event) =>
-                  handleRovingKeys(
-                    event,
-                    index,
-                    PLAY_TABS.length,
-                    playTabRefs,
-                    (nextIndex) => selectPlayTab(PLAY_TABS[nextIndex].id),
-                  )
-                }
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {activeCategory === "play" && playTab === "records" ? (
+        {activeCategory === "records" ? (
           <GameRecordsPanel
             key={`${requestedRecordKind}:${requestedRecordRange}`}
             initialGameKind={requestedRecordKind}
@@ -919,35 +846,16 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
           <GameHubCatalog />
         ) : (
           <>
-        <div className="student-board-tools">
-          <label className="student-board-search">
-            <span className="sr-only">보드 검색</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => {
-                const value = event.target.value;
-                setQuery(value);
-                replaceBoardQuery({ q: value.trim() || null });
-              }}
-              placeholder="보드 검색"
-            />
-          </label>
-        </div>
-        <p className="sr-only" role="status" aria-live="polite">
-          검색 결과 {activeBoards.length}개
-        </p>
-        {activeBoards.length > 0 ? (
-          <div className="student-board-grid">
-            {activeBoards.map((board) => renderCard(board))}
-          </div>
-        ) : (
-          <div className="student-board-empty">
-            {categoryBoards.length === 0
-              ? `${activeCategory === "lesson" ? "수업" : "등록된"} 보드가 아직 없어요.`
-              : "검색 조건에 맞는 보드가 없어요."}
-          </div>
-        )}
+            <p className="sr-only" role="status" aria-live="polite">
+              수업 보드 {activeBoards.length}개
+            </p>
+            {activeBoards.length > 0 ? (
+              <div className="student-board-grid">
+                {activeBoards.map((board) => renderCard(board))}
+              </div>
+            ) : (
+              <div className="student-board-empty">수업 보드가 아직 없어요.</div>
+            )}
           </>
         )}
       </section>

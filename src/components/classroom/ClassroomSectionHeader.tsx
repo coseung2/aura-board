@@ -48,20 +48,22 @@ export function ClassroomSectionHeader({
         ) : null}
       </div>
 
-      <nav className="classroom-section-navigation" aria-label={ariaLabel}>
-        {links.map((link) => {
-          const isActive = link.key === activeKey;
-          return (
-            <Link
-              key={link.key}
-              href={link.href}
-              aria-current={isActive ? "page" : undefined}
-            >
-              {link.label}
-            </Link>
-          );
-        })}
-      </nav>
+      {links.length > 0 ? (
+        <nav className="classroom-section-navigation" aria-label={ariaLabel}>
+          {links.map((link) => {
+            const isActive = link.key === activeKey;
+            return (
+              <Link
+                key={link.key}
+                href={link.href}
+                aria-current={isActive ? "page" : undefined}
+              >
+                {link.label}
+              </Link>
+            );
+          })}
+        </nav>
+      ) : null}
 
       {actions !== undefined && actions !== null ? (
         <div className="classroom-section-actions">{actions}</div>

@@ -17,10 +17,7 @@ export default async function StudentBoardsPage() {
         duties={home.duties}
       />
       <main className="student-page student-boards-page">
-        <header className="student-page-header">
-          <p className="student-page-eyebrow">{student.classroom.name}</p>
-          <h1 className="student-page-title">보드</h1>
-        </header>
+        <h1 className="sr-only">보드</h1>
         <StudentBoardHub boards={home.boards} />
       </main>
     </>

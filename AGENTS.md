@@ -22,7 +22,16 @@ for bounded specialist tasks. The project source of truth is the current code,
 
 ## Local Commands
 
-- Development server: `npm run dev`
+- Development secrets and environment variables are managed in Infisical.
+  Do not expect a local `.env` file or start authenticated/database-backed
+  development flows with plain `npm run dev`.
+- Web development server: `infisical run --env=dev -- npm run dev`
+- Combined web and Expo development servers:
+  `.codex\scripts\start-dev-servers.ps1` (injects the Infisical `dev`
+  environment into both processes).
+- When local auth or database APIs return configuration-related 500 errors,
+  first verify that the server was launched through Infisical before changing
+  application code or diagnosing the database.
 - Type check: `npm run typecheck`
 - Tests: `npm run test`
 - Production build: `npm run build`

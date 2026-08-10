@@ -3,77 +3,6 @@
   gap: 16px;
 }
 
-.heading {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.recordsLink {
-  display: inline-flex;
-  min-height: 44px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 14px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-btn);
-  color: var(--color-text);
-  background: transparent;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.liveFeature {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  min-width: 0;
-  padding: 22px 24px;
-  overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 42%, var(--color-border));
-  border-radius: 18px;
-  background:
-    radial-gradient(circle at 90% 10%, color-mix(in srgb, var(--color-accent) 18%, transparent), transparent 34%),
-    linear-gradient(135deg, var(--color-surface), var(--color-surface-alt));
-}
-
-.liveFeatureCopy {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  gap: 16px;
-}
-
-.liveFeatureCopy h3 {
-  margin: 0;
-  color: var(--color-text);
-  font-size: clamp(1.2rem, 2.3vw, 1.7rem);
-  line-height: 1.25;
-}
-
-.liveFeatureBadge {
-  display: inline-flex;
-  min-height: 34px;
-  flex: none;
-  align-items: center;
-  gap: 6px;
-  padding: 0 10px;
-  border-radius: 999px;
-  color: #fff;
-  background: #e23a4f;
-  font-size: 0.78rem;
-  font-weight: 900;
-  letter-spacing: 0.06em;
-}
-
-.recordsLink:focus-visible,
-.liveFeatureButton:focus-visible,
 .entryButton:focus-visible,
 .classroomPickerOption:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-accent) 32%, transparent);
@@ -143,27 +72,11 @@
   line-height: 1.35;
 }
 
-.liveFeatureButton {
-  display: inline-flex;
-  min-height: 46px;
-  flex: none;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 0 18px;
-  border: 1px solid var(--color-accent);
-  border-radius: var(--radius-btn);
-  color: var(--color-on-accent);
-  background: var(--color-accent);
-  font: inherit;
-  font-weight: 800;
-  cursor: pointer;
-}
-
 .grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, 14rem);
   align-items: stretch;
+  justify-content: start;
   gap: 12px;
 }
 
@@ -186,6 +99,49 @@
 
 .artworkImage {
   object-fit: cover;
+}
+
+.liveArtwork {
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  background:
+    radial-gradient(
+      circle at 72% 20%,
+      color-mix(in srgb, var(--color-accent) 42%, transparent),
+      transparent 34%
+    ),
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--color-danger) 82%, var(--color-accent)),
+      var(--color-accent)
+    );
+}
+
+.liveArtwork::before {
+  position: absolute;
+  inset: 14%;
+  border: 1px solid color-mix(in srgb, var(--color-on-accent) 42%, transparent);
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 16px color-mix(in srgb, var(--color-on-accent) 12%, transparent),
+    0 0 0 32px color-mix(in srgb, var(--color-on-accent) 7%, transparent);
+  content: "";
+}
+
+.liveArtwork::after {
+  position: absolute;
+  width: 24%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-on-accent) 18%, transparent);
+  content: "";
+}
+
+.liveArtworkIcon {
+  position: relative;
+  z-index: 1;
+  color: var(--color-on-accent);
 }
 
 .body {
@@ -239,6 +195,10 @@
 .status_paused { color: #8a5a00; background: #fff1c9; }
 .status_waiting { color: #365d7d; background: #e7f2fa; }
 .status_finished { color: #727272; background: #eeeeee; }
+.status_live {
+  color: var(--color-on-accent);
+  background: var(--color-danger);
+}
 
 .entryButton {
   display: inline-flex;
@@ -281,44 +241,8 @@
   line-height: 1.4;
 }
 
-@media (max-width: 900px) {
-  .grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 640px) {
-  .heading {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .recordsLink {
-    width: 100%;
-  }
-
-  .liveFeature {
-    align-items: stretch;
-    flex-direction: column;
-    padding: 18px;
-  }
-
-  .liveFeatureCopy {
-    gap: 12px;
-  }
-
-  .liveFeatureButton {
-    width: 100%;
-  }
-
-  .grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 420px) {
   .grid {
-    grid-template-columns: 1fr;
     gap: 8px;
   }
 }

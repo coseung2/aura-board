@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 
 type Props = { params: Promise<{ id: string }> };
 
-export default async function ClassroomMorningPage({ params }: Props) {
+export default async function ClassroomAssignmentsPage({ params }: Props) {
   const { id } = await params;
   const user = await getCurrentUser();
   const classroom = await db.classroom.findUnique({
@@ -24,15 +24,15 @@ export default async function ClassroomMorningPage({ params }: Props) {
       <ClassroomSectionHeader
         classroomId={classroom.id}
         eyebrow={classroom.name}
-        title="청소·당번"
-        ariaLabel="청소·당번 메뉴"
+        title="과제 현황"
+        ariaLabel="과제 현황 메뉴"
         links={[]}
-        activeKey="duties"
+        activeKey="assignments"
       />
       <ClassroomMorningDashboard
         classroomId={classroom.id}
         classroomName={classroom.name}
-        sections={["duties"]}
+        sections={["assignments"]}
         showToolbar={false}
       />
     </main>

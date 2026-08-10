@@ -562,7 +562,7 @@ export function KordleBoard({
       abandonCommandRef.current = null;
       setExitOpen(false);
       if (body.state.resultId) {
-        router.push("/student/boards?category=play&playTab=records&game=kordle");
+        router.push("/student/boards?category=records&game=kordle");
       }
     } finally {
       setExiting(false);

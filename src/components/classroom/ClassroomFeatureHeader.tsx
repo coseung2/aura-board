@@ -11,15 +11,11 @@ type Props = {
   active: ClassroomFeatureKey;
 };
 
-const FEATURE_LINKS: Array<{
-  key: ClassroomFeatureKey;
-  label: string;
-  path: string;
-}> = [
-  { key: "walking", label: "걷기 현황", path: "walking" },
-  { key: "daily-banners", label: "배너 관리", path: "daily-banners" },
-  { key: "reading", label: "독서", path: "reading" },
-];
+const FEATURE_TITLES: Record<ClassroomFeatureKey, string> = {
+  walking: "걷기 현황",
+  "daily-banners": "배너 관리",
+  reading: "독서",
+};
 
 export function ClassroomFeatureHeader({
   classroomId,
@@ -27,20 +23,14 @@ export function ClassroomFeatureHeader({
   description,
   active,
 }: Props) {
-  const basePath = `/classroom/${classroomId}`;
-
   return (
     <ClassroomSectionHeader
       classroomId={classroomId}
       eyebrow={eyebrow}
-      title="자율활동"
+      title={FEATURE_TITLES[active]}
       description={description}
       ariaLabel="자율활동"
-      links={FEATURE_LINKS.map(({ key, label, path }) => ({
-        key,
-        label,
-        href: `${basePath}/${path}`,
-      }))}
+      links={[]}
       activeKey={active}
     />
   );

@@ -56,11 +56,11 @@ export async function OfficialGameBoard({
   const actions = (
     <>
       {studentViewer ? (
-        <Link className={styles.hudButton} href="/student/boards?category=play&playTab=records">
+        <Link className={styles.hudButton} href="/student/boards?category=records">
           나의 전적
         </Link>
       ) : null}
-      <Link className={styles.hudButton} href={studentViewer ? "/student/boards?category=play&playTab=games" : "/dashboard"}>
+      <Link className={styles.hudButton} href={studentViewer ? "/student/boards?category=play" : "/dashboard"}>
         게임 목록
       </Link>
     </>

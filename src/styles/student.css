@@ -31,66 +31,6 @@
   letter-spacing: -0.02em;
 }
 
-.student-content-tabs {
-  display: flex;
-  gap: 22px;
-  margin-bottom: 22px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--color-border);
-  scrollbar-width: none;
-}
-
-.student-content-tabs::-webkit-scrollbar {
-  display: none;
-}
-
-.student-content-tabs button {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 44px;
-  padding: 0 2px;
-  border: 0;
-  background: transparent;
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: 14px;
-  font-weight: 650;
-  white-space: nowrap;
-}
-
-.student-content-tabs button::after {
-  position: absolute;
-  right: 0;
-  bottom: -1px;
-  left: 0;
-  height: 2px;
-  background: transparent;
-  content: "";
-}
-
-.student-content-tabs button:hover,
-.student-content-tabs button.is-active {
-  color: var(--color-text);
-}
-
-.student-content-tabs button.is-active::after {
-  background: var(--color-accent);
-}
-
-.student-content-tabs button:focus-visible {
-  outline: 2px solid var(--color-accent-tinted-text);
-  outline-offset: -2px;
-}
-
-.student-content-tabs span {
-  color: var(--color-text-muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-
 .student-flat-section-heading {
   display: flex;
   align-items: center;
@@ -2751,74 +2691,10 @@
   outline-offset: 4px;
 }
 
-.student-board-tools {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 14px;
-  margin-bottom: 16px;
-}
-
-.student-board-search {
-  flex: 0 1 320px;
-  min-width: 220px;
-}
-
-.student-board-search input {
-  width: 100%;
-  min-height: 44px;
-  padding: 9px 13px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-btn);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-  font-size: 14px;
-}
-
-.student-board-search input:focus-visible,
-.student-board-filters button:focus-visible,
 .board-section-tab:focus-visible,
 .student-board-card:focus-visible {
   outline: 3px solid var(--color-accent-tinted-text);
   outline-offset: 2px;
-}
-
-.student-board-filters {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.student-board-filters button {
-  min-height: 44px;
-  padding: 8px 12px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  font: inherit;
-  font-size: 12px;
-  font-weight: 800;
-  white-space: nowrap;
-}
-
-.student-board-filters button:hover,
-.student-board-filters button.is-active {
-  border-color: var(--color-accent);
-  background: var(--color-accent-tinted-bg);
-  color: var(--color-accent-tinted-text);
-}
-
-.student-play-tabs {
-  justify-content: flex-start;
-  margin-bottom: 16px;
-}
-
-.student-play-tabs button {
-  border-width: 2px;
 }
 
 .student-board-panel .student-board-grid {
@@ -3649,30 +3525,6 @@
     gap: 40px;
   }
 
-  .student-board-tools {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .student-board-search {
-    flex-basis: auto;
-    min-width: 0;
-  }
-
-  .student-board-filters {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    margin-inline: -16px;
-    padding-inline: 16px;
-    overflow-x: auto;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: thin;
-  }
-
-  .student-content-tabs {
-    gap: 18px;
-  }
-
   .student-utilities .student-wallet-header {
     flex-direction: row;
   }
@@ -3773,6 +3625,10 @@
    portfolio/duty/wallet utility strip. */
 .student-page .board-section-tabs {
   margin-top: 16px;
+}
+
+.student-page .board-section-tab {
+  min-height: 44px;
 }
 
 /* ---- Student 독서 (reading reflection) page ---------------------------- */

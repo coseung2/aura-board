@@ -649,6 +649,11 @@ export function ClassroomRolePanel({
         )}
     </div>
   );
+  const roleColumnBreak = Math.ceil(roles.length / 2);
+  const roleColumns = [
+    roles.slice(0, roleColumnBreak),
+    roles.slice(roleColumnBreak),
+  ].filter((columnRoles) => columnRoles.length > 0);
 
   return (
     <>
@@ -660,47 +665,63 @@ export function ClassroomRolePanel({
         </p>
       ) : null}
 
-      <div className="classroom-role-mini-grid">
-        {roles.map((role) => (
-          <button
-            key={role.id}
-            type="button"
-            className="classroom-role-mini-card"
-            onClick={() => openEdit(role)}
-            aria-label={`${role.labelKo} 역할 설정`}
-          >
-            <span className="classroom-role-mini-head">
-              <strong className="classroom-role-mini-label">
-                {role.labelKo}
-              </strong>
-              <span className="classroom-role-mini-salary">
-                {formatNumber(role.salaryAmount)} {unit}
-              </span>
-            </span>
+      <div className="classroom-role-mini-column-layout">
+        {roleColumns.map((columnRoles, columnIndex) => (
+          <div className="classroom-role-mini-list" key={columnIndex}>
+            <div className="classroom-role-mini-columns" aria-hidden="true">
+              <span>역할</span>
+              <span>금액</span>
+              <span>담당 학생</span>
+            </div>
 
-            <span className="classroom-role-mini-students">
-              {role.students.length > 0
-                ? role.students
-                    .map(
-                      (student) =>
-                        `${student.number ? `${student.number}번 ` : ""}${student.name}`,
-                    )
-                    .join("  ")
-                : "미배정"}
-            </span>
-          </button>
+            {columnRoles.map((role) => (
+              <button
+                key={role.id}
+                type="button"
+                className="classroom-role-mini-row"
+                onClick={() => openEdit(role)}
+                aria-label={`${role.labelKo} 역할 설정`}
+              >
+                <span className="classroom-role-mini-head">
+                  <strong className="classroom-role-mini-label">
+                    {role.labelKo}
+                  </strong>
+                  <span className="classroom-role-mini-salary">
+                    {formatNumber(role.salaryAmount)} {unit}
+                  </span>
+                </span>
+
+                <span className="classroom-role-mini-students">
+                  {role.students.length > 0
+                    ? role.students.map((student) => (
+                        <span
+                          className="classroom-role-mini-student"
+                          key={student.id}
+                        >
+                          {student.name}
+                        </span>
+                      ))
+                    : (
+                        <span className="classroom-role-mini-student classroom-role-mini-student--empty">
+                          미배정
+                        </span>
+                      )}
+                </span>
+              </button>
+            ))}
+          </div>
         ))}
-
-        {loaded ? (
-          <button
-            type="button"
-            className="classroom-role-mini-add"
-            onClick={() => setAddOpen(true)}
-          >
-            + 역할 추가
-          </button>
-        ) : null}
       </div>
+
+      {loaded ? (
+        <button
+          type="button"
+          className="classroom-role-mini-add"
+          onClick={() => setAddOpen(true)}
+        >
+          + 역할 추가
+        </button>
+      ) : null}
 
       {addOpen ? (
         <div

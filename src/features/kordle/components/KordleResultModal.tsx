@@ -68,12 +68,12 @@ export function KordleResultModal({
           >
             결과판 닫기
           </button>
-          <Link className="kordle-result-close" href="/student/boards?category=play&playTab=games">
+          <Link className="kordle-result-close" href="/student/boards?category=play">
             게임 목록
           </Link>
           <Link
             className="kordle-result-close"
-            href="/student/boards?category=play&playTab=records&game=kordle"
+            href="/student/boards?category=records&game=kordle"
           >
             나의 전적
           </Link>

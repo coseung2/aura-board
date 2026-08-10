@@ -733,7 +733,7 @@ export function SpeedGameBoard({
           ) : null
         }
         gamesAction={
-          <Link className="speed-game-secondary-button" href="/student/boards?category=play&playTab=games">
+          <Link className="speed-game-secondary-button" href="/student/boards?category=play">
             게임 목록
           </Link>
         }
@@ -741,7 +741,7 @@ export function SpeedGameBoard({
           viewerKind === "student" ? (
             <Link
               className="speed-game-secondary-button"
-              href="/student/boards?category=play&playTab=records&game=speed-game"
+              href="/student/boards?category=records&game=speed-game"
             >
               나의 전적
             </Link>

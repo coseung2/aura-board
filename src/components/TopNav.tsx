@@ -42,23 +42,27 @@ const EMPTY_NAV_DATA: TeacherNavData = {
 };
 
 const CLASSROOM_MANAGEMENT_TABS = [
-  { key: "dashboard", label: "대시보드" },
+  { key: "dashboard", label: "학급 홈" },
   { key: "students", label: "학생 명단" },
-  { key: "groups", label: "자리 배치" },
-  { key: "boards", label: "학급 보드" },
-  { key: "bank", label: "금융 관리" },
+  { key: "groups", label: "자리·모둠" },
+  { key: "boards", label: "보드 연결" },
 ] as const;
 
 const CLASSROOM_OPERATION_TABS = [
-  { key: "store", label: "매점" },
-  { key: "pay", label: "QR결제" },
+  { key: "roles", label: "1인1역" },
+  { key: "morning", label: "청소·당번" },
+  { key: "assignments", label: "과제 현황" },
   { key: "check", label: "제출 체크" },
+  { key: "bank", label: "금융 관리" },
+  { key: "pay", label: "QR결제" },
+  { key: "store", label: "매점" },
 ] as const;
 
 const CLASSROOM_ACTIVITY_TABS = [
+  { key: "portfolio", label: "포트폴리오" },
+  { key: "reading", label: "독서" },
   { key: "walking", label: "걷기 현황" },
   { key: "daily-banners", label: "일일 배너" },
-  { key: "reading", label: "독서" },
 ] as const;
 
 function boardHref(board: TeacherNavBoard) {
@@ -331,7 +335,7 @@ export function TopNav({ showAdmin = false }: Props) {
       active: pathname.startsWith("/classroom"),
       groups: [
         {
-          title: "학급 종류",
+          title: "학급 선택",
           links: classroomContextLinks,
         },
         {
@@ -341,11 +345,11 @@ export function TopNav({ showAdmin = false }: Props) {
           links: selectedClassroomManagementLinks,
         },
         {
-          title: "1인1역할",
+          title: "학급 운영",
           links: selectedClassroomOperationLinks,
         },
         {
-          title: "자율활동",
+          title: "활동·기록",
           links: selectedClassroomActivityLinks,
         },
       ],

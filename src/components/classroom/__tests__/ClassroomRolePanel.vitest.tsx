@@ -25,6 +25,41 @@ const rolesBody = {
   payPolicy: { payMode: "manual", payPeriod: "weekly" as const, payAnchor: 1 },
 };
 
+const threeColumnRolesBody = {
+  ...rolesBody,
+  defs: ["A", "B", "C", "D", "E", "F", "G", "H"].map(
+    (label, index) => ({
+      ...rolesBody.defs[0],
+      id: `role-${index}`,
+      key: `role-${index}`,
+      labelKo: `역할 ${label}`,
+      salaryAmount: 100 + index,
+    }),
+  ),
+  assignments: [
+    {
+      id: "layout-assignment-1",
+      classroomRoleId: "role-0",
+      student: { id: "layout-student-1", name: "Alice Example", number: 987 },
+    },
+    {
+      id: "layout-assignment-2",
+      classroomRoleId: "role-0",
+      student: { id: "layout-student-2", name: "Bob Example", number: 654 },
+    },
+    {
+      id: "layout-assignment-3",
+      classroomRoleId: "role-0",
+      student: { id: "layout-student-3", name: "Choi Example", number: 321 },
+    },
+    {
+      id: "layout-assignment-4",
+      classroomRoleId: "role-6",
+      student: { id: "layout-student-4", name: "Dana Example", number: 210 },
+    },
+  ],
+};
+
 const permissionsBody = {
   catalog: [],
   roles: [
@@ -91,6 +126,59 @@ describe("ClassroomRolePanel", () => {
     expect(screen.getByRole("button", { name: "+ 역할 추가" })).toBeTruthy();
     expect(screen.getByRole("radio", { name: "수동지급" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "지급" })).toBeTruthy();
+  });
+
+  it("renders a cardless three-column role list with student names only", async () => {
+    fetchMock.mockReset();
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(threeColumnRolesBody))
+      .mockResolvedValueOnce(jsonResponse(permissionsBody));
+    renderPanel();
+
+    const roleRows = await waitFor(() => {
+      const rows = Array.from(
+        document.querySelectorAll<HTMLButtonElement>(
+          ".classroom-role-mini-row",
+        ),
+      );
+      if (rows.length !== 8) {
+        throw new Error("three-column role rows are not rendered yet");
+      }
+      return rows;
+    });
+
+    expect(
+      Array.from(
+        document.querySelectorAll(".classroom-role-mini-columns > span"),
+      ).map((column) => column.textContent),
+    ).toEqual(["역할", "금액", "담당 학생", "역할", "금액", "담당 학생"]);
+    expect(
+      Array.from(document.querySelectorAll(".classroom-role-mini-list")).map(
+        (column) => column.querySelectorAll(".classroom-role-mini-row").length,
+      ),
+    ).toEqual([4, 4]);
+    expect(roleRows.every((row) => !row.hasAttribute("data-layout-option"))).toBe(
+      true,
+    );
+
+    const studentNames = roleRows.flatMap((row) =>
+      Array.from(
+        row.querySelectorAll(".classroom-role-mini-student"),
+      ).map((student) => student.textContent),
+    );
+    expect(studentNames).toEqual([
+      "Choi Example",
+      "Bob Example",
+      "Alice Example",
+      "미배정",
+      "미배정",
+      "미배정",
+      "미배정",
+      "미배정",
+      "Dana Example",
+      "미배정",
+    ]);
+    expect(studentNames.some((name) => /\d/.test(name ?? ""))).toBe(false);
   });
 
   it("creates a teacher-authored role from the typed name", async () => {

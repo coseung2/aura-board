@@ -83,8 +83,8 @@ export function GameRecordsPanel({
     (nextKind: OfficialGameKind | "all", nextRange: GameRecordRange) => {
       if (!syncUrl) return;
       const params = new URLSearchParams(searchParams.toString());
-      params.set("category", "play");
-      params.set("playTab", "records");
+      params.set("category", "records");
+      params.delete("playTab");
       params.set("game", nextKind);
       params.set("range", nextRange);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });

@@ -6,7 +6,6 @@ import {
   AlertCircle,
   CirclePlay,
   Radio,
-  Trophy,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { OfficialGameKind } from "@/lib/game-platform/contracts";
@@ -169,38 +168,6 @@ export function GameHubCatalog({
 
   return (
     <section className={styles.hub} aria-label="게임">
-      {!teacherMode ? (
-        <header className={styles.heading}>
-          <a
-            className={styles.recordsLink}
-            href="/student/boards?category=play&playTab=records"
-          >
-            <Trophy aria-hidden size={18} strokeWidth={2} />
-            나의 전적
-          </a>
-        </header>
-      ) : null}
-
-      <article className={styles.liveFeature}>
-        <div className={styles.liveFeatureCopy}>
-          <span className={styles.liveFeatureBadge}>
-            <Radio aria-hidden size={15} strokeWidth={2.5} />
-            LIVE
-          </span>
-          <h3>잼라이브</h3>
-        </div>
-        <button
-          type="button"
-          className={styles.liveFeatureButton}
-          onClick={() =>
-            router.push(teacherMode ? "/live-quiz" : "/student/live-quiz")
-          }
-        >
-          <CirclePlay aria-hidden size={20} strokeWidth={2.3} />
-          잼라이브 입장
-        </button>
-      </article>
-
       {teacherMode && classrooms.length === 0 ? (
         <div className={styles.emptyState} role="status">
           공식 게임방을 열려면 먼저 학급을 만들어 주세요. 잼라이브는 학급 없이도
@@ -212,6 +179,46 @@ export function GameHubCatalog({
       ) : null}
 
       <div className={styles.grid}>
+        <article className={styles.card}>
+          <div
+            className={`${styles.artwork} ${styles.liveArtwork}`}
+            aria-hidden="true"
+          >
+            <Radio
+              className={styles.liveArtworkIcon}
+              aria-hidden
+              size={52}
+              strokeWidth={1.8}
+            />
+          </div>
+          <div className={styles.body}>
+            <div>
+              <div className={styles.cardTitleRow}>
+                <h3 className={styles.cardTitle}>잼라이브</h3>
+                <span className={`${styles.statusLabel} ${styles.status_live}`}>
+                  LIVE
+                </span>
+              </div>
+              <p className={styles.cardDescription}>
+                선생님과 함께 실시간 퀴즈에 참여해요.
+              </p>
+            </div>
+            <div className={styles.cardFooter}>
+              <button
+                type="button"
+                className={styles.entryButton}
+                aria-label={teacherMode ? "잼라이브 게임 열기" : "잼라이브 입장"}
+                onClick={() =>
+                  router.push(teacherMode ? "/live-quiz" : "/student/live-quiz")
+                }
+              >
+                <CirclePlay aria-hidden size={19} strokeWidth={2.3} />
+                {teacherMode ? "게임 열기" : "입장"}
+              </button>
+            </div>
+          </div>
+        </article>
+
         {GAME_HUB_ORDER.map((kind, index) => {
           const game = OFFICIAL_GAME_CATALOG[kind];
           const pending = pendingKind === kind;

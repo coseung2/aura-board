@@ -126,7 +126,7 @@ describe("StudentTopNav information architecture", () => {
     expect(item("boards").groups[0].links.map(({ href }) => href)).toEqual([
       "/student/boards?category=lesson",
       "/student/boards?category=play",
-      "/student/boards?category=all",
+      "/student/boards?category=records",
     ]);
     expect(item("pet").groups[0].links.map(({ href }) => href)).toEqual([
       "/student/aura-pet?section=mine",
@@ -165,7 +165,7 @@ describe("StudentTopNav information architecture", () => {
 
   it.each([
     ["home", "/student", ""],
-    ["boards", "/student/boards", "category=all"],
+    ["boards", "/student/boards", "category=records"],
     ["pet", "/student/aura-pet", "section=shop"],
     ["reading", "/student/reading", ""],
     ["walking", "/student/walking", ""],
@@ -183,6 +183,21 @@ describe("StudentTopNav information architecture", () => {
     expect(item("home").active).toBe(false);
     expect(item("boards").active).toBe(true);
     expect(link("boards", "수업보드").active).toBe(true);
+    cleanup();
+
+    renderAt("/student/boards", "category=play&playTab=records");
+    expect(link("boards", "나의 전적").active).toBe(true);
+    expect(link("boards", "놀이보드").active).toBe(false);
+    cleanup();
+
+    renderAt("/student/boards", "category=records");
+    expect(link("boards", "나의 전적").active).toBe(true);
+    cleanup();
+
+    renderAt("/student/boards", "category=unknown");
+    expect(link("boards", "수업보드").active).toBe(true);
+    expect(link("boards", "놀이보드").active).toBe(false);
+    expect(link("boards", "나의 전적").active).toBe(false);
     cleanup();
 
     renderAt("/student/aura-pet/classroom");

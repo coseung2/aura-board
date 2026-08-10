@@ -1,10 +1,48 @@
-import { redirect } from "next/navigation";
+import { notFound } from "next/navigation";
+
+import { ClassroomRolePanel } from "@/components/classroom/ClassroomRolePanel";
+import { ClassroomSectionHeader } from "@/components/classroom/ClassroomSectionHeader";
+import { getCurrentUser } from "@/lib/auth";
+import { db } from "@/lib/db";
 
 type Props = { params: Promise<{ id: string }> };
 
-// The standalone 학급 역할 page is gone (2026-07-27); the dashboard's 1인1역
-// section now owns role listing, salary, permissions, and assignment.
 export default async function ClassroomRolesPage({ params }: Props) {
   const { id } = await params;
-  redirect(`/classroom/${id}/dashboard`);
+  const user = await getCurrentUser();
+  const classroom = await db.classroom.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      name: true,
+      teacherId: true,
+      currency: { select: { unitLabel: true } },
+      students: {
+        orderBy: [{ number: "asc" }, { createdAt: "asc" }],
+        select: { id: true, name: true, number: true },
+      },
+    },
+  });
+
+  if (!classroom || classroom.teacherId !== user.id) {
+    notFound();
+  }
+
+  return (
+    <main className="classroom-page classroom-page-detail classroom-section-page">
+      <ClassroomSectionHeader
+        classroomId={classroom.id}
+        eyebrow={classroom.name}
+        title="1인1역"
+        ariaLabel="1인1역 메뉴"
+        links={[]}
+        activeKey="roles"
+      />
+      <ClassroomRolePanel
+        classroomId={classroom.id}
+        unit={classroom.currency?.unitLabel ?? "원"}
+        students={classroom.students}
+      />
+    </main>
+  );
 }

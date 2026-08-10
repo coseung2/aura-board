@@ -1,4 +1,4 @@
-export const STUDENT_BOARD_CATEGORIES = ["lesson", "play", "all"] as const;
+export const STUDENT_BOARD_CATEGORIES = ["lesson", "play", "records"] as const;
 
 export type StudentBoardCategory = (typeof STUDENT_BOARD_CATEGORIES)[number];
 
@@ -10,6 +10,7 @@ export type StudentBoardSearchParams = Record<
 export function parseStudentBoardCategory(
   value: string | null | undefined,
 ): StudentBoardCategory {
+  if (value === "all") return "lesson";
   return STUDENT_BOARD_CATEGORIES.includes(value as StudentBoardCategory)
     ? (value as StudentBoardCategory)
     : "lesson";
