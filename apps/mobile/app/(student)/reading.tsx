@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ElementRef,
+} from "react";
 import {
   ActivityIndicator,
   Image,
@@ -66,6 +73,7 @@ const REWARD_COIN_IMAGE = require("../../assets/walking/reward-coin.png");
 
 type BookType = "comic" | "story";
 type ReadingTab = "records" | "missions" | "titles";
+type ComposerField = "title" | "author" | "reflection";
 type ReadingRank = {
   studentId: string;
   studentNumber: number | null;
@@ -156,6 +164,15 @@ export default function StudentReadingScreen() {
   const [title, setTitle] = useState("");
   const [author, setAuthor] = useState("");
   const [reflection, setReflection] = useState("");
+  const composerScrollRef = useRef<ScrollView>(null);
+  const composerFieldOffsets = useRef<Record<ComposerField, number>>({
+    title: 0,
+    author: 0,
+    reflection: 0,
+  });
+  const titleInputRef = useRef<ElementRef<typeof TextField>>(null);
+  const authorInputRef = useRef<ElementRef<typeof TextField>>(null);
+  const reflectionInputRef = useRef<ElementRef<typeof TextField>>(null);
   const [entries, setEntries] = useState<ReadingEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -433,6 +450,23 @@ export default function StudentReadingScreen() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function focusComposerField(field: ComposerField) {
+    const scrollToField = () => {
+      const y = Math.max(0, composerFieldOffsets.current[field] - spacing.sm);
+      composerScrollRef.current?.scrollTo({ y, animated: true });
+    };
+
+    // Android resizes the modal after focus. Scroll once immediately and once
+    // after that resize so every field remains above the keyboard.
+    requestAnimationFrame(scrollToField);
+    setTimeout(scrollToField, 120);
+  }
+
+  function focusNextComposerField(field: ComposerField) {
+    if (field === "title") authorInputRef.current?.focus();
+    if (field === "author") reflectionInputRef.current?.focus();
   }
 
   function openComposer() {
@@ -749,6 +783,7 @@ export default function StudentReadingScreen() {
         </View>
 
         <ScrollView
+          ref={composerScrollRef}
           style={styles.composerScroll}
           contentContainerStyle={styles.composerContent}
           keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
@@ -773,39 +808,62 @@ export default function StudentReadingScreen() {
                 </SectionNavItem>
           </SectionNav>
 
-          <View style={styles.fieldGroup}>
+          <View
+            style={styles.fieldGroup}
+            onLayout={(event) => {
+              composerFieldOffsets.current.title = event.nativeEvent.layout.y;
+            }}
+          >
             <Text style={styles.fieldLabel}>책 제목</Text>
             <TextField
+              ref={titleInputRef}
               value={title}
               onChangeText={setTitle}
               placeholder="책 제목을 입력해 주세요"
               accessibilityLabel="책 제목"
               returnKeyType="next"
+              onFocus={() => focusComposerField("title")}
+              onSubmitEditing={() => focusNextComposerField("title")}
               maxLength={80}
             />
           </View>
 
-          <View style={styles.fieldGroup}>
+          <View
+            style={styles.fieldGroup}
+            onLayout={(event) => {
+              composerFieldOffsets.current.author = event.nativeEvent.layout.y;
+            }}
+          >
             <Text style={styles.fieldLabel}>지은이</Text>
             <TextField
+              ref={authorInputRef}
               value={author}
               onChangeText={setAuthor}
               placeholder="지은이를 입력해 주세요"
               accessibilityLabel="지은이"
               returnKeyType="next"
+              onFocus={() => focusComposerField("author")}
+              onSubmitEditing={() => focusNextComposerField("author")}
               maxLength={60}
             />
           </View>
 
-          <View style={styles.fieldGroup}>
+          <View
+            style={styles.fieldGroup}
+            onLayout={(event) => {
+              composerFieldOffsets.current.reflection = event.nativeEvent.layout.y;
+            }}
+          >
             <Text style={styles.fieldLabel}>독서 감상</Text>
             <TextField
+              ref={reflectionInputRef}
               style={styles.reflectionInput}
               value={reflection}
               onChangeText={setReflection}
               placeholder="재미있었던 점이나 느낀 점"
               accessibilityLabel="독서 감상"
               multiline
+              onFocus={() => focusComposerField("reflection")}
               maxLength={600}
             />
           </View>
