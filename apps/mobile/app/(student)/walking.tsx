@@ -677,22 +677,20 @@ export default function StudentWalkingScreen() {
               </View>
             </View>
 
-            {classroomTopFive.length > 0 || classroomRankRewards.length > 0 ? (
-              <ClassroomTopFive
-                ranks={classroomTopFive.map((rank) => ({
-                  studentId: rank.studentId,
-                  studentName: rank.studentName,
-                  metricValue: rank.weeklySteps,
-                  isCurrent: rank.isCurrent,
-                  rewardAmount: rank.rewardAmount,
-                }))}
-                rankRewards={classroomRankRewards}
-                nextResetAt={classroomRankNextResetAt}
-                metricUnit="걸음"
-                rewardPending={rankRewardPending}
-                onClaimReward={(weekStart) => void claimClassroomRankReward(weekStart)}
-              />
-            ) : null}
+            <ClassroomTopFive
+              ranks={classroomTopFive.map((rank) => ({
+                studentId: rank.studentId,
+                studentName: rank.studentName,
+                metricValue: rank.weeklySteps,
+                isCurrent: rank.isCurrent,
+                rewardAmount: rank.rewardAmount,
+              }))}
+              rankRewards={classroomRankRewards}
+              nextResetAt={classroomRankNextResetAt}
+              metricUnit="걸음"
+              rewardPending={rankRewardPending}
+              onClaimReward={(weekStart) => void claimClassroomRankReward(weekStart)}
+            />
           </>
         ) : null}
             </>

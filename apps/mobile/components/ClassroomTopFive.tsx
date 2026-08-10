@@ -71,6 +71,13 @@ export function ClassroomTopFive({
           </View>
         </View>
       ))}
+      {ranks.length === 0 ? (
+        <Text style={styles.emptyState}>
+          {metricUnit === "걸음"
+            ? "이번 주 걸음 기록이 아직 없어요."
+            : "이번 주 독서 기록이 아직 없어요."}
+        </Text>
+      ) : null}
       <View accessibilityRole="list">
         {ranks.map((rank, index) => (
           <View
@@ -176,6 +183,12 @@ function formatRankRewardPeriod(weekStart: string) {
 const styles = StyleSheet.create({
   section: { gap: spacing.sm },
   period: { ...typography.label, color: colors.textMuted },
+  emptyState: {
+    ...typography.body,
+    color: colors.textMuted,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
   row: {
     minHeight: tapMin,
     flexDirection: "row",

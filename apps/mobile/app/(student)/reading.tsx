@@ -639,22 +639,20 @@ export default function StudentReadingScreen() {
                 )}
               </View>
 
-              {classroomTopFive.length > 0 || classroomRankRewards.length > 0 ? (
-                <ClassroomTopFive
-                  ranks={classroomTopFive.map((rank) => ({
-                    studentId: rank.studentId,
-                    studentName: rank.studentName,
-                    metricValue: rank.weeklyCount,
-                    isCurrent: rank.isCurrent,
-                    rewardAmount: Math.max(0, Number(rank.rewardAmount) || 0),
-                  }))}
-                  rankRewards={classroomRankRewards}
-                  nextResetAt={rankResetAt}
-                  metricUnit="권"
-                  rewardPending={rankRewardPending}
-                  onClaimReward={(weekStart) => void claimClassroomRankReward(weekStart)}
-                />
-              ) : null}
+              <ClassroomTopFive
+                ranks={classroomTopFive.map((rank) => ({
+                  studentId: rank.studentId,
+                  studentName: rank.studentName,
+                  metricValue: rank.weeklyCount,
+                  isCurrent: rank.isCurrent,
+                  rewardAmount: Math.max(0, Number(rank.rewardAmount) || 0),
+                }))}
+                rankRewards={classroomRankRewards}
+                nextResetAt={rankResetAt}
+                metricUnit="권"
+                rewardPending={rankRewardPending}
+                onClaimReward={(weekStart) => void claimClassroomRankReward(weekStart)}
+              />
               </>
             ) : activeTab === "missions" ? (
               <View style={styles.missionScreen}>
