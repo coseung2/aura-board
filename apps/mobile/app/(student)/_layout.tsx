@@ -129,7 +129,7 @@ export default function StudentLayout() {
         <StudentBottomNav duties={me?.duties} />
       ) : null}
       {!hideNav && me ? (
-        <WalkingPermissionOnboarding studentId={me.student.id} />
+        <WalkingPermissionOnboarding accountKey={me.student.id} role="student" />
       ) : null}
     </View>
   );

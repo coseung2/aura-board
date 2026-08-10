@@ -59,6 +59,7 @@ const config: ExpoConfig = {
     "expo-notifications",
     "./plugins/with-aura-board-health-connect",
     "./plugins/with-android-debug-network-security",
+    "./plugins/with-remove-audio-media-playback",
   ],
   experiments: {
     typedRoutes: true,

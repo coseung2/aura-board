@@ -339,11 +339,11 @@ export default function StudentWalkingScreen() {
       setMessage(
         Platform.OS === "ios"
           ? "권한을 요청했어요. 걸음 수가 보이지 않으면 Apple 건강 앱에서 권한을 확인해 주세요."
-          : "Health Connect 연결을 완료했어요.",
+          : "걸음 수 연결을 완료했어요.",
       );
     } catch (nextError) {
       if (!(await handleAuthError(nextError))) {
-        setError(localizedWalkingError(nextError, "Health Connect 연결에 실패했어요."));
+        setError(localizedWalkingError(nextError, "걸음 수 연결에 실패했어요."));
       }
     } finally {
       setBusy(null);
@@ -475,10 +475,10 @@ export default function StudentWalkingScreen() {
     ? "모바일 앱에서 걸음 수 사용 가능"
     : !isHealthConnectModuleAvailable()
       ? Platform.OS === "ios"
-        ? "새 iPhone 앱 빌드 필요"
-        : "새 Android 앱 빌드 필요"
+        ? "새 iPhone 앱 업데이트 필요"
+        : "새 Android 앱 업데이트 필요"
       : status === "needs_update"
-        ? "Health Connect 업데이트 필요"
+        ? "건강 데이터 업데이트 필요"
         : status === "unavailable"
           ? `${healthServiceName} 사용 불가`
           : connected
@@ -559,7 +559,7 @@ export default function StudentWalkingScreen() {
           <View style={styles.scrollLead}>
             {status === "needs_update" ? (
               <AppButton loading={busy === "settings"} onPress={() => void openSettings()}>
-                Health Connect 업데이트
+                건강 데이터 업데이트
               </AppButton>
             ) : null}
 
@@ -614,7 +614,7 @@ export default function StudentWalkingScreen() {
           <View style={styles.emptySection} accessible accessibilityRole="text">
             <Text style={styles.stateTitle}>아직 걷기 기록이 없어요.</Text>
             <Text style={styles.muted}>
-              Android 앱에서 Health Connect를 연결하면 이번 주 기록이 여기에 표시돼요.
+              Android 앱에서 건강 데이터를 연결하면 이번 주 기록이 여기에 표시돼요.
             </Text>
           </View>
         ) : null}
@@ -726,29 +726,31 @@ export default function StudentWalkingScreen() {
         accessibilityLabel="걷기 연동 설정"
         sheetStyle={styles.settingsSheet}
       >
-        <Text style={styles.settingsTitle}>걷기 연동 설정</Text>
-        <Text style={styles.settingsDescription}>{connectionLabel}</Text>
-        {status === "available" ? (
-          <View style={styles.settingsActions}>
+        <Text style={styles.settingsTitle}>걷기 연동</Text>
+        <Text style={styles.settingsHelp}>상태: {connectionLabel}</Text>
+        <Text style={styles.settingsHelp}>
+          권한: {Platform.OS === "ios" ? "Apple 건강 걸음 수·동작 및 피트니스" : "걸음 수 읽기"}
+        </Text>
+        <Text style={styles.settingsHelp}>목적: 걷기 기록·보상·학급 순위</Text>
+        <Text style={styles.settingsHelp}>
+          관리: {Platform.OS === "ios" ? "Apple 건강·iPhone 설정" : "Health Connect 설정"}
+        </Text>
+        <View style={styles.settingsActions}>
+          <AppButton
+            variant="secondary"
+            onPress={() => setSettingsVisible(false)}
+          >
+            나중에
+          </AppButton>
+          {status === "available" ? (
             <AppButton
               loading={busy === (connected ? "sync" : "connect")}
               onPress={() => void (connected ? sync() : connect())}
             >
-              {connected ? "지금 동기화" : "걸음 수 연결"}
+              연결
             </AppButton>
-            <AppButton
-              variant="secondary"
-              loading={busy === "settings"}
-              onPress={() => void openSettings()}
-            >
-              권한 설정 열기
-            </AppButton>
-          </View>
-        ) : (
-          <Text style={styles.settingsHelp}>
-            건강 데이터 연동은 새 앱 빌드에서 사용할 수 있어요.
-          </Text>
-        )}
+          ) : null}
+        </View>
       </AppModal>
     </SafeAreaView>
   );
@@ -1182,7 +1184,6 @@ const styles = StyleSheet.create({
   muted: { ...typography.label, color: colors.textMuted },
   settingsSheet: { padding: spacing.xl, gap: spacing.md },
   settingsTitle: { ...typography.title, color: colors.text },
-  settingsDescription: { ...typography.body, color: colors.textMuted },
   settingsActions: { gap: spacing.sm },
   settingsHelp: { ...typography.label, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger },

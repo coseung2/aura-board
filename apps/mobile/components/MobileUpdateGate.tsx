@@ -136,14 +136,15 @@ export function MobileUpdateGate({ children }: { children: ReactNode }) {
             showsVerticalScrollIndicator={false}
           >
             <Text accessibilityRole="header" style={styles.title}>
-              {prompt.kind === "required"
-                ? "업데이트가 필요해요"
-                : "새 버전이 있어요"}
+              앱 업데이트
             </Text>
-            <Text style={styles.message}>{prompt.policy.message}</Text>
+            <Text style={styles.message}>
+              상태: {prompt.kind === "required" ? "필수 업데이트" : "새 버전 있음"}
+            </Text>
+            <Text style={styles.message}>변경 사항: {prompt.policy.message}</Text>
             <View style={styles.versionSummary} accessible accessibilityRole="summary">
               <Text style={styles.versionText}>
-                현재 버전 {installedVersion} · 최신 버전 {prompt.policy.latestVersion}
+                버전: {installedVersion} → {prompt.policy.latestVersion}
               </Text>
             </View>
             <View style={styles.actions}>

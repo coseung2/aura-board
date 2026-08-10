@@ -28,7 +28,6 @@ import {
   getHealthConnectStatus,
   hasRequiredHealthConnectPermissions,
   isHealthConnectModuleAvailable,
-  openHealthConnectSettings,
   readWalkingDaysFromDevice,
   requestHealthConnectPermissions,
   type WalkingDay,
@@ -102,7 +101,7 @@ export default function ParentWalkingScreen() {
   const [permissions, setPermissions] = useState<HealthConnectPermission[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [busy, setBusy] = useState<"connect" | "sync" | "settings" | null>(null);
+  const [busy, setBusy] = useState<"connect" | "sync" | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -208,18 +207,6 @@ export default function ParentWalkingScreen() {
     }
   }, [readOwnWalking]);
 
-  const openSettings = useCallback(async () => {
-    setBusy("settings");
-    setHealthError(null);
-    try {
-      await openHealthConnectSettings();
-    } catch (error) {
-      setHealthError(walkingErrorMessage(error, "권한 설정을 열지 못했어요."));
-    } finally {
-      setBusy(null);
-    }
-  }, []);
-
   const ownDays = useMemo(
     () => fillCurrentWalkingWeek(ownRows, week),
     [ownRows, week],
@@ -235,7 +222,7 @@ export default function ParentWalkingScreen() {
 
   const healthServiceName = Platform.OS === "ios" ? "Apple 건강" : "Health Connect";
   const connectionLabel = !isHealthConnectModuleAvailable()
-    ? "새 앱 빌드 필요"
+    ? "앱 업데이트 필요"
     : status === "needs_update"
       ? `${healthServiceName} 업데이트 필요`
       : status !== "available"
@@ -368,27 +355,31 @@ export default function ParentWalkingScreen() {
         accessibilityLabel="걷기 연동 설정"
         sheetStyle={styles.settingsSheet}
       >
-        <Text style={styles.settingsTitle}>걷기 연동 설정</Text>
-        <Text style={styles.muted}>{connectionLabel}</Text>
-        {status === "available" ? (
-          <View style={styles.settingsActions}>
+        <Text style={styles.settingsTitle}>걷기 연동</Text>
+        <Text style={styles.settingsHelp}>상태: {connectionLabel}</Text>
+        <Text style={styles.settingsHelp}>
+          권한: {Platform.OS === "ios" ? "Apple 건강 걸음 수·동작 및 피트니스" : "걸음 수 읽기"}
+        </Text>
+        <Text style={styles.settingsHelp}>목적: 내 걷기 기록·자녀 걷기 확인</Text>
+        <Text style={styles.settingsHelp}>
+          관리: {Platform.OS === "ios" ? "Apple 건강·iPhone 설정" : "Health Connect 설정"}
+        </Text>
+        <View style={styles.settingsActions}>
+          <AppButton
+            variant="secondary"
+            onPress={() => setSettingsVisible(false)}
+          >
+            나중에
+          </AppButton>
+          {status === "available" ? (
             <AppButton
               loading={busy === (connected ? "sync" : "connect")}
               onPress={() => void (connected ? sync() : connect())}
             >
-              {connected ? "지금 동기화" : "걸음 수 연결"}
+              연결
             </AppButton>
-            <AppButton
-              variant="secondary"
-              loading={busy === "settings"}
-              onPress={() => void openSettings()}
-            >
-              권한 설정 열기
-            </AppButton>
-          </View>
-        ) : (
-          <Text style={styles.muted}>건강 데이터 연동은 네이티브 앱 빌드에서 사용할 수 있어요.</Text>
-        )}
+          ) : null}
+        </View>
       </AppModal>
       <ParentBottomNav active="walking" />
     </SafeAreaView>
@@ -514,6 +505,7 @@ const styles = StyleSheet.create({
   childName: { ...typography.label, color: colors.text },
   childMeta: { ...typography.micro, color: colors.textMuted },
   settingsSheet: { padding: spacing.xl, gap: spacing.md },
+  settingsHelp: { ...typography.label, color: colors.textMuted },
   settingsTitle: { ...typography.title, color: colors.text },
   settingsActions: { gap: spacing.sm },
 });

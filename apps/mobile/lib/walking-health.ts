@@ -166,16 +166,16 @@ export type WalkingHealthErrorCode =
   | "unknown";
 
 const HEALTH_CONNECT_ERROR_MESSAGES: Record<WalkingHealthErrorCode, string> = {
-  module_unavailable: "이 Android 앱 빌드에서는 Health Connect를 사용할 수 없습니다.",
-  provider_unavailable: "이 기기에서는 Health Connect를 사용할 수 없습니다.",
+  module_unavailable: "이 Android 앱에서는 건강 데이터 연동을 사용할 수 없습니다.",
+  provider_unavailable: "이 기기에서는 건강 데이터 연동을 사용할 수 없습니다.",
   provider_update_required:
-    "Health Connect 업데이트가 필요해요. 업데이트 후 다시 시도해 주세요.",
-  provider_error: "Health Connect에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.",
+    "건강 데이터 연동을 업데이트한 후 다시 시도해 주세요.",
+  provider_error: "건강 데이터에 연결하지 못했어요. 잠시 후 다시 시도해 주세요.",
   permission_required:
-    "걸음 수 권한이 필요해요. Health Connect 설정에서 권한을 허용해 주세요.",
+    "걸음 수 권한이 필요해요. 휴대폰의 건강 데이터 설정에서 허용해 주세요.",
   rate_limited:
-    "Health Connect 요청이 잠시 제한되었어요. 잠시 후 다시 시도해 주세요.",
-  unknown: "Health Connect 요청에 실패했어요.",
+    "건강 데이터 확인이 잠시 제한되었어요. 잠시 후 다시 시도해 주세요.",
+  unknown: "건강 데이터를 확인하지 못했어요.",
 };
 
 export class WalkingHealthError extends Error {
@@ -336,7 +336,7 @@ export async function startLiveStepUpdates(
     if (!alreadyGranted) {
       const result = await PermissionsAndroid.request(permission, {
         title: "걸음 수 실시간 표시",
-        message: "걷기 페이지를 보는 동안 걸음 수를 바로 표시하려면 신체 활동 권한이 필요해요.",
+        message: "걷기 화면을 보는 동안 걸음 수를 바로 표시하려면 활동 정보 권한이 필요해요.",
         buttonPositive: "허용",
         buttonNegative: "나중에",
       });
@@ -404,7 +404,7 @@ export async function requestHealthConnectPermissions() {
 
 export async function openHealthConnectSettings() {
   if (!isHealthConnectModuleAvailable() || !AuraBoardHealthConnectModule) {
-    throw new WalkingHealthError("module_unavailable", "Health Connect 설정을 열 수 없습니다.");
+    throw new WalkingHealthError("module_unavailable", "건강 데이터 설정을 열 수 없습니다.");
   }
   try {
     await AuraBoardHealthConnectModule.openSettings();

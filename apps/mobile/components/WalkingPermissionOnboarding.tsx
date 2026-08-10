@@ -14,12 +14,13 @@ import { colors, spacing, typography } from "../theme/tokens";
 import { AppButton, AppModal } from "./ui";
 
 type Props = {
-  studentId: string;
+  accountKey: string;
+  role: "student" | "parent";
 };
 
-const promptKey = (studentId: string) => `aura_walk_permission_intro_v2_${studentId}`;
+const promptKey = (accountKey: string) => `aura_walk_permission_intro_v2_${accountKey}`;
 
-export function WalkingPermissionOnboarding({ studentId }: Props) {
+export function WalkingPermissionOnboarding({ accountKey, role }: Props) {
   const [visible, setVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [needsUpdate, setNeedsUpdate] = useState(false);
@@ -31,8 +32,8 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
     // the Health Connect activity returns, and awaiting it keeps the button in
     // its loading state even though permission setup already succeeded.
     setVisible(false);
-    await SecureStore.setItemAsync(promptKey(studentId), "shown").catch(() => undefined);
-  }, [studentId]);
+    await SecureStore.setItemAsync(promptKey(accountKey), "shown").catch(() => undefined);
+  }, [accountKey]);
 
   const recheckGrantedPermission = useCallback(() => {
     if (permissionRecheckRef.current) return permissionRecheckRef.current;
@@ -73,7 +74,7 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
         !isWalkingHealthModuleAvailable()
       ) return;
 
-      const seen = await SecureStore.getItemAsync(promptKey(studentId)).catch(() => "shown");
+      const seen = await SecureStore.getItemAsync(promptKey(accountKey)).catch(() => "shown");
       if (seen || !active) return;
 
       try {
@@ -102,7 +103,7 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
     return () => {
       active = false;
     };
-  }, [studentId]);
+  }, [accountKey]);
 
   useEffect(() => {
     if (!visible || needsUpdate) return;
@@ -163,34 +164,30 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
       sheetStyle={styles.sheet}
     >
       <Text style={styles.title}>
-        {needsUpdate ? "Health Connect를 업데이트해요" : "걸음 수를 자동으로 기록할까요?"}
+        {needsUpdate ? "Health Connect 업데이트" : "걸음 수 연결"}
       </Text>
-      <Text style={styles.description}>
-        {needsUpdate
-          ? "걸음 수를 불러오려면 Health Connect 업데이트가 필요해요."
-          : Platform.OS === "ios"
-            ? "Apple 건강 데이터와 동작 및 피트니스 권한을 각각 요청해요. 서로 다른 권한이라 시스템 확인 창이 차례로 표시됩니다."
-            : "날짜별 걸음 수 합계만 읽어요."}
-      </Text>
-      {!needsUpdate ? (
-        <View style={styles.facts}>
-          {Platform.OS === "ios" ? (
-            <>
-              <Text style={styles.fact}>필요한 권한: Apple 건강 데이터의 걸음 수 읽기</Text>
-              <Text style={styles.fact}>필요한 권한: 동작 및 피트니스의 걸음 수 감지</Text>
-              <Text style={styles.fact}>두 권한은 별도로 요청되며, 확인 창이 차례로 나타나요.</Text>
-            </>
-          ) : (
-            <Text style={styles.fact}>필요한 권한: 걸음 수</Text>
-          )}
-          <Text style={styles.fact}>읽지 않는 정보: 위치, 이동 경로</Text>
-          <Text style={styles.fact}>
-            {Platform.OS === "ios"
-              ? "권한은 언제든 Apple 건강 및 iPhone 설정에서 바꿀 수 있어요."
-              : "권한은 언제든 Health Connect 설정에서 바꿀 수 있어요."}
-          </Text>
-        </View>
-      ) : null}
+      <View style={styles.facts}>
+        {needsUpdate ? (
+          <>
+            <Text style={styles.fact}>상태: 업데이트 필요</Text>
+            <Text style={styles.fact}>목적: 걸음 수 연동</Text>
+          </>
+        ) : (
+          <>
+            <Text style={styles.fact}>
+              {Platform.OS === "ios"
+                ? "권한: Apple 건강 걸음 수·동작 및 피트니스"
+                : "권한: 걸음 수 읽기"}
+            </Text>
+            <Text style={styles.fact}>
+              목적: {role === "parent" ? "내 걷기 기록·자녀 걷기 확인" : "걷기 기록·보상·학급 순위"}
+            </Text>
+            <Text style={styles.fact}>
+              관리: {Platform.OS === "ios" ? "Apple 건강·iPhone 설정" : "Health Connect 설정"}
+            </Text>
+          </>
+        )}
+      </View>
       {message ? <Text style={styles.error}>{message}</Text> : null}
       <View style={styles.actions}>
         <AppButton
@@ -203,7 +200,7 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
           나중에
         </AppButton>
         <AppButton style={styles.action} onPress={() => void connect()} loading={busy}>
-          {needsUpdate ? "업데이트하기" : "권한 연결"}
+          {needsUpdate ? "업데이트" : "연결"}
         </AppButton>
       </View>
     </AppModal>
@@ -213,7 +210,6 @@ export function WalkingPermissionOnboarding({ studentId }: Props) {
 const styles = StyleSheet.create({
   sheet: { padding: spacing.xl, gap: spacing.md },
   title: { ...typography.title, color: colors.text },
-  description: { ...typography.body, color: colors.textMuted },
   facts: { gap: spacing.xs, paddingVertical: spacing.xs },
   fact: { ...typography.label, color: colors.text },
   error: { ...typography.label, color: colors.danger },

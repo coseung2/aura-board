@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 
 const DEFAULT_VERSION = "1.0.4";
-const DEFAULT_MESSAGE =
-  "더 안정적인 Aura Board를 사용하려면 최신 버전으로 업데이트해 주세요.";
+const DEFAULT_MESSAGE = "안정성 개선";
 const DEFAULT_ANDROID_STORE_URL =
   "https://play.google.com/store/apps/details?id=com.auraboard.app";
 const DEFAULT_IOS_STORE_URL = "https://aura-board.com";
