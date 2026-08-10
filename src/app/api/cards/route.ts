@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import {
@@ -574,6 +575,15 @@ export async function POST(req: Request) {
       : [];
 
     const { card, createdStudentAuthor } = await db.$transaction(async (tx) => {
+      const seedStudentAuthor =
+        !teacherUser && studentAuthorId && externalAuthorName
+          ? {
+              id: randomUUID(),
+              studentId: studentAuthorId,
+              displayName: externalAuthorName.trim(),
+              order: 0,
+            }
+          : null;
       const c = await tx.card.create({
         data: {
           boardId: input.boardId,
@@ -605,6 +615,11 @@ export async function POST(req: Request) {
           commentVoteOptionCount: input.commentVoteOptionCount ?? null,
           commentVoteOptionLabels:
             input.commentVoteOptionLabels ?? Prisma.DbNull,
+          // Submit Card + its primary CardAuthor as one nested Prisma
+          // mutation, removing a separate application-level create call.
+          authors: seedStudentAuthor
+            ? { create: seedStudentAuthor }
+            : undefined,
         },
       });
       // Student-authored cards get a primary CardAuthor row so the
@@ -621,20 +636,8 @@ export async function POST(req: Request) {
         await setCardAuthors(tx, c.id, input.authors, {
           classroomId: boardClassroomId,
         });
-      } else if (studentAuthorId && externalAuthorName) {
-        // The student and classroom membership were already authenticated
-        // above. A new card cannot have stale author rows, so the generic
-        // replace-all helper would add four unnecessary DB round trips here
-        // (membership lookup, delete, insert, mirror update).
-        createdStudentAuthor = await tx.cardAuthor.create({
-          data: {
-            cardId: c.id,
-            studentId: studentAuthorId,
-            displayName: externalAuthorName.trim(),
-            order: 0,
-          },
-          select: { id: true, studentId: true, displayName: true, order: true },
-        });
+      } else if (seedStudentAuthor) {
+        createdStudentAuthor = seedStudentAuthor;
       }
       // multi-attachment: 여러 첨부 일괄 저장. order는 배열 인덱스.
       if (attachmentRows.length > 0) {
