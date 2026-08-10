@@ -26,7 +26,7 @@ export type ReadingEvaluationResult = {
 
 const shortText = z.string().trim().min(1).max(220);
 
-const gemmaEvaluationSchema = z.object({
+const readingEvaluationSchema = z.object({
   comprehensionScore: z.coerce.number().int().min(0).max(3),
   evidenceScore: z.coerce.number().int().min(0).max(3),
   personalResponseScore: z.coerce.number().int().min(0).max(3),
@@ -42,11 +42,11 @@ function oneLine(value: string): string {
 }
 
 /**
- * Gemma가 반환한 세부 점수와 문장을 서버에서 검증하고 최종 10점 점수를 계산한다.
+ * LLM이 반환한 세부 점수와 문장을 서버에서 검증하고 최종 10점 점수를 계산한다.
  * 모델이 총점을 직접 결정하지 않도록 해 평균·독서왕 집계의 일관성을 지킨다.
  */
 export function normalizeReadingEvaluation(value: unknown): ReadingEvaluationResult {
-  const parsed = gemmaEvaluationSchema.parse(value);
+  const parsed = readingEvaluationSchema.parse(value);
   const breakdown: ReadingEvaluationBreakdown = {
     comprehension: parsed.comprehensionScore,
     evidence: parsed.evidenceScore,

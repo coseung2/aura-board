@@ -2,10 +2,7 @@ import { NextResponse } from "next/server";
 
 import { db } from "@/lib/db";
 import { getTeacherKeyForClassroom } from "@/lib/llm/teacher-key";
-import {
-  evaluateReadingWithGemma,
-  ReadingGemmaError,
-} from "@/lib/reading-gemma";
+import { evaluateReadingWithLlm, ReadingLlmError } from "@/lib/reading-llm";
 import { limitReadingFeedback } from "@/lib/rate-limit-routes";
 import { getCurrentStudent } from "@/lib/student-auth";
 import type { ReadingBookType } from "@/lib/reading-evaluator";
@@ -20,7 +17,7 @@ type RouteContext = {
   params: Promise<{ logId: string }>;
 };
 
-function publicError(error: ReadingGemmaError): {
+function publicError(error: ReadingLlmError): {
   status: number;
   error: string;
   message: string;
@@ -29,31 +26,31 @@ function publicError(error: ReadingGemmaError): {
     case "invalid_key":
       return {
         status: 503,
-        error: "reading_gemini_key_invalid",
-        message: "담임 선생님의 Gemini API 키를 확인해 주세요.",
+        error: "reading_ai_key_invalid",
+        message: "담임 선생님의 AI API 키를 확인해 주세요.",
       };
     case "quota_exceeded":
       return {
         status: 429,
-        error: "reading_gemma_quota_exceeded",
+        error: "reading_ai_quota_exceeded",
         message: "AI 무료 사용 한도가 잠시 부족해요. 조금 뒤 다시 시도해 주세요.",
       };
     case "timeout":
       return {
         status: 504,
-        error: "reading_gemma_timeout",
+        error: "reading_ai_timeout",
         message: "AI 피드백 생성 시간이 초과되었어요. 다시 시도해 주세요.",
       };
     case "invalid_response":
       return {
         status: 502,
-        error: "reading_gemma_invalid_response",
+        error: "reading_ai_invalid_response",
         message: "AI가 피드백 형식에 맞게 답하지 못했어요. 다시 시도해 주세요.",
       };
     default:
       return {
         status: 502,
-        error: "reading_gemma_failed",
+        error: "reading_ai_failed",
         message: "AI 피드백을 생성하지 못했어요. 잠시 후 다시 시도해 주세요.",
       };
   }
@@ -116,13 +113,13 @@ export async function POST(_req: Request, { params }: RouteContext) {
     });
   }
 
-  const teacherKey = await getTeacherKeyForClassroom(log.classroomId);
-  if (!teacherKey || teacherKey.provider !== "gemini" || !teacherKey.apiKey) {
-    await markFailed(log.id, "담임 선생님이 설정에서 Gemini API 키를 먼저 연결해야 해요.");
+  const teacherKey = await getTeacherKeyForClassroom(log.classroomId, "reading");
+  if (!teacherKey || !teacherKey.apiKey) {
+    await markFailed(log.id, "담임 선생님이 설정에서 AI API 키를 먼저 연결해야 해요.");
     return NextResponse.json(
       {
-        error: "reading_gemini_key_missing",
-        message: "담임 선생님이 설정에서 Gemini API 키를 먼저 연결해야 해요.",
+        error: "reading_ai_key_missing",
+        message: "담임 선생님이 설정에서 AI API 키를 먼저 연결해야 해요.",
       },
       { status: 503 },
     );
@@ -180,9 +177,11 @@ export async function POST(_req: Request, { params }: RouteContext) {
   }
 
   try {
-    const result = await evaluateReadingWithGemma({
+    const result = await evaluateReadingWithLlm({
+      provider: teacherKey.provider,
       apiKey: teacherKey.apiKey,
-      modelId: process.env.READING_GEMMA_MODEL_ID,
+      modelId: teacherKey.modelId,
+      baseUrl: teacherKey.baseUrl,
       input: {
         bookType: (log.bookType === "comic" ? "comic" : "story") as ReadingBookType,
         title: log.title,
@@ -209,19 +208,19 @@ export async function POST(_req: Request, { params }: RouteContext) {
       alreadyGenerated: false,
     });
   } catch (error) {
-    const gemmaError =
-      error instanceof ReadingGemmaError
+    const readingLlmError =
+      error instanceof ReadingLlmError
         ? error
-        : new ReadingGemmaError(
+        : new ReadingLlmError(
             "provider_error",
             error instanceof Error ? error.message : "unknown reading feedback error",
           );
-    console.error("[reading-feedback] Gemma evaluation failed", {
+    console.error("[reading-feedback] provider-neutral evaluation failed", {
       logId: log.id,
-      code: gemmaError.code,
-      providerStatus: gemmaError.providerStatus,
+      code: readingLlmError.code,
+      providerStatus: readingLlmError.providerStatus,
     });
-    const response = publicError(gemmaError);
+    const response = publicError(readingLlmError);
     await markFailed(log.id, response.message);
     return NextResponse.json(
       { error: response.error, message: response.message },

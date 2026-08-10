@@ -27,6 +27,10 @@ function geminiThinkingConfig(model: string) {
   return null;
 }
 
+function normalizeBaseUrl(baseUrl: string | null | undefined, fallback: string): string {
+  return (baseUrl?.trim() || fallback).replace(/\/+$/, "");
+}
+
 export type FeedbackImage = {
   /** raw bytes base64 인코딩 (data: prefix 없이). */
   base64: string;
@@ -40,6 +44,8 @@ export type GenerateFeedbackArgs = {
   baseUrl?: string | null;
   /** Feature-specific model selected in teacher settings. */
   modelId?: string | null;
+  /** Optional cancellation signal for bounded server-side requests. */
+  signal?: AbortSignal;
   systemPrompt: string;
   userPrompt: string;
   /** 학생 작품 이미지. 비전 지원 provider(Gemini)만 사용. 그 외는 무시. */
@@ -103,8 +109,10 @@ async function callClaude(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
 async function callOpenAI(args: GenerateFeedbackArgs): Promise<GenerateFeedbackResult> {
   try {
     const model = args.modelId ?? MODELS.openai;
-    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+    const baseUrl = normalizeBaseUrl(args.baseUrl, "https://api.openai.com/v1");
+    const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
+      signal: args.signal,
       headers: {
         Authorization: `Bearer ${args.apiKey}`,
         "Content-Type": "application/json",
@@ -135,12 +143,17 @@ async function callOpenAI(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
 async function callGemini(args: GenerateFeedbackArgs): Promise<GenerateFeedbackResult> {
   try {
     const model = args.modelId ?? MODELS.gemini;
+    const baseUrl = normalizeBaseUrl(
+      args.baseUrl,
+      "https://generativelanguage.googleapis.com/v1beta",
+    );
     const url =
-      `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent` +
+      `${baseUrl}/models/${encodeURIComponent(model)}:generateContent` +
       `?key=${encodeURIComponent(args.apiKey)}`;
     const thinkingConfig = geminiThinkingConfig(model);
     const res = await fetch(url, {
       method: "POST",
+      signal: args.signal,
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: args.systemPrompt }] },
@@ -194,6 +207,7 @@ async function callOllama(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
   try {
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
+      signal: args.signal,
       headers: {
         ...(args.apiKey ? { Authorization: `Bearer ${args.apiKey}` } : {}),
         "Content-Type": "application/json",
@@ -221,15 +235,16 @@ async function callOllama(args: GenerateFeedbackArgs): Promise<GenerateFeedbackR
 }
 
 async function callOpencodeGo(args: GenerateFeedbackArgs): Promise<GenerateFeedbackResult> {
-  const baseUrl =
-    (args.baseUrl ?? "").replace(/\/+$/, "") ||
-    process.env.OPENCODE_BASE_URL ||
-    "https://opencode.ai/zen/go/v1";
+  const baseUrl = normalizeBaseUrl(
+    args.baseUrl,
+    "https://opencode.ai/zen/go/v1",
+  );
   const model = args.modelId ?? MODELS["opencode-go"];
 
   try {
     const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
+      signal: args.signal,
       headers: {
         Authorization: `Bearer ${args.apiKey}`,
         "Content-Type": "application/json",

@@ -23,11 +23,11 @@ vi.mock("@/lib/llm/teacher-key", () => ({
   getTeacherKeyForClassroom: mocks.getTeacherKey,
 }));
 
-vi.mock("@/lib/reading-gemma", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/lib/reading-gemma")>();
+vi.mock("@/lib/reading-llm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/reading-llm")>();
   return {
     ...actual,
-    evaluateReadingWithGemma: mocks.evaluate,
+    evaluateReadingWithLlm: mocks.evaluate,
   };
 });
 
@@ -47,6 +47,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { POST } from "./route";
+import { ReadingLlmError } from "@/lib/reading-llm";
 
 const now = new Date("2026-08-06T09:00:00.000Z");
 
@@ -99,7 +100,7 @@ describe("POST /api/student/reading/[logId]/feedback", () => {
       provider: "gemini",
       apiKey: "test-key",
       baseUrl: null,
-      modelId: null,
+      modelId: "gemini-2.5-flash",
     });
     mocks.limit.mockReset().mockResolvedValue({ ok: true, retryAfter: 0 });
     mocks.evaluate.mockReset().mockResolvedValue({
@@ -117,7 +118,43 @@ describe("POST /api/student/reading/[logId]/feedback", () => {
     });
   });
 
-  it("stores a Gemma score and feedback for the student's own log", async () => {
+  it.each([
+    {
+      provider: "openai" as const,
+      modelId: "gpt-5.6-terra",
+      baseUrl: "https://teacher-openai.example/v1",
+    },
+    {
+      provider: "gemini" as const,
+      modelId: "gemini-2.5-pro",
+      baseUrl: "https://teacher-gemini.example/v1",
+    },
+    {
+      provider: "opencode-go" as const,
+      modelId: "deepseek-v4-pro",
+      baseUrl: "https://teacher-opencode.example/v1",
+    },
+  ])("accepts the teacher-selected $provider reading model", async (selection) => {
+    mocks.getTeacherKey.mockResolvedValue({
+      teacherId: "teacher-1",
+      ...selection,
+      apiKey: "selected-provider-key",
+      verified: true,
+    });
+    mocks.evaluate.mockResolvedValue({
+      model: selection.modelId,
+      evaluation: {
+        score: 8,
+        feedback: "잘한 점: 생각이 잘 드러나요.",
+        breakdown: {
+          comprehension: 2,
+          evidence: 2,
+          personalResponse: 3,
+          expression: 1,
+        },
+      },
+    });
+
     const response = await POST(request(), context());
     const body = await response.json();
 
@@ -125,14 +162,16 @@ describe("POST /api/student/reading/[logId]/feedback", () => {
     expect(body.evaluation).toMatchObject({
       aiScore: 8,
       aiFeedbackStatus: "generated",
-      aiFeedbackModel: "gemma-4-26b-a4b-it",
+      aiFeedbackModel: selection.modelId,
     });
-    expect(mocks.evaluate).toHaveBeenCalledWith(
-      expect.objectContaining({
-        apiKey: "test-key",
-        input: expect.objectContaining({ title: "어린 왕자" }),
-      }),
-    );
+    expect(mocks.getTeacherKey).toHaveBeenCalledWith("classroom-1", "reading");
+    expect(mocks.evaluate).toHaveBeenCalledWith({
+      provider: selection.provider,
+      modelId: selection.modelId,
+      apiKey: "selected-provider-key",
+      baseUrl: selection.baseUrl,
+      input: expect.objectContaining({ title: "어린 왕자" }),
+    });
     expect(mocks.update).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ aiScore: 8, aiFeedbackStatus: "generated" }),
@@ -140,14 +179,14 @@ describe("POST /api/student/reading/[logId]/feedback", () => {
     );
   });
 
-  it("keeps the log and marks feedback failed when the teacher has no Gemini key", async () => {
+  it("keeps the log and marks feedback failed when the teacher has no AI key", async () => {
     mocks.getTeacherKey.mockResolvedValue(null);
 
     const response = await POST(request(), context());
     const body = await response.json();
 
     expect(response.status).toBe(503);
-    expect(body.error).toBe("reading_gemini_key_missing");
+    expect(body.error).toBe("reading_ai_key_missing");
     expect(mocks.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ aiFeedbackStatus: "failed" }),
@@ -156,13 +195,33 @@ describe("POST /api/student/reading/[logId]/feedback", () => {
     expect(mocks.evaluate).not.toHaveBeenCalled();
   });
 
-  it("returns an existing generated evaluation without calling Gemma again", async () => {
+  it("marks the log failed and returns a provider-neutral error when evaluation fails", async () => {
+    mocks.evaluate.mockRejectedValue(
+      new ReadingLlmError("quota_exceeded", "provider quota", 429),
+    );
+
+    const response = await POST(request(), context());
+    const body = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(body.error).toBe("reading_ai_quota_exceeded");
+    expect(mocks.updateMany).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          aiFeedbackStatus: "failed",
+          aiFeedbackError: expect.any(String),
+        }),
+      }),
+    );
+  });
+
+  it("returns an existing generated evaluation without calling the LLM again", async () => {
     mocks.log = {
       ...pendingLog(),
       aiScore: 9,
       aiFeedback: "기존 피드백",
       aiFeedbackStatus: "generated",
-      aiFeedbackModel: "gemma-4-26b-a4b-it",
+      aiFeedbackModel: "gemini-2.5-pro",
       evaluatedAt: now,
     };
 
