@@ -37,10 +37,17 @@ export function normalizeParentOAuthBaseUrl(value: string): string {
 
 function appBaseUrl(): string {
   const configured =
-    process.env.PARENT_OAUTH_REDIRECT_BASE_URL ??
-    process.env.NEXTAUTH_URL ??
-    "http://localhost:3000"
-  return normalizeParentOAuthBaseUrl(configured);
+    process.env.PARENT_OAUTH_REDIRECT_BASE_URL?.trim() ||
+    process.env.NEXTAUTH_URL?.trim();
+  // OAuth providers require an absolute redirect URI. Production can have an
+  // empty/missing override even though the canonical app is still available.
+  // Keep localhost as the local-development default, but never emit a
+  // relative `/api/...` callback in a deployed build.
+  const fallback =
+    process.env.NODE_ENV === "production"
+      ? CANONICAL_APP_ORIGIN
+      : "http://localhost:3000";
+  return normalizeParentOAuthBaseUrl(configured || fallback);
 }
 
 export function getCallbackUrl(provider: ProviderId): string {

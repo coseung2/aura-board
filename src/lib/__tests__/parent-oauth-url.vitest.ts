@@ -1,5 +1,9 @@
-import { describe, expect, it } from "vitest";
-import { normalizeParentOAuthBaseUrl } from "../parent-oauth";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { getCallbackUrl, normalizeParentOAuthBaseUrl } from "../parent-oauth";
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
 
 describe("parent OAuth callback base URL", () => {
   it("normalizes the Vercel alias to the canonical origin", () => {
@@ -14,6 +18,16 @@ describe("parent OAuth callback base URL", () => {
     );
     expect(normalizeParentOAuthBaseUrl("https://preview.example.test/")).toBe(
       "https://preview.example.test",
+    );
+  });
+
+  it("uses the canonical origin when production overrides are empty", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("PARENT_OAUTH_REDIRECT_BASE_URL", "");
+    vi.stubEnv("NEXTAUTH_URL", "");
+
+    expect(getCallbackUrl("google")).toBe(
+      "https://aura-board.com/api/parent/auth/callback/google",
     );
   });
 });
