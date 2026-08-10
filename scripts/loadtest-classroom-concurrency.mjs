@@ -8,9 +8,18 @@ import path from "node:path";
 import { promisify } from "node:util";
 import { performance } from "node:perf_hooks";
 import {
+  estimateRealtimeWave,
+  estimateRealtimeJoinSchedule,
+  evaluateRealtimeApproval,
+  evaluateRealtimeAllocation,
   exactSyntheticOutboxSources,
   expectedRealtimeMessageCounts,
   parseRequestValidation,
+  recordRealtimeCallback as updateRealtimeCallbackMetrics,
+  selectRealtimeActorsRoundRobin,
+  createAbortAwareDelay,
+  nextRealtimeJoinStartAt,
+  summarizeRealtimeJoinStarts,
   summarizeCommentRewardSettlement,
 } from "./loadtest-classroom-metrics.mjs";
 
@@ -79,6 +88,17 @@ const databaseUrl = process.env.DATABASE_URL?.trim();
 if (!authSecret) throw new Error("AUTH_SECRET is required");
 if (!databaseUrl) throw new Error("DATABASE_URL is required");
 
+function optionalIntegerEnv(name, options) {
+  const raw = process.env[name];
+  if (raw === undefined || raw.trim() === "") return null;
+  return integerEnv(name, null, options);
+}
+
+const approval = evaluateRealtimeApproval(
+  process.env.LOADTEST_ALLOW_APPROVED_REALTIME_OVERRIDE,
+  process.env.LOADTEST_REALTIME_APPROVAL_REFERENCE,
+);
+
 const config = {
   classrooms: integerEnv("LOADTEST_CLASSROOMS", 50, { min: 1, max: 100 }),
   studentsPerClass: integerEnv("LOADTEST_STUDENTS_PER_CLASS", 20, { min: 1, max: 50 }),
@@ -96,6 +116,16 @@ const config = {
   commentRewardPollIntervalMs: integerEnv("LOADTEST_COMMENT_REWARD_POLL_INTERVAL_MS", 250, { min: 50, max: 5_000 }),
   cleanupTimeoutMs: integerEnv("LOADTEST_CLEANUP_TIMEOUT_MS", 15_000, { min: 0, max: 120_000 }),
   realtimeClients: integerEnv("LOADTEST_REALTIME_CLIENTS", -1, { min: -1, max: 5_000 }),
+  realtimeBaselineConnections: optionalIntegerEnv("LOADTEST_REALTIME_BASELINE_CONNECTIONS", { min: 0, max: 100_000 }),
+  realtimeConnectionLimit: integerEnv("LOADTEST_REALTIME_CONNECTION_LIMIT", 500, { min: 1, max: 100_000 }),
+  realtimeConnectionHeadroom: integerEnv("LOADTEST_REALTIME_CONNECTION_HEADROOM", 50, { min: 0, max: 100_000 }),
+  realtimeMaxJoinRate: numberEnv("LOADTEST_REALTIME_MAX_JOIN_RATE", 100, { min: 0.01, max: 100_000 }),
+  realtimeMaxMessageRate: numberEnv("LOADTEST_REALTIME_MAX_MESSAGE_RATE", 400, { min: 0.01, max: 100_000 }),
+  realtimeBaselineMessageRate: optionalIntegerEnv("LOADTEST_REALTIME_BASELINE_MESSAGE_RATE", { min: 0, max: 100_000 }),
+  realtimeMessageLimit: integerEnv("LOADTEST_REALTIME_MESSAGE_LIMIT", 500, { min: 1, max: 100_000 }),
+  realtimeMessageHeadroom: integerEnv("LOADTEST_REALTIME_MESSAGE_HEADROOM", 50, { min: 0, max: 100_000 }),
+  realtimeOverrideAcknowledged: approval.acknowledged,
+  realtimeApprovalReference: approval.reference,
   sampleIntervalMs: integerEnv("LOADTEST_SAMPLE_INTERVAL_MS", 1_000, { min: 250, max: 30_000 }),
   serverPid: integerEnv("LOADTEST_SERVER_PID", 0, { min: 0, max: 4_294_967_295 }),
   forwardedHost,
@@ -106,7 +136,21 @@ const config = {
 };
 config.totalStudents = config.classrooms * config.studentsPerClass;
 if (config.realtimeClients < 0) config.realtimeClients = config.totalStudents;
-config.realtimeClients = Math.min(config.realtimeClients, config.totalStudents);
+const realtimeAllocation = evaluateRealtimeAllocation({
+  totalStudents: config.totalStudents,
+  realtimeClients: config.realtimeClients,
+  baselineConnections: config.realtimeBaselineConnections,
+  connectionLimit: config.realtimeConnectionLimit,
+  connectionHeadroom: config.realtimeConnectionHeadroom,
+  realtimeWindowMs: config.realtimeWindowMs,
+  maxJoinRate: config.realtimeMaxJoinRate,
+  messageLimit: config.realtimeMessageLimit,
+  messageHeadroom: config.realtimeMessageHeadroom,
+  baselineMessageRate: config.realtimeBaselineMessageRate,
+  maxDeliveryCallbackRate: config.realtimeMaxMessageRate,
+  overrideAcknowledged: config.realtimeOverrideAcknowledged,
+});
+config.realtimeAllocation = realtimeAllocation;
 
 function databaseDescriptor(raw) {
   try {
@@ -158,6 +202,13 @@ const result = {
     failed: 0,
     statusCounts: {},
     messageCounts: {},
+    transportCallbacks: {
+      total: 0,
+      perEvent: {},
+      perSecond: {},
+      peakPerSecond: 0,
+      rollingPeakPerSecond: 0,
+    },
     expectedMessageCounts: {},
     settle: null,
   },
@@ -167,6 +218,8 @@ const result = {
   gate: null,
   fatal: null,
 };
+let realtimeAbort = null;
+const realtimeAbortDelay = createAbortAwareDelay();
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -290,11 +343,11 @@ async function runPhase(name, items, windowMs, operation) {
   await Promise.all(
     items.map(async (item, index) => {
       const delay = scheduledDelay(name, index, windowMs);
-      if (delay > 0) await sleep(delay);
+      if (!(await realtimeAbortDelay.wait(delay)) || realtimeAbort) return;
       const row = await operation(item, index);
       if (Array.isArray(row)) rows.push(...row);
       else rows.push(row);
-    }),
+      }),
   );
   const durationMs = Date.now() - started;
   const phase = {
@@ -302,10 +355,12 @@ async function runPhase(name, items, windowMs, operation) {
     users: items.length,
     arrivalWindowMs: windowMs,
     durationMs,
+    aborted: Boolean(realtimeAbort),
     summary: summarizeRows(rows, durationMs),
   };
   result.phases.push(phase);
   console.log(JSON.stringify({ phase: name, durationMs, summary: phase.summary }));
+  if (realtimeAbort) throw new Error(`Realtime immediate abort: ${realtimeAbort.reason}`);
   return rows;
 }
 
@@ -516,6 +571,42 @@ function incrementCounter(object, key, amount = 1) {
   object[key] = (object[key] ?? 0) + safeAmount;
 }
 
+function recordRealtimeCallback(event) {
+  const bucketCount = updateRealtimeCallbackMetrics(
+    result.realtime.transportCallbacks,
+    event,
+    Date.now(),
+  );
+  if (!realtimeAbort && bucketCount > config.realtimeMaxMessageRate) {
+    realtimeAbort = {
+      reason: "realtime_callback_peak",
+      at: new Date().toISOString(),
+      bucketCount,
+    };
+    result.realtime.abort = realtimeAbort;
+    realtimeAbortDelay.abort();
+  }
+}
+
+function estimateSafeRealtimeWave(name, actors, windowMs) {
+  if (config.realtimeClients <= 0) return null;
+  const estimate = estimateRealtimeWave({
+    selectedActors: actors,
+    mutations: seeded.studentActors.map((actor, index) => ({
+      boardId: actor.boardId,
+      delayMs: scheduledDelay(name, index, windowMs),
+    })),
+    arrivalWindowMs: windowMs,
+    maxDeliveryCallbackRate: config.realtimeMaxMessageRate,
+    baselineMessageRate: config.realtimeBaselineMessageRate,
+    messageLimit: config.realtimeMessageLimit,
+    messageHeadroom: config.realtimeMessageHeadroom,
+  });
+  result.realtime.preflight ??= {};
+  result.realtime.preflight[name] = estimate;
+  return estimate;
+}
+
 async function openRealtimeChannels(actors) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
   const key =
@@ -526,14 +617,38 @@ async function openRealtimeChannels(actors) {
     return [];
   }
 
-  const selected = actors.slice(0, config.realtimeClients);
+  const selected = actors;
   const handles = [];
   const rows = [];
   const started = Date.now();
-  await Promise.all(
-    selected.map(async (actor, index) => {
-      const delay = scheduledDelay("realtime-subscribe", index, config.realtimeWindowMs);
-      if (delay > 0) await sleep(delay);
+  const statusPromises = [];
+  const actualJoinStarts = [];
+  let lastJoinStartedAt = null;
+  const scheduled = selected
+    .map((actor, index) => ({
+      actor,
+      index,
+      delay: scheduledDelay("realtime-subscribe", index, config.realtimeWindowMs),
+    }))
+    .sort((left, right) => left.delay - right.delay || left.index - right.index);
+
+  for (const { actor, index, delay } of scheduled) {
+      const plannedWaitMs = Math.max(0, started + delay - Date.now());
+      if (!(await realtimeAbortDelay.wait(plannedWaitMs)) || realtimeAbort) break;
+      const pacing = nextRealtimeJoinStartAt(
+        lastJoinStartedAt,
+        Date.now(),
+        config.realtimeMaxJoinRate,
+      );
+      while (Date.now() < pacing.startAtMs) {
+        if (
+          !(await realtimeAbortDelay.wait(pacing.startAtMs - Date.now())) ||
+          realtimeAbort
+        ) {
+          break;
+        }
+      }
+      if (realtimeAbort) break;
       const start = performance.now();
       const client = createClient(url, key, {
         auth: {
@@ -552,6 +667,7 @@ async function openRealtimeChannels(actors) {
       const channel = client
         .channel(`board:${actor.boardId}`)
         .on("broadcast", { event: "card_changed" }, (message) => {
+          recordRealtimeCallback("card_changed");
           incrementCounter(
             result.realtime.messageCounts,
             "card_changed",
@@ -559,6 +675,7 @@ async function openRealtimeChannels(actors) {
           );
         })
         .on("broadcast", { event: "board_changed" }, (message) => {
+          recordRealtimeCallback("board_changed");
           const payload = message?.payload;
           const logicalCount =
             payload?.type === "engagement_batch_changed" &&
@@ -574,8 +691,25 @@ async function openRealtimeChannels(actors) {
             "board_changed",
             logicalCount,
           );
-        })
-        .subscribe((status) => {
+        });
+      const actualStartedAt = Date.now();
+      lastJoinStartedAt = actualStartedAt;
+      actualJoinStarts.push(actualStartedAt - started);
+      result.realtime.joinActual = summarizeRealtimeJoinStarts(
+        actualJoinStarts,
+        config.realtimeMaxJoinRate,
+      );
+      if (!result.realtime.joinActual.accepted) {
+        realtimeAbort = {
+          reason: "realtime_join_actual_peak",
+          at: new Date().toISOString(),
+          rollingPeakPerSecond: result.realtime.joinActual.rollingPeakPerSecond,
+        };
+        result.realtime.abort = realtimeAbort;
+        realtimeAbortDelay.abort();
+        break;
+      }
+      channel.subscribe((status) => {
           incrementCounter(result.realtime.statusCounts, status);
           if (finished) return;
           if (status === "SUBSCRIBED") {
@@ -603,15 +737,20 @@ async function openRealtimeChannels(actors) {
       }, config.realtimeTimeoutMs);
 
       handles.push({ client, channel });
-      const statusResult = await statusPromise;
-      rows.push({
-        op: "realtime.subscribe",
-        status: statusResult.ok ? 200 : 0,
-        ok: statusResult.ok,
-        errorCode: statusResult.ok ? null : statusResult.status,
-        ms: performance.now() - start,
-      });
-    }),
+      statusPromises.push(statusPromise.then((statusResult) => {
+        rows.push({
+          op: "realtime.subscribe",
+          status: statusResult.ok ? 200 : 0,
+          ok: statusResult.ok,
+          errorCode: statusResult.ok ? null : statusResult.status,
+          ms: performance.now() - start,
+        });
+      }));
+  }
+  await Promise.all(statusPromises);
+  result.realtime.joinActual ??= summarizeRealtimeJoinStarts(
+    actualJoinStarts,
+    config.realtimeMaxJoinRate,
   );
 
   const durationMs = Date.now() - started;
@@ -644,6 +783,7 @@ async function settleRealtimeMessages(actors, mutationRows) {
 
   while (
     !complete() &&
+    !realtimeAbort &&
     Date.now() - started < config.realtimeSettleTimeoutMs
   ) {
     await sleep(100);
@@ -844,6 +984,7 @@ function aggregateGate() {
   );
   const errorRate = requests ? errors / requests : 0;
   const failures = [];
+  if (result.fatal) failures.push("fatal");
   if (errorRate > config.maxErrorRate) failures.push("error_rate");
   if (readP95 > config.maxReadP95Ms) failures.push("read_p95");
   if (writeP95 > config.maxWriteP95Ms) failures.push("write_p95");
@@ -852,6 +993,12 @@ function aggregateGate() {
   }
   if (result.realtime.settle && !result.realtime.settle.complete) {
     failures.push("realtime_delivery");
+  }
+  if (result.realtime.transportCallbacks.rollingPeakPerSecond > config.realtimeMaxMessageRate) {
+    failures.push("realtime_callback_peak");
+  }
+  if (result.realtime.joinActual && !result.realtime.joinActual.accepted) {
+    failures.push("realtime_join_actual");
   }
   if (result.commentRewardDelivery && !result.commentRewardDelivery.complete) {
     failures.push("comment_reward_delivery");
@@ -1005,6 +1152,9 @@ let stopSampler = async () => undefined;
 const mutationRows = [];
 const syntheticSources = { commentIds: [], likeIds: [], transactionIds: [] };
 try {
+  if (!realtimeAllocation.accepted) {
+    throw new Error(`Unsafe Realtime allocation: ${realtimeAllocation.failures.join(", ")}`);
+  }
   const health = await timedRequest("health", "/api/health");
   if (!health.ok) {
     throw new Error(`Target health check failed: ${health.errorCode ?? health.status}`);
@@ -1059,7 +1209,43 @@ try {
       ),
   );
 
-  realtimeHandles = await openRealtimeChannels(seeded.studentActors);
+  const selectedRealtimeActors = selectRealtimeActorsRoundRobin(
+    seeded.studentActors,
+    config.realtimeClients,
+  );
+  result.realtime.subscribersByBoard = Object.fromEntries(
+    selectedRealtimeActors.reduce((counts, actor) => {
+      counts.set(actor.boardId, (counts.get(actor.boardId) ?? 0) + 1);
+      return counts;
+    }, new Map()),
+  );
+  result.realtime.joinPreflight = estimateRealtimeJoinSchedule(
+    selectedRealtimeActors.map((_, index) =>
+      scheduledDelay("realtime-subscribe", index, config.realtimeWindowMs),
+    ),
+    config.realtimeMaxJoinRate,
+  );
+  const waveEstimates = [
+    ["class-card-wave", config.cardWindowMs],
+    ["class-comment-wave", config.commentWindowMs],
+    ["class-like-wave", config.likeWindowMs],
+  ].map(([name, windowMs]) => [
+    name,
+    estimateSafeRealtimeWave(name, selectedRealtimeActors, windowMs),
+  ]);
+  const unsafeWave = waveEstimates.find(([, estimate]) => estimate && !estimate.accepted);
+  if (unsafeWave) {
+    throw new Error(
+      `Unsafe Realtime ${unsafeWave[0]} estimate: ${unsafeWave[1].failures.join(", ")}`,
+    );
+  }
+  if (!result.realtime.joinPreflight.accepted) {
+    throw new Error(
+      `Unsafe Realtime join schedule: rolling peak ${result.realtime.joinPreflight.rollingPeakPerSecond}/sec exceeds ${config.realtimeMaxJoinRate}/sec`,
+    );
+  }
+
+  realtimeHandles = await openRealtimeChannels(selectedRealtimeActors);
 
   await runPhase(
     "student-initial-snapshot",
@@ -1161,7 +1347,7 @@ try {
         (body) => Array.isArray(body?.cards),
       ),
   );
-  await settleRealtimeMessages(seeded.studentActors, mutationRows);
+  await settleRealtimeMessages(selectedRealtimeActors, mutationRows);
 
   result.gate = aggregateGate();
   if (!result.gate.passed) process.exitCode = 2;
@@ -1198,7 +1384,7 @@ try {
     process.exitCode = 1;
   }
   result.finishedAt = new Date().toISOString();
-  if (!result.gate && !result.fatal) result.gate = aggregateGate();
+  result.gate = aggregateGate();
   await mkdir(path.dirname(resultPath), { recursive: true });
   await writeFile(resultPath, `${JSON.stringify(result, null, 2)}\n`, "utf8");
   await db.$disconnect();
