@@ -7,6 +7,12 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
 import { performance } from "node:perf_hooks";
+import {
+  exactSyntheticOutboxSources,
+  expectedRealtimeMessageCounts,
+  parseRequestValidation,
+  summarizeCommentRewardSettlement,
+} from "./loadtest-classroom-metrics.mjs";
 
 const execFileAsync = promisify(execFile);
 
@@ -42,6 +48,19 @@ function numberEnv(name, fallback, { min = 0, max = Number.MAX_VALUE } = {}) {
 const runId = `lt-${Date.now().toString(36)}-${randomBytes(2).toString("hex")}`;
 const target = new URL(process.env.LOADTEST_TARGET ?? "http://127.0.0.1:3010");
 const localTarget = ["127.0.0.1", "localhost", "::1"].includes(target.hostname);
+const configuredTargetGitSha = process.env.LOADTEST_TARGET_GIT_SHA?.trim();
+const targetGitSha = localTarget && !configuredTargetGitSha
+  ? "local-working-tree"
+  : configuredTargetGitSha;
+if (!localTarget && !targetGitSha) {
+  throw new Error("Remote load targets require LOADTEST_TARGET_GIT_SHA");
+}
+if (
+  (!localTarget && targetGitSha === "local-working-tree") ||
+  (targetGitSha !== "local-working-tree" && !/^[0-9a-f]{7,40}$/i.test(targetGitSha ?? ""))
+) {
+  throw new Error("LOADTEST_TARGET_GIT_SHA must be a 7-40 character hexadecimal git SHA");
+}
 const forwardedHost =
   process.env.LOADTEST_FORWARDED_HOST?.trim() ||
   (localTarget ? "aura-board.com" : target.host);
@@ -73,6 +92,9 @@ const config = {
   requestTimeoutMs: integerEnv("LOADTEST_REQUEST_TIMEOUT_MS", 45_000, { min: 1_000, max: 180_000 }),
   realtimeTimeoutMs: integerEnv("LOADTEST_REALTIME_TIMEOUT_MS", 20_000, { min: 1_000, max: 120_000 }),
   realtimeSettleTimeoutMs: integerEnv("LOADTEST_REALTIME_SETTLE_TIMEOUT_MS", 15_000, { min: 0, max: 120_000 }),
+  commentRewardSettleTimeoutMs: integerEnv("LOADTEST_COMMENT_REWARD_SETTLE_TIMEOUT_MS", 30_000, { min: 0, max: 300_000 }),
+  commentRewardPollIntervalMs: integerEnv("LOADTEST_COMMENT_REWARD_POLL_INTERVAL_MS", 250, { min: 50, max: 5_000 }),
+  cleanupTimeoutMs: integerEnv("LOADTEST_CLEANUP_TIMEOUT_MS", 15_000, { min: 0, max: 120_000 }),
   realtimeClients: integerEnv("LOADTEST_REALTIME_CLIENTS", -1, { min: -1, max: 5_000 }),
   sampleIntervalMs: integerEnv("LOADTEST_SAMPLE_INTERVAL_MS", 1_000, { min: 250, max: 30_000 }),
   serverPid: integerEnv("LOADTEST_SERVER_PID", 0, { min: 0, max: 4_294_967_295 }),
@@ -121,10 +143,11 @@ const resultPath = path.resolve(
   process.env.LOADTEST_RESULT ?? path.join("tmp", "loadtests", `${runId}.json`),
 );
 const result = {
-  schema: "aura-board/classroom-loadtest/v1",
+  schema: "aura-board/classroom-loadtest/v2",
   runId,
   startedAt: new Date().toISOString(),
   target: target.origin,
+  targetGitSha,
   database: databaseDescriptor(databaseUrl),
   config,
   seed: null,
@@ -140,6 +163,7 @@ const result = {
   },
   samples: [],
   cleanup: null,
+  commentRewardDelivery: null,
   gate: null,
   fatal: null,
 };
@@ -215,6 +239,7 @@ async function timedRequest(op, pathname, options = {}, validate) {
   let status = 0;
   let errorCode = null;
   let ok = false;
+  let metadata = {};
   try {
     const response = await fetch(new URL(pathname, target), {
       ...options,
@@ -230,7 +255,9 @@ async function timedRequest(op, pathname, options = {}, validate) {
         body = null;
       }
     }
-    ok = response.ok && (validate ? validate(body) : true);
+    const validation = parseRequestValidation(validate ? validate(body) : true);
+    ok = response.ok && validation.ok;
+    if (ok) metadata = validation.metadata;
     if (!ok) {
       errorCode =
         body && typeof body === "object" && typeof body.error === "string"
@@ -253,6 +280,7 @@ async function timedRequest(op, pathname, options = {}, validate) {
     ok,
     errorCode,
     ms: performance.now() - started,
+    ...metadata,
   };
 }
 
@@ -605,38 +633,9 @@ async function openRealtimeChannels(actors) {
   return handles;
 }
 
-function expectedRealtimeMessageCounts(actors) {
-  const subscribersByBoard = new Map();
-  for (const actor of actors.slice(0, config.realtimeClients)) {
-    subscribersByBoard.set(
-      actor.boardId,
-      (subscribersByBoard.get(actor.boardId) ?? 0) + 1,
-    );
-  }
-  const mutationsByBoard = new Map();
-  for (const actor of actors) {
-    mutationsByBoard.set(
-      actor.boardId,
-      (mutationsByBoard.get(actor.boardId) ?? 0) + 1,
-    );
-  }
-
-  let cardChanged = 0;
-  let boardChanged = 0;
-  for (const [boardId, mutationCount] of mutationsByBoard) {
-    const subscribers = subscribersByBoard.get(boardId) ?? 0;
-    cardChanged += mutationCount * subscribers;
-    boardChanged += mutationCount * subscribers * 2;
-  }
-  return {
-    card_changed: cardChanged,
-    board_changed: boardChanged,
-  };
-}
-
-async function settleRealtimeMessages(actors) {
+async function settleRealtimeMessages(actors, mutationRows) {
   if (result.realtime.skipped || config.realtimeClients <= 0) return;
-  const expected = expectedRealtimeMessageCounts(actors);
+  const expected = expectedRealtimeMessageCounts(actors, mutationRows, config.realtimeClients);
   result.realtime.expectedMessageCounts = expected;
   const started = Date.now();
   const complete = () =>
@@ -666,6 +665,49 @@ async function settleRealtimeMessages(actors) {
     missing,
   };
   console.log(JSON.stringify({ phase: "realtime-settle", ...result.realtime.settle }));
+}
+
+async function readCommentRewardSettlement(commentIds) {
+  if (commentIds.length === 0) {
+    return summarizeCommentRewardSettlement([], [], [], Date.now());
+  }
+  const [outboxRows, transactionRows] = await Promise.all([
+    db.notificationOutbox.findMany({
+      where: { eventType: "comment_reward", sourceId: { in: commentIds } },
+      select: { sourceId: true, status: true, createdAt: true },
+    }),
+    db.transaction.findMany({
+      where: { sourceType: "comment_reward", sourceRef: { in: commentIds } },
+      select: { id: true, sourceRef: true },
+    }),
+  ]);
+  return {
+    ...summarizeCommentRewardSettlement(commentIds, outboxRows, transactionRows, Date.now()),
+    transactionIds: transactionRows.map((row) => row.id),
+  };
+}
+
+async function settleCommentRewards(commentIds) {
+  const started = Date.now();
+  let settlement = await readCommentRewardSettlement(commentIds);
+  while (
+    !settlement.complete &&
+    !settlement.dead &&
+    Date.now() - started < config.commentRewardSettleTimeoutMs
+  ) {
+    await sleep(config.commentRewardPollIntervalMs);
+    settlement = await readCommentRewardSettlement(commentIds);
+  }
+  result.commentRewardDelivery = {
+    expected: settlement.expected,
+    outboxStatusCounts: settlement.outboxStatusCounts,
+    completedTransactionCount: settlement.completedTransactionCount,
+    durationMs: Date.now() - started,
+    complete: settlement.complete,
+    oldestOutstandingAgeMs: settlement.oldestOutstandingAgeMs,
+  };
+  console.log(JSON.stringify({ phase: "comment-reward-settle", ...result.commentRewardDelivery }));
+  return settlement.transactionIds ?? [];
 }
 
 async function closeRealtimeChannels(handles) {
@@ -811,6 +853,9 @@ function aggregateGate() {
   if (result.realtime.settle && !result.realtime.settle.complete) {
     failures.push("realtime_delivery");
   }
+  if (result.commentRewardDelivery && !result.commentRewardDelivery.complete) {
+    failures.push("comment_reward_delivery");
+  }
 
   const serverSamples = result.samples.map((sample) => sample.server).filter(Boolean);
   const dbSamples = result.samples.map((sample) => sample.db).filter(Boolean);
@@ -844,28 +889,121 @@ function aggregateGate() {
   };
 }
 
-async function cleanupSyntheticData(data) {
+async function cleanupSyntheticData(data, sourceIds) {
   if (!data) return { skipped: true };
   const boardIds = data.boards.map((board) => board.id);
+  const promptCardIds = data.promptCards.map((card) => card.id);
   const classroomIds = data.classrooms.map((classroom) => classroom.id);
+  const studentIds = data.students.map((student) => student.id);
   const userIds = data.teachers.map((teacher) => teacher.id);
+
+  const [runComments, runLikes] = await Promise.all([
+    db.cardComment.findMany({
+      where: {
+        cardId: { in: promptCardIds },
+        authorStudentId: { in: studentIds },
+      },
+      select: { id: true },
+    }),
+    db.cardLike.findMany({
+      where: {
+        cardId: { in: promptCardIds },
+        likerStudentId: { in: studentIds },
+      },
+      select: { id: true },
+    }),
+  ]);
+  const commentIds = [...new Set([
+    ...sourceIds.commentIds,
+    ...runComments.map((comment) => comment.id),
+  ])];
+  const likeIds = [...new Set([
+    ...sourceIds.likeIds,
+    ...runLikes.map((like) => like.id),
+  ])];
+  const transactionIds = new Set(sourceIds.transactionIds);
+  const cleanupStarted = Date.now();
+  let processingOutbox = 0;
+  let remainingOutbox = 0;
+  let outboxSources = [];
+  let stableEmptyPasses = 0;
+  let cleanupStable = false;
+
+  while (true) {
+    const previousTransactionCount = transactionIds.size;
+    const rewardTransactions = commentIds.length > 0
+      ? await db.transaction.findMany({
+          where: {
+            sourceType: "comment_reward",
+            sourceRef: { in: commentIds },
+          },
+          select: { id: true },
+        })
+      : [];
+    for (const transaction of rewardTransactions) transactionIds.add(transaction.id);
+    outboxSources = exactSyntheticOutboxSources({
+      commentIds,
+      likeIds,
+      transactionIds: [...transactionIds],
+    });
+    if (outboxSources.length === 0) {
+      cleanupStable = true;
+      break;
+    }
+
+    await db.notificationOutbox.deleteMany({
+      where: { OR: outboxSources, status: { not: "processing" } },
+    });
+    processingOutbox = await db.notificationOutbox.count({
+      where: { OR: outboxSources, status: "processing" },
+    });
+    remainingOutbox = await db.notificationOutbox.count({
+      where: { OR: outboxSources },
+    });
+    const discoveredNewTransaction = transactionIds.size > previousTransactionCount;
+    stableEmptyPasses = remainingOutbox === 0 && !discoveredNewTransaction
+      ? stableEmptyPasses + 1
+      : 0;
+    if (stableEmptyPasses >= 2) {
+      cleanupStable = true;
+      break;
+    }
+    if (Date.now() - cleanupStarted >= config.cleanupTimeoutMs) break;
+    await sleep(Math.min(config.commentRewardPollIntervalMs, 250));
+  }
 
   await db.board.deleteMany({ where: { id: { in: boardIds } } });
   await db.classroom.deleteMany({ where: { id: { in: classroomIds } } });
   await db.user.deleteMany({ where: { id: { in: userIds } } });
 
-  const [boards, classrooms, students, users] = await Promise.all([
+  const [boards, classrooms, students, users, outbox] = await Promise.all([
     db.board.count({ where: { id: { in: boardIds } } }),
     db.classroom.count({ where: { id: { in: classroomIds } } }),
     db.student.count({ where: { classroomId: { in: classroomIds } } }),
     db.user.count({ where: { id: { in: userIds } } }),
+    outboxSources.length > 0
+      ? db.notificationOutbox.count({ where: { OR: outboxSources } })
+      : Promise.resolve(0),
   ]);
-  return { boards, classrooms, students, users };
+  return {
+    boards,
+    classrooms,
+    students,
+    users,
+    outbox,
+    processingOutbox,
+    cleanupTimedOut: !cleanupStable,
+    discoveredComments: commentIds.length,
+    discoveredLikes: likeIds.length,
+    discoveredRewardTransactions: transactionIds.size,
+  };
 }
 
 let seeded = null;
 let realtimeHandles = [];
 let stopSampler = async () => undefined;
+const mutationRows = [];
+const syntheticSources = { commentIds: [], likeIds: [], transactionIds: [] };
 try {
   const health = await timedRequest("health", "/api/health");
   if (!health.ok) {
@@ -936,7 +1074,7 @@ try {
       ),
   );
 
-  await runPhase(
+  mutationRows.push(...await runPhase(
     "class-card-wave",
     seeded.studentActors,
     config.cardWindowMs,
@@ -953,11 +1091,11 @@ try {
           },
           "POST",
         ),
-        (body) => typeof body?.card?.id === "string",
+        (body) => typeof body?.card?.id === "string" ? { boardId: student.boardId } : false,
       ),
-  );
+  ));
 
-  await runPhase(
+  const commentRows = await runPhase(
     "class-comment-wave",
     seeded.studentActors,
     config.commentWindowMs,
@@ -974,11 +1112,17 @@ try {
           },
           "POST",
         ),
-        (body) => typeof body?.item?.id === "string",
+        (body) => typeof body?.item?.id === "string"
+          ? { boardId: student.boardId, sourceId: body.item.id }
+          : false,
       ),
   );
+  mutationRows.push(...commentRows);
+  syntheticSources.commentIds.push(
+    ...commentRows.filter((row) => row.ok && row.sourceId).map((row) => row.sourceId),
+  );
 
-  await runPhase(
+  const likeRows = await runPhase(
     "class-like-wave",
     seeded.studentActors,
     config.likeWindowMs,
@@ -987,8 +1131,21 @@ try {
         "like.create",
         `/api/cards/${encodeURIComponent(student.promptCardId)}/like`,
         studentOptions(student, { liked: true }, "POST"),
-        (body) => body?.liked === true,
+        (body) => body?.liked === true ? { boardId: student.boardId } : false,
       ),
+  );
+  mutationRows.push(...likeRows);
+  const createdLikes = await db.cardLike.findMany({
+    where: {
+      cardId: { in: seeded.promptCards.map((card) => card.id) },
+      likerStudentId: { in: seeded.students.map((student) => student.id) },
+    },
+    select: { id: true },
+  });
+  syntheticSources.likeIds.push(...createdLikes.map((like) => like.id));
+
+  syntheticSources.transactionIds.push(
+    ...await settleCommentRewards(syntheticSources.commentIds),
   );
 
   await sleep(1_000);
@@ -1004,7 +1161,7 @@ try {
         (body) => Array.isArray(body?.cards),
       ),
   );
-  await settleRealtimeMessages(seeded.studentActors);
+  await settleRealtimeMessages(seeded.studentActors, mutationRows);
 
   result.gate = aggregateGate();
   if (!result.gate.passed) process.exitCode = 2;
@@ -1018,11 +1175,19 @@ try {
   await stopSampler().catch(() => undefined);
   await closeRealtimeChannels(realtimeHandles);
   try {
-    result.cleanup = await cleanupSyntheticData(seeded);
+    result.cleanup = await cleanupSyntheticData(seeded, syntheticSources);
     if (
       result.cleanup &&
       !result.cleanup.skipped &&
-      Object.values(result.cleanup).some((value) => Number(value) !== 0)
+      [
+        result.cleanup.boards,
+        result.cleanup.classrooms,
+        result.cleanup.students,
+        result.cleanup.users,
+        result.cleanup.outbox,
+        result.cleanup.processingOutbox,
+        result.cleanup.cleanupTimedOut,
+      ].some((value) => Number(value) !== 0)
     ) {
       process.exitCode = 1;
     }

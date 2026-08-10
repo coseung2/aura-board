@@ -21,6 +21,9 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    include: ["src/**/*.vitest.{ts,tsx}"],
+    include: [
+      "src/**/*.vitest.{ts,tsx}",
+      "scripts/loadtest-classroom-metrics.vitest.ts",
+    ],
   },
 });
