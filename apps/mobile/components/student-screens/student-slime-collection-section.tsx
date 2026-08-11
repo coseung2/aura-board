@@ -29,43 +29,68 @@ import { styles } from "./student-slime.styles";
 import { visibleEquippedSlimeItemKeys } from "../../lib/slime-item-visibility";
 import type { StudentSlimeScreenViewModel } from "../../lib/student-slime-screen/student-slime-screen.types";
 
-export function StudentSlimeCollectionSection({
-  model,
-}: {
-  model: StudentSlimeScreenViewModel;
-}) {
-  const {
-    home,
-    selectedColor,
-    appliedGrowthSpeedBps,
-    buffGroupsByColor,
-    SLIME_TRAMPOLINE_ITEM_KEY,
-    manualActions,
-    activeSets,
-    SLIME_EFFECT_LABELS,
-    formatBuffPercent,
-    openEffectColor,
-    openGrowthColor,
-    petCardScene,
-    equippedFloor,
-    setManualActions,
-    setOpenGrowthColor,
-    setOpenEffectColor,
-    buffArrowAnimatedStyle,
-    busyRepresentative,
-    setRepresentative,
-    setSelectedColor,
-    setWardrobeColor,
-    cookieQuantity,
-    busyItemKey,
-    feedCookie,
-    DISABLED_COOKIE_SOURCE,
-    localSource,
-    buffGroups,
-    appliedBuffTotals,
-    SLIME_EFFECT_DESCRIPTIONS,
-  } = model;
+type StudentSlimeCollectionSectionProps = Pick<
+  StudentSlimeScreenViewModel,
+  | "home"
+  | "selectedColor"
+  | "appliedGrowthSpeedBps"
+  | "buffGroupsByColor"
+  | "SLIME_TRAMPOLINE_ITEM_KEY"
+  | "manualActions"
+  | "activeSets"
+  | "SLIME_EFFECT_LABELS"
+  | "formatBuffPercent"
+  | "openEffectColor"
+  | "openGrowthColor"
+  | "petCardScene"
+  | "setManualActions"
+  | "setOpenGrowthColor"
+  | "setOpenEffectColor"
+  | "buffArrowAnimatedStyle"
+  | "busyRepresentative"
+  | "setRepresentative"
+  | "setSelectedColor"
+  | "setWardrobeColor"
+  | "cookieQuantity"
+  | "busyItemKey"
+  | "feedCookie"
+  | "DISABLED_COOKIE_SOURCE"
+  | "localSource"
+  | "buffGroups"
+  | "appliedBuffTotals"
+  | "SLIME_EFFECT_DESCRIPTIONS"
+>;
 
+export function StudentSlimeCollectionSection({
+  home,
+  selectedColor,
+  appliedGrowthSpeedBps,
+  buffGroupsByColor,
+  SLIME_TRAMPOLINE_ITEM_KEY,
+  manualActions,
+  activeSets,
+  SLIME_EFFECT_LABELS,
+  formatBuffPercent,
+  openEffectColor,
+  openGrowthColor,
+  petCardScene,
+  setManualActions,
+  setOpenGrowthColor,
+  setOpenEffectColor,
+  buffArrowAnimatedStyle,
+  busyRepresentative,
+  setRepresentative,
+  setSelectedColor,
+  setWardrobeColor,
+  cookieQuantity,
+  busyItemKey,
+  feedCookie,
+  DISABLED_COOKIE_SOURCE,
+  localSource,
+  buffGroups,
+  appliedBuffTotals,
+  SLIME_EFFECT_DESCRIPTIONS,
+}: StudentSlimeCollectionSectionProps) {
   return (
     <>
       <View

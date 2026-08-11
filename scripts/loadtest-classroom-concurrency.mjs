@@ -1,11 +1,8 @@
 import {
-  authSecret,
   config,
   createAbortAwareDelay,
   createClient,
-  createHmac,
   db,
-  encode,
   estimateRealtimeJoinSchedule,
   estimateRealtimeWave,
   expectedRealtimeMessageCounts,
@@ -16,7 +13,6 @@ import {
   parseRequestValidation,
   path,
   performance,
-  randomBytes,
   realtimeAllocation,
   result,
   resultPath,
@@ -180,55 +176,6 @@ async function runPhase(name, items, windowMs, operation) {
   console.log(JSON.stringify({ phase: name, durationMs, summary: phase.summary }));
   if (realtimeAbort) throw new Error(`Realtime immediate abort: ${realtimeAbort.reason}`);
   return rows;
-}
-
-async function createManyBatches(model, data, batchSize = 500) {
-  for (let offset = 0; offset < data.length; offset += batchSize) {
-    await model.createMany({ data: data.slice(offset, offset + batchSize) });
-  }
-}
-
-function studentSessionToken(student) {
-  const encoded = Buffer.from(
-    JSON.stringify({
-      studentId: student.id,
-      classroomId: student.classroomId,
-      sessionVersion: 1,
-      exp: Date.now() + 6 * 60 * 60_000,
-    }),
-  ).toString("base64url");
-  const signature = createHmac("sha256", authSecret)
-    .update(encoded)
-    .digest("base64url");
-  return `${encoded}.${signature}`;
-}
-
-async function teacherSessionCookie(teacher) {
-  // Auth.js selects the secure cookie name from the resolved application URL.
-  // A local HTTP target and the production-mode server can disagree, so issue
-  // both valid names with their own salt. The server reads only its configured
-  // cookie; no browser cookie attributes are needed for this direct HTTP test.
-  const cookieNames = [
-    "authjs.session-token",
-    "__Secure-authjs.session-token",
-  ];
-  const pairs = await Promise.all(
-    cookieNames.map(async (cookieName) => {
-      const token = await encode({
-        secret: authSecret,
-        salt: cookieName,
-        maxAge: 6 * 60 * 60,
-        token: {
-          id: teacher.id,
-          sub: teacher.id,
-          email: teacher.email,
-          name: teacher.name,
-        },
-      });
-      return `${cookieName}=${token}`;
-    }),
-  );
-  return pairs.join("; ");
 }
 
 function proxyHeaders() {
@@ -528,12 +475,7 @@ async function executeLoadTest() {
     throw new Error(`Target health check failed: ${health.errorCode ?? health.status}`);
   }
 
-  seeded = await seedSyntheticClassrooms({
-    createManyBatches,
-    randomBytes,
-    studentSessionToken,
-    teacherSessionCookie,
-  });
+  seeded = await seedSyntheticClassrooms();
   result.seed = {
     teachers: seeded.teachers.length,
     classrooms: seeded.classrooms.length,

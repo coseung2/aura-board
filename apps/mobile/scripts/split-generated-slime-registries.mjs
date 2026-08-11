@@ -7,6 +7,8 @@ import { build } from "esbuild";
 import * as prettier from "prettier";
 import ts from "typescript";
 
+import { publishStagedOutputs } from "../../../src/lib/pets/chunked-registry-writer.mjs";
+
 const mobileRoot = path.resolve(import.meta.dirname, "..");
 const canonicalLibRoot = path.join(mobileRoot, "lib");
 const marker = "// Generated mobile-local split";
@@ -20,6 +22,8 @@ const targets = [
   "slime-wearable-actions.generated.ts",
 ];
 const prettierConfig = (await prettier.resolveConfig(mobileRoot)) ?? {};
+
+export const publishStagedFileSet = publishStagedOutputs;
 
 function physicalLines(source) {
   return source.split(/\r?\n/);
@@ -601,105 +605,6 @@ export function verifyMobileRegistryStage({
   }
 }
 
-function isInside(root, candidate) {
-  const relative = path.relative(root, candidate);
-  return (
-    relative === "" ||
-    (!relative.startsWith("..") && !path.isAbsolute(relative))
-  );
-}
-
-function pathExists(filePath) {
-  return fs.existsSync(filePath);
-}
-
-export function publishStagedFileSet(
-  items,
-  stagingRoot,
-  { approvedTargets, failAt = null } = {},
-) {
-  const resolvedStagingRoot = path.resolve(stagingRoot);
-  const approved = new Set(
-    (approvedTargets ?? []).map((target) => path.resolve(target)),
-  );
-  if (approved.size === 0) {
-    throw new Error("approvedTargets must explicitly authorize publication");
-  }
-  const seenTargets = new Set();
-  for (const item of items) {
-    const target = path.resolve(item.target);
-    if (seenTargets.has(target))
-      throw new Error(`Duplicate publish target: ${target}`);
-    seenTargets.add(target);
-    if (!approved.has(target)) {
-      throw new Error(`Publish target is not explicitly approved: ${target}`);
-    }
-    if (item.source) {
-      const source = path.resolve(item.source);
-      if (!isInside(resolvedStagingRoot, source)) {
-        throw new Error(`Staged source is outside the staging root: ${source}`);
-      }
-      if (!pathExists(source))
-        throw new Error(`Missing staged source: ${source}`);
-    }
-  }
-  if (failAt === "before-publish") {
-    throw new Error("Forced failure before publication");
-  }
-
-  const backupRoot = path.join(resolvedStagingRoot, ".rollback");
-  fs.mkdirSync(backupRoot, { recursive: true });
-  const backups = [];
-  const installed = [];
-  try {
-    for (const [index, item] of items.entries()) {
-      if (!pathExists(item.target)) continue;
-      const backup = path.join(backupRoot, String(index));
-      fs.mkdirSync(path.dirname(backup), { recursive: true });
-      fs.renameSync(item.target, backup);
-      backups.push({ backup, target: item.target });
-    }
-    if (failAt === "after-backup") {
-      throw new Error("Forced failure after canonical backup");
-    }
-    for (const item of items) {
-      if (!item.source) continue;
-      fs.mkdirSync(path.dirname(item.target), { recursive: true });
-      fs.renameSync(item.source, item.target);
-      installed.push(item.target);
-      if (failAt === "after-first-install" && installed.length === 1) {
-        throw new Error("Forced failure after first staged install");
-      }
-    }
-  } catch (error) {
-    const rollbackErrors = [];
-    for (const target of installed.reverse()) {
-      try {
-        fs.rmSync(target, { recursive: true, force: true });
-      } catch (rollbackError) {
-        rollbackErrors.push(rollbackError);
-      }
-    }
-    for (const item of backups.reverse()) {
-      try {
-        fs.mkdirSync(path.dirname(item.target), { recursive: true });
-        fs.renameSync(item.backup, item.target);
-      } catch (rollbackError) {
-        rollbackErrors.push(rollbackError);
-      }
-    }
-    if (rollbackErrors.length > 0) {
-      throw new AggregateError(
-        [error, ...rollbackErrors],
-        "Generated output publication and rollback failed",
-      );
-    }
-    fs.rmSync(backupRoot, { recursive: true, force: true });
-    throw error;
-  }
-  fs.rmSync(backupRoot, { recursive: true, force: true });
-}
-
 export async function splitGeneratedSlimeRegistries({
   libRoot = canonicalLibRoot,
   filenames = targets,
@@ -733,7 +638,7 @@ export async function splitGeneratedSlimeRegistries({
         targetLibRoot: resolvedLibRoot,
       }),
     );
-    publishStagedFileSet(items, stagingRoot, {
+    await publishStagedFileSet(items, stagingRoot, {
       approvedTargets: items.map((item) => item.target),
       failAt,
     });

@@ -46,8 +46,6 @@ function setup() {
   };
   const sections = stateBox([originalSection]);
   const cards = stateBox([card()]);
-  const openCard = stateBox<CardData | null>(null);
-  const editingCard = stateBox<CardData | null>(null);
   const templateBusy = stateBox<string | null>(null);
   const slideshowBusy = stateBox<string | null>(null);
   const promptBusy = stateBox<string | null>(null);
@@ -59,22 +57,15 @@ function setup() {
   const activeGroup = stateBox<Record<string, string>>({});
 
   const actions = createStreamBoardSectionActions({
-    boardId: "board-1",
     currentUserId: "teacher-1",
-    currentStudentName: null,
     isStudentViewer: false,
-    anonymousAuthor: false,
-    canManageSections: true,
     cards: cards.value,
     sections: sections.value,
-    sortedSections: sections.value,
     breakoutBySection: breakout.value,
     sectionSlideshowBusyId: slideshowBusy.value,
     sectionPromptBusyId: promptBusy.value,
     setCards: cards.set,
     setSections: sections.set,
-    setOpenCard: openCard.set,
-    setEditingCard: editingCard.set,
     setTemplateBusySectionId: templateBusy.set,
     setSectionSlideshowBusyId: slideshowBusy.set,
     setSectionPromptBusyId: promptBusy.set,
@@ -84,8 +75,6 @@ function setup() {
     setBreakoutBusyId: breakoutBusy.set,
     setBreakoutBySection: breakout.set,
     setActiveGroupBySection: activeGroup.set,
-    breakoutLoadedRef: { current: new Set<string>() },
-    visibleCardsForSection: (_sectionId, nextCards) => nextCards,
   });
 
   return { actions, cards, sections, templateBusy, originalSection };

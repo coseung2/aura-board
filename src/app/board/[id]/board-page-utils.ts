@@ -1,5 +1,4 @@
 import type { BoardTheme } from "@/components/BoardSettingsPanel";
-import type { BreakoutState } from "@/components/stream/stream-board-model";
 
 export type SectionBreakoutConfigRow = {
   sectionId: string;

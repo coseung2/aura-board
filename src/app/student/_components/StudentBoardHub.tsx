@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ChevronRight } from "lucide-react";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 import type { StudentHomeBoard as BoardItem, StudentHomeBreakout as StudentBreakout } from "@/lib/student-home-types";
 import { parseStudentBoardCategory, STUDENT_BOARD_CATEGORIES, type StudentBoardCategory } from "@/components/student/student-board-navigation";
@@ -35,52 +34,6 @@ function boardListState(board: BoardItem) {
         : { label: "시작 대기", live: false };
   }
   return { label: layoutLabel(board.layout), live: false };
-}
-
-function isPriorityBoard(board: BoardItem) {
-  return board.breakout !== null || boardListState(board).live;
-}
-
-function StudentBoardHighlights({ boards }: { boards: BoardItem[] }) {
-  const priorityBoards = boards
-    .filter((board) => !isOfficialGameKind(board.layout))
-    .filter((board) => isPriorityBoard(board))
-    .slice(0, 3);
-
-  return (
-    <section className="student-home-boards" aria-labelledby="student-home-boards-title">
-      <div className="student-flat-section-heading">
-        <h2 id="student-home-boards-title">지금 확인할 보드</h2>
-        <Link href="/student/boards?category=lesson">수업 보드</Link>
-      </div>
-      {priorityBoards.length > 0 ? (
-        <div className="student-board-highlight-list">
-          {priorityBoards.map((board) => {
-            const state = boardListState(board);
-            return (
-              <Link
-                key={board.id}
-                href="/student/boards?category=lesson"
-                className="student-board-highlight"
-              >
-                <span>
-                  <strong>{board.title}</strong>
-                  <small>
-                    {board.breakout && !board.breakout.selectedSectionId
-                      ? "모둠 선택 필요"
-                      : state.label}
-                  </small>
-                </span>
-                <span className="student-board-highlight-action">확인</span>
-              </Link>
-            );
-          })}
-        </div>
-      ) : (
-        <p className="student-flat-empty">지금 바로 확인할 보드는 없어요.</p>
-      )}
-    </section>
-  );
 }
 
 export function StudentBoardHub({ boards }: StudentBoardHubProps) {

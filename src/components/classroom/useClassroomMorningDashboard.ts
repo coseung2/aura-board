@@ -18,9 +18,14 @@ export type RoleTab = "cleaning" | "shoe";
 const ROLE_TABS: readonly RoleTab[] = ["cleaning", "shoe"];
 export const MORNING_ROSTER_COLUMNS = 4;
 
+type MorningDashboardModelOptions = Pick<
+  ClassroomMorningDashboardProps,
+  "classroomId" | "sections"
+>;
+
 export function useClassroomMorningDashboard({
   classroomId, sections = ["assignments", "duties"],
-}: ClassroomMorningDashboardProps) {
+}: MorningDashboardModelOptions) {
   const showAssignments = sections.includes("assignments");
   const showDuties = sections.includes("duties");
   const [summary, setSummary] = useState<MorningSummary | null>(null);

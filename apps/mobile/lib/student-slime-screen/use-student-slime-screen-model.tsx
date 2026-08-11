@@ -1,134 +1,33 @@
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  Animated,
-  Easing,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  useWindowDimensions,
-  View,
-} from "react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Animated, Easing, useWindowDimensions } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Image, type ImageProps } from "expo-image";
-import { CircleAlert, CircleCheck, Star } from "lucide-react-native";
-import {
-  AppButton,
-  AppHeader,
-  BarePressable,
-  ControlPressable,
-} from "../../components/ui";
-import { ContentTab, ContentTabs } from "../../components/NavigationTabs";
 import { resolvePetCardSceneGeometry } from "../../components/slime/slime-types";
-import { SlimeSprite } from "../../components/slime/SlimeSprite";
-import { SlimePurchaseConfirmModal } from "../../components/slime/SlimePurchaseConfirmModal";
-import { SlimeWardrobeSheet } from "../../components/slime/SlimeWardrobeSheet";
+import type { SlimeAction, SlimeColor } from "../slime-assets";
 import {
-  SlimeCharacterCatalogCard,
-  SlimeShopItemCard,
-} from "../../components/slime/SlimeShopCatalogCards";
-import { StudentHeaderActions } from "../../components/StudentHeaderActions";
-import { WalkingTitleSlot } from "../../components/WalkingTitleSlot";
-import { equipPetTitle } from "../titles";
-import {
-  SLIME_ASSET_COLORS,
-  SLIME_SHARED_ASSETS,
-  type EquippedFloor,
-  type SlimeAction,
-  type SlimeColor,
-} from "../slime-assets";
-import {
-  aggregateMobileSlimeBuffTotals,
-  evolutionForStage,
-  calculateGrowthTimeComparison,
-  calculateSlimeGrowthPercent,
-  floorLabel,
-  formatGrowthHours,
   isSceneBackgroundItem,
-  groupSlimeShopItemsByTier,
-  groupSlimeOutfitsByRole,
-  groupSlimePropsByKind,
-  mobileSlimeActiveSets,
-  mobileSlimeBuffGroups,
-  newSlimeIdempotencyKey,
   normalizeSlimeClassroom,
   normalizeSlimeHome,
-  resolveEquippedSceneBackground,
-  resolveEquippedVehicle,
-  resolveEquippedSlimeWearables,
-  selectSceneBackgroundSpritePath,
-  shopFilterForItem,
-  slimeShopPreviewColor,
-  slimeShopNavItems,
-  SLIME_COOKIE_ITEM_KEY,
-  SLIME_COLOR_LABELS,
-  SLIME_STAGE_LABELS,
-  stageForColor,
-  type MobileSlimeHome,
   type MobileSlimeClassmate,
-  type SlimeCatalogItem,
+  type MobileSlimeHome,
   type SlimeShopItem,
   type SlimeShopFilter,
 } from "../slimes";
-import { resolveEquippedSlimePropAction } from "../slime-props";
-import {
-  buildSlimeShopOverviewSections,
-  optimisticallyEquipSlimeItem,
-  slimeWardrobeFilterForItem,
-  slimeWardrobeItemWearerLabel,
-  slimeWardrobeNavItems,
-  type SlimeWardrobeFilter as WardrobeFilter,
+import type {
+  SlimeWardrobeFilter as WardrobeFilter,
 } from "../slime-shop-presentation";
-import {
-  prioritizeEquippedSlimeItems,
-  setSlimeItemHidden,
-  visibleEquippedSlimeItemKeys,
-} from "../slime-item-visibility";
-import { ApiError, apiFetch, getApiBase } from "../api";
+import { ApiError, apiFetch } from "../api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../session";
-import {
-  borders,
-  colors,
-  controls,
-  iconSizes,
-  layers,
-  layout,
-  pageChrome,
-  radii,
-  shadows,
-  slimeUi,
-  spacing,
-  states,
-  tapMin,
-  typography,
-} from "../../theme/tokens";
-import { styles } from "../../components/student-screens/student-slime.styles";
+import { layout, pageChrome, slimeUi } from "../../theme/tokens";
 import { useStudentSlimeDerivedState } from "./use-student-slime-derived-state";
 import {
   DISABLED_COOKIE_SOURCE,
-  ERROR_LABELS,
-  FLOOR_ORDER,
   SLIME_EFFECT_DESCRIPTIONS,
   SLIME_EFFECT_LABELS,
   SLIME_TRAMPOLINE_ITEM_KEY,
   apiErrorMessage,
   formatBuffPercent,
-  itemFloor,
   localSource,
   type Notice,
-  type SlimeCookieConsumeResponse,
-  type SlimeEquipResponse,
-  type SlimeVisibilityResponse,
 } from "./student-slime-domain";
 import { useStudentSlimeMutations } from "./use-student-slime-mutations";
 
@@ -285,9 +184,6 @@ export function useStudentSlimeScreenModel() {
     }, [load]),
   );
   const {
-    owned,
-    equippedFloor,
-    equippedItems,
     wardrobeTargetColor,
     wardrobeEquippedItems,
     shopNavItems,
@@ -298,10 +194,7 @@ export function useStudentSlimeScreenModel() {
     activeSets,
     wardrobeItemWearer,
     visibleShopTiers,
-    visibleOutfitGroups,
-    visiblePropGroups,
     nestedShopGroups,
-    wardrobeItems,
     visibleWardrobeItems,
     visibleWardrobeTitles,
     buffGroups,
@@ -400,7 +293,6 @@ export function useStudentSlimeScreenModel() {
     home,
     SLIME_TRAMPOLINE_ITEM_KEY,
     petCardScene,
-    equippedFloor,
     selectedColor,
     appliedGrowthSpeedBps,
     buffGroupsByColor,

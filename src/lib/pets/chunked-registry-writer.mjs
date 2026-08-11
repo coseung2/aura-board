@@ -17,7 +17,10 @@ function identifier(value) {
 
 function isInside(root, candidate) {
   const relative = path.relative(root, candidate);
-  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+  return (
+    relative === "" ||
+    (!relative.startsWith("..") && !path.isAbsolute(relative))
+  );
 }
 
 async function resolvedExistingParent(target) {
@@ -30,18 +33,37 @@ async function resolvedExistingParent(target) {
   return fs.realpath(current);
 }
 
-async function validateOutputTarget(outputPath, approvedRoots, allowedBaseNames) {
+async function validateOutputTarget(
+  outputPath,
+  approvedRoots,
+  allowedBaseNames,
+) {
   if (!Array.isArray(approvedRoots) || approvedRoots.length === 0) {
-    throw new Error("approvedRoots must explicitly authorize generated registry output");
+    throw new Error(
+      "approvedRoots must explicitly authorize generated registry output",
+    );
   }
-  if (!Array.isArray(allowedBaseNames) || !allowedBaseNames.includes(path.basename(outputPath))) {
-    throw new Error(`Generated registry filename is not approved: ${path.basename(outputPath)}`);
+  if (
+    !Array.isArray(allowedBaseNames) ||
+    !allowedBaseNames.includes(path.basename(outputPath))
+  ) {
+    throw new Error(
+      `Generated registry filename is not approved: ${path.basename(outputPath)}`,
+    );
   }
   const target = path.resolve(outputPath);
   const targetParent = await resolvedExistingParent(path.dirname(target));
-  const roots = await Promise.all(approvedRoots.map(async (root) => fs.realpath(path.resolve(root))));
-  if (!roots.some((root) => isInside(root, target) && isInside(root, targetParent))) {
-    throw new Error(`Generated registry target is outside approved roots: ${target}`);
+  const roots = await Promise.all(
+    approvedRoots.map(async (root) => fs.realpath(path.resolve(root))),
+  );
+  if (
+    !roots.some(
+      (root) => isInside(root, target) && isInside(root, targetParent),
+    )
+  ) {
+    throw new Error(
+      `Generated registry target is outside approved roots: ${target}`,
+    );
   }
   return target;
 }
@@ -49,11 +71,16 @@ async function validateOutputTarget(outputPath, approvedRoots, allowedBaseNames)
 function renderValue(value, depth, maxLineLength) {
   const indent = "  ".repeat(depth);
   const compact = JSON.stringify(value);
-  if (compact === undefined) throw new Error("Generated registry values must be JSON serializable");
-  if (indent.length + compact.length <= Math.min(COMPACT_VALUE_LENGTH, maxLineLength)) {
+  if (compact === undefined)
+    throw new Error("Generated registry values must be JSON serializable");
+  if (
+    indent.length + compact.length <=
+    Math.min(COMPACT_VALUE_LENGTH, maxLineLength)
+  ) {
     return [`${indent}${compact}`];
   }
-  if (value === null || typeof value !== "object") return [`${indent}${compact}`];
+  if (value === null || typeof value !== "object")
+    return [`${indent}${compact}`];
 
   if (Array.isArray(value)) {
     const lines = [`${indent}[`];
@@ -90,14 +117,22 @@ function contentBytes(lines) {
   return Buffer.byteLength(`${lines.join("\n")}\n`, "utf8");
 }
 
-function validateContent(fileName, content, { maxLines, maxBytes, maxLineLength }) {
+function validateContent(
+  fileName,
+  content,
+  { maxLines, maxBytes, maxLineLength },
+) {
   const lines = physicalLines(content);
   if (lines.at(-1) === "") lines.pop();
-  if (lines.length > maxLines) throw new Error(`${fileName} exceeds ${maxLines} lines`);
-  if (Buffer.byteLength(content, "utf8") > maxBytes) throw new Error(`${fileName} exceeds ${maxBytes} bytes`);
+  if (lines.length > maxLines)
+    throw new Error(`${fileName} exceeds ${maxLines} lines`);
+  if (Buffer.byteLength(content, "utf8") > maxBytes)
+    throw new Error(`${fileName} exceeds ${maxBytes} bytes`);
   const longLine = lines.findIndex((line) => line.length > maxLineLength);
   if (longLine >= 0) {
-    throw new Error(`${fileName}:${longLine + 1} exceeds ${maxLineLength} characters`);
+    throw new Error(
+      `${fileName}:${longLine + 1} exceeds ${maxLineLength} characters`,
+    );
   }
 }
 
@@ -107,12 +142,21 @@ function chunkEntries(entries, limits) {
   for (const [key, value] of entries) {
     const rendered = renderEntry(key, value, limits.maxLineLength);
     const candidate = [...current, ...rendered];
-    if (current.length > 0 && (candidate.length + 4 > limits.maxLines || contentBytes(candidate) > limits.maxBytes)) {
+    if (
+      current.length > 0 &&
+      (candidate.length + 4 > limits.maxLines ||
+        contentBytes(candidate) > limits.maxBytes)
+    ) {
       chunks.push(current);
       current = [];
     }
-    if (rendered.length + 4 > limits.maxLines || contentBytes(rendered) > limits.maxBytes) {
-      throw new Error(`Registry entry ${key} exceeds the configured chunk budget`);
+    if (
+      rendered.length + 4 > limits.maxLines ||
+      contentBytes(rendered) > limits.maxBytes
+    ) {
+      throw new Error(
+        `Registry entry ${key} exceeds the configured chunk budget`,
+      );
     }
     current.push(...rendered);
   }
@@ -120,7 +164,14 @@ function chunkEntries(entries, limits) {
   return chunks;
 }
 
-function registryFiles({ banner, registries, constants, aliases, chunkDirectoryName, limits }) {
+function registryFiles({
+  banner,
+  registries,
+  constants,
+  aliases,
+  chunkDirectoryName,
+  limits,
+}) {
   const files = new Map();
   const imports = [];
   const exports = [];
@@ -132,13 +183,28 @@ function registryFiles({ banner, registries, constants, aliases, chunkDirectoryN
       const number = String(index + 1).padStart(3, "0");
       const name = `${identifier(registry.name)}_${number}`;
       const fileName = `${registry.filePrefix}-${number}.generated.ts`;
-      const content = [banner, "", `export const ${name} = {`, ...entries, "} as const;", ""].join("\n");
+      const content = [
+        banner,
+        "",
+        `export const ${name} = {`,
+        ...entries,
+        "} as const;",
+        "",
+      ].join("\n");
       validateContent(fileName, content, limits);
       files.set(path.join(chunkDirectoryName, fileName), content);
-      imports.push(`import { ${name} } from "./${chunkDirectoryName}/${fileName.slice(0, -3)}";`);
+      imports.push(
+        `import { ${name} } from "./${chunkDirectoryName}/${fileName.slice(0, -3)}";`,
+      );
       names.push(name);
     }
-    exports.push([`export const ${registry.name} = {`, ...names.map((name) => `  ...${name},`), "} as const;"].join("\n"));
+    exports.push(
+      [
+        `export const ${registry.name} = {`,
+        ...names.map((name) => `  ...${name},`),
+        "} as const;",
+      ].join("\n"),
+    );
   }
 
   const constantCode = constants.map(({ name, value }) => {
@@ -147,33 +213,66 @@ function registryFiles({ banner, registries, constants, aliases, chunkDirectoryN
     lines[lines.length - 1] += " as const;";
     return lines.join("\n");
   });
-  const aliasCode = aliases.map(({ name, target }) => `export const ${name} = ${target};`);
-  const barrel = [banner, "", ...imports, "", ...exports, ...constantCode, ...aliasCode, ""].join("\n");
+  const aliasCode = aliases.map(
+    ({ name, target }) => `export const ${name} = ${target};`,
+  );
+  const barrel = [
+    banner,
+    "",
+    ...imports,
+    "",
+    ...exports,
+    ...constantCode,
+    ...aliasCode,
+    "",
+  ].join("\n");
   return { files, barrel };
 }
 
 async function pathExists(filePath) {
-  return fs.access(filePath).then(() => true).catch(() => false);
+  return fs
+    .access(filePath)
+    .then(() => true)
+    .catch(() => false);
 }
 
-export async function publishStagedOutputs(items, stagingRoot, { approvedTargets } = {}) {
-  const approved = new Set((approvedTargets ?? []).map((target) => path.resolve(target)));
-  if (approved.size === 0) throw new Error("approvedTargets must explicitly authorize publication");
+export async function publishStagedOutputs(items, stagingRoot, options = {}) {
+  const { approvedTargets, failAt = null } = options;
   const resolvedStagingRoot = path.resolve(stagingRoot);
-  for (const item of items) {
-    if (!isInside(resolvedStagingRoot, path.resolve(item.source))) {
-      throw new Error(`Staged source is outside the staging root: ${item.source}`);
-    }
-    if (!approved.has(path.resolve(item.target))) {
-      throw new Error(`Publish target is not explicitly approved: ${item.target}`);
-    }
-  }
-
-  const backupRoot = path.join(stagingRoot, "rollback");
-  await fs.mkdir(backupRoot, { recursive: true });
+  const approved = new Set(
+    (approvedTargets ?? []).map((target) => path.resolve(target)),
+  );
+  const seenTargets = new Set();
+  const backupRoot = path.join(resolvedStagingRoot, ".rollback");
   const movedBackups = [];
   const installed = [];
   try {
+    if (approved.size === 0)
+      throw new Error("approvedTargets must explicitly authorize publication");
+    for (const item of items) {
+      const target = path.resolve(item.target);
+      if (seenTargets.has(target))
+        throw new Error(`Duplicate publish target: ${target}`);
+      seenTargets.add(target);
+      if (!approved.has(target)) {
+        throw new Error(
+          `Publish target is not explicitly approved: ${item.target}`,
+        );
+      }
+      if (item.source !== null) {
+        const source = path.resolve(item.source);
+        if (!isInside(resolvedStagingRoot, source)) {
+          throw new Error(
+            `Staged source is outside the staging root: ${item.source}`,
+          );
+        }
+        if (!(await pathExists(source)))
+          throw new Error(`Missing staged source: ${source}`);
+      }
+    }
+    if (failAt === "before-publish")
+      throw new Error("Forced failure before publication");
+    await fs.mkdir(backupRoot, { recursive: true });
     for (const [index, item] of items.entries()) {
       await fs.mkdir(path.dirname(item.target), { recursive: true });
       if (!(await pathExists(item.target))) continue;
@@ -181,9 +280,15 @@ export async function publishStagedOutputs(items, stagingRoot, { approvedTargets
       await fs.rename(item.target, backup);
       movedBackups.push({ target: item.target, backup });
     }
+    if (failAt === "after-backup")
+      throw new Error("Forced failure after canonical backup");
     for (const item of items) {
+      if (item.source === null) continue;
       await fs.rename(item.source, item.target);
       installed.push(item.target);
+      if (failAt === "after-first-install" && installed.length === 1) {
+        throw new Error("Forced failure after first staged install");
+      }
     }
   } catch (error) {
     const rollbackErrors = [];
@@ -202,11 +307,22 @@ export async function publishStagedOutputs(items, stagingRoot, { approvedTargets
       }
     }
     if (rollbackErrors.length > 0) {
-      throw new AggregateError([error, ...rollbackErrors], "Generated output publication and rollback failed");
+      throw new AggregateError(
+        [error, ...rollbackErrors],
+        "Generated output publication and rollback failed",
+      );
     }
     throw error;
+  } finally {
+    await fs.rm(resolvedStagingRoot, { recursive: true, force: true });
   }
-  await fs.rm(backupRoot, { recursive: true, force: true });
+}
+
+export function publishStagedImportOutputs(items, stagingRoot, failAt = null) {
+  return publishStagedOutputs(items, stagingRoot, {
+    approvedTargets: items.map((item) => item.target),
+    failAt,
+  });
 }
 
 export async function writeChunkedRegistry({
@@ -221,28 +337,46 @@ export async function writeChunkedRegistry({
   maxBytes = DEFAULT_MAX_BYTES,
   maxLineLength = DEFAULT_MAX_LINE_LENGTH,
 }) {
-  const target = await validateOutputTarget(outputPath, approvedRoots, allowedBaseNames);
+  const target = await validateOutputTarget(
+    outputPath,
+    approvedRoots,
+    allowedBaseNames,
+  );
   const parsed = path.parse(target);
   const chunkDirectoryName = `${parsed.name}.chunks`;
   const limits = { maxLines, maxBytes, maxLineLength };
-  const rendered = registryFiles({ banner, registries, constants, aliases, chunkDirectoryName, limits });
+  const rendered = registryFiles({
+    banner,
+    registries,
+    constants,
+    aliases,
+    chunkDirectoryName,
+    limits,
+  });
   validateContent(parsed.base, rendered.barrel, limits);
 
-  const stagingRoot = await fs.mkdtemp(path.join(parsed.dir, `.${parsed.name}.staging-`));
+  const stagingRoot = await fs.mkdtemp(
+    path.join(parsed.dir, `.${parsed.name}.staging-`),
+  );
   const stagedBarrel = path.join(stagingRoot, parsed.base);
   const stagedChunks = path.join(stagingRoot, chunkDirectoryName);
   try {
     await fs.mkdir(stagedChunks, { recursive: true });
-    await Promise.all([...rendered.files].map(async ([relative, content]) => {
-      const targetFile = path.join(stagingRoot, relative);
-      await fs.mkdir(path.dirname(targetFile), { recursive: true });
-      await fs.writeFile(targetFile, content, "utf8");
-    }));
+    await Promise.all(
+      [...rendered.files].map(async ([relative, content]) => {
+        const targetFile = path.join(stagingRoot, relative);
+        await fs.mkdir(path.dirname(targetFile), { recursive: true });
+        await fs.writeFile(targetFile, content, "utf8");
+      }),
+    );
     await fs.writeFile(stagedBarrel, rendered.barrel, "utf8");
     await publishStagedOutputs(
       [
         { source: stagedBarrel, target },
-        { source: stagedChunks, target: path.join(parsed.dir, chunkDirectoryName) },
+        {
+          source: stagedChunks,
+          target: path.join(parsed.dir, chunkDirectoryName),
+        },
       ],
       stagingRoot,
       { approvedTargets: [target, path.join(parsed.dir, chunkDirectoryName)] },
@@ -253,13 +387,22 @@ export async function writeChunkedRegistry({
 }
 
 async function assertSameFile(expected, actual) {
-  const [expectedContent, actualContent] = await Promise.all([fs.readFile(expected, "utf8"), fs.readFile(actual, "utf8")]);
-  if (expectedContent !== actualContent) throw new Error(`Generated file is stale: ${actual}`);
+  const [expectedContent, actualContent] = await Promise.all([
+    fs.readFile(expected, "utf8"),
+    fs.readFile(actual, "utf8"),
+  ]);
+  if (expectedContent !== actualContent)
+    throw new Error(`Generated file is stale: ${actual}`);
 }
 
 export async function verifyChunkedRegistry(options) {
-  const temporaryDirectory = await fs.mkdtemp(path.join(os.tmpdir(), "aura-registry-check-"));
-  const outputPath = path.join(temporaryDirectory, path.basename(options.outputPath));
+  const temporaryDirectory = await fs.mkdtemp(
+    path.join(os.tmpdir(), "aura-registry-check-"),
+  );
+  const outputPath = path.join(
+    temporaryDirectory,
+    path.basename(options.outputPath),
+  );
   try {
     await writeChunkedRegistry({
       ...options,
@@ -270,9 +413,20 @@ export async function verifyChunkedRegistry(options) {
     const expectedChunkDirectory = `${outputPath.slice(0, -3)}.chunks`;
     const actualChunkDirectory = `${options.outputPath.slice(0, -3)}.chunks`;
     await assertSameFile(outputPath, options.outputPath);
-    const [expectedFiles, actualFiles] = await Promise.all([fs.readdir(expectedChunkDirectory), fs.readdir(actualChunkDirectory)]);
-    if (expectedFiles.join("\n") !== actualFiles.join("\n")) throw new Error(`Generated chunk set is stale: ${actualChunkDirectory}`);
-    await Promise.all(expectedFiles.map((file) => assertSameFile(path.join(expectedChunkDirectory, file), path.join(actualChunkDirectory, file))));
+    const [expectedFiles, actualFiles] = await Promise.all([
+      fs.readdir(expectedChunkDirectory),
+      fs.readdir(actualChunkDirectory),
+    ]);
+    if (expectedFiles.join("\n") !== actualFiles.join("\n"))
+      throw new Error(`Generated chunk set is stale: ${actualChunkDirectory}`);
+    await Promise.all(
+      expectedFiles.map((file) =>
+        assertSameFile(
+          path.join(expectedChunkDirectory, file),
+          path.join(actualChunkDirectory, file),
+        ),
+      ),
+    );
   } finally {
     await fs.rm(temporaryDirectory, { recursive: true, force: true });
   }

@@ -111,7 +111,12 @@ export function formatNumber(value: number) {
   return value.toLocaleString("ko-KR");
 }
 
-export function useClassroomRolePanel({ classroomId, students }: Props) {
+type RolePanelModelOptions = Pick<Props, "classroomId" | "students">;
+
+export function useClassroomRolePanel({
+  classroomId,
+  students,
+}: RolePanelModelOptions) {
   const [roles, setRoles] = useState<RoleTile[]>([]);
   const [payPolicy, setPayPolicy] = useState<PayPolicy>(DEFAULT_PAY_POLICY);
   const [catalog, setCatalog] = useState<CatalogEntry[]>([]);

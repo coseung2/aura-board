@@ -74,14 +74,14 @@ export function parseLiveQuizRealtimeCounter(
   };
 }
 
-export function liveQuizCounterKey(
+function liveQuizCounterKey(
   sessionKey: string,
   questionId: string,
 ): string {
   return `${sessionKey}:${questionId}`;
 }
 
-export function liveQuizCounterShardKey(
+function liveQuizCounterShardKey(
   sessionKey: string,
   questionId: string,
   shard: number,

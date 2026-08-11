@@ -2,33 +2,23 @@ import type { Dispatch, FormEvent, MutableRefObject, SetStateAction } from "reac
 import type { AddCardData } from "../AddCardModal";
 import type { EditCardUpdates } from "../EditCardModal";
 import type { CardData } from "../DraggableCard";
-import { withBoardAnonymousAuthor } from "@/lib/card-anonymity";
 import { sortSections } from "@/lib/sort-sections";
 import { resolveCardBreakoutGroupId, sortPosts, type BreakoutState, type StreamSection } from "./stream-board-model";
 
 type Context = {
   boardId: string;
-  composerSectionId: string | null;
   composerGroupId: string | null;
-  currentUserId: string;
-  currentStudentName?: string | null;
   isStudentViewer?: boolean;
-  anonymousAuthor: boolean;
   cards: CardData[];
   openCard: CardData | null;
   editingCard: CardData | null;
-  sections: StreamSection[];
   breakoutBySection: Record<string, BreakoutState>;
   newSectionTitle: string;
   sectionAddBusy: boolean;
   deletingIds: MutableRefObject<Set<string>>;
   setCards: Dispatch<SetStateAction<CardData[]>>;
   setSections: Dispatch<SetStateAction<StreamSection[]>>;
-  setComposerOpen: Dispatch<SetStateAction<boolean>>;
-  setComposerSectionId: Dispatch<SetStateAction<string | null>>;
-  setComposerGroupId: Dispatch<SetStateAction<string | null>>;
   setOpenCard: Dispatch<SetStateAction<CardData | null>>;
-  setEditingCard: Dispatch<SetStateAction<CardData | null>>;
   setIsAddingSection: Dispatch<SetStateAction<boolean>>;
   setNewSectionTitle: Dispatch<SetStateAction<string>>;
   setSectionAddBusy: Dispatch<SetStateAction<boolean>>;
@@ -36,11 +26,10 @@ type Context = {
 };
 
 export function createStreamBoardCardActions({
-  boardId, composerSectionId, composerGroupId, currentUserId, currentStudentName,
-  isStudentViewer, anonymousAuthor, cards, openCard, editingCard, sections, breakoutBySection,
-  newSectionTitle, sectionAddBusy, deletingIds, setCards, setSections, setComposerOpen,
-  setComposerSectionId, setComposerGroupId, setOpenCard, setEditingCard,
-  setIsAddingSection, setNewSectionTitle, setSectionAddBusy, setSectionAddError,
+  boardId, composerGroupId, isStudentViewer, cards, openCard, editingCard, breakoutBySection,
+  newSectionTitle, sectionAddBusy, deletingIds, setCards, setSections,
+  setOpenCard, setIsAddingSection, setNewSectionTitle, setSectionAddBusy,
+  setSectionAddError,
 }: Context) {
 async function handleAdd(data: AddCardData, groupId?: string | null) {
   const sectionId = data.sectionId ?? null;
@@ -234,3 +223,5 @@ async function handleAddSection(event: FormEvent<HTMLFormElement>) {
     handleAddSection,
   };
 }
+
+export type StreamBoardCardActions = ReturnType<typeof createStreamBoardCardActions>;

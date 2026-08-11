@@ -15,7 +15,6 @@ import { SlimeCharacterSprite } from "@/components/creatures/SlimeCharacterSprit
 import type {
   StudentAssignmentTodo,
   StudentDailyRewardProgress,
-  StudentHomeBoard as BoardItem,
 } from "@/lib/student-home-types";
 import { isStudentAssignmentReminded } from "@/lib/student-home-types";
 const STUDENT_ASSIGNMENT_VISIBLE_LIMIT = 4;
@@ -26,15 +25,6 @@ function formatAssignmentDate(value: string | null | undefined) {
   if (Number.isNaN(date.getTime())) return "";
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
-
-type Duty = {
-  classroomId: string;
-  classroomName: string;
-  roleKey: string;
-  roleLabel: string;
-  emoji: string | null;
-  href: string;
-};
 
 type WalletSummary = {
   classroomId: string;
@@ -63,11 +53,7 @@ type StudentSlimeHome = {
 };
 
 type Props = {
-  studentName: string;
-  classroomName: string;
   classroomId: string;
-  boards: BoardItem[];
-  duties: Duty[];
   assignments?: StudentAssignmentTodo[];
   dailyRewards?: { comment: StudentDailyRewardProgress };
 };
@@ -89,8 +75,6 @@ const SLIME_EFFECT_LABELS: Record<SlimeEffectKey, string> = {
 };
 
 export function StudentDashboard({
-  studentName,
-  classroomName,
   classroomId,
   assignments = [],
   dailyRewards,
@@ -532,6 +516,3 @@ function StudentAssignmentTodos({
     </section>
   );
 }
-
-
-export { StudentBoardHub } from "@/app/student/_components/StudentBoardHub";

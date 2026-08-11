@@ -1,8 +1,7 @@
 
 import { PrismaClient } from "@prisma/client";
-import { encode } from "@auth/core/jwt";
 import { createClient } from "@supabase/supabase-js";
-import { createHmac, randomBytes } from "node:crypto";
+import { randomBytes } from "node:crypto";
 import { execFile } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -27,8 +26,6 @@ import {
 export {
   createAbortAwareDelay,
   createClient,
-  createHmac,
-  encode,
   estimateRealtimeJoinSchedule,
   estimateRealtimeWave,
   exactSyntheticOutboxSources,
@@ -38,7 +35,6 @@ export {
   parseRequestValidation,
   path,
   performance,
-  randomBytes,
   readFile,
   selectRealtimeActorsRoundRobin,
   summarizeCommentRewardSettlement,

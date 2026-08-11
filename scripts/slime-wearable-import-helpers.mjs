@@ -22,29 +22,16 @@ import {
   framesEqual,
   parseSheetMetadata,
 } from "../src/lib/pets/slime-wearable-frame-parser.mjs";
+import { exists, toPosix, writeJson } from "./slime-import-shared-helpers.mjs";
 
-export const toPosix = (value) => value.split(path.sep).join("/");
+export { exists, toPosix, writeJson };
 
 function sha256(buffer) {
   return createHash("sha256").update(buffer).digest("hex");
 }
 
-export async function exists(filePath) {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 export async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, "utf8"));
-}
-
-export async function writeJson(target, value) {
-  await fs.mkdir(path.dirname(target), { recursive: true });
-  await fs.writeFile(target, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
 export async function listDirectories(root) {

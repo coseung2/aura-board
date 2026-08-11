@@ -11,10 +11,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { writeChunkedRegistry } from "../src/lib/pets/chunked-registry-writer.mjs";
+import {
+  publishStagedImportOutputs,
+  writeChunkedRegistry,
+} from "../src/lib/pets/chunked-registry-writer.mjs";
 import {
   mobileRegistryPublicationItems,
-  publishStagedFileSet,
   stageMobileGeneratedRegistry,
 } from "../apps/mobile/scripts/split-generated-slime-registries.mjs";
 import {
@@ -54,6 +56,8 @@ export {
   SLIME_PLAYBACK_BY_ACTION,
   slimeExpectedActionsForEvolution,
 };
+
+export const publishSlimeAssetImportOutputs = publishStagedImportOutputs;
 
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -620,21 +624,6 @@ async function main(argv = process.argv.slice(2)) {
   } finally {
     webRoot = canonicalWebRoot;
     mobileRoot = canonicalMobileRoot;
-    await fs.rm(stagingRoot, { recursive: true, force: true });
-  }
-}
-
-export async function publishSlimeAssetImportOutputs(
-  items,
-  stagingRoot,
-  failAt = null,
-) {
-  try {
-    publishStagedFileSet(items, stagingRoot, {
-      approvedTargets: items.map((item) => item.target),
-      failAt,
-    });
-  } finally {
     await fs.rm(stagingRoot, { recursive: true, force: true });
   }
 }

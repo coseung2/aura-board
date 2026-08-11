@@ -9,26 +9,38 @@ import { View } from "react-native";
 import { styles } from "./student-slime.styles";
 import type { StudentSlimeScreenViewModel } from "../../lib/student-slime-screen/student-slime-screen.types";
 
+type StudentSlimeShopSectionProps = Pick<
+  StudentSlimeScreenViewModel,
+  | "home"
+  | "shopNavItems"
+  | "shopFilter"
+  | "setShopFilter"
+  | "shopOverviewSections"
+  | "visibleShopItems"
+  | "nestedShopGroups"
+  | "visibleShopTiers"
+  | "selectedColor"
+  | "busyItemKey"
+  | "confirmItemPurchase"
+  | "busyColor"
+  | "confirmSlimePurchase"
+>;
+
 export function StudentSlimeShopSection({
-  model,
-}: {
-  model: StudentSlimeScreenViewModel;
-}) {
-  const {
-    home,
-    shopNavItems,
-    shopFilter,
-    setShopFilter,
-    shopOverviewSections,
-    visibleShopItems,
-    nestedShopGroups,
-    visibleShopTiers,
-    selectedColor,
-    busyItemKey,
-    confirmItemPurchase,
-    busyColor,
-    confirmSlimePurchase,
-  } = model;
+  home,
+  shopNavItems,
+  shopFilter,
+  setShopFilter,
+  shopOverviewSections,
+  visibleShopItems,
+  nestedShopGroups,
+  visibleShopTiers,
+  selectedColor,
+  busyItemKey,
+  confirmItemPurchase,
+  busyColor,
+  confirmSlimePurchase,
+}: StudentSlimeShopSectionProps) {
   const renderShopItemCard = (item: SlimeShopItem) => (
     <SlimeShopItemCard
       key={item.key}

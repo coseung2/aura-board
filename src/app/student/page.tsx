@@ -29,11 +29,7 @@ export default async function StudentPage({ searchParams }: StudentPageProps) {
       />
       <main className="student-page">
         <StudentDashboard
-          studentName={student.name}
-          classroomName={student.classroom.name}
           classroomId={student.classroomId}
-          boards={home.boards}
-          duties={home.duties}
           assignments={home.assignments}
           dailyRewards={home.dailyRewards}
         />

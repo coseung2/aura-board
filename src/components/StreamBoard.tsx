@@ -6,10 +6,8 @@ import {
   useMemo,
   useRef,
   useState,
-  type FormEvent,
 } from "react";
 import { createPortal } from "react-dom";
-import type { AddCardData } from "./AddCardModal";
 import { CardDetailModal } from "./cards/CardDetailModal";
 import type { CardData } from "./DraggableCard";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
@@ -25,14 +23,12 @@ import {
 } from "./icons/UiIcons";
 import { SectionActionsPanel } from "./SectionActionsPanel";
 import { StreamComposer } from "./stream/StreamComposer";
-import { StreamActivityTemplatePanel } from "./stream/StreamActivityTemplatePanel";
 import { StreamPost } from "./stream/StreamPost";
 import {
   ActivityTemplateModal,
   SectionWritingPromptModal,
 } from "./stream/StreamSectionModals";
 import { BreakoutConfigModal } from "./stream/StreamBreakoutConfigModal";
-import type { GroupEditorDraft } from "./classroom/GroupRosterEditor";
 import { useBoardAnonymityChange } from "@/hooks/useBoardAnonymityChange";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
 import {
@@ -40,12 +36,6 @@ import {
   withBoardAnonymousAuthors,
 } from "@/lib/card-anonymity";
 import { sortSections } from "@/lib/sort-sections";
-import {
-  STREAM_ACTIVITY_TEMPLATE_LABELS,
-  normalizeStreamActivityTemplateState,
-  type StreamActivityTemplate,
-  type StreamActivityTemplateState,
-} from "@/lib/stream-activity-templates";
 import {
   useBoardSlideshow,
   type SlideshowSectionOption,
@@ -436,6 +426,11 @@ export function StreamBoard({
     setSectionOptions,
   ]);
 
+  const cardActions = createStreamBoardCardActions({
+    boardId, composerGroupId, isStudentViewer, cards, openCard, editingCard,
+    breakoutBySection, newSectionTitle, sectionAddBusy, deletingIds, setCards, setSections,
+    setOpenCard, setIsAddingSection, setNewSectionTitle, setSectionAddBusy, setSectionAddError,
+  });
   const {
     handleAdd,
     handleDelete,
@@ -443,35 +438,23 @@ export function StreamBoard({
     startAddSection,
     cancelAddSection,
     handleAddSection,
-  } = createStreamBoardCardActions({
-    boardId, composerSectionId, composerGroupId, currentUserId, currentStudentName,
-    isStudentViewer, anonymousAuthor, cards, openCard, editingCard, sections, breakoutBySection,
-    newSectionTitle, sectionAddBusy, deletingIds, setCards, setSections, setComposerOpen,
-    setComposerSectionId, setComposerGroupId, setOpenCard, setEditingCard,
-    setIsAddingSection, setNewSectionTitle, setSectionAddBusy, setSectionAddError,
+  } = cardActions;
+  const sectionActions = createStreamBoardSectionActions({
+    currentUserId, isStudentViewer, cards, sections, breakoutBySection,
+    sectionSlideshowBusyId, sectionPromptBusyId,
+    setCards, setSections, setTemplateBusySectionId,
+    setSectionSlideshowBusyId, setSectionPromptBusyId, setSectionOrderBusyId,
+    setContentOrderBusyId, setGuideBusyId, setBreakoutBusyId, setBreakoutBySection,
+    setActiveGroupBySection,
   });
   const {
     handleSectionRenamed,
     handleSectionDeleted,
-    handleMoveSection,
     handleSectionTemplateChange,
-    handleSectionSlideshowToggle,
     handleSectionWritingGuidanceSave,
-    handleSectionActivityStateChange,
-    handleToggleGuide,
-    handleMoveSectionContent,
     handleSaveBreakout,
     handleDisableBreakout,
-    handleJoinBreakout,
-  } = createStreamBoardSectionActions({
-    boardId, currentUserId, currentStudentName, isStudentViewer, anonymousAuthor,
-    canManageSections, cards, sections, sortedSections, breakoutBySection,
-    sectionSlideshowBusyId, sectionPromptBusyId,
-    setCards, setSections, setOpenCard, setEditingCard, setTemplateBusySectionId,
-    setSectionSlideshowBusyId, setSectionPromptBusyId, setSectionOrderBusyId,
-    setContentOrderBusyId, setGuideBusyId, setBreakoutBusyId, setBreakoutBySection,
-    setActiveGroupBySection, breakoutLoadedRef, visibleCardsForSection,
-  });
+  } = sectionActions;
   const showComposerSections =
     streamSectionsEnabled && sectionOptions.length > 0;
 
@@ -548,53 +531,51 @@ export function StreamBoard({
           <StreamGroupedFeed
             sections={sortedSections}
             grouped={grouped}
-            boardId={boardId}
-            canEdit={canManageSections}
-            currentUserId={currentUserId}
-            currentRole={currentRole}
-            canAddPost={canAddPost}
-            isStudentViewer={isStudentViewer}
-            currentStudentName={currentStudentName}
-            isAddingSection={isAddingSection}
-            newSectionTitle={newSectionTitle}
-            sectionAddBusy={sectionAddBusy}
-            sectionAddError={sectionAddError}
-            onStartAddSection={startAddSection}
-            onCancelAddSection={cancelAddSection}
-            onSectionTitleChange={setNewSectionTitle}
-            onSubmitSection={handleAddSection}
-            onOpenSectionPanel={(sectionId, tab) =>
-              setPanelState({ sectionId, tab })
-            }
-            onToggleSectionSlideshow={handleSectionSlideshowToggle}
-            onOpenSectionPromptModal={setSectionPromptModalId}
-            onMoveSection={handleMoveSection}
-            onOpenTemplateModal={setTemplateModalSectionId}
-            onOpenBreakoutModal={setBreakoutModalSectionId}
-            onOpenComposerForSection={openComposer}
-            onSectionActivityStateChange={handleSectionActivityStateChange}
-            onCreateSectionCard={(sectionId, data, groupId) =>
-              handleAdd({ ...data, sectionId }, groupId)
-            }
-            onMoveSectionContent={handleMoveSectionContent}
-            templateBusySectionId={templateBusySectionId}
-            sectionSlideshowBusyId={sectionSlideshowBusyId}
-            sectionPromptBusyId={sectionPromptBusyId}
-            sectionOrderBusyId={sectionOrderBusyId}
-            contentOrderBusyId={contentOrderBusyId}
-            guideBusyId={guideBusyId}
-            breakoutBySection={breakoutBySection}
-            activeGroupBySection={activeGroupBySection}
-            breakoutBusyId={breakoutBusyId}
-            onSetActiveGroup={(sectionId, group) =>
-              setActiveGroupBySection((prev) => ({ ...prev, [sectionId]: group }))
-            }
-            onJoinBreakout={handleJoinBreakout}
-            onRemoveBreakoutMember={handleRemoveBreakoutMember}
-            onEditCard={setEditingCard}
-            onOpenCard={setOpenCard}
-            onDeleteCard={handleDelete}
-            onToggleGuide={handleToggleGuide}
+            viewer={{
+              boardId,
+              canEdit: canManageSections,
+              currentUserId,
+              currentRole,
+              canAddPost,
+              isStudentViewer,
+              currentStudentName,
+            }}
+            sectionCreation={{
+              isAdding: isAddingSection,
+              title: newSectionTitle,
+              busy: sectionAddBusy,
+              error: sectionAddError,
+              onStart: startAddSection,
+              onCancel: cancelAddSection,
+              onTitleChange: setNewSectionTitle,
+              onSubmit: handleAddSection,
+            }}
+            sectionUi={{
+              onOpenPanel: (sectionId, tab) => setPanelState({ sectionId, tab }),
+              onOpenPromptModal: setSectionPromptModalId,
+              onOpenTemplateModal: setTemplateModalSectionId,
+              onOpenBreakoutModal: setBreakoutModalSectionId,
+              onOpenComposer: openComposer,
+            }}
+            sectionActions={sectionActions}
+            busy={{
+              templateSectionId: templateBusySectionId,
+              slideshowSectionId: sectionSlideshowBusyId,
+              promptSectionId: sectionPromptBusyId,
+              sectionOrder: sectionOrderBusyId,
+              contentOrder: contentOrderBusyId,
+              guideCardId: guideBusyId,
+            }}
+            breakout={{
+              stateBySection: breakoutBySection,
+              activeGroupBySection,
+              busySectionId: breakoutBusyId,
+              onSetActiveGroup: (sectionId, group) =>
+                setActiveGroupBySection((prev) => ({ ...prev, [sectionId]: group })),
+              onRemoveMember: handleRemoveBreakoutMember,
+            }}
+            cardActions={cardActions}
+            cardUi={{ onEdit: setEditingCard, onOpen: setOpenCard }}
           />
         ) : (
           <div className="stream-post-grid">

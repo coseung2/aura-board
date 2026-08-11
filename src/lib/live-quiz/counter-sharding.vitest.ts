@@ -12,18 +12,32 @@ const migrationPath = resolve(
   "prisma/migrations/20260811_shard_global_live_quiz_counters/migration.sql",
 );
 
+// Test-only oracle vectors. These values are the SQL contract's first eight
+// MD5 hex digits modulo 128, kept fixed so this test does not reimplement the
+// production hash and accidentally agree with a changed implementation.
+const SHARD_ORACLE_VECTORS = [
+  { participantType: "student", participantId: "student-42", shard: 7 },
+  { participantType: "teacher", participantId: "teacher-7", shard: 96 },
+] as const;
+
 function readShardMigration(): string {
   return readFileSync(migrationPath, "utf8");
 }
 
 describe("global live quiz counter sharding", () => {
+  it("matches fixed SQL-compatible shard oracle vectors", () => {
+    for (const vector of SHARD_ORACLE_VECTORS) {
+      expect(
+        liveQuizCounterShard(vector.participantType, vector.participantId),
+      ).toBe(vector.shard);
+    }
+  });
+
   it("maps retries for one participant to one stable shard", () => {
     const first = liveQuizCounterShard("student", "student-42");
     expect(liveQuizCounterShard("student", "student-42")).toBe(first);
     expect(first).toBeGreaterThanOrEqual(0);
     expect(first).toBeLessThan(LIVE_QUIZ_COUNTER_SHARDS);
-    expect(first).toBe(7);
-    expect(liveQuizCounterShard("teacher", "teacher-7")).toBe(96);
   });
 
   it("uses the same shard contract for SQL backfill and insert triggers", () => {

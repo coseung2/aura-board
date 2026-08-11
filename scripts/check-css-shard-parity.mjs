@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, posix, resolve } from "node:path";
 
 const manifests = [
   "src/components/creatures/SlimePetPage.module.css",
@@ -28,9 +28,22 @@ const manifests = [
 
 const normalize = (value) => value.replace(/^\uFEFF/u, "").replace(/\r\n?/gu, "\n");
 const cascadeSource = (value) => normalize(value).replace(/\/\*[\s\S]*?\*\//gu, "");
+const importsFrom = (value) => [
+  ...normalize(value).matchAll(/^@import\s+"([^"]+)";\s*$/gmu),
+];
+const readHead = (path) =>
+  normalize(execFileSync("git", ["show", `HEAD:${path}`], { encoding: "utf8" }));
+
+function rebuildHeadCascade(manifest, headManifest) {
+  const headImports = importsFrom(headManifest);
+  if (headImports.length === 0) return headManifest;
+  return headImports
+    .map((match) => readHead(posix.normalize(posix.join(posix.dirname(manifest), match[1]))))
+    .join("");
+}
 
 for (const manifest of manifests) {
-  const imports = [...readFileSync(manifest, "utf8").matchAll(/^@import\s+"([^"]+)";\s*$/gmu)];
+  const imports = importsFrom(readFileSync(manifest, "utf8"));
   if (imports.length === 0) {
     throw new Error(`${manifest}: expected local string-form @import entries`);
   }
@@ -38,8 +51,8 @@ for (const manifest of manifests) {
   const rebuilt = imports
     .map((match) => normalize(readFileSync(resolve(dirname(manifest), match[1]), "utf8")))
     .join("");
-  const head = normalize(execFileSync("git", ["show", `HEAD:${manifest}`], { encoding: "utf8" }));
-  if (cascadeSource(rebuilt) !== cascadeSource(head)) {
+  const expected = rebuildHeadCascade(manifest, readHead(manifest));
+  if (cascadeSource(rebuilt) !== cascadeSource(expected)) {
     throw new Error(`${manifest}: imported shards do not preserve the HEAD cascade`);
   }
 }
