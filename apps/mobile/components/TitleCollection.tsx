@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
 
 import { getApiBase } from "../lib/api";
+import type { TitleProgress } from "../lib/titles";
 import {
   borders,
   colors,
@@ -13,16 +14,7 @@ import {
 } from "../theme/tokens";
 import { AppButton } from "./ui";
 
-export type TitleProgress = {
-  key: string;
-  label: string;
-  imagePath: string;
-  requirement: string;
-  effectKey: string;
-  buffBps: number;
-  earned: boolean;
-  claimed: boolean;
-};
+export type { TitleProgress };
 
 const EFFECT_LABELS: Record<string, string> = {
   growth_speed: "성장 속도",

@@ -6,75 +6,22 @@ import {
   useState,
   type ElementRef,
 } from "react";
-import {
-  ActivityIndicator,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { ScrollView, useWindowDimensions } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronDown, ChevronUp, X } from "lucide-react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
-import {
-  borders,
-  colors,
-  composer,
-  controls,
-  iconSizes,
-  pageChrome,
-  radii,
-  spacing,
-  tapMin,
-  typography,
-  walking,
-} from "../../theme/tokens";
-import {
-  AppButton,
-  AppHeader,
-  AppModal,
-  ControlPressable,
-  MediaPressable,
-  SectionHeader,
-  TextField,
-} from "../../components/ui";
-import {
-  ContentTab,
-  ContentTabs,
-  SectionNav,
-  SectionNavItem,
-} from "../../components/NavigationTabs";
-import { StudentHeaderActions } from "../../components/StudentHeaderActions";
-import {
-  ClassroomTopFive,
-  type ClassroomRankReward,
-} from "../../components/ClassroomTopFive";
-import { MissionProgressTrack } from "../../components/MissionProgressTrack";
-import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
-import {
-  TitleCollection,
-  type TitleProgress,
-} from "../../components/TitleCollection";
+import { spacing } from "../../theme/tokens";
+import { TextField } from "../../components/ui";
 import { claimStudentAttendanceReward } from "../../lib/student-attendance";
-import { claimTitle } from "../../lib/titles";
+import { claimTitle, type TitleProgress } from "../../lib/titles";
 import {
   fetchWalkingSnapshot,
+  type ClassroomRankReward,
   type WalkingMonthlyAttendanceReward,
   type WalkingRepresentativeSlime,
 } from "../../lib/walking-health";
-import { styles } from "../../components/student-screens/student-reading.styles";
 
 import { studentRewardNumberFormatter as numberFormatter } from "./student-reward-format";
-import {
-  SummaryRow,
-  ReadingWeeklyMissionPanel,
-} from "./student-reading-presentation";
 
 type BookType = "comic" | "story";
 type ReadingTab = "records" | "missions" | "titles";

@@ -1,19 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  AppState,
-  Image,
-  Platform,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useWindowDimensions,
-} from "react-native";
+import { AppState, Platform } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Footprints, Settings } from "lucide-react-native";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import {
@@ -43,43 +30,11 @@ import type {
   HealthConnectPermission,
   HealthConnectStatus,
 } from "../../modules/aura-board-health-connect/src/AuraBoardHealthConnect.types";
-import {
-  borders,
-  colors,
-  iconSizes,
-  layout,
-  pageChrome,
-  radii,
-  spacing,
-  tapMin,
-  typography,
-  walking,
-} from "../../theme/tokens";
-import {
-  AppButton,
-  AppHeader,
-  AppModal,
-  ControlPressable,
-  MediaPressable,
-  SectionHeader,
-} from "../../components/ui";
-import { ContentTab, ContentTabs } from "../../components/NavigationTabs";
-import { StudentHeaderActions } from "../../components/StudentHeaderActions";
-import { ClassroomTopFive } from "../../components/ClassroomTopFive";
-import { MissionProgressTrack } from "../../components/MissionProgressTrack";
-import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
-import { TitleCollection } from "../../components/TitleCollection";
 import { claimStudentAttendanceReward } from "../../lib/student-attendance";
 import { claimTitle } from "../../lib/titles";
-import { styles } from "../../components/student-screens/student-walking.styles";
-
-import { studentRewardNumberFormatter as numberFormatter } from "./student-reward-format";
-import {
-  SummaryRow,
-  WalkingMissionPanel,
-} from "./student-walking-presentation";
 
 type WalkingView = "record" | "missions" | "titles";
+type WalkingSnapshot = Awaited<ReturnType<typeof fetchWalkingSnapshot>>;
 
 function dayLabel(day: string, today: string) {
   if (day === today) return "오늘";
@@ -175,11 +130,7 @@ export function useStudentWalkingScreenModel() {
     [router],
   );
 
-  const syncWalkingData = useCallback(async () => {
-    await readAndSyncWalkingDays();
-    const snapshot = await fetchWalkingSnapshot(undefined, {
-      forceRefresh: true,
-    });
+  const applyWalkingSnapshot = useCallback((snapshot: WalkingSnapshot) => {
     setRows(snapshot.rows);
     setPolicy(snapshot.policy);
     setMonthlyAttendanceReward(snapshot.monthlyAttendanceReward);
@@ -190,8 +141,16 @@ export function useStudentWalkingScreenModel() {
     setClassroomTopFive(snapshot.classroomTopFive);
     setClassroomRankRewards(snapshot.classroomRankRewards);
     setClassroomRankNextResetAt(snapshot.classroomRankNextResetAt);
-    setLiveStepDelta(0);
   }, []);
+
+  const syncWalkingData = useCallback(async () => {
+    await readAndSyncWalkingDays();
+    const snapshot = await fetchWalkingSnapshot(undefined, {
+      forceRefresh: true,
+    });
+    applyWalkingSnapshot(snapshot);
+    setLiveStepDelta(0);
+  }, [applyWalkingSnapshot]);
 
   const load = useCallback(
     async (syncNative = false, refresh = false) => {
@@ -204,16 +163,7 @@ export function useStudentWalkingScreenModel() {
         const cloudSnapshot = await fetchWalkingSnapshot(undefined, {
           forceRefresh: refresh,
         });
-        setRows(cloudSnapshot.rows);
-        setPolicy(cloudSnapshot.policy);
-        setMonthlyAttendanceReward(cloudSnapshot.monthlyAttendanceReward);
-        setDailyStepRewards(cloudSnapshot.dailyStepRewards);
-        setWeeklyStepRewards(cloudSnapshot.weeklyStepRewards);
-        setRepresentativeSlime(cloudSnapshot.representativeSlime);
-        setTitles(cloudSnapshot.titles);
-        setClassroomTopFive(cloudSnapshot.classroomTopFive);
-        setClassroomRankRewards(cloudSnapshot.classroomRankRewards);
-        setClassroomRankNextResetAt(cloudSnapshot.classroomRankNextResetAt);
+        applyWalkingSnapshot(cloudSnapshot);
         if (!refresh) setLoading(false);
 
         if (!isHealthConnectModuleAvailable()) {
@@ -248,7 +198,7 @@ export function useStudentWalkingScreenModel() {
         setRefreshing(false);
       }
     },
-    [handleAuthError, syncWalkingData],
+    [applyWalkingSnapshot, handleAuthError, syncWalkingData],
   );
 
   const syncLatestSilently = useCallback(async () => {

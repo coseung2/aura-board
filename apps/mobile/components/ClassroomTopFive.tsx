@@ -1,4 +1,5 @@
 import { Image, StyleSheet, Text, View } from "react-native";
+import type { ClassroomRankReward } from "../lib/walking-health";
 import {
   borders,
   colors,
@@ -8,6 +9,8 @@ import {
   walking,
 } from "../theme/tokens";
 import { MediaPressable, SectionHeader } from "./ui";
+
+export type { ClassroomRankReward };
 
 const numberFormatter = new Intl.NumberFormat("ko-KR");
 const REWARD_CLAIM_BUTTON_IMAGE = require("../assets/walking/reward-claim-button.png");
@@ -20,12 +23,6 @@ export type ClassroomTopFiveRank = {
   metricValue: number;
   isCurrent: boolean;
   rewardAmount: number;
-};
-
-export type ClassroomRankReward = {
-  weekStart: string;
-  rank: number;
-  amount: number;
 };
 
 type Props = {

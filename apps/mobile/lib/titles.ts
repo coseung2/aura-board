@@ -1,5 +1,15 @@
 import { apiFetch } from "./api";
-import type { TitleProgress } from "../components/TitleCollection";
+
+export type TitleProgress = {
+  key: string;
+  label: string;
+  imagePath: string;
+  requirement: string;
+  effectKey: string;
+  buffBps: number;
+  earned: boolean;
+  claimed: boolean;
+};
 
 /** Claim one earned title so it can be equipped on the student's pets. */
 export async function claimTitle(titleKey: string) {

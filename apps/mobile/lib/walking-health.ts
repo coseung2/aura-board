@@ -1,5 +1,6 @@
 import { PermissionsAndroid, Platform } from "react-native";
 import { apiFetch } from "./api";
+import type { TitleProgress } from "./titles";
 import {
   EQUIPPED_FLOORS,
   SLIME_ASSET_COLORS,
@@ -21,16 +22,7 @@ export type WalkingDay = {
   syncedAt: string | null;
 };
 
-export type WalkingTitleProgress = {
-  key: string;
-  label: string;
-  imagePath: string;
-  requirement: string;
-  effectKey: string;
-  buffBps: number;
-  earned: boolean;
-  claimed: boolean;
-};
+export type WalkingTitleProgress = TitleProgress;
 
 export type WalkingWeekRange = {
   weekStart: string;
