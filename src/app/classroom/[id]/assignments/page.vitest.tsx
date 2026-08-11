@@ -1,11 +1,9 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { ReactNode } from "react";
 
-type MorningDashboardProps = {
+type AssignmentsViewProps = {
   classroomId: string;
-  classroomName: string;
-  sections?: ReadonlyArray<"assignments" | "duties">;
-  showToolbar?: boolean;
 };
 
 const mocks = vi.hoisted(() => ({
@@ -20,22 +18,31 @@ vi.mock("@/lib/db", () => ({
 }));
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 vi.mock("@/components/classroom/ClassroomSectionHeader", () => ({
-  ClassroomSectionHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
+  ClassroomSectionHeader: ({
+    title,
+    actions,
+  }: {
+    title: string;
+    actions?: ReactNode;
+  }) => (
+    <header>
+      <h1>{title}</h1>
+      {actions}
+    </header>
+  ),
 }));
-vi.mock("@/components/classroom/ClassroomMorningDashboard", () => ({
-  ClassroomMorningDashboard: ({
-    classroomId,
-    classroomName,
-    sections = [],
-    showToolbar,
-  }: MorningDashboardProps) => (
+vi.mock("@/components/classroom/ClassroomAssignmentsView", () => ({
+  ClassroomAssignmentsView: ({ classroomId }: AssignmentsViewProps) => (
     <section
-      data-testid="morning-panel"
+      data-testid="assignments-view"
       data-classroom-id={classroomId}
-      data-classroom-name={classroomName}
-      data-sections={sections.join(",")}
-      data-show-toolbar={String(showToolbar)}
     />
+  ),
+  ClassroomAssignmentDistributeButton: () => (
+    <button type="button">+ 과제 배부</button>
+  ),
+  ArchivedAssignmentsButton: () => (
+    <button type="button">보관함</button>
   ),
 }));
 
@@ -50,7 +57,7 @@ describe("ClassroomAssignmentsPage", () => {
     });
   });
 
-  it("calls notFound and stops before composing the dashboard for another teacher", async () => {
+  it("calls notFound and stops before composing the view for another teacher", async () => {
     const notFoundError = new Error("NEXT_NOT_FOUND");
     mocks.notFound.mockImplementationOnce(() => {
       throw notFoundError;
@@ -68,7 +75,7 @@ describe("ClassroomAssignmentsPage", () => {
     expect(mocks.notFound).toHaveBeenCalledWith();
   });
 
-  it("composes the dashboard for assignments with the authorized classroom data", async () => {
+  it("composes the full-width assignments view for the authorized classroom", async () => {
     mocks.classroomFindUnique.mockResolvedValue({
       id: "classroom-1",
       name: "햇살반",
@@ -82,11 +89,9 @@ describe("ClassroomAssignmentsPage", () => {
     );
 
     expect(screen.getByRole("heading", { name: "과제 현황" })).toBeTruthy();
-    const panel = screen.getByTestId("morning-panel");
-    expect(panel.getAttribute("data-classroom-id")).toBe("classroom-1");
-    expect(panel.getAttribute("data-classroom-name")).toBe("햇살반");
-    expect(panel.getAttribute("data-sections")).toBe("assignments");
-    expect(panel.getAttribute("data-show-toolbar")).toBe("false");
+    expect(screen.getByRole("button", { name: "+ 과제 배부" })).toBeTruthy();
+    const view = screen.getByTestId("assignments-view");
+    expect(view.getAttribute("data-classroom-id")).toBe("classroom-1");
     expect(mocks.notFound).not.toHaveBeenCalled();
   });
 });

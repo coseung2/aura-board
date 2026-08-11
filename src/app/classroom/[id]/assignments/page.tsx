@@ -1,6 +1,10 @@
 import { notFound } from "next/navigation";
 
-import { ClassroomMorningDashboard } from "@/components/classroom/ClassroomMorningDashboard";
+import {
+  ClassroomAssignmentsView,
+  ClassroomAssignmentDistributeButton,
+  ArchivedAssignmentsButton,
+} from "@/components/classroom/ClassroomAssignmentsView";
 import { ClassroomSectionHeader } from "@/components/classroom/ClassroomSectionHeader";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -28,13 +32,14 @@ export default async function ClassroomAssignmentsPage({ params }: Props) {
         ariaLabel="과제 현황 메뉴"
         links={[]}
         activeKey="assignments"
+        actions={
+          <>
+            <ClassroomAssignmentDistributeButton classroomId={classroom.id} />
+            <ArchivedAssignmentsButton classroomId={classroom.id} />
+          </>
+        }
       />
-      <ClassroomMorningDashboard
-        classroomId={classroom.id}
-        classroomName={classroom.name}
-        sections={["assignments"]}
-        showToolbar={false}
-      />
+      <ClassroomAssignmentsView classroomId={classroom.id} />
     </main>
   );
 }

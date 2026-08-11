@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { ClassroomDashboardSections } from "@/components/classroom/ClassroomDashboardSections";
+import { ClassroomHomeFeatureGrid } from "@/components/classroom/ClassroomHomeFeatureGrid";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { getClassroomHomeSummary } from "@/lib/classroom-home-summary";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -22,12 +24,6 @@ export default async function ClassroomDashboardPage({ params }: Props) {
       name: true,
       code: true,
       teacherId: true,
-      _count: {
-        select: {
-          students: true,
-          boards: true,
-        },
-      },
     },
   });
 
@@ -35,26 +31,7 @@ export default async function ClassroomDashboardPage({ params }: Props) {
     notFound();
   }
 
-  const [assignedStudentRows, authoredCardCount, portfolioAssetCount] =
-    await Promise.all([
-      db.classroomRoleAssignment.findMany({
-        where: { classroomId: id },
-        select: { studentId: true },
-        distinct: ["studentId"],
-      }),
-      db.card.count({
-        where: {
-          studentAuthorId: { not: null },
-          studentAuthor: { classroomId: id },
-          OR: [{ queueStatus: null }, { queueStatus: { not: "played" } }],
-        },
-      }),
-      db.studentAsset.count({
-        where: { classroomId: id },
-      }),
-    ]);
-
-  const portfolioItemCount = authoredCardCount + portfolioAssetCount;
+  const summary = await getClassroomHomeSummary(classroom.id);
 
   return (
     <main className="classroom-page classroom-page-detail classroom-section-page">
@@ -62,19 +39,20 @@ export default async function ClassroomDashboardPage({ params }: Props) {
         classroomId={classroom.id}
         classroomName={classroom.name}
         summaryKpis={[
-          { label: "학생 수", value: `${classroom._count.students}명` },
-          { label: "연결 보드", value: `${classroom._count.boards}개` },
+          { label: "학생 수", value: `${summary.students.total}명` },
+          { label: "연결 보드", value: `${summary.boards.count}개` },
           {
             label: "1인1역 배정",
-            value: `${assignedStudentRows.length}/${classroom._count.students}`,
+            value: `${summary.roles.assignedCount}/${summary.students.total}`,
           },
           {
             label: "포트폴리오",
-            value: `${formatNumber(portfolioItemCount)}개`,
+            value: `${formatNumber(summary.portfolio.itemCount)}개`,
           },
           { label: "학급 코드", value: classroom.code },
         ]}
       />
+      <ClassroomHomeFeatureGrid classroomId={classroom.id} summary={summary} />
     </main>
   );
 }

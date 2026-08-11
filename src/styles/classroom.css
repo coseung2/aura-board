@@ -4,6 +4,8 @@
 @import "./parts/classroom-dashboard-shell.css";
 @import "./parts/classroom-role-modals.css";
 @import "./parts/classroom-dashboard-overview.css";
+@import "./parts/classroom-home-summary.css";
+@import "./parts/classroom-assignments.css";
 @import "./parts/classroom-roles.css";
 @import "./parts/classroom-role-permissions.css";
 @import "./parts/classroom-bank.css";

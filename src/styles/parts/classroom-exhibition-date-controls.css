@@ -268,10 +268,19 @@
 
 .classroom-section-heading {
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  align-items: flex-start;
   flex: 1 1 auto;
   min-width: 0;
   padding-bottom: 18px;
+}
+
+/* The back link, eyebrow, and title stack vertically: the link is the top
+   entry point, the eyebrow sits right above the page title. The shared
+   .classroom-back-link margin is meant for standalone use, so it is removed
+   inside the hero heading (2026-08-12). */
+.classroom-section-heading .classroom-back-link {
+  margin-bottom: 0;
 }
 
 .classroom-section-title {

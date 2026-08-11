@@ -41,6 +41,9 @@ const PatchBoardSchema = z.object({
   // 주제별 보드 정렬 (2026-07-08) — 출석번호 시드 모달의 기본값이자
   // 보드설정 > 주제 정렬 탭의 저장 값.
   subjectOrder: z.enum(["asc", "desc"]).nullable().optional(),
+  // 과제 아카이빙 (2026-08-12): 설정 시 과제현황 노출에서 제외한다.
+  // 마감일(assignmentDeadline)은 보상 기준일이므로 이 토글로 건드리지 않는다.
+  assignmentArchivedAt: z.coerce.date().nullable().optional(),
 });
 
 export async function GET(

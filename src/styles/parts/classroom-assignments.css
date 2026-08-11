@@ -1,0 +1,371 @@
+/* Dedicated full-width assignments page (2026-08-12): a flat 3-column
+   store-style grid with fixed-size cards. The title row carries the missing
+   count / due date / 마감 toggle; the body spreads missing students in a
+   3-column grid. 제출 과제는 초록, 보드 과제는 파랑으로 구분한다. */
+.classroom-assignments-view {
+  padding-top: 24px;
+}
+
+.classroom-assignments-error {
+  color: var(--color-danger);
+}
+
+.classroom-assignments-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 24px 32px;
+}
+
+.classroom-assignment-item {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 200px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.classroom-assignment-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-btn);
+  background: var(--color-surface-alt);
+}
+
+.classroom-assignment-item-title {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.classroom-assignment-item-title h3 {
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
+.classroom-assignment-kind {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.classroom-assignment-item-kind-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.kind-check {
+  color: var(--color-bank-positive);
+}
+
+.kind-board {
+  color: var(--color-accent-tinted-text);
+}
+
+.classroom-assignment-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.classroom-assignment-toggle {
+  display: block;
+  flex: 0 0 auto;
+  align-self: center;
+  width: 34px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.classroom-assignment-toggle:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.classroom-assignment-toggle-track {
+  position: relative;
+  display: block;
+  width: 34px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-strong);
+  transition: background 0.15s ease;
+}
+
+.classroom-assignment-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(24, 74, 92, 0.25);
+  transition: transform 0.15s ease;
+}
+
+.classroom-assignment-toggle[aria-checked="true"] .classroom-assignment-toggle-track {
+  background: var(--color-bank-positive);
+}
+
+.classroom-assignment-toggle[aria-checked="true"] .classroom-assignment-toggle-thumb {
+  transform: translateX(14px);
+}
+
+.classroom-assignment-toggle:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
+
+.classroom-assignment-item-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+}
+
+.classroom-assignment-names {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-content: start;
+  gap: 6px 12px;
+  min-height: 0;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 0 0 0 var(--radius-btn);
+  overflow: hidden;
+  list-style: none;
+}
+
+.classroom-assignment-item.is-expanded {
+  height: auto;
+}
+
+.classroom-assignment-item.is-expanded .classroom-assignment-names {
+  overflow: visible;
+}
+
+.classroom-assignment-expand {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: center;
+  margin-top: 4px;
+  padding: 2px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.classroom-assignment-expand:hover {
+  color: var(--color-accent);
+}
+
+.classroom-assignment-expand:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.classroom-assignment-expand svg {
+  transition: transform 0.15s ease;
+}
+
+.classroom-assignment-expand[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.classroom-assignment-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.classroom-assignment-name .morning-list-num {
+  min-width: 22px;
+}
+
+@media (max-width: 960px) {
+  .classroom-assignments-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .classroom-assignments-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .classroom-assignment-item {
+    height: auto;
+    min-height: 168px;
+  }
+}
+
+/* ── 보관함 드로어 (2026-08-12) ───────────────────────────────────── */
+
+.classroom-archive-open {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.classroom-archive-open:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.classroom-archive-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal-top, 2147483600);
+  display: grid;
+  justify-items: end;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.classroom-archive-drawer {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: min(380px, 100%);
+  height: 100%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.classroom-archive-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 56px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.classroom-archive-header h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.classroom-archive-empty {
+  margin: 0;
+  padding: 24px 16px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.classroom-archive-list {
+  display: grid;
+  align-content: start;
+  margin: 0;
+  padding: 0 16px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.classroom-archive-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.classroom-archive-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.classroom-archive-title-line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.classroom-archive-title-line strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.classroom-archive-meta {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.classroom-archive-restore {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  justify-self: end;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.classroom-archive-restore:hover {
+  border-color: var(--color-bank-positive);
+  color: var(--color-bank-positive);
+}
+
+.classroom-archive-restore:disabled {
+  opacity: 0.55;
+  cursor: default;
+}

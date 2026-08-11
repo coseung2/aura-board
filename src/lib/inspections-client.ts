@@ -152,7 +152,15 @@ export type MorningMissingAssignment = {
 };
 export type MorningMissingAssignmentBoard = {
   student: StudentRef;
-  boards: Array<{ id: string; title: string; dueDate: string | null }>;
+  boards: Array<{
+    id: string;
+    title: string;
+    dueDate: string | null;
+    /** "board" = 과제 보드 슬롯, "section" = 주제별 보드 섹션 과제. */
+    kind: "board" | "section";
+    /** 섹션 과제가 속한 보드 이름 (kind="board"면 null). 파란 라벨로 표시. */
+    boardName: string | null;
+  }>;
 };
 
 

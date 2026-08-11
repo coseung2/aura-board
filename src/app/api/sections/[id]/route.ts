@@ -20,6 +20,7 @@ const PatchSectionSchema = z.object({
   pinned: z.boolean().optional(),
   assignmentPublishedAt: z.coerce.date().nullable().optional(),
   assignmentReminderSentAt: z.coerce.date().nullable().optional(),
+  assignmentArchivedAt: z.coerce.date().nullable().optional(),
   activityTemplate: ActivityTemplateSchema.nullable().optional(),
   activityTemplateState: z
     .object({
@@ -87,6 +88,9 @@ export async function PATCH(
     }
     if (input.assignmentReminderSentAt !== undefined) {
       data.assignmentReminderSentAt = input.assignmentReminderSentAt;
+    }
+    if (input.assignmentArchivedAt !== undefined) {
+      data.assignmentArchivedAt = input.assignmentArchivedAt;
     }
     if (input.activityTemplate !== undefined) {
       data.activityTemplate = input.activityTemplate;

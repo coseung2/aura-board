@@ -168,6 +168,8 @@ export async function GET(
           id: slot.boardId,
           title: slot.boardTitle,
           dueDate: slot.boardDeadline ? slot.boardDeadline.toISOString() : null,
+          kind: "board" as const,
+          boardName: null,
         }));
       if (entries.length === 0) return null;
       return { student, boards: entries };
@@ -183,6 +185,8 @@ export async function GET(
           id: section.sectionId,
           title: section.sectionTitle + ' (' + section.boardTitle + ')',
           dueDate: section.publishedAt,
+          kind: "section" as const,
+          boardName: section.boardTitle,
         }));
       if (entries.length === 0) return null;
       return { student, boards: entries };
@@ -334,6 +338,7 @@ async function loadSectionAssignmentStatus(
   const sections = await db.section.findMany({
     where: {
       assignmentPublishedAt: { not: null },
+      assignmentArchivedAt: null,
       board: {
         classroomId,
         layout: "columns",
@@ -365,6 +370,7 @@ async function loadSectionAssignmentStatus(
       }
     }
     return {
+      kind: "section" as const,
       sectionId: section.id,
       sectionTitle: section.title,
       boardId: section.board.id,
@@ -400,6 +406,7 @@ async function loadAssignmentSlotStatus(
       board: {
         classroomId,
         layout: "assignment",
+        assignmentArchivedAt: null,
         // deadline 이 없거나 (null) 아직 지나지 않은 보드만 활성으로 본다.
         OR: [{ assignmentDeadline: null }, { assignmentDeadline: { lt: tomorrow } }],
       },
@@ -412,6 +419,7 @@ async function loadAssignmentSlotStatus(
     },
   }).then((rows) =>
     rows.map((row) => ({
+      kind: "board" as const,
       boardId: row.boardId,
       boardTitle: row.board.title,
       boardDeadline: row.board.assignmentDeadline,

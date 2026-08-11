@@ -14,6 +14,15 @@ export type ClassroomMorningDashboardProps = {
   showToolbar?: boolean;
 };
 
+export type MorningAssignmentSection = {
+  id: string;
+  /** "check" = 체크 과제(제출 체크), "board" = 과제 보드/섹션 과제. */
+  kind: "check" | "board";
+  title: string;
+  dueDate: string | null;
+  students: Array<{ id: string; name: string; number: number | null }>;
+};
+
 export type RoleTab = "cleaning" | "shoe";
 const ROLE_TABS: readonly RoleTab[] = ["cleaning", "shoe"];
 export const MORNING_ROSTER_COLUMNS = 4;
@@ -296,18 +305,14 @@ export function useClassroomMorningDashboard({
   const assignmentSections = summary
     ? [
         ...summary.missingAssignments.reduce<
-          Array<{
-            id: string;
-            title: string;
-            dueDate: string | null;
-            students: MorningSummary["missingAssignments"][number]["student"][];
-          }>
+          MorningAssignmentSection[]
         >((sections, item) => {
           for (const task of item.tasks) {
             let section = sections.find((candidate) => candidate.id === task.id);
             if (!section) {
               section = {
                 id: task.id,
+                kind: "check",
                 title: task.title,
                 dueDate: task.dueDate,
                 students: [],
@@ -319,18 +324,14 @@ export function useClassroomMorningDashboard({
           return sections;
         }, []),
         ...summary.missingAssignmentBoards.reduce<
-          Array<{
-            id: string;
-            title: string;
-            dueDate: string | null;
-            students: MorningSummary["missingAssignments"][number]["student"][];
-          }>
+          MorningAssignmentSection[]
         >((sections, item) => {
           for (const board of item.boards) {
             let section = sections.find((candidate) => candidate.id === board.id);
             if (!section) {
               section = {
                 id: board.id,
+                kind: "board",
                 title: board.title,
                 dueDate: board.dueDate,
                 students: [],
