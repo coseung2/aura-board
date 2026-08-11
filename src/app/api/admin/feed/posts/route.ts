@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { isAdminEmail } from "@/lib/admin-auth";
+import { ADMIN_EMAIL } from "@/lib/admin-auth";
 import { logAudit } from "@/lib/audit";
 import { getCurrentUser } from "@/lib/auth";
 import { createFeedPost } from "@/lib/feed/repository";
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  if (!isAdminEmail(user.email)) {
+  if (user.email.toLowerCase() !== ADMIN_EMAIL) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
