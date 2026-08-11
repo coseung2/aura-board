@@ -49,10 +49,20 @@ export async function resolvePlayActor(): Promise<PlayActor> {
   throw new PlayAccessError(401, "unauthorized");
 }
 
-export async function resolvePlayActorForBoard(boardId: string): Promise<{
+type ClassroomBoardActorOptions = {
+  notFoundCode: string;
+  requiredLayout?: string;
+};
+
+type ClassroomBoardActor = {
   actor: PlayActor;
   board: { id: string; classroomId: string };
-}> {
+};
+
+async function resolveClassroomBoardActor(
+  boardId: string,
+  options: ClassroomBoardActorOptions,
+): Promise<ClassroomBoardActor> {
   const actor = await resolvePlayActor();
   const board = await db.board.findUnique({
     where: { id: boardId },
@@ -63,8 +73,12 @@ export async function resolvePlayActorForBoard(boardId: string): Promise<{
       classroom: { select: { teacherId: true } },
     },
   });
-  if (!board || board.layout !== "omok" || !board.classroomId) {
-    throw new PlayAccessError(404, "play_board_not_found");
+  if (
+    !board ||
+    !board.classroomId ||
+    (options.requiredLayout && board.layout !== options.requiredLayout)
+  ) {
+    throw new PlayAccessError(404, options.notFoundCode);
   }
 
   if (actor.role === "host") {
@@ -89,44 +103,22 @@ export async function resolvePlayActorForBoard(boardId: string): Promise<{
   };
 }
 
-/** Song-guess is a board-owned play surface but has no UI layout dependency. */
-export async function resolveSongGuessActorForBoard(boardId: string): Promise<{
-  actor: PlayActor;
-  board: { id: string; classroomId: string };
-}> {
-  const actor = await resolvePlayActor();
-  const board = await db.board.findUnique({
-    where: { id: boardId },
-    select: {
-      id: true,
-      classroomId: true,
-      classroom: { select: { teacherId: true } },
-    },
+export async function resolvePlayActorForBoard(
+  boardId: string,
+): Promise<ClassroomBoardActor> {
+  return resolveClassroomBoardActor(boardId, {
+    notFoundCode: "play_board_not_found",
+    requiredLayout: "omok",
   });
-  if (!board || !board.classroomId) {
-    throw new PlayAccessError(404, "song_guess_board_not_found");
-  }
+}
 
-  if (actor.role === "host") {
-    const member = await db.boardMember.findFirst({
-      where: {
-        boardId,
-        userId: actor.userId ?? "",
-        role: { in: ["owner", "editor"] },
-      },
-      select: { id: true },
-    });
-    if (board.classroom?.teacherId !== actor.userId && !member) {
-      throw new PlayAccessError(403, "forbidden");
-    }
-  } else if (actor.classroomId !== board.classroomId) {
-    throw new PlayAccessError(403, "forbidden");
-  }
-
-  return {
-    actor,
-    board: { id: board.id, classroomId: board.classroomId },
-  };
+/** Song-guess is a board-owned play surface but has no UI layout dependency. */
+export async function resolveSongGuessActorForBoard(
+  boardId: string,
+): Promise<ClassroomBoardActor> {
+  return resolveClassroomBoardActor(boardId, {
+    notFoundCode: "song_guess_board_not_found",
+  });
 }
 
 export async function loadSongGuessTeacherBoard(boardId: string) {
