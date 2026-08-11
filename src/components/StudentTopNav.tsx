@@ -80,6 +80,7 @@ export function StudentTopNav({
     (rawBoardCategory === "records" ||
       (rawBoardCategory === "play" && boardPlayTab === "records"));
 
+  const feedActive = pathMatches(pathname, "/student/feed");
   const petActive = pathMatches(pathname, "/student/aura-pet");
   const petMineActive =
     pathname === "/student/aura-pet" &&
@@ -104,6 +105,13 @@ export function StudentTopNav({
       label: "홈",
       href: "/student",
       active: homeActive,
+      groups: [],
+    },
+    {
+      id: "feed",
+      label: "피드",
+      href: "/student/feed",
+      active: feedActive,
       groups: [],
     },
     {

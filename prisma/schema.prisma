@@ -132,6 +132,11 @@ model User {
 
   // UGC safety (App Store guideline 1.2).
   contentReportsResolved ContentReport[] @relation("ContentReportResolver")
+
+  // SNS-style feed publication foundation.
+  feedPostsAuthored         FeedPost[]
+  feedPublicationsPublished FeedPublication[]
+  feedPoolEntriesCreated    FeedPoolEntry[]
 }
 
 // ???????? Audit Log (Seed 14 security, 2026-04-22) ????????
@@ -601,6 +606,8 @@ model Classroom {
   // UGC safety (App Store guideline 1.2).
   contentReports ContentReport[]
 
+  feedPublications FeedPublication[]
+
   @@index([teacherId])
   @@index([code])
 }
@@ -760,10 +767,106 @@ model Student {
   // Global daily banner submissions.
   dailyBannerSubmissions DailyBannerSubmission[] @relation("DailyBannerSubmissionStudent")
 
+  // SNS-style feed publication foundation.
+  feedPostsAuthored         FeedPost[]
+  feedPublicationsPublished FeedPublication[]
+
   @@unique([classroomId, number])
   @@index([classroomId])
   @@index([qrToken])
   @@index([textCode])
+}
+
+// SNS-style feed content is stored once and distributed through publication
+// references. Database CHECK constraints and the scope-specific partial unique
+// indexes live in 20260812003000_add_feed_publications/migration.sql because
+// Prisma 6 cannot represent those PostgreSQL constraints directly.
+model FeedPost {
+  id String @id
+
+  authorKind        String
+  authorDisplayName String
+  authorUserId      String?
+  authorStudentId   String?
+
+  title String?
+  body  String?
+
+  status  String @default("PUBLISHED")
+  version Int    @default(1)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  authorUser    User?    @relation(fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorStudent Student? @relation(fields: [authorStudentId], references: [id], onDelete: SetNull)
+
+  media        FeedPostMedia[]
+  publications FeedPublication[]
+  poolEntry    FeedPoolEntry?
+
+  @@index([status, createdAt(sort: Desc)])
+}
+
+model FeedPostMedia {
+  id String @id
+
+  postId         String
+  kind           String
+  url            String
+  youtubeVideoId String?
+  altText        String?
+  position       Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  post FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, position])
+}
+
+model FeedPublication {
+  id String @id
+
+  postId      String
+  scope       String
+  classroomId String?
+  status      String @default("ACTIVE")
+
+  publishedByUserId    String?
+  publishedByStudentId String?
+  publishedAt          DateTime @default(now())
+  removedAt            DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  post               FeedPost   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  classroom          Classroom? @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  publishedByUser    User?      @relation(fields: [publishedByUserId], references: [id], onDelete: SetNull)
+  publishedByStudent Student?   @relation(fields: [publishedByStudentId], references: [id], onDelete: SetNull)
+
+  // The migration owns partial uniqueness for GLOBAL(postId) and
+  // CLASSROOM(postId, classroomId); declaring an unconditional @@unique here
+  // would incorrectly strengthen the database invariant.
+  @@index([scope, status, publishedAt(sort: Desc), id(sort: Desc)])
+  @@index([classroomId, status, publishedAt(sort: Desc), id(sort: Desc)])
+}
+
+model FeedPoolEntry {
+  postId String @id
+
+  status          String @default("AVAILABLE")
+  createdByUserId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  post          FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  createdByUser User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt(sort: Desc)])
 }
 
 // A student-submitted marquee text or image waiting for the submitting

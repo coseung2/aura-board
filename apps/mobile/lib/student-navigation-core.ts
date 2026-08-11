@@ -48,6 +48,7 @@ export const studentBaseNavTargets: StudentNavTarget[] = [
 ];
 
 export const studentOptionalNavTargets: StudentNavTarget[] = [
+  { id: "feed", label: "피드", emoji: "▣", href: "/(student)/feed", pathname: "/feed" },
   { id: "portfolio", label: "포트폴리오", emoji: "▤", href: "/(student)/portfolio", pathname: "/portfolio" },
   { id: "wallet", label: "은행", emoji: "💳", href: "/(student)/wallet", pathname: "/wallet" },
   { id: "notifications", label: "알림", emoji: "🔔", href: "/(student)/notifications", pathname: "/notifications" },

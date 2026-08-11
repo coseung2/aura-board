@@ -8,6 +8,7 @@ import {
   Footprints,
   Home,
   Landmark,
+  MessageSquare,
   MoreHorizontal,
   PawPrint,
   PiggyBank,
@@ -19,6 +20,7 @@ import type { StudentNavTarget } from "./student-navigation-core";
 
 const targetIcons: Record<string, LucideIcon> = {
   home: Home,
+  feed: MessageSquare,
   boards: Presentation,
   portfolio: FolderOpen,
   reading: BookOpen,
