@@ -4,7 +4,7 @@ import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentStudentIdentityRaw } from "@/lib/student-auth";
 import { getBoardRole } from "@/lib/rbac";
 import type { SpeedGameWire } from "@/components/speed-game/types";
 import {
@@ -55,9 +55,10 @@ export async function authenticateGameViewer(
   const user = await getCurrentUser().catch(() => null);
   if (user) {
     const role = await getBoardRole(boardId, user.id);
-    if (role) return { kind: "teacher", userId: user.id, role };
+    if (!role) return { kind: "unauthorized" };
+    return { kind: "teacher", userId: user.id, role };
   }
-  const student = await getCurrentStudent();
+  const student = await getCurrentStudentIdentityRaw();
   if (student) {
     const board = await db.board.findUnique({
       where: { id: boardId },
