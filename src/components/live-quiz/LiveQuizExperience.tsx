@@ -9,10 +9,10 @@ import {
 
 import {
   estimateServerOffsetMs,
+  createLiveQuizCounterAccumulator,
   liveQuizBoundaryTarget,
-  liveQuizCounterKey,
+  mergeLiveQuizCounterShard,
   mergeCachedLiveQuizAnswerCount,
-  mergeLiveQuizAnswerCount,
   parseLiveQuizRealtimeCounter,
 } from "@/lib/live-quiz/client-sync";
 import type {
@@ -61,7 +61,8 @@ export function LiveQuizExperience({
     useState<OptimisticAnswer | null>(null);
   const stateRequestInFlightRef = useRef(false);
   const stateRefreshQueuedRef = useRef(false);
-  const realtimeAnswerCountsRef = useRef(new Map<string, number>());
+  const realtimeCountersRef = useRef(createLiveQuizCounterAccumulator());
+  const counterRenderFrameRef = useRef<number | null>(null);
   const boundaryRefreshKeyRef = useRef<string | null>(null);
 
   const loadState = useCallback(async (silent = false) => {
@@ -88,7 +89,7 @@ export function LiveQuizExperience({
         setState(
           mergeCachedLiveQuizAnswerCount(
             body,
-            realtimeAnswerCountsRef.current,
+            realtimeCountersRef.current.totals,
           ),
         );
         const nextServerOffsetMs = estimateServerOffsetMs(
@@ -169,9 +170,44 @@ export function LiveQuizExperience({
     const client = getLiveQuizRealtimeClient();
     if (!client) return;
 
-    realtimeAnswerCountsRef.current.clear();
+    realtimeCountersRef.current = createLiveQuizCounterAccumulator();
+    let cancelled = false;
     let hasSubscribed = false;
     let needsReconnectSync = false;
+    const reconcileCounterState = () => {
+      if (cancelled) return;
+      if (counterRenderFrameRef.current !== null) return;
+      counterRenderFrameRef.current = window.requestAnimationFrame(() => {
+        counterRenderFrameRef.current = null;
+        if (cancelled) return;
+        setState((current) =>
+          current
+            ? mergeCachedLiveQuizAnswerCount(
+                current,
+                realtimeCountersRef.current.totals,
+              )
+            : current,
+        );
+      });
+    };
+    const seedCounterSnapshot = async () => {
+      const { data, error } = await client
+        .from("LiveQuizQuestionCounterShard")
+        .select("sessionKey,questionId,shard,answerCount")
+        .eq("sessionKey", sessionKey);
+      if (cancelled) return;
+      if (error) {
+        void loadState(true);
+        return;
+      }
+      for (const row of data ?? []) {
+        const counter = parseLiveQuizRealtimeCounter(row);
+        if (counter) {
+          mergeLiveQuizCounterShard(counter, realtimeCountersRef.current);
+        }
+      }
+      reconcileCounterState();
+    };
     const channel = client
       .channel(`live-quiz:${sessionKey}:${realtimeChannelSuffix()}`)
       .on(
@@ -183,6 +219,7 @@ export function LiveQuizExperience({
           filter: `sessionKey=eq.${sessionKey}`,
         },
         () => {
+          if (cancelled) return;
           void loadState(true);
         },
       )
@@ -191,39 +228,28 @@ export function LiveQuizExperience({
         {
           event: "*",
           schema: "public",
-          table: "LiveQuizQuestionCounter",
+          table: "LiveQuizQuestionCounterShard",
           filter: `sessionKey=eq.${sessionKey}`,
         },
         (payload) => {
+          if (cancelled) return;
           const counter = parseLiveQuizRealtimeCounter(payload.new);
           if (!counter || counter.sessionKey !== sessionKey) return;
 
-          const counterKey = liveQuizCounterKey(
-            counter.sessionKey,
-            counter.questionId,
-          );
-          const previousCount = realtimeAnswerCountsRef.current.get(counterKey);
-          if (
-            previousCount === undefined ||
-            counter.answerCount > previousCount
-          ) {
-            realtimeAnswerCountsRef.current.set(
-              counterKey,
-              counter.answerCount,
-            );
-          }
-          setState((current) =>
-            current ? mergeLiveQuizAnswerCount(current, counter) : current,
-          );
+          mergeLiveQuizCounterShard(counter, realtimeCountersRef.current);
+          reconcileCounterState();
         },
       )
       .subscribe((status) => {
+        if (cancelled) return;
         if (status === "SUBSCRIBED") {
-          const shouldReconcile = !hasSubscribed || needsReconnectSync;
+          const reconnecting = needsReconnectSync;
+          const shouldReconcile = !hasSubscribed || reconnecting;
           hasSubscribed = true;
           needsReconnectSync = false;
           if (shouldReconcile) {
-            void loadState(true);
+            void seedCounterSnapshot();
+            if (reconnecting) void loadState(true);
           }
           return;
         }
@@ -237,6 +263,11 @@ export function LiveQuizExperience({
       });
 
     return () => {
+      cancelled = true;
+      if (counterRenderFrameRef.current !== null) {
+        window.cancelAnimationFrame(counterRenderFrameRef.current);
+        counterRenderFrameRef.current = null;
+      }
       void client.removeChannel(channel);
     };
   }, [loadState, state?.sessionKey]);

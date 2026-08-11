@@ -1,0 +1,616 @@
+/* -------- Modal -------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 100;
+  animation: fadeIn 150ms ease;
+  /* Center non-positioned children. Modals with their own position:fixed
+     (.add-card-modal 등) are in a separate containing block and unaffected. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  overflow-y: auto;
+}
+
+.add-card-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 520px;
+  max-width: var(--modal-max);
+  max-height: calc(100dvh - 64px);
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.18),
+    0 8px 24px rgba(0, 0, 0, 0.1);
+  z-index: 101;
+  animation: modalIn 200ms ease;
+}
+
+/* Card detail lightbox — 2-column near-fullscreen layout:
+   left = media (image/iframe, fills pane, contain-fit),
+   right = narrow side panel (title + content + link + author). */
+.card-detail-modal {
+  width: min(1400px, calc(100vw - 48px));
+  /* dvh (dynamic viewport) so Chrome Android's address-bar resize
+     doesn't leave the modal taller than the visible viewport. */
+  height: calc(100dvh - 48px);
+  max-width: calc(100vw - 48px);
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  --card-detail-corner-inset: 14px;
+}
+
+/* The visual card surface. Navigation arrows live outside this frame so
+   they are not clipped by the modal border-radius / overflow. */
+.card-detail-frame {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+/* refined-icons (2026-04-26): 모든 버튼 내부에 SVG (currentColor stroke)
+   를 사용하므로 font-size/line-height 글리프 metric 의존 제거. flex
+   center 만으로 픽셀 단위 완벽 정렬. */
+.card-detail-close {
+  top: var(--card-detail-corner-inset);
+  right: var(--card-detail-corner-inset);
+}
+
+/* Fullscreen toggle — bottom-right for presentation mode. */
+.card-detail-fullscreen {
+  right: var(--card-detail-corner-inset);
+  bottom: var(--card-detail-corner-inset);
+  color: var(--color-text);
+}
+.card-detail-fullscreen:hover {
+  transform: scale(1.06);
+}
+
+.card-detail-nav {
+  position: fixed;
+  top: 50%;
+  z-index: 102;
+  --ui-icon-action-size: 48px;
+  --card-detail-nav-half: 24px;
+  --card-detail-nav-gap: 16px;
+  --card-detail-nav-min-center: calc(var(--card-detail-nav-half) + 8px);
+  --card-detail-nav-modal-half: 700px;
+  --card-detail-nav-edge: max(24px, calc(50vw - var(--card-detail-nav-modal-half)));
+  --card-detail-nav-center: max(
+    var(--card-detail-nav-min-center),
+    calc(
+      var(--card-detail-nav-edge) - var(--card-detail-nav-gap) -
+        var(--card-detail-nav-half)
+    )
+  );
+  color: var(--color-text);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-border) 70%, transparent);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
+  backdrop-filter: blur(10px);
+}
+.card-detail-nav[data-detail-layout="text-meta"] {
+  --card-detail-nav-modal-half: 450px;
+}
+.card-detail-nav:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+
+.card-detail-nav-prev {
+  left: var(--card-detail-nav-center);
+  transform: translate(-50%, -50%);
+}
+.card-detail-nav-next {
+  right: var(--card-detail-nav-center);
+  transform: translate(50%, -50%);
+}
+.card-detail-nav-prev:hover:not(:disabled),
+.card-detail-nav-prev:focus-visible:not(:disabled) {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  transform: translate(-50%, -50%) scale(1.04);
+}
+.card-detail-nav-next:hover:not(:disabled),
+.card-detail-nav-next:focus-visible:not(:disabled) {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+  transform: translate(50%, -50%) scale(1.04);
+}
+
+/* When entering the browser fullscreen, the modal becomes the root
+   element — strip all width/height caps + fixed-position offsets so it
+   genuinely fills the screen. Hide the side panel so the presenter sees
+   only the media. Close + fullscreen-toggle buttons fade
+   in on hover so they don't distract during presentation. */
+.card-detail-modal[data-fullscreen="true"] {
+  width: 100vw !important;
+  max-width: 100vw !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  top: 0 !important;
+  left: 0 !important;
+  transform: none !important;
+  border-radius: 0 !important;
+  border: none !important;
+}
+.card-detail-modal[data-fullscreen="true"] .card-detail-frame {
+  border-radius: 0;
+}
+.card-detail-modal[data-fullscreen="true"] .card-detail-body {
+  flex: 1 1 auto;
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+.card-detail-modal[data-fullscreen="true"] .card-detail-rail {
+  display: none;
+}
+.card-detail-modal[data-has-media="false"] .card-detail-fullscreen {
+  display: none;
+}
+.card-detail-modal[data-fullscreen="true"][data-has-media="true"]
+  .card-detail-main {
+  display: flex;
+  min-height: 0;
+}
+.card-detail-modal[data-fullscreen="true"][data-has-media="true"]
+  .card-detail-content-zone {
+  display: none;
+}
+.card-detail-modal[data-fullscreen="true"][data-has-media="true"]
+  .card-detail-media {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  max-height: none;
+}
+.card-detail-modal[data-fullscreen="true"]
+  .card-detail-media
+  .card-canva-slot-frame {
+  min-height: 100vh;
+}
+.card-detail-modal[data-fullscreen="true"] .card-detail-close,
+.card-detail-modal[data-fullscreen="true"] .card-detail-fullscreen {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.card-detail-modal[data-fullscreen="true"]:hover .card-detail-close,
+.card-detail-modal[data-fullscreen="true"]:hover .card-detail-fullscreen {
+  opacity: 1;
+}
+
+.card-detail-body {
+  display: grid;
+  /* 1-column + right rail (2026-06-13): 좌측 main = media + 텍스트/다운로드,
+     우측 rail = meta + engagement. rail은 220px 고정, main은 나머지. */
+  grid-template-columns: 1fr 280px;
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.card-detail-media {
+  position: relative;
+  background: var(--color-surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+}
+
+.card-detail-media-link {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid rgba(204, 220, 232, 0.9);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--color-primary, #097fe8);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+  box-shadow: 0 10px 24px rgba(11, 31, 45, 0.18);
+}
+
+.card-detail-media-link:hover {
+  background: #fff;
+  border-color: var(--color-primary, #097fe8);
+}
+
+/* Without this, .card-attachments collapses to its min-content (~67px)
+   because flex items default to flex-grow:0/flex-basis:auto. The
+   width:100% on .card-canva-slot then has nothing to fill against. */
+.card-detail-media .card-attachments {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  /* card-file-attachment (2026-04-20): 파일/문서 카드 뒤로 모달 다크
+     배경(#0b0b0d)이 비쳐보이던 증상. 첨부 컨테이너 자체에 밝은 배경 +
+     패딩을 주어 파일 카드가 정상 대비로 읽힘. 이미지/비디오는 기존과
+     동일하게 중앙 정렬되어 렌더되며, 라이트박스 필요한 경우는 상세 모달
+     자체가 아닌 별도 뷰어가 담당. */
+  background: var(--color-surface);
+  padding: 16px;
+  overflow-y: auto;
+  align-self: stretch;
+}
+
+/* Link-only cards use the saved preview image as the main modal content.
+   The board card keeps its compact preview, but the detail modal should let
+   the thumbnail occupy the available viewing pane. */
+.card-detail-media .card-link-preview {
+  width: min(100%, 980px);
+  /* height는 더 이상 min(100%, 760px) 강제 안 함 — 같은 컨테이너에 영상/이미지가
+     같이 있을 때 형제(flex item)의 height 압축에 쫓겨 link-preview-image가
+     컴팩트(112px)로 줄어드는 증상 방지. flex-shrink:0 + min-height로 자연
+     높이를 보장하고 컨테이너가 모자라면 scroll. */
+  flex: 0 0 auto;
+  min-height: 280px;
+  margin: auto;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow: hidden;
+}
+.card-detail-media .card-link-preview:hover {
+  box-shadow: var(--shadow-card-hover);
+}
+.card-detail-media .card-link-preview-image {
+  width: 100%;
+  flex: 1 1 auto;
+  /* min-height:0 → flex item이 컨텐츠보다 작게 압축 가능했던 게 컴팩트 잘림의
+     직접 원인. min-height로 자연 높이를 보장. */
+  min-height: 200px;
+  height: auto;
+  max-height: none;
+  background: var(--color-bg);
+}
+.card-detail-media .card-link-preview-image img {
+  object-fit: contain;
+  background: var(--color-bg);
+}
+.card-detail-media .card-link-preview-body {
+  flex: 0 0 auto;
+  display: flex;
+  padding: 14px 16px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.card-detail-media .card-link-preview-title {
+  font-size: 15px;
+  line-height: 1.35;
+}
+.card-detail-media .card-link-preview-url {
+  font-size: 12px;
+}
+.card-detail-media .card-attachment-image,
+.card-detail-media img:not(.emoji) {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+/* Twemoji 이모지(📥 다운로드 아이콘 등) 는 위 광범위 규칙에 말려 거대해짐.
+   이모지는 항상 글자 크기로 되돌린다. */
+.card-detail-media img.emoji {
+  width: 1em;
+  height: 1em;
+  max-width: 1em;
+  max-height: 1em;
+  object-fit: initial;
+  display: inline-block;
+  vertical-align: -0.1em;
+}
+
+/* 여러 파일/이미지가 쌓여 모달이 비대해지는 것 방지 — 첨부별 상한.
+   media-attach-carousel (2026-06-12): 항목 ≥ 2 일 때 .card-attachments 안에서
+   carousel 컨테이너로 감싸 렌더되므로 column 방향은 그대로. carousel 자체는
+   미디어 영역(검은 배경)을 꽉 채움. */
+.card-detail-media .card-attachments {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+/* media-attach-carousel (2026-06-12): 슬라이드 컨테이너. 검은 미디어
+   영역을 그대로 사용. arrow는 콘텐츠 중단 좌우에 글리프만(박스 없음),
+   indicator는 콘텐츠 자체 정중앙 하단 — viewport를 relative 기준점으로
+   삼아 콘텐츠가 그려진 박스 기준 가운데에 떠 있도록 함. */
+.card-attach-carousel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  flex: 1;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-attach-carousel-viewport {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.card-attach-carousel-viewport > * {
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* carousel 내 이미지는 부모가 viewport이므로 .is-detail 의 max-height:
+   70vh 가 오히려 슬라이드를 작게 만들 수 있어 object-fit 으로 컨테인.
+   기존 detail 단일 표시(.card-detail-media .card-attach-image.is-detail)엔
+   영향 없도록 carousel 스코프 안에서만 덮어씀. */
+.card-attach-carousel-viewport .card-attach-image.is-detail {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.card-attach-carousel-viewport .card-attach-image.is-detail img {
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+}
+
+.card-attach-carousel-viewport .card-attach-video {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-attach-carousel-viewport .card-attach-video iframe,
+.card-attach-carousel-viewport .card-attach-video video {
+  width: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+}
+
+.card-attach-carousel-viewport .card-attach-file-wrap {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 24px;
+  color: #f5f5f5;
+}
+
+.card-attach-carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #fff;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 6;
+  width: 48px;
+  height: 64px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  user-select: none;
+  opacity: 1;
+  box-shadow: none;
+  text-shadow: 0 1px 3px rgba(15, 23, 42, 0.55);
+  transition:
+    opacity 120ms ease,
+    transform 120ms ease;
+}
+
+.card-attach-carousel-arrow:hover,
+.card-attach-carousel-arrow:focus-visible {
+  opacity: 0.78;
+  transform: translateY(-50%) scale(1.04);
+  outline: none;
+}
+
+.card-attach-carousel-arrow:active {
+  transform: translateY(-50%) scale(0.98);
+}
+
+.card-attach-carousel-arrow-prev {
+  left: 18px;
+}
+
+.card-attach-carousel-arrow-next {
+  right: 18px;
+}
+
+.card-detail-media .card-attach-carousel-arrow {
+  background: transparent;
+  color: #fff;
+  mix-blend-mode: difference;
+  text-shadow: none;
+}
+
+.card-detail-media .card-attach-carousel-arrow:hover,
+.card-detail-media .card-attach-carousel-arrow:focus-visible {
+  background: transparent;
+}
+
+.card-attach-carousel-indicator {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.card-attach-carousel-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(7, 18, 28, 0.62);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
+  pointer-events: auto;
+  backdrop-filter: blur(8px);
+}
+
+.card-attach-carousel-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 0;
+  transition:
+    background 120ms ease,
+    transform 120ms ease;
+}
+
+.card-attach-carousel-dot.is-active {
+  background: #fff;
+  transform: scale(1.15);
+}
+
+@media (max-width: 640px) {
+  .card-attach-carousel-arrow {
+    width: 44px;
+    height: 56px;
+  }
+
+  .card-attach-carousel-arrow-prev {
+    left: 10px;
+  }
+
+  .card-attach-carousel-arrow-next {
+    right: 10px;
+  }
+}
+
+/* detail 모드 이미지는 OptimizedImage(fill)가 아니라 plain <img> 로 렌더됨.
+   원본 비율 보존 + 70vh 상한. 클릭 시 라이트박스 오픈. 컨테이너 스코프
+   없이 적용해서 카드 상세 모달뿐 아니라 포트폴리오 모달 등 다른 컨테이너
+   안에서도 동일하게 동작. */
+.card-attach-image.is-detail {
+  flex: 0 0 auto;
+  width: 100%;
+  max-height: none;
+  display: flex;
+  justify-content: center;
+  background: transparent;
+  position: relative;
+}
+
+.card-attach-image.is-detail img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.card-attach-image.is-detail img.is-clickable {
+  cursor: zoom-in;
+  transition: transform 120ms ease-out;
+}
+
+.card-attach-image.is-detail img.is-clickable:hover {
+  transform: scale(1.01);
+}
+
+.card-detail-media .card-attach-file,
+.card-detail-media .card-attach-file-wrap {
+  flex: 0 0 auto;
+  width: 100%;
+}
+
+/* Detail modal video sizing — override card-body limits (max-height:180px
+   from card.css) so videos fill the available media pane with natural
+   aspect ratio, matching how .card-attach-image.is-detail images behave.
+   YouTube iframes get full width + 16:9 ratio, uploaded videos keep
+   their encoded aspect via object-fit. Both constrained to 70vh max to
+   prevent excessive height in the scrolling column. */
+.card-detail-media .card-attach-video {
+  flex: 0 0 auto;
+  width: 100%;
+  max-height: 100%;
+  display: flex;
+  justify-content: center;
+  background: var(--color-surface);
+}
+
+.card-detail-media .card-attach-video > iframe,
+.card-detail-media .card-attach-video > video {
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  aspect-ratio: auto 16 / 9;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.card-detail-media .card-attach-video > video {
+  max-height: 70vh;
+}

@@ -1,0 +1,608 @@
+/* =====================================================
+   Teacher plant dashboard — design-system aligned summary
+   ===================================================== */
+
+/* ── Teacher summary hero ── */
+.plant-hero {
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 24px;
+  color: var(--color-text);
+  margin-bottom: 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  box-shadow: var(--shadow-card);
+}
+.plant-hero h1 {
+  font-size: var(--text-display-size);
+  font-weight: var(--text-display-weight);
+  letter-spacing: var(--text-display-ls);
+  line-height: 1.2;
+  margin: 0;
+}
+.plant-hero p {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  margin: 6px 0 0;
+}
+.plant-hero-actions {
+  display: flex;
+  gap: 10px;
+  flex-shrink: 0;
+}
+@media (max-width: 640px) {
+  .plant-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+  }
+  .plant-hero-actions {
+    width: 100%;
+  }
+  .plant-hero-actions .ds-btn-primary,
+  .plant-hero-actions .ds-btn-secondary {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+.plant-summary-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .plant-summary-actions {
+    width: 100%;
+  }
+
+  .plant-summary-actions .ds-btn-primary,
+  .plant-summary-actions .ds-btn-secondary {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+}
+
+/* ── KPI cards ── */
+.plant-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.plant-kpi-card {
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 18px 20px;
+  box-shadow: var(--shadow-card);
+  transition:
+    box-shadow var(--t-slow),
+    border-color var(--t-slow);
+  position: relative;
+  overflow: hidden;
+  border-left: 3px solid transparent;
+}
+.plant-kpi-card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-card-hover);
+}
+.plant-kpi-card .kpi-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+.plant-kpi-card .kpi-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 8px 0 4px;
+  letter-spacing: -0.5px;
+  line-height: 1;
+}
+.plant-kpi-card .kpi-sub {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.plant-kpi-card .kpi-micro {
+  margin-top: 10px;
+  height: 4px;
+  background: var(--color-surface-alt);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.plant-kpi-card .kpi-micro-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.4s;
+}
+.kpi-tone-plant {
+  border-left-color: var(--color-plant-active);
+}
+.kpi-tone-plant .kpi-value {
+  color: var(--color-plant-active);
+}
+.kpi-tone-plant .kpi-micro-fill {
+  background: var(--color-plant-active);
+}
+.kpi-tone-danger {
+  border-left-color: var(--color-danger);
+}
+.kpi-tone-danger .kpi-value {
+  color: var(--color-danger);
+}
+.kpi-tone-danger .kpi-micro-fill {
+  background: var(--color-danger);
+}
+.kpi-tone-warn {
+  border-left-color: var(--color-warning);
+}
+.kpi-tone-warn .kpi-value {
+  color: #b45309;
+}
+.kpi-tone-warn .kpi-micro-fill {
+  background: var(--color-warning);
+}
+.kpi-tone-info {
+  border-left-color: var(--color-accent);
+}
+.kpi-tone-info .kpi-value {
+  color: var(--color-accent);
+}
+.kpi-tone-info .kpi-micro-fill {
+  background: var(--color-accent);
+}
+@media (max-width: 860px) {
+  .plant-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 560px) {
+  .plant-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Stage distribution bars ── */
+.plant-dist-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  height: 160px;
+  padding: 0 4px;
+}
+.plant-dist-bar-wrap {
+  flex: 1;
+  min-width: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+  justify-content: flex-end;
+}
+.plant-dist-bar {
+  width: 100%;
+  max-width: 36px;
+  border-radius: 6px 6px 3px 3px;
+  background: var(--color-plant-active);
+  opacity: 0.3;
+  transition:
+    height 0.4s,
+    opacity 0.15s;
+  min-height: 4px;
+  position: relative;
+}
+.plant-dist-bar-wrap:hover .plant-dist-bar {
+  opacity: 0.45;
+}
+.plant-dist-count {
+  font-size: 11px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  color: var(--color-text);
+}
+.plant-dist-label {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+/* ── Attention cards ── */
+.plant-attention-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  border: var(--border-card);
+  transition:
+    background var(--t-fast),
+    border-color var(--t-fast);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+.plant-attention-card:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+.plant-attention-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--color-surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+.plant-attention-info {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.plant-attention-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--color-text);
+}
+.plant-attention-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.plant-attention-badge {
+  display: inline-block;
+  font-size: var(--text-badge-size);
+  font-weight: var(--text-badge-weight);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+.plant-attention-badge.stalled {
+  background: var(--color-status-returned-bg);
+  color: var(--color-status-returned-text);
+}
+.plant-attention-badge.active {
+  background: var(--color-status-reviewed-bg);
+  color: var(--color-status-reviewed-text);
+}
+.plant-attention-badge.normal {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+
+.plant-attention-groups {
+  display: grid;
+  gap: 10px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.plant-attention-group {
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.plant-attention-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+.plant-attention-summary span:last-child {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+.plant-attention-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+.plant-attention-empty {
+  margin: 0;
+  padding: 0 12px 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+/* ── Student card grid ── */
+.plant-student-game-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+.plant-student-game-card {
+  display: flex;
+  align-items: center;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  transition: all 0.2s;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  width: 100%;
+}
+.plant-student-game-card:hover {
+  border-color: #95d5b2;
+  box-shadow: 0 4px 16px rgba(45, 106, 79, 0.1);
+  transform: translateY(-2px);
+}
+.plant-student-game-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  margin-right: 14px;
+  background: #edf7ed;
+  flex-shrink: 0;
+}
+.plant-student-game-info {
+  flex: 1;
+  min-width: 0;
+}
+.plant-student-game-name {
+  font-weight: 600;
+  font-size: 14px;
+}
+.plant-student-game-plant {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.plant-student-game-stage {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+.plant-student-game-stage .stage-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.plant-student-game-stage .stage-green {
+  background: #52b788;
+}
+.plant-student-game-stage .stage-yellow {
+  background: #e9c46a;
+}
+.plant-student-game-stage .stage-red {
+  background: #d62828;
+}
+.plant-student-game-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 10px;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+.badge-game-stalled {
+  background: #ffe0e0;
+  color: #d62828;
+}
+.badge-game-ok {
+  background: #e0f5e0;
+  color: #2d6a4f;
+}
+.badge-game-pending {
+  background: #f0f2f5;
+  color: #5b6b7f;
+}
+
+/* ── Matrix preview mini grid ── */
+.plant-matrix-game {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 20px;
+  padding: 24px;
+  margin-top: 28px;
+}
+.plant-matrix-game-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.plant-matrix-game-head h3 {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+.plant-matrix-game-stats {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.plant-matrix-game-stats strong {
+  color: var(--color-text);
+}
+.plant-matrix-game-grid {
+  display: grid;
+  grid-template-columns: 100px repeat(auto-fill, minmax(56px, 1fr));
+  gap: 4px;
+}
+.plant-matrix-game-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  padding: 4px;
+}
+.plant-matrix-game-cell {
+  aspect-ratio: 1;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  cursor: pointer;
+  transition: all 0.12s;
+  border: none;
+  font-family: inherit;
+}
+.plant-matrix-game-cell:hover {
+  transform: scale(1.15);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+.mgc-photo {
+  background: #d8f3dc;
+}
+.mgc-empty {
+  background: #f0f7f0;
+  color: #b8d0c0;
+}
+.mgc-current {
+  box-shadow: inset 0 0 0 2px #52b788;
+}
+.mgc-stale {
+  background: #fef3d9;
+}
+.plant-matrix-game-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+/* ── Board header toggles ── */
+.plant-view-toggle {
+  display: flex;
+  gap: 4px;
+  background: #f0f2f5;
+  border-radius: 12px;
+  padding: 3px;
+}
+.plant-view-toggle button {
+  border: none;
+  background: transparent;
+  padding: 6px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.plant-view-toggle button[data-active="true"] {
+  background: white;
+  color: var(--color-text);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+.plant-view-toggle button:hover:not([data-active="true"]) {
+  color: var(--color-text);
+}
+
+/* ── Dashboard layout ── */
+.plant-dash {
+  display: grid;
+  grid-template-columns: 1.6fr 1fr;
+  gap: 18px;
+  margin-bottom: 24px;
+}
+.plant-panel {
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+.plant-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.plant-panel-head h3 {
+  font-size: var(--text-section-size);
+  font-weight: var(--text-section-weight);
+  margin: 0;
+}
+.plant-panel-eyebrow {
+  font-size: var(--text-micro-size);
+  font-weight: var(--text-micro-weight);
+  color: var(--color-text-muted);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+@media (max-width: 1100px) {
+  .plant-student-hero,
+  .plant-teacher-dashboard-grid,
+  .plant-dash {
+    grid-template-columns: 1fr;
+  }
+  .plant-matrix-layout {
+    grid-template-columns: 1fr;
+  }
+  .plant-matrix-drilldown {
+    position: static;
+  }
+}
+
+@media (max-width: 860px) {
+  .plant-teacher-hero,
+  .plant-matrix-toolbar,
+  .plant-teacher-panel-head,
+  .plant-teacher-table-head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .plant-teacher-kpi-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .plant-roadmap,
+  .plant-teacher,
+  .plant-matrix-shell {
+    padding: 12px;
+  }
+  .plant-student-hero,
+  .plant-teacher-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .plant-hero-main-card,
+  .plant-hero-mission-card,
+  .plant-teacher-hero,
+  .plant-teacher-panel,
+  .plant-matrix-drilldown {
+    border-radius: 16px;
+    padding: 14px;
+  }
+  .plant-teacher-table-tools input,
+  .plant-teacher-table-tools select {
+    width: 100%;
+  }
+}

@@ -1,16 +1,28 @@
+
 "use client";
 
-import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GameLobby } from "@/components/game-platform/GameLobby";
 import { GameExitDialog } from "@/components/game-platform/GameExitDialog";
-import { GameResultPanel } from "@/components/game-platform/GameResultPanel";
 import {
   SPEED_GAME_CHANGED_EVENT,
   speedGameChannelKey,
 } from "@/lib/realtime";
 import type { PublicSupabaseClient } from "@/lib/supabase/client";
-import type { SpeedGameAnswer, SpeedGameWire } from "./types";
+import type { SpeedGameWire } from "./types";
+import {
+  FALLBACK_BASE_DELAY_MS,
+  FALLBACK_MAX_DELAY_MS,
+  answerForRound,
+  type CommandErrorBody,
+  errorMessage,
+  makeRequestId,
+  readJson,
+  type ParticipantAction,
+  type PendingCommand,
+  type RefreshResult,
+  type RunAction,
+} from "./speed-game-board-utils";
+import { SpeedGameTerminalPanel } from "./SpeedGameTerminalPanel";
 
 type Props = {
   boardId: string;
@@ -20,78 +32,6 @@ type Props = {
   currentStudentId: string | null;
   initialGame: SpeedGameWire | null;
 };
-
-type RunAction = "start" | "next" | "finish" | "end-early" | "rematch";
-type ParticipantAction = "join" | "ready" | "forfeit";
-
-type CommandErrorBody = {
-  error?: string;
-  game?: SpeedGameWire;
-};
-
-type PendingCommand = {
-  requestId: string;
-  runId: string;
-  expectedVersion: number;
-  fingerprint: string;
-};
-
-const FALLBACK_BASE_DELAY_MS = 15_000;
-const FALLBACK_MAX_DELAY_MS = 60_000;
-type RefreshResult = "updated" | "failed" | "terminal" | "skipped";
-
-function makeRequestId(prefix: string) {
-  return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-}
-
-function errorMessage(code: string | undefined): string {
-  switch (code) {
-    case "version_conflict":
-      return "다른 기기에서 게임 상태가 바뀌었어요. 최신 상태를 반영했습니다.";
-    case "idempotency_key_reuse":
-      return "이 요청은 다른 내용으로 이미 사용됐어요. 다시 시도해 주세요.";
-    case "not_current_guesser":
-      return "이번 라운드의 답변 순서가 아니에요.";
-    case "already_answered":
-      return "우리 모둠은 이미 답을 제출했어요.";
-    case "participant_not_invited":
-      return "이 게임의 참가자 명단에 없어요.";
-    case "participant_forfeited":
-      return "이미 게임에서 나간 참가자예요.";
-    case "game_not_running":
-    case "round_not_active":
-      return "현재 답을 제출할 수 있는 라운드가 아니에요.";
-    case "already_last_round":
-      return "마지막 라운드예요. 게임을 종료해 주세요.";
-    case "run_not_terminal":
-      return "게임이 끝난 뒤에 다시 시작할 수 있어요.";
-    case "game_already_started":
-      return "게임이 이미 시작되어 준비 상태를 바꿀 수 없어요.";
-    default:
-      return "요청을 처리하지 못했어요. 연결을 확인하고 다시 시도해 주세요.";
-  }
-}
-
-async function readJson<T>(response: Response): Promise<T | null> {
-  return (await response.json().catch(() => null)) as T | null;
-}
-
-function participantState(participant: SpeedGameWire["participants"][number]) {
-  if (participant.forfeitedAt) return "forfeited" as const;
-  if (participant.readyAt) return "ready" as const;
-  if (participant.joinedAt) return "joined" as const;
-  return "invited" as const;
-}
-
-function answerForRound(
-  game: SpeedGameWire,
-  roundId: string,
-  groupId: string,
-): SpeedGameAnswer | undefined {
-  return game.answers.find(
-    (answer) => answer.roundId === roundId && answer.groupId === groupId,
-  );
-}
 
 export function SpeedGameBoard({
   boardId,
@@ -624,22 +564,21 @@ export function SpeedGameBoard({
     [game, viewerKind],
   );
 
-  if (!game) {
-    return (
-      <section className="speed-game-empty" role="status">
-        <h2>스피드게임 준비 중</h2>
-        <p>게임 설정이나 모둠 구성이 아직 완료되지 않았어요.</p>
-      </section>
-    );
-  }
-
-  if (viewerKind === "none") {
-    return (
-      <section className="speed-game-empty" role="alert">
-        <h2>접근할 수 없어요</h2>
-        <p>이 게임을 볼 권한이 없습니다.</p>
-      </section>
-    );
+  const terminalPanel = (
+    <SpeedGameTerminalPanel
+      game={game}
+      viewerKind={viewerKind}
+      busy={busy}
+      reconnecting={reconnecting}
+      error={error}
+      currentParticipant={currentParticipant}
+      currentGroup={currentGroup}
+      onRunAction={mutateRun}
+      onParticipantAction={executeParticipantCommand}
+    />
+  );
+  if (!game || viewerKind === "none" || game.status !== "active") {
+    return terminalPanel;
   }
 
   const pendingAnswers = game.answers.filter((item) => item.correct === null);
@@ -647,109 +586,6 @@ export function SpeedGameBoard({
     currentRound && currentGroup
       ? answerForRound(game, currentRound.id, currentGroup.id)
       : undefined;
-
-  if (game.status === "waiting") {
-    return (
-      <>
-        <GameLobby
-          title="스피드게임 대기실"
-          description="모둠과 순서를 확인하고 준비가 끝나면 게임을 시작하세요."
-          participants={game.participants.map((participant) => ({
-            id: participant.studentId,
-            name: participant.name,
-            state: participantState(participant),
-          }))}
-          actions={
-            <>
-              {viewerKind === "teacher" ? (
-                <button
-                  type="button"
-                  className="speed-game-primary-button"
-                  disabled={busy}
-                  onClick={() => void mutateRun("start")}
-                >
-                  게임 시작
-                </button>
-              ) : null}
-              {viewerKind === "student" && currentParticipant ? (
-                <button
-                  type="button"
-                  className="speed-game-primary-button"
-                  disabled={busy || Boolean(currentParticipant.readyAt)}
-                  onClick={() => void executeParticipantCommand("ready")}
-                >
-                  {currentParticipant.readyAt ? "준비 완료" : "준비하기"}
-                </button>
-              ) : null}
-            </>
-          }
-        />
-        {reconnecting ? (
-          <p className="speed-game-notice" role="status">
-            최신 게임 상태를 다시 확인하고 있어요. 입력은 잠시 잠깁니다.
-          </p>
-        ) : null}
-        {error ? <p className="speed-game-error" role="alert">{error}</p> : null}
-      </>
-    );
-  }
-
-  if (game.status === "finished") {
-    const ownRow = currentGroup
-      ? game.leaderboard.find((row) => row.groupId === currentGroup.id)
-      : null;
-    const ownRank = ownRow
-      ? game.leaderboard.findIndex((row) => row.groupId === ownRow.groupId) + 1
-      : null;
-    return (
-      <GameResultPanel
-        outcome={
-          game.terminalReason === "host_ended"
-            ? "host-ended"
-            : currentParticipant?.forfeitedAt
-              ? "forfeit"
-              : "completed"
-        }
-        score={ownRow?.score ?? null}
-        metrics={[
-          ...(ownRank == null ? [] : [{ label: "모둠 순위", value: `${ownRank}위` }]),
-          { label: "라운드", value: `${game.rounds.length}개` },
-        ]}
-        message={
-          game.terminalReason === "host_ended"
-            ? "진행자가 게임을 종료했습니다. 서버가 확정한 결과만 전적에 기록됩니다."
-            : "게임이 완료되었습니다."
-        }
-        retryAction={
-          viewerKind === "teacher" ? (
-            <button
-              type="button"
-              className="speed-game-primary-button"
-              disabled={busy}
-              onClick={() => void mutateRun("rematch")}
-            >
-              다시 하기
-            </button>
-          ) : null
-        }
-        gamesAction={
-          <Link className="speed-game-secondary-button" href="/student/boards?category=play">
-            게임 목록
-          </Link>
-        }
-        recordsAction={
-          viewerKind === "student" ? (
-            <Link
-              className="speed-game-secondary-button"
-              href="/student/boards?category=records&game=speed-game"
-            >
-              나의 전적
-            </Link>
-          ) : null
-        }
-      />
-    );
-  }
 
   return (
     <section className="speed-game-shell" aria-busy={busy || reconnecting || undefined}>

@@ -1,0 +1,548 @@
+/* =====================================================
+   plant-roadmap layout (PJ-1~6)
+   ===================================================== */
+
+/* ── Select step ─────────────────────────── */
+.plant-select {
+  padding: 24px 32px 120px;
+}
+.plant-select-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin: 0 0 8px;
+}
+.plant-select-sub {
+  color: var(--color-text-muted);
+  margin: 0 0 20px;
+}
+.plant-species-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+.plant-species-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 18px 14px;
+  cursor: pointer;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition:
+    border-color 120ms,
+    box-shadow 120ms;
+  font: inherit;
+  color: inherit;
+}
+.plant-species-card:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: var(--shadow-lift);
+}
+.plant-species-card[data-selected="true"] {
+  border-color: var(--color-plant-active);
+  box-shadow: 0 0 0 2px rgba(39, 163, 95, 0.2);
+}
+.plant-species-emoji {
+  font-size: 36px;
+  line-height: 1;
+}
+.plant-species-name {
+  font-weight: 700;
+  font-size: 16px;
+}
+.plant-species-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.plant-species-badge {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.plant-select-bar {
+  position: sticky;
+  bottom: 0;
+  background: var(--color-bg-alt);
+  border-top: 1px solid var(--color-border);
+  padding: 14px 20px;
+  margin: 24px -20px 0;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.plant-select-bar input {
+  flex: 1;
+  padding: 10px 12px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-border);
+  font: inherit;
+}
+
+/* ── Roadmap view ─────────────────────────── */
+.plant-roadmap {
+  padding: 24px 32px;
+}
+.plant-head-emoji {
+  font-size: 36px;
+}
+.plant-head-name {
+  font-size: 18px;
+  font-weight: 700;
+}
+.plant-head-nickname {
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+/* ── Stage detail sheet ─────────────────────────── */
+.plant-sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 90;
+}
+.plant-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--color-surface);
+  border-radius: 16px 16px 0 0;
+  max-height: 78vh;
+  overflow-y: auto;
+  padding: 20px 20px 32px;
+  z-index: 100;
+  box-shadow: var(--shadow-card);
+}
+@media (min-width: 768px) {
+  .plant-sheet {
+    left: auto;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 420px;
+    max-height: none;
+    border-radius: 16px 0 0 16px;
+  }
+}
+.plant-sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.plant-sheet-title {
+  font-size: 18px;
+  font-weight: 700;
+}
+.plant-sheet-points {
+  background: var(--color-bg);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+.plant-sheet-points h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+.plant-sheet-points ul {
+  padding-left: 18px;
+  margin: 0;
+}
+
+.plant-obs-list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.plant-obs-card {
+  flex-shrink: 0;
+  width: 220px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  background: var(--color-surface);
+}
+.plant-obs-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+  display: flex;
+  justify-content: space-between;
+}
+.plant-obs-imgs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 6px 0;
+}
+.plant-obs-imgs img {
+  width: 80px;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  flex: 0 0 80px;
+}
+.plant-obs-memo {
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.plant-obs-reason {
+  font-size: 12px;
+  color: var(--color-plant-stalled);
+  margin-top: 4px;
+}
+.plant-obs-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.plant-obs-actions button {
+  font-size: 12px;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.plant-sheet-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+.plant-sheet-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.plant-sheet-actions button.primary {
+  background: var(--color-plant-active);
+  border-color: var(--color-plant-active);
+  color: #fff;
+}
+
+/* ── Teacher summary ─────────────────────────── */
+.plant-teacher {
+  padding: 24px 32px;
+}
+.plant-distribution {
+  display: flex;
+  gap: 6px;
+  align-items: flex-end;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  margin-bottom: 20px;
+}
+.plant-dist-item {
+  flex: 0 0 80px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+.plant-dist-count {
+  font-weight: 800;
+  font-size: 22px;
+  color: var(--color-plant-active);
+}
+.plant-dist-label {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+  text-align: center;
+}
+.plant-student-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.plant-student-table th,
+.plant-student-table td {
+  text-align: left;
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+.plant-student-table th {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+.plant-stalled-badge {
+  background: rgba(198, 40, 40, 0.1);
+  color: var(--color-plant-stalled);
+  border-radius: var(--radius-pill);
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* ── Teacher matrix ─────────────────────────── */
+.plant-matrix-wrap {
+  max-width: 100%;
+  overflow: auto;
+  padding: 20px;
+}
+.plant-matrix {
+  border-collapse: collapse;
+}
+.plant-matrix th,
+.plant-matrix td {
+  border: 1px solid var(--color-border);
+  width: 80px;
+  height: 80px;
+  text-align: center;
+  vertical-align: middle;
+  background: var(--color-surface);
+}
+.plant-matrix thead th {
+  position: sticky;
+  top: 0;
+  background: var(--color-bg-alt);
+  z-index: 2;
+  font-size: 12px;
+}
+.plant-matrix tbody th {
+  position: sticky;
+  left: 0;
+  background: var(--color-bg-alt);
+  z-index: 1;
+  font-size: 12px;
+}
+.plant-matrix-cell img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  cursor: zoom-in;
+}
+.plant-matrix-empty {
+  color: var(--color-text-faint);
+  font-size: 22px;
+}
+.plant-matrix-forbidden {
+  max-width: 520px;
+  margin: 60px auto;
+  padding: 30px;
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--color-border);
+  text-align: center;
+}
+
+/* ── Modals (editor, reason) ─────────────────────────── */
+.plant-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.plant-modal {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  width: 100%;
+  max-width: 560px;
+  padding: 22px;
+  max-height: 92vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-card);
+}
+.plant-modal h3 {
+  margin: 0 0 12px;
+}
+.plant-modal .plant-modal-row {
+  margin-bottom: 14px;
+}
+.plant-modal textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 10px;
+  font: inherit;
+  min-height: 90px;
+}
+.plant-modal .plant-upload-drop {
+  border: 2px dashed var(--color-border);
+  padding: 14px;
+  text-align: center;
+  border-radius: var(--radius-card);
+  cursor: pointer;
+  color: var(--color-text-muted);
+}
+.plant-modal .plant-upload-drop:hover {
+  border-color: var(--color-plant-active);
+  color: var(--color-plant-active);
+}
+.plant-thumb-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+.plant-thumb {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+.plant-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.plant-thumb .plant-thumb-x {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  font-size: 14px;
+  line-height: 24px;
+  cursor: pointer;
+}
+.plant-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 10px;
+}
+.plant-modal-actions button {
+  padding: 8px 16px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  font-weight: 600;
+}
+.plant-modal-actions button.primary {
+  background: var(--color-plant-active);
+  color: #fff;
+  border-color: var(--color-plant-active);
+}
+.plant-modal-actions button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.plant-observation-editor {
+  display: grid;
+  gap: 16px;
+}
+.plant-observation-editor h3,
+.plant-observation-editor .plant-modal-row,
+.plant-observation-editor .plant-modal-actions {
+  margin: 0;
+}
+.plant-observation-editor .plant-modal-row {
+  display: grid;
+  gap: 10px;
+}
+.plant-observation-editor .plant-upload-drop {
+  display: block;
+}
+.plant-observation-editor .plant-thumb-grid,
+.plant-observation-editor .plant-upload-progress {
+  margin-top: 2px;
+}
+.plant-observation-editor .plant-memo-count {
+  margin-top: -2px;
+  color: var(--color-text-faint);
+  font-size: 11px;
+  line-height: 1.3;
+  text-align: right;
+}
+.plant-observation-editor .plant-error {
+  margin: -4px 0 0;
+}
+.plant-reason-list label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+}
+.plant-reason-list label:hover {
+  background: var(--color-bg);
+}
+.plant-reason-other {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  font: inherit;
+}
+.plant-error {
+  color: var(--color-plant-stalled);
+  font-size: 13px;
+  margin-top: 6px;
+}
+.plant-upload-progress {
+  height: 3px;
+  background: var(--color-plant-active);
+  animation: plant-upload-indeterminate 1.5s infinite;
+}
+@keyframes plant-upload-indeterminate {
+  0% {
+    width: 0%;
+  }
+  50% {
+    width: 70%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+.plant-empty-state {
+  text-align: center;
+  color: var(--color-text-muted);
+  padding: 60px 20px;
+}
+
+/* Lightbox for full image */
+.plant-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+}
+.plant-lightbox img {
+  max-width: 94vw;
+  max-height: 94vh;
+}

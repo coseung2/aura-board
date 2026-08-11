@@ -1,0 +1,432 @@
+/* -------- Assignment Board -------- */
+
+.assign-board {
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+}
+
+/* Assignment description */
+.assign-description {
+  padding: 16px 20px;
+  background: var(--color-accent-tinted-bg);
+  border: 1px solid rgba(0, 117, 222, 0.15);
+  border-radius: var(--radius-card);
+  font-size: 14px;
+  color: var(--color-text);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+
+/* Progress bar */
+.assign-progress {
+  margin-bottom: 24px;
+}
+
+.assign-progress-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 8px;
+  display: block;
+}
+
+.assign-progress-bar {
+  height: 8px;
+  background: var(--color-surface-alt);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.assign-progress-fill {
+  height: 100%;
+  background: var(--color-accent);
+  border-radius: 4px;
+  transition: width 300ms ease;
+}
+
+/* Student cards grid */
+.assign-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.assign-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 12px;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+  transition: box-shadow 150ms ease, border-color 150ms ease, transform 150ms ease;
+  text-align: center;
+}
+
+.assign-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+.assign-card-none {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.assign-card-none:hover {
+  transform: none;
+  box-shadow: var(--shadow-card);
+}
+
+.assign-card-submitted {
+  border-color: #1565c0;
+}
+
+.assign-card-reviewed {
+  border-color: #2e7d32;
+}
+
+.assign-card-returned {
+  border-color: #c62828;
+}
+
+.assign-card-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.assign-card-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.assign-card-status {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+}
+
+.assign-card-status.status-submitted {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.assign-card-status.status-reviewed {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.assign-card-status.status-returned {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.assign-card-grade {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+/* Student self-view */
+.assign-student-view {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.assign-my-submission {
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+}
+
+.assign-my-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.assign-badge-submitted {
+  background: #e3f2fd;
+  color: #1565c0;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.assign-badge-reviewed {
+  background: #e8f5e9;
+  color: #2e7d32;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.assign-badge-returned {
+  background: #fce4ec;
+  color: #c62828;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.assign-my-grade {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.assign-my-content {
+  font-size: 14px;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  margin-bottom: 12px;
+  line-height: 1.6;
+}
+
+.assign-empty-state {
+  text-align: center;
+  padding: 60px 24px;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.assign-empty-state p {
+  margin: 0 0 20px;
+  color: var(--color-text-muted);
+  font-size: 15px;
+}
+
+.assign-submit-btn-large {
+  padding: 14px 32px;
+  font-size: 16px;
+}
+
+.assign-table-wrap {
+  overflow-x: auto;
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.assign-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.assign-th-task,
+.assign-th-student {
+  padding: 14px 16px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg);
+  white-space: nowrap;
+}
+
+.assign-th-student {
+  text-align: center;
+  min-width: 100px;
+}
+
+.assign-td-task {
+  padding: 14px 16px;
+  font-weight: 600;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+  max-width: 240px;
+}
+
+.assign-td-status {
+  padding: 10px 12px;
+  text-align: center;
+  border-bottom: 1px solid var(--color-border);
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+
+.assign-td-status:hover {
+  background: var(--color-surface-alt);
+}
+
+.assign-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-submitted .assign-badge,
+.assign-badge.status-submitted {
+  background: #e3f2fd;
+  color: #1565c0;
+}
+
+.status-reviewed .assign-badge,
+.assign-badge.status-reviewed {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-returned .assign-badge,
+.assign-badge.status-returned {
+  background: #fce4ec;
+  color: #c62828;
+}
+
+.status-none {
+  cursor: default;
+}
+
+.assign-badge-empty {
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+.assign-add-btn {
+  margin-top: 20px;
+  padding: 12px 24px;
+  background: transparent;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius-card);
+  color: var(--color-text-faint);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 150ms ease, color 150ms ease;
+  width: 100%;
+}
+
+.assign-add-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* Student view */
+.assign-student-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.assign-student-card {
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px 24px;
+}
+
+.assign-student-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.assign-student-task-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.assign-student-submission {
+  padding: 12px 0;
+  border-top: 1px solid var(--color-border);
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.assign-student-submission p {
+  margin: 0 0 8px;
+}
+
+.assign-link {
+  display: inline-block;
+  font-size: 13px;
+  color: var(--color-accent);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.assign-link:hover {
+  text-decoration: underline;
+}
+
+.assign-feedback {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: var(--color-accent-tinted-bg);
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.assign-grade {
+  margin-top: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.assign-submit-btn {
+  margin-top: 12px;
+  padding: 8px 20px;
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.assign-submit-btn:hover {
+  background: var(--color-accent-active);
+}
+
+/* View submission modal extras */
+.assign-view-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.assign-view-content {
+  padding: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 14px;
+  white-space: pre-wrap;
+  min-height: 60px;
+}

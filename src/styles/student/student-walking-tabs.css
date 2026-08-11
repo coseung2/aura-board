@@ -1,0 +1,237 @@
+/* Walking view tabs replace the content below the activity header. Keep both
+   panels in the DOM for stable hydration while `hidden` controls visibility. */
+.student-activity-tabpanel[hidden],
+.student-walking-tabpanel[hidden] {
+  display: none;
+}
+
+.student-activity-tabpanel:focus-visible,
+.student-walking-tabpanel:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 4px;
+}
+
+.student-walking-missions-content {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.student-walking-mission-dashboard {
+  display: contents;
+}
+
+.student-walking-achievements {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
+.student-walking-achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.student-walking-achievement {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.student-walking-achievement-image {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 1;
+  opacity: 0.32;
+  filter: grayscale(1);
+}
+
+.student-walking-achievement-image img {
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.student-walking-achievement.is-earned .student-walking-achievement-image {
+  opacity: 1;
+  filter: none;
+}
+
+.student-walking-achievement-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+}
+
+.student-walking-achievement-meta strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-walking-achievement.is-earned .student-walking-achievement-meta span {
+  color: var(--color-accent-tinted-text);
+  font-weight: 800;
+}
+
+.student-walking-mission-summary {
+  display: grid;
+  grid-column: 2;
+  grid-row: 1;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.student-walking-page .student-walking-attendance-panel {
+  display: flex;
+  grid-column: 1;
+  grid-row: 1;
+  flex-direction: column;
+  padding-top: 12px;
+  border-top: 0;
+}
+
+.student-attendance-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding-top: 12px;
+  border-top: 0;
+}
+
+.student-attendance-status {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.student-attendance-status.is-complete {
+  color: var(--color-accent-tinted-text);
+}
+
+.student-walking-page .student-walking-rewards {
+  min-width: 0;
+}
+
+.student-walking-mission-section {
+  display: grid;
+  gap: 12px;
+}
+
+.student-walking-mission-section + .student-walking-mission-section,
+.student-walking-mission-section + .student-walking-rewards {
+  border-top: 1px solid var(--color-border);
+}
+
+.student-walking-mission-status {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.student-walking-mission-status.is-complete {
+  color: var(--color-accent);
+}
+
+.student-walking-mission-progress {
+  display: grid;
+  gap: 12px;
+}
+
+.student-walking-mission-progress-labels {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.student-walking-mission-progress-labels span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.student-walking-mission-progress-labels strong {
+  flex: 0 0 auto;
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.student-walking-progress-track {
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+}
+
+.student-walking-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 180ms ease;
+}
+
+.student-walking-daily-milestones {
+  position: relative;
+  height: 64px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.student-walking-daily-milestones li {
+  position: absolute;
+  top: -18px;
+  display: grid;
+  min-width: 64px;
+  justify-items: center;
+  gap: 3px;
+  transform: translateX(-50%);
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.student-walking-daily-milestones li:last-child {
+  justify-items: end;
+  transform: translateX(-100%);
+}
+
+.student-walking-daily-milestone-dot {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--color-accent);
+  border-radius: 50%;
+  background: var(--color-surface);
+  outline: 2px solid var(--color-accent-tinted-bg);
+}
+
+.student-walking-daily-milestones strong {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-size: 11px;
+}

@@ -184,11 +184,10 @@ async function readQuestionAnswerCount(
   questionId: string,
 ): Promise<number> {
   const [row] = await db.$queryRaw<CountRow[]>(Prisma.sql`
-    SELECT "answerCount"::int AS "count"
-    FROM "LiveQuizQuestionCounter"
+    SELECT COALESCE(SUM("answerCount"), 0)::int AS "count"
+    FROM "LiveQuizQuestionCounterShard"
     WHERE "sessionKey" = ${sessionKey}
       AND "questionId" = ${questionId}
-    LIMIT 1
   `);
   return row?.count ?? 0;
 }

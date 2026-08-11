@@ -1,0 +1,590 @@
+/* =====================================================
+   Classroom tab panels (handoff T6-2, 2026-04-21)
+   학생 명단 / 학부모 연결 / 공유된 보드 / 설정 4탭
+   ===================================================== */
+
+.classroom-tabs {
+  display: flex;
+  gap: 2px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.classroom-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition:
+    color var(--t-normal),
+    border-color var(--t-normal);
+  white-space: nowrap;
+}
+
+.classroom-tab:hover {
+  color: var(--color-text);
+}
+
+.classroom-tab.is-active {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
+  font-weight: 600;
+}
+
+.classroom-tab-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1px;
+}
+
+.classroom-tab.is-active .classroom-tab-count {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+
+.classroom-tab-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-tinted-bg);
+  color: var(--color-warning);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.classroom-parents-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 14px 20px;
+  background: var(--color-warning-tinted-bg);
+  border-radius: var(--radius-card);
+  color: var(--color-warning);
+  min-width: 120px;
+}
+
+.classroom-parents-stat-num {
+  font-family: var(--font-display);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  line-height: 1;
+}
+
+.classroom-parents-stat-label {
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  text-transform: none;
+}
+
+.classroom-parents-cta {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: var(--color-accent);
+  color: #fff;
+  border-radius: var(--radius-btn);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background var(--t-normal);
+}
+
+.classroom-parents-cta:hover {
+  background: var(--color-accent-active);
+}
+
+/* ---- Settings panel ---- */
+.classroom-settings-panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 640px;
+}
+
+.classroom-setting-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.classroom-setting-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+.classroom-setting-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.classroom-setting-heading-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.classroom-setting-input {
+  max-width: 380px;
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  font-family: inherit;
+  font-size: 15px;
+  color: var(--color-text);
+  background: var(--color-bg-alt);
+  outline: none;
+  transition:
+    border-color var(--t-normal),
+    box-shadow var(--t-normal);
+}
+
+.classroom-setting-input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+.classroom-setting-saving {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.classroom-setting-err {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-danger);
+}
+
+.classroom-setting-hint {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+  max-width: 420px;
+}
+
+.classroom-setting-danger {
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+@media (max-width: 540px) {
+  .classroom-setting-danger {
+    flex-direction: column;
+  }
+  .classroom-setting-input {
+    max-width: 100%;
+  }
+}
+
+/* ═══ Handoff roster avatar (2026-04-21) — aura-board-design-system ═════ */
+
+.classroom-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: 0;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.classroom-td-avatar {
+  padding-left: 4px !important;
+  padding-right: 4px !important;
+}
+
+/* ═══ Handoff tabs: link tabs (역할/은행/매점) + separator ═════════════ */
+
+.classroom-tabs-sep {
+  flex: 1 1 auto;
+  min-width: 12px;
+}
+
+.classroom-tab-link {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.classroom-tab-link:hover {
+  color: var(--color-accent-tinted-text);
+  background: var(--color-accent-tinted-bg);
+}
+
+.classroom-tab-link::after {
+  content: "↗";
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+@media (max-width: 640px) {
+  .classroom-tabs-sep {
+    display: none;
+  }
+  .classroom-tab-link::after {
+    display: none;
+  }
+}
+
+/* ═══ Classroom name + gear button (2026-04-21) ══════════════════════ */
+
+.classroom-detail-name-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.classroom-settings-gear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9999px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 16px;
+  cursor: pointer;
+  transition:
+    background var(--t-normal, 150ms ease),
+    color var(--t-normal, 150ms ease),
+    border-color var(--t-normal, 150ms ease);
+  padding: 0;
+  line-height: 1;
+}
+
+.classroom-settings-gear:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  border-color: var(--color-border-hover);
+}
+
+/* ═══ Classroom settings modal (학급명 옆 톱니바퀴) ═══════════════════ */
+
+.classroom-settings-modal {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  max-width: 560px;
+  width: calc(100vw - 32px);
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-card);
+}
+
+.classroom-settings-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.classroom-settings-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.classroom-settings-modal-body {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.group-roster-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.group-roster-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.group-roster-toolbar button,
+.group-roster-name-field button {
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.group-roster-toolbar button {
+  padding: 0 12px;
+}
+
+.group-roster-toolbar button:hover:not(:disabled),
+.group-roster-name-field button:hover:not(:disabled) {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+
+.group-roster-name-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.group-roster-name-field {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.group-roster-name-field span {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--color-text-muted);
+}
+
+.group-roster-name-field input,
+.group-roster-table select {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.group-roster-name-field input {
+  padding: 0 10px;
+}
+
+.group-roster-name-field button {
+  padding: 0 8px;
+  color: var(--color-danger);
+}
+
+.group-roster-table-wrap {
+  overflow: auto;
+  border-top: 1px solid var(--color-border);
+}
+
+.group-roster-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.group-roster-table th,
+.group-roster-table td {
+  padding: 8px 4px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+
+.group-roster-table th {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.group-roster-table select {
+  padding: 0 8px;
+}
+
+.group-roster-empty {
+  margin: 10px 0 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.group-roster-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.group-roster-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+}
+
+.group-roster-card-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+
+.group-roster-card-head strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-roster-card-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.group-roster-card-count {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.group-roster-card-body {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.group-roster-card-empty {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  padding: 8px 4px;
+  text-align: center;
+}
+
+.group-roster-member {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: var(--radius-btn);
+  background: var(--color-bg);
+  font-size: 13px;
+}
+
+.group-roster-member span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-roster-member select {
+  min-height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.group-roster-unassigned {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg);
+}
+
+.group-roster-unassigned > strong {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 8px;
+  color: var(--color-text);
+}
+
+.group-roster-member-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 6px;
+}
+
+@media (max-width: 860px) {
+  .group-roster-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .group-roster-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .group-roster-member-list {
+    grid-template-columns: 1fr;
+  }
+}

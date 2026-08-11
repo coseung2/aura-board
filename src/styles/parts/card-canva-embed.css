@@ -1,0 +1,217 @@
+/* Canva live-embed wrapper (task 2026-04-12-canva-oembed).
+   16:9 responsive box with thumbnail + iframe stacked. The thumbnail
+   fades out once the iframe finishes loading, so the card has something
+   visible immediately (LCP) but ends up showing the live design. */
+.card-canva-embed {
+  position: relative;
+  width: 100%;
+  padding-bottom: 56.25%;
+  min-height: 90px;
+  background: var(--color-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.card-canva-embed > img,
+.card-canva-embed > iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.card-canva-embed > img {
+  object-fit: cover;
+  opacity: 1;
+  transition: opacity 150ms ease;
+}
+.card-canva-embed[data-loaded="true"] > img {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-canva-embed > img {
+    transition: none;
+  }
+}
+
+/* ----------------------------------------------------------------------
+   Canva virtualized slot (task 2026-04-13-iframe-virtualization-t0-2).
+   Default: thumbnail + tap-to-activate overlay (no iframe DOM cost).
+   Activated + in-viewport: iframe mounts on top of thumbnail.
+   Scrolled off-viewport or LRU-evicted: iframe unmounts, thumbnail stays.
+   ---------------------------------------------------------------------- */
+
+.card-canva-slot {
+  position: relative;
+  width: 100%;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.card-canva-slot-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 22px;
+  /* canva-mode-badge-right (2026-04-26): "썸네일/라이브" 토글이 좌측에서
+     본문 글자랑 시각적으로 충돌해 보였음 → 우측 정렬. */
+  justify-content: flex-end;
+}
+
+.card-canva-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border, rgba(0, 0, 0, 0.12));
+  background: var(--color-surface, #fff);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-text-subtle, #666);
+  cursor: pointer;
+  user-select: none;
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+.card-canva-mode-badge:hover {
+  background: var(--color-surface-hover, #f5f5f5);
+}
+.card-canva-mode-badge:focus-visible {
+  outline: 2px solid var(--color-accent, #3b82f6);
+  outline-offset: 2px;
+}
+.card-canva-mode-badge[data-mode="live"] {
+  color: #fff;
+  background: #e11d48; /* live = red accent */
+  border-color: #be123c;
+}
+.card-canva-mode-badge[data-mode="live"]:hover {
+  background: #be123c;
+}
+.card-canva-mode-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.card-canva-mode-badge[data-mode="live"] .card-canva-mode-dot {
+  animation: card-canva-pulse 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-canva-mode-badge[data-mode="live"] .card-canva-mode-dot {
+    animation: none;
+  }
+}
+@keyframes card-canva-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.card-canva-eviction-toast {
+  font-size: 11px;
+  color: var(--color-text-subtle, #666);
+  background: var(--color-surface-hover, #f5f5f5);
+  padding: 2px 8px;
+  border-radius: 6px;
+  animation: card-canva-fadeout 1.8s ease forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-canva-eviction-toast {
+    animation: none;
+  }
+}
+@keyframes card-canva-fadeout {
+  0% { opacity: 0; transform: translateY(-2px); }
+  10% { opacity: 1; transform: translateY(0); }
+  80% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.card-canva-slot-frame {
+  position: relative;
+  width: 100%;
+  padding-bottom: 50%;
+  min-height: 76px;
+  background: var(--color-bg, #f4f4f5);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.card-canva-slot-thumbnail,
+.card-canva-slot-iframe {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+.card-canva-slot-thumbnail {
+  object-fit: cover;
+  opacity: 1;
+  transition: opacity 150ms ease;
+}
+/* When iframe has loaded, fade the thumbnail underneath so the iframe is
+   visually primary. When active but iframe still loading, keep thumbnail
+   fully visible (LCP). */
+.card-canva-slot[data-active="true"][data-loaded="true"] .card-canva-slot-thumbnail {
+  opacity: 0;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-canva-slot-thumbnail {
+    transition: none;
+  }
+}
+
+/* Tap-to-activate overlay sitting above the thumbnail. Acts as a button
+   for sighted + AT users. Disappears once the iframe is mounted (the
+   shouldRenderIframe branch renders <iframe> instead of this overlay). */
+.card-canva-slot-activate-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--color-text);
+  background: transparent;
+  transition: background 150ms ease;
+}
+.card-canva-slot-activate-overlay:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+.card-canva-slot-activate-overlay:focus-visible {
+  outline: 3px solid var(--color-accent, #3b82f6);
+  outline-offset: -3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-canva-slot-activate-overlay {
+    transition: none;
+  }
+}
+
+.card-canva-slot-play-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+  /* refined-icons (2026-04-26): SVG ▶ 는 viewBox 중앙으로 그려 padding-left
+     optical hack 불필요. 시각 보정은 SVG path 자체에서 처리. */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+.card-canva-slot-overlay-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}

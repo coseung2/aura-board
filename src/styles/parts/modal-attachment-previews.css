@@ -1,0 +1,248 @@
+/* -------- File attachment preview (card-file-attachment 2026-04-20) -------- */
+
+.modal-file-drop-hint {
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin-top: 2px;
+}
+
+.modal-file-preview-file {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--color-surface-alt);
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  min-width: 0;
+  /* 기존 modal-file-preview는 position:relative라 제거 버튼이 absolute.
+     파일 프리뷰는 인라인 플렉스라 absolute 제거 버튼이 필요 없음. */
+  position: static;
+  overflow: visible;
+}
+
+.modal-file-preview-icon {
+  font-size: 28px;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.modal-file-preview-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modal-file-preview-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.modal-file-preview-meta {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.modal-file-preview-file .modal-file-remove {
+  position: static;
+  padding: 6px 12px;
+  background: transparent;
+  color: var(--color-danger);
+  border: 1px solid var(--color-border);
+  flex: 0 0 auto;
+}
+
+.modal-file-preview-file .modal-file-remove:hover {
+  background: var(--color-danger);
+  color: white;
+  border-color: var(--color-danger);
+}
+
+/* -------- Multi-attachment list (multi-attachment 2026-04-20) -------- */
+
+.modal-attach-notice {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin: 4px 0 0;
+}
+
+.modal-attach-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.modal-attach-list:empty {
+  display: none;
+}
+
+.modal-attach-list-item {
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+}
+
+/* upload preview: plain <img> + intrinsic 비율 유지. fill 모드 wrap 은
+   부모 height 없으면 collapse 해서 strip 으로 보이는 버그가 있어 의도적으로
+   회피. blob: URI 라 어차피 next/image 최적화 이득도 없음. */
+.modal-attach-list-item-image {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+}
+.modal-attach-image-preview {
+  display: block;
+  max-width: 100%;
+  max-height: 220px;
+  width: auto;
+  height: auto;
+}
+
+.modal-attach-list-item-video video {
+  display: block;
+  width: 100%;
+  max-height: 160px;
+  background: #000;
+}
+
+.modal-attach-filebar {
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  box-sizing: border-box;
+}
+
+.modal-attach-filebar-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.modal-attach-download,
+.modal-file-download {
+  flex: 0 0 auto;
+  min-height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.modal-attach-download:hover,
+.modal-file-download:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+  color: var(--color-text);
+}
+
+.modal-attach-download:focus-visible,
+.modal-file-download:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 2px;
+}
+
+.modal-attach-item-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: white;
+  border: none;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 120ms ease;
+}
+
+.modal-attach-item-remove:hover {
+  background: rgba(0, 0, 0, 0.8);
+}
+
+.modal-file-drop.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* attachment reorder ↑/↓ (attachment-reorder 2026-04-20) */
+.modal-attach-reorder {
+  display: flex;
+  gap: 2px;
+  flex: 0 0 auto;
+}
+
+.modal-attach-reorder-btn {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease;
+}
+
+.modal-attach-reorder-btn:not(:disabled):hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+
+.modal-attach-reorder-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* 이미지/비디오는 프리뷰 위에 오버레이로 겹침. 파일 카드는 오버레이 안 씀. */
+.modal-attach-reorder-overlay {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 6px;
+  padding: 2px;
+}

@@ -14,6 +14,11 @@ import { useColumnRoster } from "./columns/useColumnRoster";
 import { useCardMutations } from "./columns/useCardMutations";
 import { useSectionMutations } from "./columns/useSectionMutations";
 import type { SavedAuthor } from "./cards/CardAuthorEditor";
+import {
+  applySectionAssignmentState,
+  getSectionAssignmentState,
+  toSectionAssignmentPatch,
+} from "./columns/assignment-state";
 import type { CardData } from "./DraggableCard";
 import { formatAuthorList } from "@/lib/card-author";
 import {
@@ -782,39 +787,4 @@ export function ColumnsBoard({
       />
     </div>
   );
-}
-
-type PersistedAssignmentState = Omit<ColumnAssignmentState, "pending">;
-
-function getSectionAssignmentState(
-  section: SectionData,
-  pending = false,
-): ColumnAssignmentState {
-  const distributedAt = section.assignmentPublishedAt ?? null;
-  const reminderSentAt = section.assignmentReminderSentAt ?? null;
-
-  return {
-    distributed: Boolean(distributedAt),
-    distributedAt,
-    reminderSentAt,
-    pending,
-  };
-}
-
-function applySectionAssignmentState(
-  section: SectionData,
-  state: PersistedAssignmentState | ColumnAssignmentState,
-): SectionData {
-  return {
-    ...section,
-    assignmentPublishedAt: state.distributed ? state.distributedAt : null,
-    assignmentReminderSentAt: state.reminderSentAt,
-  };
-}
-
-function toSectionAssignmentPatch(state: PersistedAssignmentState) {
-  return {
-    assignmentPublishedAt: state.distributed ? state.distributedAt : null,
-    assignmentReminderSentAt: state.reminderSentAt,
-  };
 }

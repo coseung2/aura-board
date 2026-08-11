@@ -1,11 +1,18 @@
 "use client";
-
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import {
   type GroupEditorDraft,
   type GroupEditorStudent,
 } from "./GroupRosterEditor";
+import {
+  GROUP_SIZE, MIN_GROUP_COUNT, PLACEMENT_STEP_MS, clampGroupCount, cloneGroups,
+  fixedPairId, genderLabel, genderOf, isSameDropTarget, pairMatches,
+  pairModeLabel, scaledGenderTargets, seatingTransitionName, shuffle,
+  type DropTarget,
+  type FixedPair,
+  type PairMode,
+} from "./classroom-seating-model";
 
 type Props = {
   students: GroupEditorStudent[];
@@ -13,145 +20,6 @@ type Props = {
   disabled?: boolean;
   onChange: (groups: GroupEditorDraft[]) => void;
 };
-
-const GROUP_SIZE = 4;
-
-/**
- * Where a drag would land. `seat` targets a specific slot (swap or insert);
- * `area` drops at the end of a group; `unassigned` removes the seat.
- */
-type DropTarget =
-  | { kind: "seat"; groupIndex: number; seatIndex: number }
-  | { kind: "area"; groupIndex: number }
-  | { kind: "unassigned" };
-
-function isSameDropTarget(a: DropTarget | null, b: DropTarget | null): boolean {
-  if (!a || !b) return a === b;
-  if (a.kind !== b.kind) return false;
-  if (a.kind === "seat" && b.kind === "seat") {
-    return a.groupIndex === b.groupIndex && a.seatIndex === b.seatIndex;
-  }
-  if (a.kind === "area" && b.kind === "area") {
-    return a.groupIndex === b.groupIndex;
-  }
-  return true;
-}
-const PLACEMENT_STEP_MS = 110;
-const MIN_GROUP_COUNT = 1;
-type StudentGender = "male" | "female";
-type PairMode = "any" | "mixed" | "same" | "male_male" | "female_female";
-type FixedPair = {
-  id: string;
-  studentIds: [string, string];
-};
-
-function fixedPairId(a: string, b: string): string {
-  return [a, b].sort().join("__");
-}
-
-function genderOf(
-  student: GroupEditorStudent | undefined,
-): StudentGender | null {
-  return student?.gender === "male" || student?.gender === "female"
-    ? student.gender
-    : null;
-}
-
-function genderLabel(gender: string | null | undefined): string {
-  if (gender === "male") return "남";
-  if (gender === "female") return "여";
-  return "미정";
-}
-
-function shuffle<T>(items: T[]): T[] {
-  const next = [...items];
-  for (let i = next.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [next[i], next[j]] = [next[j], next[i]];
-  }
-  return next;
-}
-
-function cloneGroups(groups: GroupEditorDraft[]): GroupEditorDraft[] {
-  return groups.map((group) => ({
-    ...group,
-    studentIds: [...group.studentIds],
-  }));
-}
-
-function clampGroupCount(count: number, max: number): number {
-  return Math.min(
-    Math.max(count, MIN_GROUP_COUNT),
-    Math.max(MIN_GROUP_COUNT, max),
-  );
-}
-
-function seatingTransitionName(studentId: string) {
-  return `seat-${studentId.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
-}
-
-function pairMatches(
-  a: GroupEditorStudent | undefined,
-  b: GroupEditorStudent | undefined,
-  mode: PairMode,
-): boolean {
-  if (mode === "any") return true;
-  const aGender = genderOf(a);
-  const bGender = genderOf(b);
-  if (!aGender || !bGender) return false;
-  if (mode === "mixed") return aGender !== bGender;
-  if (mode === "same") return aGender === bGender;
-  if (mode === "male_male") return aGender === "male" && bGender === "male";
-  return aGender === "female" && bGender === "female";
-}
-
-function pairModeLabel(mode: PairMode): string {
-  switch (mode) {
-    case "mixed":
-      return "남녀";
-    case "same":
-      return "동성";
-    case "male_male":
-      return "남남";
-    case "female_female":
-      return "여여";
-    default:
-      return "제한 없음";
-  }
-}
-
-function scaledGenderTargets(
-  size: number,
-  femaleTarget: number,
-  maleTarget: number,
-) {
-  const quotaTotal = femaleTarget + maleTarget;
-  if (size <= 0 || quotaTotal <= 0)
-    return { female: 0, male: 0, scaled: false };
-  if (quotaTotal <= size) {
-    return { female: femaleTarget, male: maleTarget, scaled: false };
-  }
-
-  const femaleExact = (femaleTarget / quotaTotal) * size;
-  let female = Math.floor(femaleExact);
-  let male = Math.floor((maleTarget / quotaTotal) * size);
-  let remaining = size - female - male;
-
-  const femaleRemainder = femaleExact - female;
-  const maleRemainder = (maleTarget / quotaTotal) * size - male;
-  while (remaining > 0) {
-    if (femaleRemainder >= maleRemainder && female < femaleTarget) {
-      female += 1;
-    } else if (male < maleTarget) {
-      male += 1;
-    } else {
-      female += 1;
-    }
-    remaining -= 1;
-  }
-
-  return { female, male, scaled: true };
-}
 
 export function ClassroomSeatingEditor({
   students,
@@ -171,12 +39,6 @@ export function ClassroomSeatingEditor({
   const [fixedPairs, setFixedPairs] = useState<FixedPair[]>([]);
   const [pairFirstId, setPairFirstId] = useState("");
   const [pairSecondId, setPairSecondId] = useState("");
-  /**
-   * Drop target under the cursor. Dragover only updates this highlight; the
-   * seating data is mutated exactly once on drop (2026-07-27). Previously
-   * dragover swapped students for real, which reordered the DOM mid-drag and
-   * made drops land on stale targets.
-   */
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
 
   const studentMap = useMemo(() => {
@@ -293,7 +155,6 @@ export function ClassroomSeatingEditor({
     setDropTarget(null);
   }
 
-  /** Dragover handler: records the hovered target without touching the data. */
   function highlightDropTarget(target: DropTarget) {
     if (disabled || !draggingStudentId) return;
     setDropTarget((current) =>
@@ -301,7 +162,6 @@ export function ClassroomSeatingEditor({
     );
   }
 
-  /** Single commit point for every drop path. */
   function applyDrop(studentId: string, target: DropTarget) {
     if (disabled) {
       endDrag();

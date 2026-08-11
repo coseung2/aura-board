@@ -289,6 +289,47 @@ describe("classroom load-test metrics", () => {
     }
   }, 15_000);
 
+  it("completes a safe startup preflight without contacting target or database", async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), "aura-loadtest-"));
+    const resultPath = path.join(directory, "result.json");
+    try {
+      const exitCode = await new Promise((resolve, reject) => {
+        const child = spawn(process.execPath, ["scripts/loadtest-classroom-concurrency.mjs"], {
+          cwd: process.cwd(),
+          env: {
+            ...process.env,
+            LOADTEST_ALLOW_DATABASE_WRITE: "1",
+            LOADTEST_PREFLIGHT_ONLY: "1",
+            AUTH_SECRET: "test-only-secret",
+            DATABASE_URL: "postgresql://invalid.invalid:1/no-access",
+            LOADTEST_TARGET: "http://127.0.0.1:1",
+            LOADTEST_CLASSROOMS: "1",
+            LOADTEST_STUDENTS_PER_CLASS: "1",
+            LOADTEST_REALTIME_CLIENTS: "1",
+            LOADTEST_REALTIME_BASELINE_CONNECTIONS: "0",
+            LOADTEST_REALTIME_BASELINE_MESSAGE_RATE: "0",
+            LOADTEST_RESULT: resultPath,
+          },
+          stdio: "ignore",
+        });
+        child.once("error", reject);
+        child.once("exit", resolve);
+      });
+      expect(exitCode).toBe(0);
+      const evidence = JSON.parse(await readFile(resultPath, "utf8"));
+      expect(evidence.preflight).toMatchObject({
+        mode: "startup-only",
+        accepted: true,
+      });
+      expect(evidence.seed).toBeNull();
+      expect(evidence.cleanup).toEqual({ skipped: true });
+      expect(evidence.fatal).toBeNull();
+      expect(evidence.gate).toMatchObject({ passed: true, failures: [] });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 15_000);
+
   it("counts realtime expectations only for successful mutations per board", () => {
     const actors = [
       { boardId: "board-a" },

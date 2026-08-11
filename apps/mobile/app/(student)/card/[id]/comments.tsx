@@ -60,6 +60,7 @@ import {
   tapMin,
   typography,
 } from "../../../../theme/tokens";
+import { styles } from "../../../../components/student-screens/student-card-comments.styles";
 
 type CommentItem = MobileCommentItem;
 
@@ -71,10 +72,12 @@ type Params = {
 export default function StudentCardCommentsScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<Params>();
-  const cardId = Array.isArray(params.id) ? params.id[0] ?? "" : params.id ?? "";
+  const cardId = Array.isArray(params.id)
+    ? (params.id[0] ?? "")
+    : (params.id ?? "");
   const cardTitle = Array.isArray(params.title)
-    ? params.title[0] ?? "댓글"
-    : params.title ?? "댓글";
+    ? (params.title[0] ?? "댓글")
+    : (params.title ?? "댓글");
   const [items, setItems] = useState<CommentItem[]>([]);
   const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(true);
@@ -125,9 +128,7 @@ export default function StudentCardCommentsScreen() {
         const response = await apiFetch<{
           items: CommentItem[];
           guardianAvailable?: boolean;
-        }>(
-          commentsPath(cardId, nextAudience),
-        );
+        }>(commentsPath(cardId, nextAudience));
         if (version !== requestVersion.current) return;
         setItems(response.items ?? []);
         setGuardianAvailable(Boolean(response.guardianAvailable));
@@ -136,7 +137,8 @@ export default function StudentCardCommentsScreen() {
         if (await handleAuthError(nextError)) return;
         setError(
           nextAudience === "guardian" &&
-          nextError instanceof ApiError && nextError.status === 403
+            nextError instanceof ApiError &&
+            nextError.status === 403
             ? FAMILY_THREAD_PRIVATE_MESSAGE
             : "댓글을 불러오지 못했어요.",
         );
@@ -222,9 +224,15 @@ export default function StudentCardCommentsScreen() {
   }
 
   /** Mark one comment hidden or visible in local state. */
-  function applyHiddenReason(commentId: string, hiddenReason: HiddenReason | null) {
+  function applyHiddenReason(
+    commentId: string,
+    hiddenReason: HiddenReason | null,
+  ) {
     setItems((current) =>
-      updateThreadComment(current, commentId, (item) => ({ ...item, hiddenReason })),
+      updateThreadComment(current, commentId, (item) => ({
+        ...item,
+        hiddenReason,
+      })),
     );
   }
 
@@ -296,7 +304,11 @@ export default function StudentCardCommentsScreen() {
 
   async function reportComment(
     item: CommentItem,
-    input: { reason: Parameters<typeof reportContent>[0]["reason"]; detail?: string; hideAuthor: boolean },
+    input: {
+      reason: Parameters<typeof reportContent>[0]["reason"];
+      detail?: string;
+      hideAuthor: boolean;
+    },
   ) {
     const result = await reportContent({
       targetKind: "comment",
@@ -362,7 +374,10 @@ export default function StudentCardCommentsScreen() {
   function renderCommentItem(item: CommentItem, isReply: boolean) {
     if (item.hiddenReason) {
       return (
-        <View key={item.id} style={[styles.hiddenItem, isReply && styles.replyItem]}>
+        <View
+          key={item.id}
+          style={[styles.hiddenItem, isReply && styles.replyItem]}
+        >
           <Text style={styles.hiddenText}>
             {hiddenPlaceholderText("comment", item.hiddenReason)}
           </Text>
@@ -392,7 +407,9 @@ export default function StudentCardCommentsScreen() {
           <BarePressable
             style={styles.commentTextBlock}
             onPress={() => setModerationTarget(null)}
-            onLongPress={item.canModerate ? () => openModerationMenu(item) : undefined}
+            onLongPress={
+              item.canModerate ? () => openModerationMenu(item) : undefined
+            }
             delayLongPress={350}
             accessible={item.canModerate}
             accessibilityRole={item.canModerate ? "button" : undefined}
@@ -407,7 +424,9 @@ export default function StudentCardCommentsScreen() {
                 <Text style={styles.commentAuthor} numberOfLines={1}>
                   {item.authorLabel || "작성자"}
                 </Text>
-                <Text style={styles.commentDate}>{formatCommentDate(item.createdAt)}</Text>
+                <Text style={styles.commentDate}>
+                  {formatCommentDate(item.createdAt)}
+                </Text>
               </View>
             </View>
             <Text style={styles.commentContent}>{item.content}</Text>
@@ -421,7 +440,10 @@ export default function StudentCardCommentsScreen() {
             onUnauthorized={handleAuthError}
             onChanged={(next) => {
               setItems((current) =>
-                updateThreadComment(current, item.id, (entry) => ({ ...entry, ...next })),
+                updateThreadComment(current, item.id, (entry) => ({
+                  ...entry,
+                  ...next,
+                })),
               );
             }}
           />
@@ -527,7 +549,10 @@ export default function StudentCardCommentsScreen() {
                   {error}
                 </Text>
                 {!isFamilyAccessNotice ? (
-                  <AppButton variant="quiet" onPress={() => void loadComments(false, audience)}>
+                  <AppButton
+                    variant="quiet"
+                    onPress={() => void loadComments(false, audience)}
+                  >
                     다시 시도
                   </AppButton>
                 ) : null}
@@ -545,7 +570,9 @@ export default function StudentCardCommentsScreen() {
                 {items.map((root) => (
                   <View key={root.id} style={styles.thread}>
                     {renderCommentItem(root, false)}
-                    {(root.replies ?? []).map((reply) => renderCommentItem(reply, true))}
+                    {(root.replies ?? []).map((reply) =>
+                      renderCommentItem(reply, true),
+                    )}
                     {replyTarget?.rootId === root.id ? (
                       <View style={styles.replyComposer}>
                         <Text style={styles.replyTargetLabel} numberOfLines={1}>
@@ -611,210 +638,3 @@ function formatCommentDate(value: string): string {
   if (Number.isNaN(date.getTime())) return "";
   return `${date.getFullYear()}. ${date.getMonth() + 1}. ${date.getDate()}.`;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.bg,
-  },
-  flex: {
-    flex: 1,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  content: {
-    width: "100%",
-    maxWidth: layout.readableMaxWidth,
-    alignSelf: "center",
-    paddingHorizontal: pageChrome.horizontalPadding,
-    paddingTop: pageChrome.directContentStartGap,
-    paddingBottom: spacing.xxxl,
-    gap: spacing.lg,
-  },
-  composer: {
-    gap: spacing.sm,
-    paddingBottom: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  commentInput: {
-    minHeight: controls.multilineInputMinHeight,
-    textAlignVertical: "top",
-  },
-  submitButton: {
-    alignSelf: "flex-start",
-  },
-  errorBlock: {
-    gap: spacing.xs,
-    alignItems: "flex-start",
-  },
-  errorText: {
-    ...typography.body,
-    color: colors.danger,
-  },
-  familyNoticeBlock: {
-    width: "100%",
-    alignItems: "center",
-    paddingVertical: spacing.xl,
-  },
-  familyNoticeText: {
-    color: colors.textMuted,
-    textAlign: "center",
-  },
-  commentList: {
-    gap: spacing.none,
-  },
-  thread: {
-    gap: spacing.none,
-  },
-  commentItem: {
-    minHeight: tapMin,
-    gap: spacing.xs,
-    paddingVertical: spacing.lg,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  replyItem: {
-    marginLeft: spacing.xl,
-    paddingLeft: spacing.md,
-    borderLeftWidth: borders.hairline,
-    borderLeftColor: colors.border,
-  },
-  commentItemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  commentTextBlock: {
-    flex: 1,
-    gap: spacing.xs,
-  },
-  commentHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  commentIdentity: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    flex: 1,
-  },
-  commentAuthor: {
-    ...typography.label,
-    color: colors.text,
-    flexShrink: 1,
-  },
-  commentDate: {
-    ...typography.micro,
-    color: colors.textMuted,
-  },
-  commentContent: {
-    ...typography.body,
-    color: colors.text,
-  },
-  commentActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  commentAction: {
-    minHeight: tapMin,
-    justifyContent: "center",
-    paddingHorizontal: spacing.none,
-    paddingVertical: spacing.xxs,
-    borderWidth: borders.none,
-    borderColor: colors.transparent,
-    borderRadius: radii.none,
-    backgroundColor: colors.transparent,
-  },
-  replyLabel: {
-    ...typography.micro,
-    color: colors.textMuted,
-  },
-  deleteLabel: {
-    ...typography.micro,
-    color: colors.danger,
-  },
-  replyComposer: {
-    marginLeft: spacing.xl,
-    paddingVertical: spacing.md,
-    paddingLeft: spacing.md,
-    gap: spacing.xs,
-    borderLeftWidth: borders.hairline,
-    borderLeftColor: colors.accent,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  replyTargetLabel: {
-    ...typography.micro,
-    color: colors.accentTintedText,
-  },
-  replyComposerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  replyInput: {
-    flex: 1,
-    minHeight: controls.inputHeight,
-  },
-  replySubmitButton: {
-    minWidth: tapMin,
-  },
-  replyCancel: {
-    alignSelf: "flex-start",
-    minHeight: tapMin,
-    justifyContent: "center",
-    paddingHorizontal: spacing.none,
-    paddingVertical: spacing.none,
-    borderWidth: borders.none,
-    backgroundColor: colors.transparent,
-  },
-  replyCancelLabel: {
-    ...typography.micro,
-    color: colors.textMuted,
-  },
-  // Placeholder that replaces a hidden comment in place.
-  hiddenItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.control,
-    backgroundColor: colors.surfaceAlt,
-  },
-  hiddenText: {
-    ...typography.label,
-    color: colors.textMuted,
-    flex: 1,
-  },
-  hiddenAction: {
-    minHeight: tapMin,
-    justifyContent: "center",
-    paddingHorizontal: spacing.none,
-    paddingVertical: spacing.xxs,
-    borderWidth: borders.none,
-    borderColor: colors.transparent,
-    borderRadius: radii.none,
-    backgroundColor: colors.transparent,
-  },
-  hiddenActionLabel: {
-    ...typography.micro,
-    color: colors.accent,
-  },
-  emptyState: {
-    alignItems: "flex-start",
-    paddingVertical: spacing.xxxl,
-  },
-  emptyText: {
-    ...typography.body,
-    color: colors.textMuted,
-  },
-});

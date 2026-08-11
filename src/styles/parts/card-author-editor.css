@@ -1,0 +1,211 @@
+/* ═══════════ CardAuthorEditor (card-author-multi, 2026-04-15) ═══════════ */
+.card-author-editor {
+  max-width: 720px;
+  z-index: 10020;
+}
+.card-author-editor-backdrop {
+  z-index: 10019;
+}
+.card-author-editor-body {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(260px, 1fr);
+  gap: 16px;
+}
+@media (max-width: 640px) {
+  .card-author-editor-body {
+    grid-template-columns: 1fr;
+  }
+}
+.card-author-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  margin: 0 0 8px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.card-author-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-text-faint);
+}
+.card-author-student-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+}
+.card-author-student-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
+}
+.card-author-student-row:last-child {
+  border-bottom: none;
+}
+.card-author-student-row.is-selected {
+  background: var(--color-accent-tinted-bg);
+}
+.card-author-num {
+  width: 28px;
+  color: var(--color-text-faint);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: right;
+}
+.card-author-selected-list {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.card-author-selected-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+.card-author-primary-badge {
+  width: 24px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.card-author-name-input {
+  flex: 1;
+  padding: 6px 10px;
+  font-size: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  font-family: inherit;
+}
+.card-author-row-actions {
+  display: flex;
+  gap: 6px;
+}
+.card-author-row-actions button {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 14px;
+}
+@media (pointer: coarse) {
+  .card-author-row-actions button {
+    width: var(--tap-min);
+    height: var(--tap-min);
+  }
+  .card-author-student-row {
+    min-height: var(--tap-min);
+  }
+}
+.card-author-row-actions button:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+.card-author-row-remove {
+  color: var(--color-danger) !important;
+}
+.card-author-add-freeform {
+  width: 100%;
+  padding: 8px;
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.card-author-add-freeform:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.card-author-loading,
+.card-author-empty {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  padding: 12px;
+  text-align: center;
+}
+.card-author-error {
+  color: var(--color-danger);
+  font-size: 13px;
+  padding: 8px 0;
+}
+.card-author-save-error {
+  margin-top: 8px;
+  background: var(--color-status-returned-bg);
+  border-radius: var(--radius-btn);
+  padding: 8px 12px;
+}
+.card-detail-edit-authors,
+.card-author-edit-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--control-inline-gap);
+  margin-top: 0;
+  width: auto;
+  min-height: 24px;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 120ms ease;
+}
+.card-detail-edit-authors img.emoji,
+.card-author-edit-action img.emoji {
+  margin: 0;
+}
+.card-detail-edit-authors:hover,
+.card-author-edit-action:hover {
+  color: var(--color-text);
+}
+
+/* Placeholder shown in CanvaEmbedSlot when we don't have an oEmbed
+   thumbnail (anonymous oEmbed returns 401). Neutral Canva-brand-ish
+   gradient with a centred label. Replaced by the real iframe the
+   moment it loads. */
+.card-canva-slot-placeholder {
+  background: #fff;
+  color: var(--color-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  inset: 0;
+}
+.card-canva-slot-placeholder-label {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  opacity: 0.92;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}

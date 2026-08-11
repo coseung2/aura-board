@@ -1,0 +1,130 @@
+/* -------- Dashboard classroom link -------- */
+
+.dashboard-classroom-row {
+  max-width: var(--container-max-width);
+  margin: 0 auto 16px;
+  /* BC-1 fix: flex row so the h2 (lesson/play title) sits on the left and
+     the .dashboard-classroom-link (학급 관리) pushes to the right via
+     margin-left: auto. Without this the link collapses next to the title. */
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dashboard-classroom-link {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-accent);
+  text-decoration: none;
+  transition: color 150ms ease;
+}
+
+.dashboard-classroom-link:hover {
+  color: var(--color-accent-active);
+}
+
+/* -------- BC-1: lesson vs play section title -------- */
+
+.dashboard-section-title {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--color-text-strong);
+  margin: 0;
+}
+
+.dashboard-section-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.dashboard-classroom-row .dashboard-classroom-link {
+  margin-left: auto;
+}
+
+.board-section-tabs {
+  max-width: var(--container-max-width);
+  margin: 0 auto 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.board-section-tabs-list {
+  display: inline-flex;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  overflow: hidden;
+  background: var(--color-surface);
+}
+
+.board-section-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 88px;
+  box-sizing: border-box;
+  border: none;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    color 120ms ease;
+}
+
+.board-section-tab:last-child {
+  border-right: none;
+}
+
+.board-section-tab:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.board-section-tab.is-active {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.board-section-tab-count {
+  display: inline-flex;
+  justify-content: flex-end;
+  min-width: 2ch;
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.9;
+}
+
+.board-section-tabs-link {
+  margin-left: auto;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.board-section-tabs-link:hover {
+  color: var(--color-accent-active);
+}
+
+@media (max-width: 640px) {
+  .board-section-tabs {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .board-section-tabs-link {
+    margin-left: 0;
+  }
+}

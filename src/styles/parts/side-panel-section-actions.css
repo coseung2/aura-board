@@ -1,0 +1,121 @@
+
+/* ?? Section actions trigger in ColumnsBoard header ???? */
+
+.section-actions-trigger {
+  background: none;
+  border: 0;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 8px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  border-radius: 6px;
+}
+
+.section-actions-trigger:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+/* ?? Section rename / delete tab styles ???????????????? */
+
+.section-rename-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-rename-form label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.section-rename-form input {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.section-rename-form input:focus {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 2px;
+}
+
+.section-rename-form .actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 6px;
+}
+
+.section-rename-form button[type="submit"] {
+  background: var(--color-accent);
+  color: #fff;
+  border: 0;
+  padding: 10px 16px;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.section-rename-form button[type="submit"]:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.section-delete-confirm {
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-bg);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.section-delete-confirm p {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.section-delete-confirm .checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.section-delete-btn {
+  background: var(--color-danger, #c62828);
+  color: #fff;
+  border: 0;
+  padding: 10px 16px;
+  border-radius: var(--radius-btn);
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-end;
+}
+
+.section-delete-btn:hover:not(:disabled) {
+  background: var(--color-danger-active, #a01b1b);
+}
+
+.section-delete-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.section-panel-notice {
+  padding: 12px;
+  border-radius: var(--radius-card);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin-bottom: 12px;
+}

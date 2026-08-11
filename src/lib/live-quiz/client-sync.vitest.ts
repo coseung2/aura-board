@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import type { LiveQuizStateResponse } from "./contracts";
 import {
+  createLiveQuizCounterAccumulator,
   estimateServerOffsetMs,
   liveQuizBoundaryTarget,
   liveQuizCounterKey,
+  mergeLiveQuizCounterShard,
   mergeCachedLiveQuizAnswerCount,
   mergeLiveQuizAnswerCount,
   parseLiveQuizRealtimeCounter,
@@ -94,17 +96,20 @@ describe("live quiz client synchronization", () => {
       parseLiveQuizRealtimeCounter({
         sessionKey: "2026-08-06",
         questionId: "question-1",
+        shard: 3,
         answerCount: 7,
       }),
     ).toEqual({
       sessionKey: "2026-08-06",
       questionId: "question-1",
+      shard: 3,
       answerCount: 7,
     });
     expect(
       parseLiveQuizRealtimeCounter({
         sessionKey: "2026-08-06",
         questionId: "question-1",
+        shard: 3,
         answerCount: "7",
       }),
     ).toBeNull();
@@ -112,6 +117,7 @@ describe("live quiz client synchronization", () => {
       parseLiveQuizRealtimeCounter({
         sessionKey: "2026-08-06",
         questionId: "question-1",
+        shard: 3,
         answerCount: -1,
       }),
     ).toBeNull();
@@ -122,6 +128,7 @@ describe("live quiz client synchronization", () => {
     const advanced = mergeLiveQuizAnswerCount(state, {
       sessionKey: "2026-08-06",
       questionId: "question-1",
+      shard: 3,
       answerCount: 5,
     });
     expect(advanced.activeAnswerCount).toBe(5);
@@ -129,6 +136,7 @@ describe("live quiz client synchronization", () => {
       mergeLiveQuizAnswerCount(advanced, {
         sessionKey: "2026-08-06",
         questionId: "question-1",
+        shard: 3,
         answerCount: 4,
       }),
     ).toBe(advanced);
@@ -136,9 +144,81 @@ describe("live quiz client synchronization", () => {
       mergeLiveQuizAnswerCount(state, {
         sessionKey: "2026-08-06",
         questionId: "question-2",
+        shard: 3,
         answerCount: 9,
       }),
     ).toBe(state);
+  });
+
+  it("aggregates independent shard updates without moving a shard backward", () => {
+    const counters = createLiveQuizCounterAccumulator();
+    expect(
+      mergeLiveQuizCounterShard(
+        {
+          sessionKey: "2026-08-06",
+          questionId: "question-1",
+          shard: 4,
+          answerCount: 3,
+        },
+        counters,
+      ),
+    ).toBe(3);
+    expect(
+      mergeLiveQuizCounterShard(
+        {
+          sessionKey: "2026-08-06",
+          questionId: "question-1",
+          shard: 9,
+          answerCount: 5,
+        },
+        counters,
+      ),
+    ).toBe(8);
+    expect(
+      mergeLiveQuizCounterShard(
+        {
+          sessionKey: "2026-08-06",
+          questionId: "question-1",
+          shard: 4,
+          answerCount: 2,
+        },
+        counters,
+      ),
+    ).toBe(8);
+  });
+
+  it("advances a seeded total on the first post-subscribe shard increment", () => {
+    const counters = createLiveQuizCounterAccumulator();
+    const seeded = [
+      { shard: 3, answerCount: 40 },
+      { shard: 9, answerCount: 60 },
+    ];
+    for (const row of seeded) {
+      mergeLiveQuizCounterShard(
+        {
+          sessionKey: "2026-08-06",
+          questionId: "question-1",
+          ...row,
+        },
+        counters,
+      );
+    }
+    expect(counters.totals.get(liveQuizCounterKey("2026-08-06", "question-1"))).toBe(100);
+
+    const total = mergeLiveQuizCounterShard(
+      {
+        sessionKey: "2026-08-06",
+        questionId: "question-1",
+        shard: 9,
+        answerCount: 61,
+      },
+      counters,
+    );
+    expect(total).toBe(101);
+    expect(
+      mergeCachedLiveQuizAnswerCount(liveState({ activeAnswerCount: 100 }), counters.totals)
+        .activeAnswerCount,
+    ).toBe(101);
   });
 
   it("merges an event received before the matching snapshot is rendered", () => {

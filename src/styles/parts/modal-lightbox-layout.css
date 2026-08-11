@@ -1,0 +1,388 @@
+/* Image Lightbox — card detail images are portaled to document.body so the
+   viewer covers the whole viewport instead of being clipped by the modal. */
+.card-image-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(16px, 3vw, 40px);
+}
+
+.card-image-lightbox-img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.card-image-lightbox-close,
+.card-image-lightbox-nav {
+  position: absolute;
+  color: #fff;
+  cursor: pointer;
+  width: 46px;
+  height: 46px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  transition: transform 120ms ease;
+}
+
+.card-image-lightbox-close:hover,
+.card-image-lightbox-nav:hover {
+  color: #fff;
+}
+
+.card-image-lightbox-nav {
+  filter: drop-shadow(0 1px 3px rgba(15, 23, 42, 0.55));
+}
+
+.card-image-lightbox-nav:hover {
+  background: transparent;
+  border-color: transparent;
+}
+
+.card-image-lightbox-close:focus-visible,
+.card-image-lightbox-nav:focus-visible {
+  outline: 3px solid rgba(255, 255, 255, 0.42);
+  outline-offset: 3px;
+}
+
+.card-image-lightbox-close {
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+  filter: drop-shadow(0 1px 3px rgba(15, 23, 42, 0.55));
+}
+
+.card-image-lightbox-nav.is-prev {
+  left: max(16px, env(safe-area-inset-left));
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.card-image-lightbox-nav.is-next {
+  right: max(16px, env(safe-area-inset-right));
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.card-image-lightbox-nav.is-prev:hover {
+  transform: translateY(-50%) translateX(-2px);
+}
+
+.card-image-lightbox-nav.is-next:hover {
+  transform: translateY(-50%) translateX(2px);
+}
+
+.card-image-lightbox-counter {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 4px 12px;
+  border-radius: 999px;
+}
+
+/* OptimizedImage wrapper — force the wrapper to take the full pane so
+   the <img> inside can actually grow. next/image with fill needs a sized
+   parent. */
+.card-detail-media .optimized-img-wrap,
+.card-detail-media .card-link-preview-image {
+  width: 100%;
+  position: relative;
+}
+
+/* LinkPreviewImage renders with both .card-link-preview-image AND
+   .optimized-img-wrap. optimized-image.css's combined selector
+   (`.card-link-preview-image.optimized-img-wrap`) hard-codes
+   height: 112px so the card thumbnail looks compact — but it lives later
+   in the import order than modal.css, so the fixed height wins inside
+   the detail modal too, shrinking the link preview to a 112px sliver
+   whenever the card also has an image. Bump specificity with the
+   modal-scoped ancestor so the modal's `flex: 1 1 auto; height: auto`
+   rule above actually applies. */
+.card-detail-media .card-link-preview-image.optimized-img-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+  max-height: none;
+}
+/* In the detail modal, the Canva slot should fill the full media pane
+   (height of modal minus header). Override the 16:9 padding-bottom
+   aspect ratio trick that card.css uses for the inline thumbnail. */
+.card-detail-media .card-canva-slot {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0;
+}
+.card-detail-media .card-canva-slot-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  height: auto;
+  padding-bottom: 0;
+  min-height: 60vh;
+}
+.card-detail-media .card-canva-slot-iframe,
+.card-detail-media .card-canva-slot-thumbnail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* 1-column + right rail (2026-06-13): 모달 좌측 main = carousel + 텍스트
+   + 다운로드. 우측 rail = 작성자 + 좋아요/댓글. main은 column flex로
+   위 = media, 아래 = content-zone. */
+.card-detail-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  background: var(--color-surface);
+}
+/* media/content-zone 고정 (2026-06-13): media는 YouTube 16:9 비율로 고정.
+   content-zone은 남은 공간. */
+.card-detail-media {
+  flex: 0 0 auto;
+  aspect-ratio: 16 / 9;
+  width: 100%;
+  min-height: 0;
+  max-height: 70%;
+}
+.card-detail-content-zone {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 16px 24px 20px;
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+}
+.card-detail-body-text {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card-detail-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px 64px;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.card-detail-title {
+  font-family: var(--font-display);
+  /* font-size는 CardDetailModal.tsx에서 인라인 clamp()로 슬라이드
+     영역에 맞춰 가변 적용. */
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+  flex-shrink: 0;
+}
+
+/* body-text (2026-06-13): 위 .card-detail-content-zone 안에서 정의됨. */
+.card-detail-file-list {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.card-detail-content {
+  white-space: pre-wrap;
+  /* font-size는 인라인 15px로 고정. */
+  margin: 0;
+  color: var(--color-text);
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+.card-detail-content-title,
+.card-detail-link-title,
+.card-detail-link-desc {
+  flex-shrink: 0;
+}
+
+/* 작성자 + 작성자 지정 버튼 묶음 — 본문과 분리, 슬라이드 하단 고정. */
+.card-detail-meta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+  min-height: 24px;
+  font-size: 15px;
+  line-height: 1.5;
+  padding-right: 50px;
+}
+
+.card-detail-meta .card-author-footer {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  min-height: 24px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+  line-height: 1;
+}
+
+.card-detail-meta .card-author-chip {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 24px;
+  max-width: 180px;
+  line-height: 1;
+}
+
+.card-detail-meta .card-author-time {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 500;
+  min-height: 24px;
+  line-height: 1;
+}
+
+.add-card-author-picker {
+  display: grid;
+  grid-template-columns: minmax(200px, 1fr) minmax(260px, 1fr);
+  gap: 16px;
+}
+
+.add-card-author-picker .card-author-roster,
+.add-card-author-picker .card-author-selected {
+  min-width: 0;
+}
+
+.add-card-author-picker[data-has-roster="false"] {
+  grid-template-columns: 1fr;
+}
+
+@media (max-width: 640px) {
+  .add-card-author-picker {
+    grid-template-columns: 1fr;
+  }
+}
+
+.card-detail-link {
+  display: inline-block;
+  padding: 8px 14px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.card-detail-link:hover {
+  background: var(--color-surface-alt);
+}
+
+.card-detail-modal[data-detail-layout="media-meta"] .card-detail-content-zone,
+.card-detail-modal[data-has-body="false"][data-has-media="true"]
+  .card-detail-content-zone {
+  display: none;
+}
+.card-detail-modal[data-detail-layout="media-meta"] .card-detail-main,
+.card-detail-modal[data-has-body="false"][data-has-media="true"]
+  .card-detail-main {
+  /* media only: media만 보이게 main column 너비 제한. rail은 220px 그대로. */
+  max-width: 100%;
+}
+.card-detail-modal[data-detail-layout="media-meta"] .card-detail-media,
+.card-detail-modal[data-has-body="false"][data-has-media="true"]
+  .card-detail-media {
+  flex: 1 1 auto;
+  aspect-ratio: auto;
+  max-height: none;
+}
+/* media-only: portrait에서 grid 1fr (rail만) + media full width */
+@media (orientation: portrait), (max-width: 1199px) {
+  .card-detail-modal[data-detail-layout="media-meta"] .card-detail-body,
+  .card-detail-modal[data-has-body="false"][data-has-media="true"]
+    .card-detail-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 1fr auto;
+  }
+}
+
+/* text-only modal variant (2026-06-13): media가 없으면 main을 hide하지
+   않고 display:flex로 살려서 content-zone이 main 안에서 정상 렌더되게
+   함. modal 컨테이너 크기도 줄여서 빈 공간 최소화. CSS-only 변경. */
+.card-detail-modal[data-detail-layout="text-meta"] .card-detail-body,
+.card-detail-modal[data-has-media="false"] .card-detail-body {
+  /* main을 살리므로 rail만 별도 컬럼으로 두기 위해 1fr 280px 유지
+     (기본 1fr 220px → 본문이 좁아보이니 text-only에선 rail 280px) */
+  grid-template-columns: 1fr 280px;
+}
+.card-detail-modal[data-detail-layout="text-meta"] .card-detail-main,
+.card-detail-modal[data-has-media="false"] .card-detail-main {
+  display: flex;
+}
+.card-detail-modal[data-detail-layout="text-meta"],
+.card-detail-modal[data-has-media="false"] {
+  width: min(900px, calc(100vw - 48px));
+  height: auto;
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+}
+.card-detail-modal[data-detail-layout="text-meta"] .card-detail-content-zone,
+.card-detail-modal[data-has-media="false"] .card-detail-content-zone {
+  border-top: none;
+}
+/* portrait mode override (2026-06-13): text-only면 55dvh collapse 방지.
+   portrait에서도 main이 살았으므로 grid rows auto로 두기. */
+@media (orientation: portrait), (max-width: 1199px) {
+  .card-detail-modal[data-detail-layout="text-meta"] .card-detail-body,
+  .card-detail-modal[data-has-media="false"] .card-detail-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
+  }
+}
+
+/* Stack vertically whenever the viewport is portrait-oriented (tablet
+   세로, phone) OR narrower than 1200px (narrow desktop window). 1컬럼 +
+   rail 구조에서는 main 위, rail 아래로 쌓음. */
+@media (orientation: portrait), (max-width: 1199px) {
+  .card-detail-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: 55dvh auto;
+  }
+  .card-detail-rail {
+    border-left: 0;
+    border-top: 1px solid var(--color-border);
+    overflow-y: auto;
+  }
+}

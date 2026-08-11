@@ -10,6 +10,10 @@ vi.mock("./slime-assets", () => ({
   SLIME_ASSET_COLORS: ["blue", "green", "yellow", "purple", "red"],
 }));
 
+vi.mock("./slime-props.generated", () => ({
+  SLIME_MOBILE_BALL_PROP_REGISTRY: {},
+}));
+
 import {
   buildSlimeShopOverviewSections,
   optimisticallyEquipSlimeItem,

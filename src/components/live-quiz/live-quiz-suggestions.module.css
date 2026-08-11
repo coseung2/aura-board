@@ -1,0 +1,325 @@
+.suggestionLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.suggestionForm,
+.suggestionHistory {
+  padding: clamp(20px, 4vw, 32px);
+}
+
+.sectionHeading h2 {
+  margin-top: 4px;
+  font-size: 1.45rem;
+}
+
+.formIntro {
+  margin: 12px 0 22px;
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+  margin-bottom: 16px;
+}
+
+.field > span,
+.choiceEditor legend {
+  color: var(--color-text);
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.field input,
+.field textarea,
+.choiceEditRow > input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  outline: none;
+}
+
+.field input,
+.choiceEditRow > input {
+  min-height: 46px;
+  padding: 0 13px;
+}
+
+.field textarea {
+  resize: vertical;
+  padding: 12px 13px;
+  line-height: 1.55;
+}
+
+.field input:focus,
+.field textarea:focus,
+.choiceEditRow > input:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 14%, transparent);
+}
+
+.choiceEditor {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 16px;
+  padding: 0;
+  border: 0;
+}
+
+.choiceEditor legend {
+  margin-bottom: 7px;
+}
+
+.choiceEditor > p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.choiceEditRow {
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 9px;
+}
+
+.correctRadio {
+  position: relative;
+  display: grid;
+  min-height: 46px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.correctRadio input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.correctRadio:has(input:checked) {
+  border-color: var(--color-accent);
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.successNotice,
+.errorNotice {
+  margin: 12px 0 0;
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.successNotice {
+  color: #15803d;
+}
+
+.suggestionHistory {
+  position: sticky;
+  top: 82px;
+}
+
+.emptyHistory {
+  display: grid;
+  min-height: 220px;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.emptyHistory span {
+  font-size: 2rem;
+}
+
+.emptyHistory p {
+  margin: 0;
+}
+
+.historyList {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.historyList li {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface-alt);
+}
+
+.historyList li > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.historyList time {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.historyList strong {
+  color: var(--color-text);
+  font-size: 0.93rem;
+  line-height: 1.45;
+}
+
+.historyList p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.statusChip {
+  display: inline-flex;
+  min-height: 25px;
+  align-items: center;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.pending {
+  color: #92400e;
+  background: #fef3c7;
+}
+
+.approved {
+  color: #166534;
+  background: #dcfce7;
+}
+
+.rejected {
+  color: #9f1239;
+  background: #ffe4e6;
+}
+
+.archived {
+  color: #475569;
+  background: #e2e8f0;
+}
+
+.skeletonTitle,
+.skeletonBody {
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-alt),
+    color-mix(in srgb, var(--color-surface-alt) 55%, white),
+    var(--color-surface-alt)
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.4s infinite;
+}
+
+.skeletonTitle {
+  width: min(360px, 80%);
+  height: 42px;
+}
+
+.skeletonBody {
+  width: min(560px, 92%);
+  height: 150px;
+}
+
+@keyframes shimmer {
+  to {
+    background-position: -220% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waitingPulse::before,
+  .skeletonTitle,
+  .skeletonBody {
+    animation: none;
+  }
+
+  .option,
+  .progressTrack span,
+  .timerTrack span {
+    transition: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 16px 12px 44px;
+  }
+
+  .hero {
+    align-items: stretch;
+    padding: 22px 18px;
+    flex-direction: column;
+  }
+
+  .viewerCard {
+    min-width: 0;
+  }
+
+  .options,
+  .suggestionLayout {
+    grid-template-columns: 1fr;
+  }
+
+  .suggestionHistory {
+    position: static;
+  }
+
+  .option {
+    min-height: 76px;
+  }
+}
+
+@media (max-width: 460px) {
+  .quizCard,
+  .suggestionForm,
+  .suggestionHistory {
+    border-radius: 18px;
+  }
+
+  .quizMeta {
+    align-items: flex-start;
+  }
+
+  .prompt {
+    margin: 28px auto;
+  }
+
+  .option {
+    grid-template-columns: auto 1fr;
+    gap: 10px;
+    padding: 12px;
+  }
+
+  .optionResult {
+    grid-column: 2;
+  }
+
+  .tabs {
+    border-radius: 13px;
+  }
+}

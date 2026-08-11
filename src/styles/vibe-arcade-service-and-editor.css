@@ -1,0 +1,356 @@
+/* ======================================================================
+   Student landing (보드 진입 시 학생이 보는 중앙 CTA)
+   ===================================================================== */
+
+.va-student-landing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+}
+
+.va-student-landing-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+  max-width: 520px;
+  padding: 48px 40px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.va-student-landing-inner .va-title {
+  font-size: 28px;
+  margin: 0;
+}
+
+.va-student-landing-inner .va-subtitle {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin: 0 0 8px;
+}
+
+.va-student-enter {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 32px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 700;
+  border-radius: var(--radius-btn);
+  text-decoration: none;
+  transition: background var(--t-normal), transform var(--t-fast);
+}
+
+.va-student-enter:hover {
+  background: var(--color-primary-dark, #388e3c);
+  transform: translateY(-1px);
+}
+
+/* Agent service secondary entry */
+.va-student-enter-secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 2px solid var(--color-border);
+}
+
+.va-student-enter-secondary:hover {
+  border-color: var(--color-primary);
+  background: var(--color-primary-bg, #e8f5e9);
+}
+
+.va-student-enter:active {
+  transform: translateY(0);
+}
+
+/* ======================================================================
+   Student Studio page (풀페이지 챗 + 프리뷰)
+   ===================================================================== */
+
+.va-studio-page {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--color-bg);
+}
+
+.va-studio-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.va-studio-back {
+  padding: 6px 12px;
+  border-radius: var(--radius-btn);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background var(--t-normal);
+}
+
+.va-studio-back:hover {
+  background: var(--color-border);
+}
+
+.va-studio-bar-center {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.va-studio-title {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  font-size: 15px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--color-text);
+  outline: none;
+}
+
+.va-studio-title:focus {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+
+.va-studio-author {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.va-studio-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.va-studio-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.va-studio-tag select {
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+}
+
+.va-studio-submit {
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--t-normal);
+}
+
+.va-studio-submit:hover:not(:disabled) {
+  background: var(--color-accent-active);
+}
+
+.va-studio-submit:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.va-studio-err {
+  padding: 8px 18px;
+  background: #fff4f4;
+  border-bottom: 1px solid var(--color-danger);
+  color: var(--color-danger);
+  font-size: 12px;
+}
+
+.va-studio-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  /* row 를 minmax(0,1fr) 로 잠가야 자식의 긴 콘텐츠가 row 를 늘리지 않음.
+     이전: rows 가 auto → 챗 로그가 커지면 row 가 함께 커져 프리뷰까지 무한 확장. */
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.va-studio-chat {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-right: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.va-studio-chat-log {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.va-studio-chat-form {
+  display: flex;
+  gap: 8px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--color-border);
+  background: #faf9f7;
+}
+
+.va-studio-chat-input {
+  flex: 1;
+  resize: none;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+}
+
+.va-studio-chat-input:focus {
+  border-color: var(--color-accent);
+}
+
+.va-studio-chat-send {
+  padding: 8px 18px;
+  border: none;
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: #fff;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background var(--t-normal);
+}
+
+.va-studio-chat-send:hover:not(:disabled) {
+  background: var(--color-accent-active);
+}
+
+.va-studio-chat-send:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.va-studio-preview {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  background: #f0ede9;
+}
+
+.va-studio-preview-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: #faf9f7;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.va-studio-preview-tab {
+  padding: 6px 14px;
+  border: none;
+  background: transparent;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-btn);
+  transition: background var(--t-normal), color var(--t-normal);
+}
+
+.va-studio-preview-tab:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.va-studio-preview-tab.is-active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.va-studio-code {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 14px 16px;
+  overflow: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--color-text);
+  background: #fff;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.va-studio-code-editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.va-studio-code-editor .monaco-canvas {
+  flex: 1;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.va-studio-code-editor .monaco-canvas-tabs,
+.va-studio-code-editor .monaco-canvas-editor {
+  min-height: 0;
+}
+
+.va-studio-code-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  background: #fff;
+}
+
+.va-studio-iframe {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: #fff;
+}

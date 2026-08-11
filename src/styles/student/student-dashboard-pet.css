@@ -1,0 +1,505 @@
+/* -------- Slime dashboard widget -------- */
+.student-daily-game-panel {
+  display: grid;
+  grid-template-rows: 44px minmax(260px, auto);
+}
+
+.student-daily-game-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  column-gap: clamp(16px, 4vw, 48px);
+}
+
+.student-daily-game-header h2 {
+  align-self: stretch;
+  display: flex;
+  align-items: flex-end;
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.student-daily-game-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: clamp(16px, 4vw, 48px);
+  min-height: 260px;
+}
+
+.student-daily-game-panel .student-slime-card {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.student-daily-game-panel .student-slime-header {
+  display: none;
+}
+
+.student-daily-game-panel .student-slime-link,
+.student-daily-game-panel .student-slime-copy {
+  display: none;
+}
+
+.student-daily-game-panel .student-slime-body {
+  min-height: 260px;
+  grid-template-columns: 1fr;
+  padding: 0;
+  background: transparent;
+}
+
+.student-daily-game-panel .student-slime-sprite {
+  min-height: 260px;
+  width: 100%;
+}
+
+.student-daily-reward-panel {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  padding: 8px 0;
+}
+
+.student-daily-reward-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 4px 12px;
+  border-radius: 0;
+  color: var(--color-text);
+  background: transparent;
+  text-decoration: none;
+}
+
+.student-daily-reward-row:hover,
+.student-daily-reward-row:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.student-daily-reward-label {
+  width: 48px;
+  font-weight: 700;
+}
+
+.student-daily-reward-status {
+  color: var(--color-accent-active);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.student-daily-reward-status.is-complete {
+  color: var(--color-text-muted);
+}
+
+.student-daily-reward-icon {
+  color: var(--color-text-muted);
+  flex: 0 0 auto;
+}
+
+.student-daily-reward-status {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.student-daily-reward-chevron {
+  color: var(--color-text-faint);
+  flex: 0 0 auto;
+}
+
+.student-daily-reward-complete {
+  color: var(--color-success);
+  flex: 0 0 auto;
+}
+
+.student-slime-card {
+  display: grid;
+  gap: 8px;
+  min-height: 260px;
+  padding: 16px clamp(18px, 4vw, 48px) 24px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background:
+    radial-gradient(
+      circle at 28% 48%,
+      color-mix(in srgb, var(--color-surface) 94%, transparent),
+      transparent 30%
+    ),
+    var(--color-accent-tinted-bg);
+  overflow: hidden;
+}
+
+.student-slime-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.student-slime-eyebrow {
+  margin: 0 0 5px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+
+.student-slime-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.student-slime-link {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.student-slime-link:hover,
+.student-slime-link:focus-visible {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.student-slime-body {
+  display: grid;
+  grid-template-columns: minmax(200px, 0.85fr) minmax(220px, 1fr);
+  align-items: center;
+  gap: clamp(24px, 6vw, 72px);
+  width: min(760px, 100%);
+  margin: 0 auto;
+}
+
+.student-slime-sprite {
+  display: grid;
+  width: max-content;
+  max-width: 100%;
+  min-width: 128px;
+  min-height: 230px;
+  height: auto;
+  place-items: center;
+  justify-self: center;
+  border-radius: 0;
+  background: transparent;
+  overflow: visible;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.student-slime-sprite.student-slime-sprite-scene {
+  /* Use the same tallest 2x scene canvas as the pet collection and classroom
+     gallery, so changing floor or vehicle never shifts the home layout. */
+  width: max-content;
+  max-width: none;
+  height: auto;
+  min-height: 230px;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  background-image: none;
+  overflow: visible;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* The sprite renderer owns integer scaling. Never re-scale children here. */
+.student-slime-sprite > * {
+  transform: none;
+  transform-origin: center;
+  max-width: none;
+}
+
+.student-slime-sprite img {
+  display: block;
+  max-width: none;
+  object-fit: fill;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.student-slime-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 7px;
+}
+
+.student-slime-name {
+  overflow: hidden;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: clamp(20px, 3vw, 30px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-slime-color,
+.student-slime-buff,
+.student-slime-balance,
+.student-slime-status,
+.student-slime-empty span {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.student-slime-buff {
+  color: var(--color-accent-tinted-text);
+  font-weight: 600;
+}
+
+.student-slime-balance {
+  margin-top: 2px;
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.student-slime-status,
+.student-slime-empty {
+  align-self: center;
+  justify-self: center;
+  width: min(520px, 100%);
+  margin: 28px 0;
+  padding: 20px;
+  border-radius: 8px;
+  background: var(--color-bg-alt);
+}
+
+.student-slime-status[role="alert"] {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-bank-negative);
+}
+
+.student-slime-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.student-slime-empty p {
+  margin: 0;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.student-page .student-slime-card {
+  min-height: 240px;
+  padding: 4px 0 28px;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  background: transparent;
+}
+
+.student-page .student-daily-game-panel .student-slime-card {
+  min-height: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.student-page .student-slime-sprite {
+  background: transparent;
+}
+
+.student-page .student-overview-row {
+  margin-block: 0 32px;
+}
+
+.student-page .student-daily-game-panel {
+  margin-bottom: 64px;
+}
+
+.student-page .student-utilities,
+.student-page .student-assignment-panel {
+    padding-bottom: 20px;
+}
+
+@media (max-width: 480px) {
+  .student-slime-body {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    text-align: center;
+  }
+
+  .student-slime-sprite,
+  .student-slime-sprite.student-slime-sprite-scene {
+    width: max-content;
+    max-width: 100%;
+    min-height: 230px;
+    height: auto;
+  }
+
+  .student-slime-sprite > * {
+    transform: none;
+  }
+
+  .student-slime-copy {
+    align-items: center;
+  }
+}
+
+@media (max-width: 760px) {
+  .student-page {
+    padding: 28px 16px 44px;
+  }
+
+  .student-topnav {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 10px 16px;
+  }
+
+  .student-topnav-left {
+    width: 100%;
+    gap: 12px;
+  }
+
+  .student-topnav-logo .ab-logo-wordmark {
+    display: none;
+  }
+
+  .student-topnav-links {
+    flex: 1;
+  }
+
+  .student-topnav-right {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .student-topnav-right.auth-header {
+    justify-content: flex-end;
+  }
+
+  .student-topnav-user {
+    align-items: flex-start;
+  }
+
+  .student-overview-row {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .student-utilities .student-wallet-header {
+    flex-direction: row;
+  }
+
+  .student-utilities .student-wallet-link {
+    width: auto;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 680px) {
+  .student-slime-body {
+    grid-template-columns: 180px minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .student-slime-body-scene {
+    grid-template-columns: 240px minmax(0, 1fr);
+  }
+
+  .student-slime-sprite,
+  .student-slime-sprite.student-slime-sprite-scene {
+    width: max-content;
+    max-width: 100%;
+    min-height: 230px;
+    height: auto;
+  }
+}
+
+.student-login-btn {
+  display: block;
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px;
+  background: var(--color-accent);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: background var(--t-normal);
+}
+
+.student-login-btn:hover:not(:disabled) {
+  background: var(--color-accent-active);
+}
+
+.student-login-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* ---- Empty state ---- */
+
+.student-empty {
+  text-align: center;
+  padding: 48px;
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+/* ---- QR Landing ---- */
+
+.student-qr-landing {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg);
+  padding: 32px;
+}
+
+.student-qr-error {
+  text-align: center;
+  max-width: 400px;
+}
+
+.student-qr-error h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 0 8px;
+  color: var(--color-text);
+}
+
+.student-qr-error p {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  margin: 0 0 24px;
+  line-height: 1.5;
+}
+
+/* BC-1: give lesson/play tabs comfortable breathing room after the compacted
+   portfolio/duty/wallet utility strip. */
+.student-page .board-section-tabs {
+  margin-top: 16px;
+}
+
+.student-page .board-section-tab {
+  min-height: 44px;
+}

@@ -7,33 +7,25 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { getEffectiveBoardRole, type Role } from "@/lib/rbac";
 import { shouldUseStudentBoardViewer } from "@/lib/board-engagement-context";
 import { BoardCanvas } from "@/components/BoardCanvas";
-import { GridBoard } from "@/components/GridBoard";
-import { StreamBoard } from "@/components/StreamBoard";
-import { ColumnsBoard } from "@/components/ColumnsBoard";
 import { AssignmentBoard } from "@/components/AssignmentBoard";
-import { QuizBoard } from "@/components/QuizBoard";
-import { PlantRoadmapBoard } from "@/components/PlantRoadmapBoard";
-import { EventSignupBoard } from "@/components/event/EventSignupBoard";
-import { AssessmentBoard } from "@/components/assessment/AssessmentBoard";
+import { BoardHeader } from "@/components/BoardHeader";
 import { BreakoutBoard } from "@/components/BreakoutBoard";
-import { DJBoard } from "@/components/DJBoard";
-import { VibeArcadeBoard } from "@/components/VibeArcadeBoard";
-import { VibeGalleryBoard } from "@/components/VibeGalleryBoard";
-import { QuestionBoard } from "@/components/QuestionBoard";
-import { SpeedGameBoard } from "@/components/speed-game/SpeedGameBoard";
-import { ShadowAllianceBoard } from "@/components/ShadowAllianceBoard";
-import { OmokBoard } from "@/components/OmokBoard";
-import { SongGuessBoard } from "@/components/SongGuessBoard";
-import { KordleTeacherBoard } from "@/features/kordle/components/KordleTeacherBoard";
 import { OfficialGameBoard } from "@/components/game-platform/OfficialGameBoard";
+import { renderGameplayBoard } from "./board-gameplay-renderer";
+import { renderBasicBoard } from "./board-basic-renderer";
+import {
+  buildSectionBreakoutForPage,
+  decodeRouteParam,
+  normalizeBoardTheme,
+  type SectionBreakoutConfigRow,
+  type SectionBreakoutGroupRow,
+} from "./board-page-utils";
 import { isOfficialPlayLayout } from "@/lib/game-platform/catalog";
 import { cloneStructure } from "@/lib/breakout";
 import { loadGameSnapshot } from "@/lib/speed-game/runtime";
 import type { PlantJournalResponse } from "@/types/plant";
 import type { BoardSection } from "@/components/BoardSettingsPanel";
-import { BoardVisitTracker } from "@/components/BoardVisitTracker";
-import { BoardHeader } from "@/components/BoardHeader";
-import { BoardSlideshowProvider } from "@/components/slideshow/BoardSlideshowProvider";
+import { BoardPageChrome } from "./board-page-chrome";
 import { loadPlantJournalInitial } from "@/lib/board-page/plant-journal-loader";
 import {
   isStreamActivityTemplate,
@@ -52,60 +44,6 @@ import type {
   AuraEvaluationLevel,
 } from "@/components/AuraEvaluationControl";
 import "@/features/kordle/components/kordle.css";
-
-// Auth + cookie reads already flag this route as dynamic.
-// Dropping the explicit flag keeps the Router Cache warm for navigations.
-
-// stream-board section breakout (2026-06-23): mirror of the SSE
-// buildSectionBreakoutSnapshot for the initial server-rendered page
-// payload. Inline (not a shared import) so the section-breakout wire
-// type is also free of client-side import friction.
-type SectionBreakoutConfigRow = {
-  sectionId: string;
-  groupCount: number;
-  groupCapacity: number | null;
-  joinMode: string;
-};
-type SectionBreakoutGroupRow = {
-  id: string;
-  sectionId: string;
-  name: string;
-  order: number;
-  _count: { members: number };
-  members: {
-    id: string;
-    studentId: string;
-    student: { id: string; name: string; number: number | null };
-  }[];
-};
-
-function buildSectionBreakoutForPage(
-  sectionId: string,
-  configBySection: Map<string, SectionBreakoutConfigRow>,
-  groupsBySection: Map<string, SectionBreakoutGroupRow[]>,
-) {
-  const cfg = configBySection.get(sectionId);
-  if (!cfg) return null;
-  const groups = (groupsBySection.get(sectionId) ?? []).map((g) => ({
-    id: g.id,
-    sectionId: g.sectionId,
-    name: g.name,
-    order: g.order,
-    memberCount: g._count.members,
-    members: g.members.map((member) => ({
-      id: member.id,
-      studentId: member.studentId,
-      studentName: member.student.name,
-      studentNumber: member.student.number,
-    })),
-  }));
-  return {
-    groupCount: cfg.groupCount,
-    groupCapacity: cfg.groupCapacity,
-    joinMode: cfg.joinMode,
-    groups,
-  };
-}
 export default async function BoardPage({
   params,
   searchParams,
@@ -113,21 +51,6 @@ export default async function BoardPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ view?: string }>;
 }) {
-  const normalizeBoardTheme = (
-    value: string | null | undefined,
-  ): BoardTheme => {
-    switch (value) {
-      case "pastel-peach":
-      case "pastel-mint":
-      case "pastel-sky":
-      case "pastel-lilac":
-      case "pastel-lemon":
-        return value;
-      default:
-        return "pastel-sky";
-    }
-  };
-
   const { id: rawId } = await params;
   const id = decodeRouteParam(rawId);
   const { view: viewParam } = await searchParams;
@@ -136,7 +59,6 @@ export default async function BoardPage({
   // tradeoff (scope phase2 R9 / phase3 §E9 accept this imperfection).
   const uaString =
     viewParam === "matrix" ? ((await headers()).get("user-agent") ?? "") : "";
-
   // Round 1 — resolve the board itself plus auth subjects concurrently.
   const [board, user, student] = await Promise.all([
     db.board.findFirst({
@@ -153,7 +75,6 @@ export default async function BoardPage({
     hasTeacherSession: Boolean(user),
     studentViewRequested,
   });
-
   // Official play layouts dispatch before any card/section/submission query.
   // Category is a database invariant, while layout is the canonical wire kind.
   if (isOfficialPlayLayout(board.layout)) {
@@ -181,10 +102,8 @@ export default async function BoardPage({
       />
     );
   }
-
   // 개발 중 기능(dev-only) 접근 권한이 있는 관리자 계정 여부.
   const isAdmin = isAdminEmail(user?.email);
-
   // Round 2 — fan out every dependent query that this layout actually renders.
   // - Card-rendering layouts (freeform / grid / stream / columns) skip
   //   submissions, members, and quizzes.
@@ -215,7 +134,6 @@ export default async function BoardPage({
     // twitter-style flow it was before.
     (board.layout === "stream" && board.streamSectionsEnabled);
   const needsBreakoutAssignment = needsBreakoutData;
-
   const cardsPromise = needsCards
     ? db.card.findMany({
         where: { boardId: board.id },
@@ -369,6 +287,7 @@ export default async function BoardPage({
     speedGamePromise,
   ]);
   const breakoutMemberships = breakoutMembershipsRaw ?? [];
+
   const rosterStudents = rosterStudentsRaw ?? [];
   const sectionBreakoutConfigRows = sectionBreakoutConfigRaw ?? [];
   const sectionBreakoutGroupRows = sectionBreakoutGroupRaw ?? [];
@@ -383,12 +302,11 @@ export default async function BoardPage({
     list.push(g);
     sectionBreakoutGroupBySection.set(g.sectionId, list);
   }
-
   const cards = cardsRaw ?? [];
+
   const sections = sectionsRaw ?? [];
   const quizzes = quizzesRaw ?? [];
   const speedGameInitial = speedGameRaw ?? null;
-
   // Role resolution moved into getEffectiveBoardRole (teacher + student DJ +
   // classroom-student baseline). studentViewer is the identity signal for
   // downstream viewer-kind checks. Teacher identity remains the default when
@@ -456,6 +374,7 @@ export default async function BoardPage({
         !hiddenReason &&
         studentViewer &&
         c.studentAuthorId &&
+
         c.studentAuthorId !== studentViewer.id,
       ),
       hiddenReason,
@@ -470,6 +389,7 @@ export default async function BoardPage({
         ? []
         : ((
             c as {
+
               authors?: {
                 id: string;
                 studentId: string | null;
@@ -532,7 +452,7 @@ export default async function BoardPage({
   let plantJournalInitial: PlantJournalResponse | null = null;
   if (needsPlantData) {
     plantJournalInitial = await loadPlantJournalInitial({
-      board,
+      board: board!,
       role,
       student,
       studentViewer,
@@ -675,47 +595,31 @@ export default async function BoardPage({
       anonymousAuthor: board!.anonymousAuthor,
     };
 
+    const basicBoard = renderBasicBoard({
+      board: board!,
+      common,
+      auraSettings,
+      auraEvaluations,
+      sectionProps,
+      subjectOrder,
+      classroomStudentCount,
+      currentUserId: user?.id ?? null,
+      currentStudentId: studentViewer?.id ?? null,
+      plantJournalInitial,
+    });
+    if (basicBoard !== undefined) return basicBoard;
+
+    const gameplayBoard = renderGameplayBoard({
+      board: board!,
+      effectiveRole,
+      studentViewer,
+      userId: user?.id ?? null,
+      quizzes,
+      speedGameInitial,
+    });
+    if (gameplayBoard !== undefined) return gameplayBoard;
+
     switch (board!.layout) {
-      case "grid":
-        return (
-          <GridBoard
-            {...common}
-            auraSettings={auraSettings}
-            auraEvaluations={auraEvaluations}
-          />
-        );
-      case "stream":
-        return (
-          <StreamBoard
-            {...common}
-            initialSections={sectionProps}
-            streamSectionsEnabled={board!.streamSectionsEnabled}
-            streamTitlePrompt={board!.streamTitlePrompt ?? ""}
-            streamContentPrompt={board!.streamContentPrompt ?? ""}
-          />
-        );
-      case "columns":
-        return (
-          <ColumnsBoard
-            {...common}
-            initialSections={sectionProps}
-            boardSubjectOrder={subjectOrder}
-            classroomStudentCount={classroomStudentCount}
-          />
-        );
-      case "dj-queue":
-        return (
-          <DJBoard
-            boardId={board!.id}
-            boardTitle={board!.title}
-            initialCards={cardProps}
-            currentRole={
-              (effectiveRole ?? "viewer") as "owner" | "editor" | "viewer"
-            }
-            currentUserId={user?.id ?? null}
-            currentStudentId={studentViewer?.id ?? null}
-          />
-        );
       case "breakout": {
         if (!breakoutAssignmentRaw) {
           return (
@@ -794,10 +698,12 @@ export default async function BoardPage({
         let matrixView = false;
         if (viewParam === "matrix") {
           if (viewer !== "teacher") {
+
             notFound();
           }
           const ua = uaString ?? "";
           const isNonDesktop = /Android|iPhone|iPad|iPod|Mobile|Tablet/i.test(
+
             ua,
           );
           if (isNonDesktop) {
@@ -841,191 +747,6 @@ export default async function BoardPage({
           />
         );
       }
-      case "plant-roadmap":
-        return <PlantRoadmapBoard initial={plantJournalInitial!} />;
-      case "event-signup":
-        return (
-          <EventSignupBoard
-            boardId={board!.id}
-            slug={board!.slug}
-            accessMode={board!.accessMode}
-            accessToken={board!.accessToken}
-            applicationStart={board!.applicationStart?.toISOString() ?? null}
-            applicationEnd={board!.applicationEnd?.toISOString() ?? null}
-            eventPosterUrl={board!.eventPosterUrl}
-            venue={board!.venue}
-            maxSelections={board!.maxSelections}
-            canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
-          />
-        );
-      case "quiz": {
-        const answerToIndex: Record<string, number> = {
-          A: 0,
-          B: 1,
-          C: 2,
-          D: 3,
-        };
-        return (
-          <QuizBoard
-            boardId={board!.id}
-            quizzes={quizzes.map((q) => ({
-              id: q.id,
-              title: q.title,
-              roomCode: q.roomCode,
-              status: q.status as "waiting" | "active" | "finished",
-              currentQuestionIndex: q.currentQ,
-              questions: q.questions.map((qn) => ({
-                id: qn.id,
-                text: qn.question,
-                options: [qn.optionA, qn.optionB, qn.optionC, qn.optionD],
-                correctIndex: answerToIndex[qn.answer] ?? 0,
-                timeLimit: qn.timeLimit,
-              })),
-              players: q.players.map((p) => ({
-                id: p.id,
-                nickname: p.nickname,
-                score: p.score,
-              })),
-            }))}
-          />
-        );
-      }
-      case "assessment": {
-        const viewerKind: "teacher" | "student" | "none" = studentViewer
-          ? "student"
-          : effectiveRole === "owner"
-            ? "teacher"
-            : "none";
-        return (
-          <AssessmentBoard
-            boardId={board!.id}
-            classroomId={board!.classroomId ?? ""}
-            viewerKind={viewerKind}
-          />
-        );
-      }
-      case "vibe-arcade": {
-        const viewerKind: "teacher" | "student" | "none" = studentViewer
-          ? "student"
-          : effectiveRole === "owner" || effectiveRole === "editor"
-            ? "teacher"
-            : "none";
-        return (
-          <VibeArcadeBoard
-            boardId={board!.id}
-            classroomId={board!.classroomId ?? ""}
-            viewerKind={viewerKind}
-            studentId={studentViewer?.id ?? null}
-          />
-        );
-      }
-      case "vibe-gallery": {
-        // 2026-04-21: vibe-arcade studio에서 승인된 프로젝트를 전시하는 별도 보드.
-        // classroom 내부에서 큐레이션 가능 + 다른 학급이 옆 보드에서 감상.
-        const viewerKind: "teacher" | "student" | "none" = studentViewer
-          ? "student"
-          : effectiveRole === "owner" || effectiveRole === "editor"
-            ? "teacher"
-            : "none";
-        return (
-          <VibeGalleryBoard
-            boardId={board!.id}
-            classroomId={board!.classroomId ?? ""}
-            viewerKind={viewerKind}
-          />
-        );
-      }
-      case "question-board": {
-        const viewerKind: "teacher" | "student" | "none" = studentViewer
-          ? "student"
-          : effectiveRole === "owner" || effectiveRole === "editor"
-            ? "teacher"
-            : "none";
-        return (
-          <QuestionBoard
-            boardId={board!.id}
-            boardSlug={board!.slug}
-            initialPrompt={board!.questionPrompt ?? null}
-            initialVizMode={
-              (board!.questionVizMode as
-                | "word-cloud"
-                | "bar"
-                | "pie"
-                | "timeline"
-                | "list") ?? "word-cloud"
-            }
-            viewerKind={viewerKind}
-            currentStudentId={studentViewer?.id ?? null}
-          />
-        );
-      }
-      case "speed-game": {
-        const viewerKind: "teacher" | "student" | "none" = studentViewer
-          ? "student"
-          : effectiveRole === "owner" || effectiveRole === "editor"
-            ? "teacher"
-            : "none";
-        return (
-          <SpeedGameBoard
-            boardId={board!.id}
-            boardSlug={board!.slug ?? board!.id}
-            classroomId={board!.classroomId ?? ""}
-            viewerKind={viewerKind}
-            currentStudentId={studentViewer?.id ?? null}
-            initialGame={speedGameInitial}
-          />
-        );
-      }
-      case "shadow-alliance": {
-        const viewer = studentViewer
-          ? "student"
-          : effectiveRole === "owner" || effectiveRole === "editor"
-            ? "teacher"
-            : null;
-        return viewer ? (
-          <ShadowAllianceBoard
-            boardId={board!.id}
-            boardTitle={board!.title}
-            viewer={viewer}
-          />
-        ) : null;
-      }
-      case "omok": {
-        const viewer = studentViewer
-          ? "student"
-          : effectiveRole === "owner" || effectiveRole === "editor"
-            ? "teacher"
-            : null;
-        return viewer ? (
-          <OmokBoard
-            boardId={board!.id}
-            boardTitle={board!.title}
-            viewer={viewer}
-          />
-        ) : null;
-      }
-      case "song-guess": {
-        const viewer = studentViewer
-          ? "student"
-          : effectiveRole === "owner" || effectiveRole === "editor"
-            ? "teacher"
-            : null;
-        return viewer ? (
-          <SongGuessBoard
-            boardId={board!.id}
-            boardTitle={board!.title}
-            viewer={viewer}
-          />
-        ) : null;
-      }
-      case "kordle": {
-        if (studentViewer) {
-          redirect(`/board/${board!.slug ?? board!.id}/play/kordle`);
-        }
-        return (
-          <KordleTeacherBoard boardId={board!.id} teacherUserId={user!.id} />
-        );
-      }
       case "freeform":
       default:
         return (
@@ -1039,53 +760,18 @@ export default async function BoardPage({
   }
 
   return (
-    <BoardSlideshowProvider key={board.id}>
-      <main
-        className="board-page"
-        data-board-theme={boardTheme}
-        data-play-board={isPlayBoard ? "true" : undefined}
-        data-board-category={board.category}
-      >
-        <BoardVisitTracker boardId={board.id} />
-        {!isPlayBoard && (
-          <BoardHeader
-            boardId={board.id}
-            title={board.title}
-            layout={board.layout}
-            isAdmin={isAdmin}
-            isStudent={!!studentViewer}
-            backHref={studentViewer ? "/student" : "/dashboard"}
-            canEdit={effectiveRole === "owner" || effectiveRole === "editor"}
-            classrooms={settingsClassrooms}
-            classroomId={board.classroomId}
-            thumbnailMode={board.thumbnailMode}
-            thumbnailUrl={
-              (board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null
-            }
-            settingsSections={settingsSections}
-            anonymousAuthor={board.anonymousAuthor}
-            boardTheme={boardTheme}
-            shareMode={board.shareMode}
-            shareToken={board.shareToken}
-            shareShortCode={board.shareShortCode}
-            streamTitlePrompt={board.streamTitlePrompt ?? ""}
-            streamContentPrompt={board.streamContentPrompt ?? ""}
-            streamSectionsEnabled={board.streamSectionsEnabled}
-            auraSettings={auraSettings}
-            subjectOrder={subjectOrder}
-            showAuth={false}
-          />
-        )}
-        {renderBoard()}
-      </main>
-    </BoardSlideshowProvider>
+    <BoardPageChrome
+      board={board}
+      isAdmin={isAdmin}
+      isStudent={Boolean(studentViewer)}
+      effectiveRole={effectiveRole}
+      settingsClassrooms={settingsClassrooms}
+      settingsSections={settingsSections}
+      boardTheme={boardTheme}
+      auraSettings={auraSettings}
+      subjectOrder={subjectOrder}
+    >
+      {renderBoard()}
+    </BoardPageChrome>
   );
-}
-
-function decodeRouteParam(value: string) {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
 }

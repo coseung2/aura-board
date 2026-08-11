@@ -1,0 +1,133 @@
+/* ?? SidePanel primitive ????????????????????????????? */
+
+.side-panel-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 9998;
+  border: 0;
+  cursor: default;
+  padding: 0;
+}
+
+.side-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 420px;
+  max-width: 100%;
+  background: var(--color-surface);
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.08), var(--shadow-card);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  transform: translateX(0);
+  transition: transform 250ms ease-out;
+}
+
+@media (max-width: 767px) {
+  .side-panel {
+    top: auto;
+    left: 0;
+    right: 0;
+    width: auto !important;
+    max-height: 85vh;
+    border-radius: 16px 16px 0 0;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .side-panel {
+    transition: none;
+  }
+}
+
+.side-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--color-border);
+  flex: 0 0 auto;
+}
+
+.side-panel-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.side-panel-close {
+  background: none;
+  border: 0;
+  cursor: pointer;
+  padding: 6px;
+  color: var(--color-text-muted);
+  border-radius: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.side-panel-close:hover {
+  color: var(--color-text);
+}
+
+.side-panel-body {
+  padding: 16px 20px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+.side-panel-footer {
+  padding: 12px 20px;
+  border-top: 1px solid var(--color-border);
+  flex: 0 0 auto;
+}
+
+/* ?? Tablist (used by SectionActionsPanel) ????????????? */
+
+.side-panel-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--color-border);
+  flex: 0 0 auto;
+  background: var(--color-bg);
+}
+
+.side-panel-tab {
+  flex: 1 1 0;
+  min-width: 0;
+  background: none;
+  border: 0;
+  padding: 10px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  line-height: 1.25;
+}
+
+.side-panel-tab:hover {
+  color: var(--color-text);
+}
+
+.side-panel-tab[aria-selected="true"] {
+  color: var(--color-text);
+  border-bottom-color: var(--color-accent);
+  background: var(--color-surface);
+}
+
+.side-panel-tab.danger[aria-selected="true"] {
+  color: var(--color-danger, #c62828);
+  border-bottom-color: var(--color-danger, #c62828);
+}

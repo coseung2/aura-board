@@ -1,0 +1,534 @@
+/* Bank tab */
+.classroom-bank {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+.bank-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+.bank-summary-card {
+  min-width: 0;
+  padding: 20px 24px;
+  background: transparent;
+  border-right: 1px solid var(--color-border);
+}
+.bank-summary-card:first-child {
+  padding-left: 0;
+}
+.bank-summary-card:last-child {
+  padding-right: 0;
+  border-right: 0;
+}
+.bank-summary-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.bank-summary-value {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-top: 2px;
+}
+.bank-summary-rate {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+}
+.bank-rate-input {
+  width: 72px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-size: 12px;
+}
+.bank-rate-save {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-accent);
+  background: var(--color-accent);
+  color: white;
+  cursor: pointer;
+}
+
+.bank-action-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-top: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+@media (max-width: 720px) {
+  .bank-action-grid {
+    grid-template-columns: 1fr;
+  }
+  .bank-action-panel {
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+  }
+}
+.bank-student-panel,
+.bank-action-panel {
+  min-width: 0;
+  background: transparent;
+  padding: 24px 0;
+}
+.bank-student-panel {
+  padding-right: 32px;
+}
+.bank-action-panel {
+  padding-left: 32px;
+  border-left: 1px solid var(--color-border);
+}
+@media (max-width: 720px) {
+  .bank-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .bank-student-list {
+    grid-template-columns: 1fr;
+  }
+  .bank-summary-card,
+  .bank-summary-card:first-child,
+  .bank-summary-card:last-child {
+    padding: 16px 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border-subtle, var(--color-border));
+  }
+  .bank-summary-card:last-child {
+    border-bottom: 0;
+  }
+  .bank-student-panel,
+  .bank-action-panel {
+    padding: 20px 0;
+  }
+  .bank-action-panel {
+    border-top: 1px solid var(--color-border);
+    border-left: 0;
+  }
+}
+.bank-student-panel h3,
+.bank-action-panel h3 {
+  margin: 0 0 16px;
+  font-size: 17px;
+}
+.bank-student-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 16px;
+  max-height: 340px;
+  overflow-y: auto;
+}
+.bank-student-list > li {
+  min-width: 0;
+}
+/* One table for every student: wallet, fixed deposits, and inline
+   deposit/withdraw controls (2026-07-27). */
+.bank-student-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.bank-student-table th {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.bank-student-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--color-border);
+  font-size: 13px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.bank-row-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.bank-student-table .bank-amount-input {
+  width: 88px;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+  text-align: right;
+}
+
+.bank-student-table .bank-amount-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+.bank-student-table .bank-btn {
+  flex: 0 0 auto;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+}
+
+/* 적금 만기 shares the deposit column's muted styling. */
+.bank-student-table .bank-fd-due {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bank-student-table .bank-fd-due.is-empty {
+  color: var(--color-text-faint);
+  font-weight: 400;
+}
+
+.bank-student-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 10px 8px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle, var(--color-border));
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-size: 13px;
+}
+.bank-student-row:hover {
+  background: var(--color-surface-alt);
+}
+.bank-student-row.is-selected {
+  background: var(--color-accent-tinted-bg);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+.bank-student-num {
+  color: var(--color-text-faint);
+  font-size: 11px;
+}
+.bank-student-balance {
+  font-weight: 600;
+}
+
+/* 지갑 = spendable balance, shown next to the amount locked in fixed
+   deposits. */
+.bank-student-fd {
+  min-width: 64px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.bank-student-fd.is-empty {
+  color: var(--color-text-faint);
+  font-weight: 400;
+}
+.bank-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.bank-field input {
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  font-size: 14px;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+.bank-btn-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.bank-btn {
+  flex: 1 1 auto;
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  min-width: 90px;
+}
+.bank-btn-deposit {
+  background: var(--color-bank-positive);
+  color: white;
+  border-color: var(--color-bank-positive);
+}
+.bank-btn-withdraw {
+  background: var(--color-bank-negative);
+  color: white;
+  border-color: var(--color-bank-negative);
+}
+.bank-btn-fd {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+.bank-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.bank-error {
+  color: var(--color-bank-negative);
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+.bank-toast {
+  color: var(--color-bank-positive);
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+.bank-loading {
+  color: var(--color-text-muted);
+}
+
+.bank-fd-section,
+.bank-txn-section {
+  background: transparent;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  border-radius: 0;
+  padding: 28px 0 0;
+}
+.bank-txn-section {
+  overflow: visible;
+}
+.bank-txn-list {
+  min-width: 0;
+}
+.bank-fd-section h3,
+.bank-txn-section h3 {
+  margin: 0 0 16px;
+  font-size: 17px;
+}
+.bank-fd-list,
+.bank-txn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.bank-fd-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--color-border-subtle, var(--color-border));
+  border-radius: 0;
+  font-size: 13px;
+}
+.bank-fd-principal {
+  font-weight: 700;
+}
+.bank-fd-rate {
+  color: var(--color-text-muted);
+}
+.bank-fd-due {
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.bank-fd-cancel {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--color-bank-negative);
+  background: transparent;
+  color: var(--color-bank-negative);
+  cursor: pointer;
+}
+
+.bank-txn-row {
+  display: grid;
+  grid-template-columns: 132px 110px 94px 120px minmax(140px, 1fr) 120px auto 64px;
+  gap: 8px;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border-subtle, var(--color-border));
+  font-size: 13px;
+}
+.bank-txn-time {
+  font-size: 11px;
+  color: var(--color-text-faint);
+}
+.bank-txn-type {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+}
+.bank-txn-amount {
+  font-weight: 700;
+}
+.bank-txn-deposit .bank-txn-amount,
+.bank-txn-fd_matured .bank-txn-amount,
+.bank-txn-fd_cancelled .bank-txn-amount,
+.bank-txn-correction_credit .bank-txn-amount {
+  color: var(--color-bank-positive);
+}
+.bank-txn-withdraw .bank-txn-amount,
+.bank-txn-purchase .bank-txn-amount,
+.bank-txn-fd_open .bank-txn-amount,
+.bank-txn-correction_debit .bank-txn-amount {
+  color: var(--color-bank-negative);
+}
+.bank-txn-student {
+  font-weight: 650;
+}
+.bank-txn-note {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+.bank-txn-balance,
+.bank-txn-by {
+  color: var(--color-text-faint);
+  font-size: 11px;
+}
+.bank-txn-correct,
+.bank-txn-corrected {
+  justify-self: end;
+  font-size: 11px;
+}
+.bank-txn-correct {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--color-danger);
+  font-weight: 700;
+  cursor: pointer;
+}
+.bank-txn-correct:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+.bank-txn-corrected {
+  color: var(--color-text-faint);
+}
+.bank-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  padding-top: 24px;
+}
+.bank-pagination button {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.bank-pagination button:hover:not(:disabled) {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+.bank-pagination button[aria-current="page"] {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent);
+}
+.bank-pagination button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.bank-rate-input:focus-visible,
+.bank-rate-save:focus-visible,
+.bank-student-row:focus-visible,
+.bank-field input:focus-visible,
+.bank-btn:focus-visible,
+.bank-fd-cancel:focus-visible,
+.bank-txn-correct:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+.bank-pagination button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+@media (max-width: 720px) {
+  .bank-fd-row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+  .bank-fd-student {
+    grid-column: 1 / 3;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bank-fd-cancel {
+    grid-column: 3;
+  }
+}
+.bank-txn-row {
+  min-width: 0;
+}
+@media (max-width: 900px) {
+  .bank-txn-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 6px 12px;
+  }
+  .bank-txn-time,
+  .bank-txn-type,
+  .bank-txn-balance {
+    justify-self: start;
+  }
+  .bank-txn-student,
+  .bank-txn-amount,
+  .bank-txn-by {
+    justify-self: end;
+    text-align: right;
+  }
+  .bank-txn-note {
+    grid-column: 1 / -1;
+  }
+  .bank-txn-correct,
+  .bank-txn-corrected {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}
+.bank-empty {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}

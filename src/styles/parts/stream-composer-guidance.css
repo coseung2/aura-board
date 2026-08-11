@@ -1,0 +1,131 @@
+/* -------- Stream Composer title input -------- */
+
+.stream-composer-title {
+  width: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.4;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 12px;
+}
+
+.stream-composer-title::placeholder {
+  color: var(--color-text-faint);
+  font-weight: 600;
+}
+
+.stream-composer-title:focus {
+  border-bottom-color: var(--color-accent);
+}
+
+.stream-composer-title:disabled {
+  opacity: 0.55;
+}
+
+/* -------- Stream writing guidance settings -------- */
+
+.stream-guidance-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stream-guidance-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.stream-guidance-input {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  padding: 9px 12px;
+  outline: 0;
+  transition: border-color 150ms ease;
+}
+
+.stream-guidance-input:focus {
+  border-color: var(--color-accent);
+}
+
+.stream-guidance-input:disabled {
+  opacity: 0.55;
+}
+
+.stream-guidance-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 80px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 9px 12px;
+  outline: 0;
+  transition: border-color 150ms ease;
+}
+
+.stream-guidance-textarea:focus {
+  border-color: var(--color-accent);
+}
+
+.stream-guidance-textarea:disabled {
+  opacity: 0.55;
+}
+
+.stream-guidance-counter {
+  font-size: 11px;
+  color: var(--color-text-faint);
+  text-align: right;
+}
+
+.stream-guidance-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.stream-guidance-save {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.stream-guidance-save:hover:not(:disabled) {
+  background: var(--color-accent-active);
+}
+
+.stream-guidance-save:disabled {
+  background: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+.stream-guidance-status {
+  font-size: 12px;
+  color: var(--color-status-reviewed-text, #15803d);
+}
+
+.stream-guidance-error {
+  font-size: 12px;
+  color: var(--color-danger);
+}

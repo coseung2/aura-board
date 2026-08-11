@@ -1,0 +1,391 @@
+.kordle-result {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.55);
+}
+.kordle-result-card {
+  background: #fff;
+  padding: 24px;
+  border-radius: 12px;
+  max-width: 360px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.kordle-result-close {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.kordle-live-toasts {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  width: min(360px, calc(100vw - 36px));
+  height: min(420px, 54vh);
+  pointer-events: none;
+}
+
+.kordle-live-toasts::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto;
+  height: 110px;
+  z-index: 1;
+  pointer-events: none;
+  backdrop-filter: blur(7px);
+  -webkit-backdrop-filter: blur(7px);
+  mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.78) 42%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, rgba(0, 0, 0, 0.78) 42%, transparent 100%);
+}
+
+.kordle-live-chat-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  padding-top: 78px;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.24) 15%, #000 34%, #000 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0%, rgba(0, 0, 0, 0.24) 15%, #000 34%, #000 100%);
+}
+
+.kordle-live-toast {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  min-height: 32px;
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 999px;
+  padding: 7px 11px;
+  background: rgba(15, 23, 42, 0.76);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  font-size: 13px;
+  line-height: 1.2;
+  transform-origin: bottom right;
+  animation: kordle-chat-rise 220ms ease-out;
+}
+
+.kordle-live-toast--winner {
+  border-color: rgba(255, 230, 128, 0.78);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.9), rgba(34, 197, 94, 0.88) 48%, rgba(250, 204, 21, 0.88));
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.22), 0 0 0 1px rgba(255, 255, 255, 0.18) inset;
+  animation:
+    kordle-chat-rise 220ms ease-out,
+    kordle-winner-glow 1100ms ease-out;
+}
+
+.kordle-live-toast--winner::before,
+.kordle-live-toast--winner::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.kordle-live-toast--winner::before {
+  top: 50%;
+  right: 36px;
+  background: #ffffff;
+  box-shadow:
+    0 -34px 0 #ffffff,
+    28px -24px 0 #ffe66d,
+    40px 0 0 #38bdf8,
+    26px 24px 0 #fb7185,
+    0 34px 0 #bbf7d0,
+    -28px 22px 0 #fef08a,
+    -38px 0 0 #a78bfa,
+    -24px -24px 0 #f97316;
+  animation: kordle-firework-pop 900ms ease-out;
+}
+
+.kordle-live-toast--winner::after {
+  top: 10px;
+  left: 38px;
+  background: #fef08a;
+  box-shadow:
+    0 -24px 0 #fde047,
+    20px -16px 0 #22d3ee,
+    28px 4px 0 #ffffff,
+    16px 22px 0 #fb7185,
+    -8px 26px 0 #86efac,
+    -24px 12px 0 #c084fc,
+    -20px -14px 0 #fdba74;
+  animation: kordle-firework-pop 820ms ease-out 120ms;
+}
+
+.kordle-live-toast strong {
+  font-weight: 850;
+}
+
+.kordle-live-toast span {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@keyframes kordle-chat-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes kordle-winner-glow {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1.18);
+  }
+  44% {
+    transform: translateY(-2px) scale(1.03);
+    filter: brightness(1.08);
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes kordle-firework-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.22);
+  }
+  18% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.65);
+  }
+}
+
+.game-waiting,
+.kordle-waiting {
+  width: min(100%, 420px);
+  margin: 0 auto;
+  padding: 48px 16px;
+  text-align: center;
+}
+
+.board-page[data-board-category="PLAY"] .kordle-waiting,
+.board-page[data-board-category="PLAY"].kordle-play-page {
+  min-height: 100dvh;
+}
+
+.game-waiting h1,
+.kordle-waiting h1 {
+  margin: 0;
+  color: var(--color-text, #0f172a);
+  font-size: 22px;
+}
+
+.game-waiting > p:last-child,
+.kordle-waiting p:last-child {
+  margin: 8px 0 0;
+  color: var(--color-text-muted, #64748b);
+  font-size: 14px;
+}
+
+.game-waiting-participants,
+.kordle-waiting-participants {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 18px;
+  color: var(--color-text-muted, #64748b);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.game-waiting-participants div,
+.kordle-waiting-participants div {
+  justify-content: center;
+}
+
+.kordle-waiting {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  width: 100%;
+  min-height: calc(100dvh - 76px);
+  margin: 0;
+  padding: 72px 40px 56px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: #ffffff;
+}
+
+.kordle-waiting::before {
+  content: none;
+}
+
+.kordle-waiting::after {
+  content: none;
+}
+
+.kordle-waiting h1 {
+  max-width: 760px;
+  margin: 0 auto;
+  color: #ffffff;
+  font-family: "Jua", "Gamja Flower", "Arial Rounded MT Bold", "Segoe UI Rounded", "Noto Sans KR", sans-serif;
+  text-wrap: balance;
+  font-size: clamp(56px, 8vw, 84px);
+  font-weight: 950;
+  line-height: 1;
+  text-shadow: 0 5px 0 rgba(15, 23, 42, 0.18);
+}
+
+.kordle-lobby-pulse {
+  margin: 34px auto 0 !important;
+  color: rgba(255, 255, 255, 0.94) !important;
+  font-family: "Jua", "Gamja Flower", "Arial Rounded MT Bold", "Segoe UI Rounded", "Noto Sans KR", sans-serif;
+  font-size: clamp(28px, 4vw, 38px) !important;
+  font-weight: 950 !important;
+  letter-spacing: 0;
+  text-shadow: 0 3px 0 rgba(15, 23, 42, 0.16);
+}
+
+.kordle-lobby-pulse span {
+  animation: kordle-ready-dot 1.15s ease-in-out infinite;
+}
+
+.kordle-lobby-pulse span:nth-child(2) {
+  animation-delay: 0.16s;
+}
+
+.kordle-lobby-pulse span:nth-child(3) {
+  animation-delay: 0.32s;
+}
+
+.kordle-waiting .game-waiting-participants {
+  width: min(100%, 640px);
+  margin: 44px auto 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.94);
+  gap: 18px;
+  font-family: "Jua", "Gamja Flower", "Arial Rounded MT Bold", "Segoe UI Rounded", "Noto Sans KR", sans-serif;
+}
+
+.kordle-waiting .game-waiting-participants > span {
+  color: #ffffff;
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 900;
+  text-shadow: 0 3px 0 rgba(15, 23, 42, 0.14);
+}
+
+.kordle-waiting .game-participant-list div {
+  justify-content: center;
+  gap: 12px 22px;
+}
+
+.kordle-waiting .game-participant-list strong {
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+  font-size: clamp(26px, 3.6vw, 36px);
+  font-weight: 900;
+  text-shadow: 0 3px 0 rgba(15, 23, 42, 0.18);
+}
+
+@keyframes kordle-ready-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 760px) {
+  .kordle-shell {
+    padding: 24px 16px 16px;
+  }
+
+  .kordle-play-layout {
+    grid-template-columns: minmax(0, 420px);
+    width: min(100%, 452px);
+    margin-top: 24px;
+  }
+
+  .kordle-teacher-live-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .kordle-teacher-live-panel {
+    position: static;
+    margin-top: 0;
+  }
+
+  .kordle-winner-info {
+    order: -1;
+    padding-top: 0;
+  }
+
+  .kordle-teacher-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .kordle-kbd-key {
+    min-width: 0;
+    min-height: 50px;
+    padding: 0 6px;
+    font-size: 17px;
+  }
+
+  .kordle-kbd-key--action {
+    min-width: 0;
+  }
+
+  .kordle-waiting {
+    min-height: calc(100dvh - 74px);
+    margin-top: 0;
+    padding: 56px 18px 34px;
+  }
+
+  .kordle-waiting h1 {
+    font-size: 44px;
+  }
+
+  .kordle-waiting .game-waiting-participants {
+    margin-top: 34px;
+  }
+}

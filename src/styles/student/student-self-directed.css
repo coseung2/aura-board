@@ -1,0 +1,473 @@
+/* ---- Flat self-directed mission and title parity with mobile ------------ */
+.student-reading-missions-content {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+}
+
+.student-walking-attendance-board,
+.student-attendance-board {
+  width: min(100%, 760px);
+  aspect-ratio: auto;
+  justify-self: center;
+  overflow: visible;
+}
+
+.student-walking-ordinal-grid,
+.student-attendance-ordinal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  width: 100%;
+}
+
+.student-walking-ordinal-slot,
+.student-attendance-ordinal-slot {
+  width: 100%;
+  min-width: 0;
+  min-height: clamp(72px, 11vw, 92px);
+  aspect-ratio: auto;
+}
+
+.student-walking-ordinal-cell,
+.student-attendance-ordinal-cell {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-start;
+  flex-direction: column;
+  gap: 3px;
+  overflow: visible;
+  padding: 6px 3px;
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  text-align: center;
+}
+
+.student-walking-ordinal-cell.is-milestone,
+.student-attendance-ordinal-cell.is-milestone {
+  border-bottom-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+}
+
+.student-walking-ordinal-cell.is-earned,
+.student-attendance-ordinal-cell.is-earned {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  cursor: default;
+  transform: none;
+}
+
+.student-walking-ordinal-cell.is-claimable,
+.student-attendance-ordinal-cell.is-claimable {
+  border-color: var(--color-accent);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.student-walking-ordinal-cell.is-claimable.is-milestone,
+.student-attendance-ordinal-cell.is-claimable.is-milestone {
+  background: var(--color-accent-tinted-bg);
+}
+
+.student-walking-ordinal-cell.is-earned:hover,
+.student-attendance-ordinal-cell.is-earned:hover {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  transform: none;
+}
+
+.student-walking-claimable-marker,
+.student-attendance-claimable-marker {
+  flex: 0 0 auto;
+  width: 34%;
+  height: 2px;
+  margin-top: 2px;
+  border-radius: 999px;
+  background: var(--color-accent);
+}
+
+.student-walking-ordinal-number,
+.student-attendance-ordinal-number {
+  flex: 0 0 auto;
+  color: inherit;
+  font-size: clamp(9px, 1.15vw, 12px);
+  font-weight: 800;
+  line-height: 1.2;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.student-walking-ordinal-cell.is-milestone .student-walking-ordinal-number,
+.student-attendance-ordinal-cell.is-milestone .student-attendance-ordinal-number {
+  color: var(--color-accent-tinted-text);
+}
+
+.student-walking-ordinal-reward,
+.student-attendance-ordinal-reward {
+  display: grid;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  align-self: stretch;
+  place-items: center;
+  color: var(--color-text);
+  text-align: center;
+}
+
+@media (max-width: 560px) {
+  .student-walking-ordinal-grid,
+  .student-attendance-ordinal-grid {
+    gap: 3px;
+  }
+
+  .student-walking-ordinal-slot,
+  .student-attendance-ordinal-slot {
+    min-height: 64px;
+  }
+
+  .student-walking-ordinal-cell,
+  .student-attendance-ordinal-cell {
+    gap: 1px;
+    padding: 4px 2px;
+  }
+
+  .student-walking-ordinal-number,
+  .student-attendance-ordinal-number {
+    font-size: 9px;
+  }
+
+  .student-mobile-calendar-reward {
+    gap: 1px;
+    font-size: 8px;
+  }
+
+  .student-mobile-calendar-reward img {
+    width: 18px;
+    height: 18px;
+  }
+
+  .student-mobile-calendar-reward.is-cookie img {
+    width: 20px;
+    height: 20px;
+  }
+
+  .student-mobile-calendar-gift {
+    font-size: 19px;
+  }
+}
+
+.student-mission-section {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 0 0 28px;
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+}
+
+.student-mission-section-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.student-mission-section-header h2,
+.student-mission-section-header p {
+  margin: 0;
+}
+
+.student-mission-section-header h2 {
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.student-mission-section-header p,
+.student-mission-section-header > span,
+.student-mission-section-header > strong {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.student-mobile-calendar-reward {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(2px, 0.45vw, 5px);
+  min-width: 0;
+  color: var(--color-text);
+  font-size: clamp(9px, 1.1vw, 12px);
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.student-mobile-calendar-reward img {
+  display: block;
+  width: clamp(20px, 4vw, 36px);
+  height: clamp(20px, 4vw, 36px);
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.student-mobile-calendar-reward.is-cookie img {
+  width: clamp(24px, 4.6vw, 42px);
+  height: clamp(24px, 4.6vw, 42px);
+}
+
+.student-mobile-calendar-gift {
+  font-size: clamp(20px, 4vw, 36px);
+  line-height: 1;
+}
+
+.student-mobile-reward-coin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  min-height: 30px;
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.student-mobile-reward-coin img {
+  display: block;
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.student-mobile-reward-claim {
+  position: relative;
+  display: grid;
+  width: min(100%, 116px);
+  min-width: 84px;
+  min-height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.student-mobile-reward-claim img {
+  display: block;
+  width: 100%;
+  height: 44px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.student-mobile-reward-claim:not(:disabled):hover img {
+  transform: translateY(-1px);
+}
+
+.student-mobile-reward-claim:focus-visible {
+  border-radius: var(--radius-btn);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.student-mobile-reward-claim:disabled {
+  cursor: default;
+}
+
+.student-mobile-reward-claim-status {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  transform: translate(-50%, -50%);
+}
+
+.student-attendance-ordinal-stamp,
+.student-walking-ordinal-stamp {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  display: block;
+  width: clamp(28px, 4.8vw, 44px);
+  height: clamp(28px, 4.8vw, 44px);
+  border: 0;
+  border-radius: 0;
+  object-fit: contain;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-10deg);
+  image-rendering: pixelated;
+}
+
+.student-title-content,
+.student-title-collection {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.student-title-collection {
+  padding-bottom: 32px;
+}
+
+.student-title-collection-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.student-title-collection-header h2,
+.student-title-empty-hint,
+.student-activity-state p,
+.student-activity-notice,
+.student-activity-error {
+  margin: 0;
+}
+
+.student-title-collection-header h2 {
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.student-title-collection-header span {
+  color: var(--color-accent-tinted-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.student-title-empty-hint,
+.student-activity-state,
+.student-title-meta small {
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.student-title-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.student-title-row {
+  display: grid;
+  grid-template-columns: 132px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.student-title-row:first-child {
+  border-top: 1px solid var(--color-border);
+}
+
+.student-title-row.is-claimable {
+  padding-inline: 12px;
+  background: var(--color-accent-tinted-bg);
+}
+
+.student-title-row.is-locked .student-title-tag {
+  opacity: 0.42;
+  filter: grayscale(1);
+}
+
+.student-title-tag {
+  display: grid;
+  width: 132px;
+  height: 54px;
+  place-items: center;
+}
+
+.student-title-tag img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.student-title-meta {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.student-title-meta strong {
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.student-title-meta small.is-claimable {
+  color: var(--color-accent-tinted-text);
+}
+
+.student-title-claim,
+.student-activity-retry {
+  min-width: 72px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.student-title-claim:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.student-activity-retry {
+  background: transparent;
+  color: var(--color-accent-active);
+}
+
+.student-activity-state {
+  display: grid;
+  min-height: 160px;
+  align-content: center;
+  justify-items: start;
+  gap: 10px;
+  padding-block: 28px;
+  border-block: 1px solid var(--color-border);
+}
+
+.student-activity-state.is-error,
+.student-activity-error {
+  color: var(--color-danger);
+}
+
+.student-activity-notice {
+  color: var(--color-accent-tinted-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.student-activity-error {
+  font-size: 13px;
+  font-weight: 800;
+}

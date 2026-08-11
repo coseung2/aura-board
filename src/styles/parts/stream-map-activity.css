@@ -1,0 +1,335 @@
+.stream-map-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  min-height: clamp(520px, 68vh, 760px);
+  overflow: hidden;
+}
+
+.stream-map-canvas {
+  min-height: inherit;
+  background: var(--color-surface-alt);
+}
+
+.stream-map-sidebar {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-left: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.stream-map-toolbar {
+  display: grid;
+  gap: 3px;
+  padding: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.stream-map-toolbar strong {
+  font-size: 14px;
+}
+
+.stream-map-toolbar span,
+.stream-map-error {
+  color: var(--color-text-faint);
+  font-size: 12px;
+}
+
+.stream-map-error {
+  padding: 10px 12px;
+  color: var(--color-danger);
+}
+
+.stream-map-place-list {
+  display: grid;
+  gap: 0;
+  max-height: 168px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.stream-map-place-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px;
+  align-items: center;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.stream-map-place-list li:last-child {
+  border-bottom: 0;
+}
+
+.stream-map-place-list li.is-selected {
+  background: var(--color-accent-tinted-bg);
+}
+
+.stream-map-place-list button {
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+}
+
+.stream-map-place-list > li > button {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 7px;
+  padding: 4px;
+  text-align: left;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.stream-map-place-list > li > button span {
+  display: inline-grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--color-accent);
+  color: white;
+  font-size: 12px;
+}
+
+.stream-map-place-list li > div {
+  display: flex;
+  gap: 2px;
+}
+
+.stream-map-place-list li > div button {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  color: var(--color-text-muted);
+}
+
+.stream-map-place-list button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.stream-map-editor {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+}
+
+.stream-map-editor input,
+.stream-map-editor textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+.stream-map-editor input {
+  height: 36px;
+  padding: 7px 9px;
+  font-weight: 800;
+}
+
+.stream-map-editor textarea {
+  min-height: 88px;
+  resize: vertical;
+  padding: 9px;
+  line-height: 1.45;
+}
+
+.stream-map-editor > div {
+  display: flex;
+  gap: 8px;
+}
+
+.stream-map-editor button {
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stream-template-modal {
+  width: min(92vw, 620px);
+}
+
+.stream-template-modal-section {
+  margin: 0 0 12px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.stream-section-prompt-modal {
+  width: min(92vw, 560px);
+}
+
+.stream-section-prompt-form {
+  display: grid;
+  gap: 12px;
+}
+
+.stream-section-prompt-field {
+  display: grid;
+  gap: 6px;
+}
+
+.stream-section-prompt-field span {
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.stream-section-prompt-field input,
+.stream-section-prompt-field textarea {
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.stream-section-prompt-field input {
+  height: 40px;
+  padding: 0 11px;
+}
+
+.stream-section-prompt-field textarea {
+  min-height: 104px;
+  padding: 10px 11px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.stream-section-prompt-field input:focus-visible,
+.stream-section-prompt-field textarea:focus-visible {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.stream-template-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.stream-template-card {
+  display: grid;
+  min-height: 156px;
+  padding: 14px 12px 12px;
+  gap: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.stream-template-card:hover,
+.stream-template-card:focus-visible {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
+  outline: none;
+}
+
+.stream-template-card.is-selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+}
+
+.stream-template-card:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.stream-template-card-preview {
+  width: 100%;
+  aspect-ratio: 5 / 3;
+  display: block;
+  overflow: hidden;
+}
+
+.stream-template-preview-bg {
+  fill: transparent;
+  stroke: transparent;
+}
+
+.stream-template-preview-line {
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.stream-template-preview-accent-fill {
+  fill: var(--color-accent-tinted-bg);
+  stroke: var(--color-accent);
+  stroke-width: 1;
+}
+
+.stream-template-preview-word text {
+  fill: var(--color-accent);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.stream-template-preview-word text:first-child {
+  font-size: 24px;
+}
+
+.stream-template-preview-dot {
+  fill: var(--color-accent-tinted-text);
+  opacity: 0.35;
+}
+
+.stream-template-preview-map-land {
+  fill: var(--color-accent-tinted-bg);
+  stroke: var(--color-border);
+  stroke-width: 1.5;
+}
+
+.stream-template-preview-pin {
+  fill: var(--color-accent);
+  stroke: var(--color-surface);
+  stroke-width: 1.5;
+}
+
+.stream-template-preview-timeline {
+  fill: var(--color-accent);
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.stream-template-card-title {
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.stream-template-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}

@@ -1,0 +1,89 @@
+/* Role permission modal */
+.role-perm-modal {
+  background: var(--color-surface);
+  border-radius: 12px;
+  max-width: 520px;
+  width: calc(100vw - 32px);
+  max-height: calc(100vh - 80px);
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+.role-perm-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+.role-perm-modal-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+.role-perm-modal-body {
+  padding: 16px 20px;
+}
+.role-perm-group {
+  margin-bottom: 16px;
+}
+.role-perm-group-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  margin: 0 0 8px;
+}
+.role-perm-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.role-perm-row {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.role-perm-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.role-perm-label-main {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+.role-perm-desc {
+  margin: 4px 0 0 24px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.role-perm-error {
+  color: var(--color-bank-negative);
+  font-size: 12px;
+  padding: 0 20px;
+}
+.role-perm-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--color-border);
+}
+.role-perm-btn-cancel,
+.role-perm-btn-save {
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  border: 1px solid var(--color-border);
+  cursor: pointer;
+}
+.role-perm-btn-cancel {
+  background: transparent;
+  color: var(--color-text-muted);
+}
+.role-perm-btn-save {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: white;
+}

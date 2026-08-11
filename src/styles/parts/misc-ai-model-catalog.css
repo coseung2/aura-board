@@ -1,0 +1,342 @@
+/* Feature-specific AI model catalog */
+.ai-settings-stack {
+  display: grid;
+  gap: 38px;
+}
+
+.ai-settings-group {
+  min-width: 0;
+}
+
+.ai-settings-group + .ai-settings-group {
+  padding-top: 34px;
+}
+
+.ai-settings-group-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 2px solid var(--color-text);
+}
+
+.ai-settings-group-head h3 {
+  margin: 0;
+  padding-bottom: 10px;
+  color: var(--color-text);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.ai-settings-group-body {
+  border-top: 0;
+}
+
+.ai-settings-group-head p {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+.ai-settings-group-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.ai-provider-table-head {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.3fr) minmax(140px, 0.7fr) minmax(160px, 0.8fr);
+  gap: 16px;
+  align-items: end;
+}
+
+.ai-provider-table-head > div:first-child {
+  min-width: 0;
+}
+
+.ai-provider-table-labels {
+  display: contents;
+}
+
+.ai-provider-table-labels span {
+  padding-bottom: 10px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ai-provider-table {
+  display: grid;
+}
+
+.ai-provider-table-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.3fr) minmax(140px, 0.7fr) minmax(160px, 0.8fr);
+  gap: 16px;
+  align-items: center;
+  min-height: 64px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ai-provider-table-row:last-child {
+  border-bottom: 0;
+}
+
+.ai-provider-table-provider {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ai-provider-table-provider strong {
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.ai-provider-table-provider span {
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+}
+
+  .ai-provider-table-connection,
+  .ai-provider-table-billing {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+  }
+
+  .canva-scope-cell {
+    min-width: 0;
+    display: grid;
+    gap: 4px;
+  }
+
+  .canva-scope-cell strong {
+    color: var(--color-text);
+    font-size: 12px;
+  }
+
+  .canva-scope-cell span,
+  .canva-scope-cell code {
+    color: var(--color-text-muted);
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+
+  .canva-scope-cell code {
+    overflow-wrap: anywhere;
+    font-family: inherit;
+    font-size: 10.5px;
+  }
+
+.ai-provider-connection-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+}
+
+.ai-provider-connection-btn code {
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.ai-provider-connection-btn:hover code,
+.ai-provider-connection-btn:focus-visible code {
+  color: var(--color-text);
+}
+
+.ai-provider-connection-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.ai-provider-status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-text-faint);
+}
+
+.ai-provider-status-dot.is-on {
+  background: var(--color-plant-active);
+}
+
+.ai-provider-status-dot.is-warn {
+  background: var(--color-warning);
+}
+
+
+
+.ai-feature-group-head {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.15fr) minmax(120px, 0.55fr) minmax(230px, 1fr);
+  gap: 16px;
+  align-items: end;
+}
+
+.ai-feature-group-head > div:first-child {
+  min-width: 0;
+}
+
+.ai-feature-column-labels {
+  display: contents;
+}
+
+.ai-feature-column-labels span {
+  padding-bottom: 10px;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ai-feature-model-list {
+  min-width: 0;
+}
+
+.ai-feature-model-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.15fr) minmax(120px, 0.55fr) minmax(230px, 1fr);
+  gap: 16px;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.ai-feature-model-row:last-child {
+  border-bottom: 0;
+}
+
+.ai-feature-model-copy {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.ai-feature-model-copy strong {
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.ai-feature-model-copy span {
+  color: var(--color-text-muted);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.ai-feature-select {
+  min-width: 0;
+  display: block;
+}
+
+.ai-feature-select select {
+  width: 100%;
+  min-height: 44px;
+  height: 44px;
+  padding: 9px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12.5px;
+  outline: none;
+}
+
+.ai-feature-select select:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+
+
+@media (max-width: 940px) {
+  .ai-provider-table-head,
+  .ai-provider-table-row {
+    grid-template-columns: minmax(180px, 1.1fr) minmax(120px, 0.7fr) minmax(150px, 0.8fr);
+  }
+
+  .ai-feature-group-head,
+  .ai-feature-model-row {
+    grid-template-columns: minmax(180px, 1fr) minmax(140px, 0.7fr) minmax(220px, 1fr);
+  }
+
+}
+
+@media (max-width: 640px) {
+  .ai-provider-panel-head,
+  .ai-settings-group-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .ai-provider-table-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+
+  .ai-provider-table-labels {
+    display: none;
+  }
+
+  .ai-provider-table-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: start;
+    padding: 16px 0;
+  }
+
+  .ai-provider-table-connection,
+  .ai-provider-table-billing {
+    justify-content: flex-start;
+  }
+
+  .ai-provider-current {
+    justify-content: flex-start;
+  }
+
+  .ai-provider-key-form {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .ai-provider-key-form .settings-action-btn {
+    justify-self: start;
+  }
+
+  .ai-feature-group-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+  }
+
+  .ai-feature-column-labels {
+    display: none;
+  }
+
+  .ai-feature-model-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .ai-feature-select select {
+    width: 100%;
+  }
+
+
+}

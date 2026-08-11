@@ -11,7 +11,6 @@ import {
   type SlimeAction,
   type SlimeColor,
   type SlimeEvolution,
-  type SlimeFrame,
   type SlimeSheetAction,
 } from "@/lib/pets/slime-assets";
 import {
@@ -29,7 +28,6 @@ import {
   SLIME_DEFAULT_RENDERER_SCALE,
   normalizeSlimeRendererScale,
   resolveSlimeSpriteGeometry,
-  slimeFrameOffset,
 } from "@/lib/pets/slime-sprite-geometry";
 
 import styles from "./OfficialSlimeSprite.module.css";
@@ -37,6 +35,12 @@ import {
   useGroundedVehiclePlayback,
   useSlimeSpritePlayback,
 } from "./useSlimeSpritePlayback";
+import {
+  frameSourceStyle,
+  resolveSpritePath,
+  wearableSheetStyle,
+  wearableViewportStyle,
+} from "./OfficialSlimeSprite.styles";
 
 /** Single-pass H(x)*V(y) feather mask, identical to the mobile shared asset. */
 const SCENE_BACKGROUND_FEATHER_MASK =
@@ -149,74 +153,6 @@ export type OfficialSlimeSpriteProps = {
   repeat?: boolean;
   onComplete?: () => void;
 };
-
-function frameSourceStyle(
-  frame: SlimeFrame,
-  sheetWidth: number,
-  sheetHeight: number,
-  scale: number,
-  offsetY = 0,
-): CSSProperties {
-  const offset = slimeFrameOffset(frame, scale, offsetY);
-  return {
-    width: sheetWidth * scale,
-    height: sheetHeight * scale,
-    transform: `translate(${offset.left}px, ${offset.top}px)`,
-  };
-}
-
-/**
- * Wearable sheets are clipped by a one-frame viewport. The packed sheet is
- * shifted so the chosen source column lands at the origin, then nudged by the
- * per-frame `(dx, dy)` offset authored for that timeline.
- *
- * Jump actions are authored on a taller canvas whose extra headroom sits above
- * the grounded pose, so `characterOffsetY` is subtracted to bring the overlay
- * back onto the character's own 64px viewport. Grounded actions report zero, so
- * both families share one formula.
- */
-/** Matches apps/mobile theme layers.spriteProp: prop drinks/balls sit above vehicles. */
-const SLIME_PROP_LAYER_Z = 501;
-
-function wearableViewportStyle(
-  wearable: ResolvedSlimeWearable,
-  scale: number,
-  sceneInsetX: number,
-  sceneInsetY: number,
-  riderOffsetY = 0,
-  frontmost = false,
-): CSSProperties {
-  return {
-    width: wearable.frameSize.w * scale,
-    height: wearable.frameSize.h * scale,
-    left: sceneInsetX + wearable.dx * scale,
-    top:
-      sceneInsetY +
-      (wearable.dy - wearable.characterOffsetY) * scale +
-      riderOffsetY,
-    // Inline z-index overrides CSS. Mobile wins propLayer (501) over vehicle
-    // (spriteItem+200). Without this, drink wearables stayed at 2+role and hid
-    // under the vehicle body at z-index 200.
-    zIndex: frontmost ? SLIME_PROP_LAYER_Z : 2 + wearable.zIndex,
-  };
-}
-
-function wearableSheetStyle(
-  wearable: ResolvedSlimeWearable,
-  scale: number,
-): CSSProperties {
-  return {
-    width: wearable.sheetWidth * scale,
-    height: wearable.sheetHeight * scale,
-    transform: `translate(${-wearable.sourceFrame * wearable.frameSize.w * scale}px, 0px)`,
-  };
-}
-
-function resolveSpritePath(path: string | null | undefined): string | null {
-  if (!path) return null;
-  if (/^https?:\/\//i.test(path) || path.startsWith("/")) return path;
-  return `/${path}`;
-}
 
 /**
  * Plays the imported official sheet for one semantic slime state. The sheet
