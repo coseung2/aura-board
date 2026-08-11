@@ -32,6 +32,7 @@ import type {
 } from "../../modules/aura-board-health-connect/src/AuraBoardHealthConnect.types";
 import { claimStudentAttendanceReward } from "../../lib/student-attendance";
 import { claimTitle } from "../../lib/titles";
+import { studentRewardNumberFormatter as numberFormatter } from "./student-reward-format";
 
 type WalkingView = "record" | "missions" | "titles";
 type WalkingSnapshot = Awaited<ReturnType<typeof fetchWalkingSnapshot>>;

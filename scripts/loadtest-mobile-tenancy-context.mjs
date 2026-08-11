@@ -30,7 +30,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { performance } from "node:perf_hooks";
 import process from "node:process";
 
-export const env = process.env;
+const env = process.env;
 export const TARGET = (env.LOADTEST_TARGET ?? "https://aura-board.com").replace(/\/$/, "");
 export const RUN_ID = required("LOADTEST_RUN_ID");
 export const TEACHER_USERNAME = required("LOADTEST_TEACHER_USERNAME");
@@ -81,13 +81,13 @@ export const logical = {
   mixedActionsCompleted: 0,
 };
 
-export function required(name) {
+function required(name) {
   const value = env[name]?.trim();
   if (!value) throw new Error(`${name} is required`);
   return value;
 }
 
-export function integerEnv(name, fallback, min, max) {
+function integerEnv(name, fallback, min, max) {
   const raw = env[name];
   const value = raw == null || raw === "" ? fallback : Number(raw);
   if (!Number.isInteger(value) || value < min || value > max) {
@@ -115,14 +115,14 @@ export function requestId(prefix, actor, attempt = 0) {
   return `${prefix}.${suffix}`.slice(0, 128);
 }
 
-export function syntheticIp(globalIndex) {
+function syntheticIp(globalIndex) {
   const safe = Math.max(0, globalIndex);
   const third = Math.floor(safe / 250) % 256;
   const fourth = (safe % 250) + 1;
   return `198.18.${third}.${fourth}`;
 }
 
-export function actorFor(classIndex, studentIndex) {
+function actorFor(classIndex, studentIndex) {
   const globalIndex = classIndex * STUDENTS_PER_CLASS + studentIndex;
   const classSuffix = pad(classIndex, 2);
   const studentSuffix = pad(globalIndex, 4);
@@ -163,7 +163,7 @@ export function classRepresentatives() {
   return representatives;
 }
 
-export function actorHeaders(actor, extra = {}) {
+function actorHeaders(actor, extra = {}) {
   return {
     accept: "application/json",
     "x-aura-mobile-capabilities": "loadtest-v1,student-bearer-v1,slime-v2",
@@ -174,7 +174,7 @@ export function actorHeaders(actor, extra = {}) {
   };
 }
 
-export function parseJson(text) {
+function parseJson(text) {
   if (!text) return null;
   try {
     return JSON.parse(text);
@@ -183,7 +183,7 @@ export function parseJson(text) {
   }
 }
 
-export function expectedStatusPredicate(expected) {
+function expectedStatusPredicate(expected) {
   if (typeof expected === "function") return expected;
   const allowed = new Set(Array.isArray(expected) ? expected : [expected]);
   return (status) => allowed.has(status);
@@ -250,19 +250,19 @@ export async function http(operation, path, options = {}) {
   return { ...metric, body, bodyText, headers: responseHeaders };
 }
 
-export function splitSetCookieHeader(value) {
+function splitSetCookieHeader(value) {
   if (!value) return [];
   return value.split(/,(?=\s*[^;,\s]+=)/g).map((part) => part.trim());
 }
 
-export function responseSetCookies(response) {
+function responseSetCookies(response) {
   if (typeof response.headers.getSetCookie === "function") {
     return response.headers.getSetCookie();
   }
   return splitSetCookieHeader(response.headers.get("set-cookie"));
 }
 
-export function absorbCookies(jar, response) {
+function absorbCookies(jar, response) {
   for (const cookie of responseSetCookies(response)) {
     const pair = cookie.split(";", 1)[0];
     const equals = pair.indexOf("=");
@@ -271,7 +271,7 @@ export function absorbCookies(jar, response) {
   }
 }
 
-export function cookieHeader(jar) {
+function cookieHeader(jar) {
   return [...jar.entries()].map(([name, value]) => `${name}=${value}`).join("; ");
 }
 

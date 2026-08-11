@@ -48,7 +48,7 @@ export function ClassroomRolePanel({ classroomId, unit, students, payBarSlot }: 
     applyPayAnchor,
     payAll,
     setPermissionKey,
-  } = useClassroomRolePanel({ classroomId, unit, students, payBarSlot });
+  } = useClassroomRolePanel({ classroomId, students });
   const payBar = (
     <div className="classroom-role-pay-bar">
         <div

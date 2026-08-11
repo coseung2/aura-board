@@ -1,34 +1,24 @@
-import type { Dispatch, MutableRefObject, SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import type { CardData } from "../DraggableCard";
 import type { GroupEditorDraft } from "../classroom/GroupRosterEditor";
-import { withBoardAnonymousAuthor } from "@/lib/card-anonymity";
 import { sortSections } from "@/lib/sort-sections";
 import { normalizeStreamActivityTemplateState, type StreamActivityTemplate, type StreamActivityTemplateState } from "@/lib/stream-activity-templates";
 import {
-  buildBreakoutStateFromSection, buildSectionContentItems, cardHasAnyStudentAuthor,
-  cardHasStudentAuthor, getGroupIdForCardAuthors, isGuideCard,
-  isSectionSlideshowEnabled,
-  normalizeBreakoutStateForViewer, resolveCardBreakoutGroupId, sortPosts,
+  cardHasAnyStudentAuthor, getGroupIdForCardAuthors, isSectionSlideshowEnabled,
+  normalizeBreakoutStateForViewer, sortPosts,
   type BreakoutState, type StreamContentItem, type StreamSection,
 } from "./stream-board-model";
 
 type Context = {
-  boardId: string;
   currentUserId: string;
-  currentStudentName?: string | null;
   isStudentViewer?: boolean;
-  anonymousAuthor: boolean;
-  canManageSections: boolean;
   cards: CardData[];
   sections: StreamSection[];
-  sortedSections: StreamSection[];
   breakoutBySection: Record<string, BreakoutState>;
   sectionSlideshowBusyId: string | null;
   sectionPromptBusyId: string | null;
   setCards: Dispatch<SetStateAction<CardData[]>>;
   setSections: Dispatch<SetStateAction<StreamSection[]>>;
-  setOpenCard: Dispatch<SetStateAction<CardData | null>>;
-  setEditingCard: Dispatch<SetStateAction<CardData | null>>;
   setTemplateBusySectionId: Dispatch<SetStateAction<string | null>>;
   setSectionSlideshowBusyId: Dispatch<SetStateAction<string | null>>;
   setSectionPromptBusyId: Dispatch<SetStateAction<string | null>>;
@@ -38,18 +28,15 @@ type Context = {
   setBreakoutBusyId: Dispatch<SetStateAction<string | null>>;
   setBreakoutBySection: Dispatch<SetStateAction<Record<string, BreakoutState>>>;
   setActiveGroupBySection: Dispatch<SetStateAction<Record<string, string>>>;
-  breakoutLoadedRef: MutableRefObject<Set<string>>;
-  visibleCardsForSection: (sectionId: string, cards: CardData[]) => CardData[];
 };
 
 export function createStreamBoardSectionActions({
-  boardId, currentUserId, currentStudentName, isStudentViewer, anonymousAuthor,
-  canManageSections, cards, sections, sortedSections, breakoutBySection,
+  currentUserId, isStudentViewer, cards, sections, breakoutBySection,
   sectionSlideshowBusyId, sectionPromptBusyId,
-  setCards, setSections, setOpenCard, setEditingCard, setTemplateBusySectionId,
+  setCards, setSections, setTemplateBusySectionId,
   setSectionSlideshowBusyId, setSectionPromptBusyId, setSectionOrderBusyId,
   setContentOrderBusyId, setGuideBusyId, setBreakoutBusyId, setBreakoutBySection,
-  setActiveGroupBySection, breakoutLoadedRef, visibleCardsForSection,
+  setActiveGroupBySection,
 }: Context) {
 function handleSectionRenamed(sectionId: string, newTitle: string) {
   setSections((list) =>
@@ -596,3 +583,5 @@ async function handleJoinBreakout(sectionId: string, groupId: string): Promise<b
     handleJoinBreakout,
   };
 }
+
+export type StreamBoardSectionActions = ReturnType<typeof createStreamBoardSectionActions>;

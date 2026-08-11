@@ -20,7 +20,6 @@ import {
   type WalkingMonthlyAttendanceReward,
   type WalkingRepresentativeSlime,
 } from "../../lib/walking-health";
-
 import { studentRewardNumberFormatter as numberFormatter } from "./student-reward-format";
 
 type BookType = "comic" | "story";

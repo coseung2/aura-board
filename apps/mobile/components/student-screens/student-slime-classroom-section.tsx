@@ -17,22 +17,26 @@ import { styles } from "./student-slime.styles";
 import { visibleEquippedSlimeItemKeys } from "../../lib/slime-item-visibility";
 import type { StudentSlimeScreenViewModel } from "../../lib/student-slime-screen/student-slime-screen.types";
 
-export function StudentSlimeClassroomSection({
-  model,
-}: {
-  model: StudentSlimeScreenViewModel;
-}) {
-  const {
-    classroomLoading,
-    classmates,
-    classroomError,
-    loadClassroom,
-    home,
-    SLIME_TRAMPOLINE_ITEM_KEY,
-    petCardScene,
-    equippedFloor,
-  } = model;
+type StudentSlimeClassroomSectionProps = Pick<
+  StudentSlimeScreenViewModel,
+  | "classroomLoading"
+  | "classmates"
+  | "classroomError"
+  | "loadClassroom"
+  | "home"
+  | "SLIME_TRAMPOLINE_ITEM_KEY"
+  | "petCardScene"
+>;
 
+export function StudentSlimeClassroomSection({
+  classroomLoading,
+  classmates,
+  classroomError,
+  loadClassroom,
+  home,
+  SLIME_TRAMPOLINE_ITEM_KEY,
+  petCardScene,
+}: StudentSlimeClassroomSectionProps) {
   return classroomLoading && classmates === null ? (
     <View style={styles.classroomState}>
       <ActivityIndicator size="large" color={colors.accent} />

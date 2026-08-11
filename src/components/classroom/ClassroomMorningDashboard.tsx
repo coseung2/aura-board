@@ -2,15 +2,13 @@
 
 import Link from "next/link";
 import { AppBackgroundButton } from "@/components/AppBackground";
-import { MORNING_ROSTER_COLUMNS, useClassroomMorningDashboard, type ClassroomMorningDashboardProps as Props, type RoleTab } from "./useClassroomMorningDashboard";
+import { MORNING_ROSTER_COLUMNS, useClassroomMorningDashboard, type ClassroomMorningDashboardProps as Props } from "./useClassroomMorningDashboard";
 
 type DateNavigationProps = {
   date: string;
   onPrevious: () => void;
   onNext: () => void;
 };
-
-const ROLE_TABS: readonly RoleTab[] = ["cleaning", "shoe"];
 
 function formatDateNav(dateStr: string): string {
   const date = new Date(`${dateStr}T00:00:00`);
@@ -115,7 +113,7 @@ export function ClassroomMorningDashboard({
     refresh,
     handleRoleTabKeyDown,
     completeShoeFinding,
-  } = useClassroomMorningDashboard({ classroomId, classroomName, sections, showToolbar });
+  } = useClassroomMorningDashboard({ classroomId, sections });
   return (
     <section
       className={`morning-dashboard${showToolbar ? "" : " is-embedded"}`}

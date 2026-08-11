@@ -5,7 +5,6 @@ import {
   createLiveQuizCounterAccumulator,
   estimateServerOffsetMs,
   liveQuizBoundaryTarget,
-  liveQuizCounterKey,
   mergeLiveQuizCounterShard,
   mergeCachedLiveQuizAnswerCount,
   mergeLiveQuizAnswerCount,
@@ -203,7 +202,7 @@ describe("live quiz client synchronization", () => {
         counters,
       );
     }
-    expect(counters.totals.get(liveQuizCounterKey("2026-08-06", "question-1"))).toBe(100);
+    expect(counters.totals.get("2026-08-06:question-1")).toBe(100);
 
     const total = mergeLiveQuizCounterShard(
       {
@@ -224,7 +223,7 @@ describe("live quiz client synchronization", () => {
   it("merges an event received before the matching snapshot is rendered", () => {
     const state = liveState();
     const counts = new Map([
-      [liveQuizCounterKey("2026-08-06", "question-1"), 8],
+      ["2026-08-06:question-1", 8],
     ]);
     expect(mergeCachedLiveQuizAnswerCount(state, counts).activeAnswerCount).toBe(8);
   });

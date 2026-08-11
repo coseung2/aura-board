@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { StudentBoardHub } from "@/components/StudentDashboard";
+import { StudentBoardHub } from "@/app/student/_components/StudentBoardHub";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentHomePayload } from "@/lib/student-home";

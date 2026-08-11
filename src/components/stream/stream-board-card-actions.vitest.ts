@@ -45,8 +45,6 @@ function setup(options?: {
   const sections = stateBox<StreamSection[]>([]);
   const openCard = stateBox<CardData | null>(options?.openCard ?? null);
   const editingCard = stateBox<CardData | null>(options?.editingCard ?? null);
-  const composerOpen = stateBox(true);
-  const composerSectionId = stateBox<string | null>("section-1");
   const composerGroupId = stateBox<string | null>(
     options?.composerGroupId ?? null,
   );
@@ -58,27 +56,18 @@ function setup(options?: {
 
   const actions = createStreamBoardCardActions({
     boardId: "board-1",
-    composerSectionId: composerSectionId.value,
     composerGroupId: composerGroupId.value,
-    currentUserId: "teacher-1",
-    currentStudentName: null,
     isStudentViewer: false,
-    anonymousAuthor: false,
     cards: cards.value,
     openCard: openCard.value,
     editingCard: editingCard.value,
-    sections: sections.value,
     breakoutBySection: options?.breakoutBySection ?? {},
     newSectionTitle: newSectionTitle.value,
     sectionAddBusy: sectionAddBusy.value,
     deletingIds,
     setCards: cards.set,
     setSections: sections.set,
-    setComposerOpen: composerOpen.set,
-    setComposerSectionId: composerSectionId.set,
-    setComposerGroupId: composerGroupId.set,
     setOpenCard: openCard.set,
-    setEditingCard: editingCard.set,
     setIsAddingSection: isAddingSection.set,
     setNewSectionTitle: newSectionTitle.set,
     setSectionAddBusy: sectionAddBusy.set,

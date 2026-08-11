@@ -15,7 +15,6 @@ import { writeGameResult } from "@/lib/game-platform/result-writer";
 import {
   answersMatch,
   computeScore,
-  normalizeKeyword,
   parseBonusRanks,
   rankCorrectAnswers,
 } from "./score";

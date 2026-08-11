@@ -36,14 +36,6 @@ export function useStudentSlimeDerivedState({
   wardrobeFilter,
   sectionParam,
 }: StudentSlimeDerivedStateArgs) {
-  const owned = home?.ownedColors.includes(selectedColor) ?? false;
-
-  const equippedFloor =
-    home?.equippedFloorByColor[selectedColor] ??
-    (home?.representativeColor === selectedColor ? home.equippedFloor : "none");
-
-  const equippedItems = home?.equippedItemsByColor[selectedColor] ?? [];
-
   const wardrobeTargetColor = wardrobeColor ?? selectedColor;
 
   const wardrobeEquippedItems =
@@ -208,9 +200,6 @@ export function useStudentSlimeDerivedState({
         ? "shop"
         : "mine";
   return {
-    owned,
-    equippedFloor,
-    equippedItems,
     wardrobeTargetColor,
     wardrobeEquippedItems,
     shopNavItems,

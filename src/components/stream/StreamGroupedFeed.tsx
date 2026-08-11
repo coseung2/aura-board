@@ -1,23 +1,20 @@
 import type { FormEvent } from "react";
-import type { AddCardData } from "../AddCardModal";
 import type { CardData } from "../DraggableCard";
 import { ChevronDownIcon, ChevronUpIcon, GroupIcon, PencilIcon, SlideshowIcon, TemplateIcon, TrashIcon, WritingGuideIcon } from "../icons/UiIcons";
-import { SectionActionsPanel } from "../SectionActionsPanel";
 import { StreamActivityTemplatePanel } from "./StreamActivityTemplatePanel";
 import { StreamPost } from "./StreamPost";
 import { StreamGuideList } from "./StreamGuideList";
-import { STREAM_ACTIVITY_TEMPLATE_LABELS, type StreamActivityTemplate, type StreamActivityTemplateState } from "@/lib/stream-activity-templates";
+import { STREAM_ACTIVITY_TEMPLATE_LABELS, type StreamActivityTemplateState } from "@/lib/stream-activity-templates";
+import type { StreamBoardCardActions } from "./stream-board-card-actions";
+import type { StreamBoardSectionActions } from "./stream-board-section-actions";
 import {
   buildBreakoutStateFromSection, buildSectionContentItems, canDeleteCard, canToggleGuideCard,
-  cardHasAnyStudentAuthor, cardHasStudentAuthor, formatBreakoutMemberName,
-  getGroupIdForCardAuthors, getSectionWritingGuidance, isGuideCard, isSectionSlideshowEnabled,
-  resolveCardBreakoutGroupId,
-  type BreakoutGroup, type BreakoutState, type StreamContentItem, type StreamSection,
+  isGuideCard, isSectionSlideshowEnabled,
+  type BreakoutState, type StreamContentItem, type StreamSection,
 } from "./stream-board-model";
 import { StreamBreakoutBody } from "./StreamBreakoutBody";
-type StreamGroupedFeedProps = {
-  sections: StreamSection[];
-  grouped: { bySection: Map<string, CardData[]>; unsectioned: CardData[] };
+
+type StreamGroupedFeedViewer = {
   boardId: string;
   canEdit: boolean;
   currentUserId: string;
@@ -25,102 +22,99 @@ type StreamGroupedFeedProps = {
   canAddPost: boolean;
   isStudentViewer?: boolean;
   currentStudentName?: string | null;
-  isAddingSection: boolean;
-  newSectionTitle: string;
-  sectionAddBusy: boolean;
-  sectionAddError: string | null;
-  onStartAddSection: () => void;
-  onCancelAddSection: () => void;
-  onSectionTitleChange: (title: string) => void;
-  onSubmitSection: (event: FormEvent<HTMLFormElement>) => void;
-  onOpenSectionPanel: (sectionId: string, tab: "rename" | "delete") => void;
-  onToggleSectionSlideshow: (section: StreamSection) => Promise<void>;
-  onOpenSectionPromptModal: (sectionId: string) => void;
-  onMoveSection: (sectionId: string, direction: "up" | "down") => Promise<void>;
+};
+
+type StreamGroupedFeedSectionCreation = {
+  isAdding: boolean;
+  title: string;
+  busy: boolean;
+  error: string | null;
+  onStart: () => void;
+  onCancel: () => void;
+  onTitleChange: (title: string) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+};
+
+type StreamGroupedFeedSectionUi = {
+  onOpenPanel: (sectionId: string, tab: "rename" | "delete") => void;
+  onOpenPromptModal: (sectionId: string) => void;
   onOpenTemplateModal: (sectionId: string) => void;
   onOpenBreakoutModal: (sectionId: string) => void;
-  onOpenComposerForSection: (sectionId: string, groupId?: string | null) => void;
-  onSectionActivityStateChange: (
-    sectionId: string,
-    activityTemplateState: StreamActivityTemplateState | null,
-  ) => Promise<boolean>;
-  onCreateSectionCard: (
-    sectionId: string,
-    data: { title: string; content: string },
-    groupId?: string | null,
-  ) => Promise<void>;
-  onMoveSectionContent: (
-    section: StreamSection,
-    items: StreamContentItem[],
-    itemId: string,
-    direction: "up" | "down",
-  ) => Promise<void>;
-  templateBusySectionId: string | null;
-  sectionSlideshowBusyId: string | null;
-  sectionPromptBusyId: string | null;
-  sectionOrderBusyId: string | null;
-  contentOrderBusyId: string | null;
-  guideBusyId: string | null;
-  breakoutBySection: Record<string, BreakoutState>;
+  onOpenComposer: (sectionId: string, groupId?: string | null) => void;
+};
+
+type StreamGroupedFeedBusyState = {
+  templateSectionId: string | null;
+  slideshowSectionId: string | null;
+  promptSectionId: string | null;
+  sectionOrder: string | null;
+  contentOrder: string | null;
+  guideCardId: string | null;
+};
+
+type StreamGroupedFeedBreakout = {
+  stateBySection: Record<string, BreakoutState>;
   activeGroupBySection: Record<string, string>;
-  breakoutBusyId: string | null;
+  busySectionId: string | null;
   onSetActiveGroup: (sectionId: string, group: string) => void;
-  onJoinBreakout: (sectionId: string, groupId: string) => Promise<boolean>;
-  onRemoveBreakoutMember: (
-    sectionId: string,
-    membershipId: string,
-  ) => Promise<boolean>;
-  onEditCard: (card: CardData) => void;
-  onOpenCard: (card: CardData) => void;
-  onDeleteCard: (card: CardData) => void;
-  onToggleGuide: (card: CardData, guidePinned: boolean) => void;
+  onRemoveMember: (sectionId: string, membershipId: string) => Promise<boolean>;
+};
+
+type StreamGroupedFeedCardUi = {
+  onEdit: (card: CardData) => void;
+  onOpen: (card: CardData) => void;
+};
+
+type StreamGroupedFeedProps = {
+  sections: StreamSection[];
+  grouped: { bySection: Map<string, CardData[]>; unsectioned: CardData[] };
+  viewer: StreamGroupedFeedViewer;
+  sectionCreation: StreamGroupedFeedSectionCreation;
+  sectionUi: StreamGroupedFeedSectionUi;
+  sectionActions: Pick<
+    StreamBoardSectionActions,
+    | "handleSectionSlideshowToggle"
+    | "handleMoveSection"
+    | "handleSectionActivityStateChange"
+    | "handleMoveSectionContent"
+    | "handleToggleGuide"
+    | "handleJoinBreakout"
+  >;
+  busy: StreamGroupedFeedBusyState;
+  breakout: StreamGroupedFeedBreakout;
+  cardActions: Pick<StreamBoardCardActions, "handleAdd" | "handleDelete">;
+  cardUi: StreamGroupedFeedCardUi;
 };
 
 export function StreamGroupedFeed({
   sections,
   grouped,
-  boardId,
-  canEdit,
-  currentUserId,
-  currentRole,
-  canAddPost,
-  isStudentViewer,
-  currentStudentName,
-  isAddingSection,
-  newSectionTitle,
-  sectionAddBusy,
-  sectionAddError,
-  onStartAddSection,
-  onCancelAddSection,
-  onSectionTitleChange,
-  onSubmitSection,
-  onOpenSectionPanel,
-  onToggleSectionSlideshow,
-  onOpenSectionPromptModal,
-  onMoveSection,
-  onOpenTemplateModal,
-  onOpenBreakoutModal,
-  onOpenComposerForSection,
-  onSectionActivityStateChange,
-  onCreateSectionCard,
-  onMoveSectionContent,
-  templateBusySectionId,
-  sectionSlideshowBusyId,
-  sectionPromptBusyId,
-  sectionOrderBusyId,
-  contentOrderBusyId,
-  guideBusyId,
-  breakoutBySection,
-  activeGroupBySection,
-  breakoutBusyId,
-  onSetActiveGroup,
-  onJoinBreakout,
-  onRemoveBreakoutMember,
-  onEditCard,
-  onOpenCard,
-  onDeleteCard,
-  onToggleGuide,
+  viewer,
+  sectionCreation,
+  sectionUi,
+  sectionActions,
+  busy,
+  breakout,
+  cardActions,
+  cardUi,
 }: StreamGroupedFeedProps) {
+  const { boardId, canEdit, currentUserId, currentRole, canAddPost, isStudentViewer, currentStudentName } = viewer;
+  const { isAdding: isAddingSection, title: newSectionTitle, busy: sectionAddBusy, error: sectionAddError, onStart: onStartAddSection, onCancel: onCancelAddSection, onTitleChange: onSectionTitleChange, onSubmit: onSubmitSection } = sectionCreation;
+  const { onOpenPanel: onOpenSectionPanel, onOpenPromptModal: onOpenSectionPromptModal, onOpenTemplateModal, onOpenBreakoutModal, onOpenComposer: onOpenComposerForSection } = sectionUi;
+  const { handleSectionSlideshowToggle: onToggleSectionSlideshow, handleMoveSection: onMoveSection, handleSectionActivityStateChange: onSectionActivityStateChange, handleMoveSectionContent: onMoveSectionContent, handleToggleGuide: onToggleGuide, handleJoinBreakout: onJoinBreakout } = sectionActions;
+  const { templateSectionId: templateBusySectionId, slideshowSectionId: sectionSlideshowBusyId, promptSectionId: sectionPromptBusyId, sectionOrder: sectionOrderBusyId, contentOrder: contentOrderBusyId, guideCardId: guideBusyId } = busy;
+  const { stateBySection: breakoutBySection, activeGroupBySection, busySectionId: breakoutBusyId, onSetActiveGroup, onRemoveMember: onRemoveBreakoutMember } = breakout;
+  const { handleAdd: addCard, handleDelete: onDeleteCard } = cardActions;
+  const { onEdit: onEditCard, onOpen: onOpenCard } = cardUi;
+
+  function onCreateSectionCard(
+    sectionId: string,
+    data: { title: string; content: string },
+    groupId?: string | null,
+  ): Promise<void> {
+    return addCard({ ...data, sectionId }, groupId);
+  }
+
   return (
     <>
       {canEdit && (

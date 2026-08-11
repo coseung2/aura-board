@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { StudentHomeBoard } from "@/lib/student-home-types";
 import { legacyStudentBoardRedirect } from "./student/student-board-navigation";
-import { StudentBoardHub, StudentDashboard } from "./StudentDashboard";
+import { StudentBoardHub } from "@/app/student/_components/StudentBoardHub";
+import { StudentDashboard } from "./StudentDashboard";
 
 const replace = vi.fn();
 const push = vi.fn();
@@ -114,14 +115,10 @@ function stubDashboardFetch(options?: {
   return fetchMock;
 }
 
-function renderDashboard(boards: StudentHomeBoard[] = []) {
+function renderDashboard() {
   return render(
     <StudentDashboard
-      studentName="민지"
-      classroomName="햇살반"
       classroomId="classroom-1"
-      boards={boards}
-      duties={[]}
     />,
   );
 }
@@ -217,7 +214,7 @@ describe("student home and board hub separation", () => {
 
   it("keeps the home concise and removes the full board explorer", async () => {
     stubDashboardFetch();
-    const { container } = renderDashboard(playBoards);
+    const { container } = renderDashboard();
     await screen.findByText("블루 슬라임");
 
     expect(screen.queryByRole("heading", { level: 1, name: "홈" })).toBeNull();

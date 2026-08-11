@@ -1,51 +1,20 @@
-import { ActivityIndicator } from "react-native";
-import { Animated } from "react-native";
-import { AppButton } from "../../components/ui";
-import { AppHeader } from "../../components/ui";
-import { BarePressable } from "../../components/ui";
-import { CircleAlert } from "lucide-react-native";
-import { CircleCheck } from "lucide-react-native";
-import { ContentTab } from "../../components/NavigationTabs";
-import { ContentTabs } from "../../components/NavigationTabs";
-import { ControlPressable } from "../../components/ui";
-import type { EquippedFloor } from "../../lib/slime-assets";
-import { Fragment } from "react";
-import { Image } from "expo-image";
-import { RefreshControl } from "react-native";
-import { SLIME_ASSET_COLORS } from "../../lib/slime-assets";
-import { SLIME_COLOR_LABELS } from "../../lib/slimes";
-import { SLIME_SHARED_ASSETS } from "../../lib/slime-assets";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { ScrollView } from "react-native";
-import type { SlimeAction } from "../../lib/slime-assets";
-import { SlimePurchaseConfirmModal } from "../../components/slime/SlimePurchaseConfirmModal";
 import {
-  SlimeCharacterCatalogCard,
-  SlimeShopItemCard,
-} from "../../components/slime/SlimeShopCatalogCards";
-import { SlimeSprite } from "../../components/slime/SlimeSprite";
+  ActivityIndicator,
+  RefreshControl,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
+import { AppButton, AppHeader, ControlPressable } from "../../components/ui";
+import { CircleAlert, CircleCheck } from "lucide-react-native";
+import { ContentTab, ContentTabs } from "../../components/NavigationTabs";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { SlimePurchaseConfirmModal } from "../../components/slime/SlimePurchaseConfirmModal";
 import { SlimeWardrobeSheet } from "../../components/slime/SlimeWardrobeSheet";
-import { Star } from "lucide-react-native";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
-import { Text } from "react-native";
-import { View } from "react-native";
-import { WalkingTitleSlot } from "../../components/WalkingTitleSlot";
-import { calculateGrowthTimeComparison } from "../../lib/slimes";
-import { calculateSlimeGrowthPercent } from "../../lib/slimes";
 import { colors } from "../../theme/tokens";
-import { formatGrowthHours } from "../../lib/slimes";
-import { getApiBase } from "../../lib/api";
 import { iconSizes } from "../../theme/tokens";
-import { resolveEquippedSceneBackground } from "../../lib/slimes";
-import { resolveEquippedSlimePropAction } from "../../lib/slime-props";
-import { resolveEquippedSlimeWearables } from "../../lib/slimes";
-import { resolveEquippedVehicle } from "../../lib/slimes";
-import { selectSceneBackgroundSpritePath } from "../../lib/slimes";
-import { spacing } from "../../theme/tokens";
-import { stageForColor } from "../../lib/slimes";
 import { styles } from "./student-slime.styles";
-import { visibleEquippedSlimeItemKeys } from "../../lib/slime-item-visibility";
-import type { SlimeCatalogItem, SlimeShopItem } from "../../lib/slimes";
 import type { StudentSlimeScreenViewModel } from "../../lib/student-slime-screen/student-slime-screen.types";
 import { StudentSlimeClassroomSection } from "./student-slime-classroom-section";
 import { StudentSlimeCollectionSection } from "./student-slime-collection-section";
@@ -76,7 +45,6 @@ export function StudentSlimeScreenView({
     home,
     SLIME_TRAMPOLINE_ITEM_KEY,
     petCardScene,
-    equippedFloor,
     selectedColor,
     appliedGrowthSpeedBps,
     buffGroupsByColor,
@@ -214,15 +182,66 @@ export function StudentSlimeScreenView({
             }
           >
             {section === "classroom" ? (
-              <StudentSlimeClassroomSection model={model} />
+              <StudentSlimeClassroomSection
+                classroomLoading={classroomLoading}
+                classmates={classmates}
+                classroomError={classroomError}
+                loadClassroom={loadClassroom}
+                home={home}
+                SLIME_TRAMPOLINE_ITEM_KEY={SLIME_TRAMPOLINE_ITEM_KEY}
+                petCardScene={petCardScene}
+              />
             ) : (
               <>
                 {section === "mine" ? (
-                  <StudentSlimeCollectionSection model={model} />
+                  <StudentSlimeCollectionSection
+                    home={home}
+                    selectedColor={selectedColor}
+                    appliedGrowthSpeedBps={appliedGrowthSpeedBps}
+                    buffGroupsByColor={buffGroupsByColor}
+                    SLIME_TRAMPOLINE_ITEM_KEY={SLIME_TRAMPOLINE_ITEM_KEY}
+                    manualActions={manualActions}
+                    activeSets={activeSets}
+                    SLIME_EFFECT_LABELS={SLIME_EFFECT_LABELS}
+                    formatBuffPercent={formatBuffPercent}
+                    openEffectColor={openEffectColor}
+                    openGrowthColor={openGrowthColor}
+                    petCardScene={petCardScene}
+                    setManualActions={setManualActions}
+                    setOpenGrowthColor={setOpenGrowthColor}
+                    setOpenEffectColor={setOpenEffectColor}
+                    buffArrowAnimatedStyle={buffArrowAnimatedStyle}
+                    busyRepresentative={busyRepresentative}
+                    setRepresentative={setRepresentative}
+                    setSelectedColor={setSelectedColor}
+                    setWardrobeColor={setWardrobeColor}
+                    cookieQuantity={cookieQuantity}
+                    busyItemKey={busyItemKey}
+                    feedCookie={feedCookie}
+                    DISABLED_COOKIE_SOURCE={DISABLED_COOKIE_SOURCE}
+                    localSource={localSource}
+                    buffGroups={buffGroups}
+                    appliedBuffTotals={appliedBuffTotals}
+                    SLIME_EFFECT_DESCRIPTIONS={SLIME_EFFECT_DESCRIPTIONS}
+                  />
                 ) : null}
 
                 {section === "shop" ? (
-                  <StudentSlimeShopSection model={model} />
+                  <StudentSlimeShopSection
+                    home={home}
+                    shopNavItems={shopNavItems}
+                    shopFilter={shopFilter}
+                    setShopFilter={setShopFilter}
+                    shopOverviewSections={shopOverviewSections}
+                    visibleShopItems={visibleShopItems}
+                    nestedShopGroups={nestedShopGroups}
+                    visibleShopTiers={visibleShopTiers}
+                    selectedColor={selectedColor}
+                    busyItemKey={busyItemKey}
+                    confirmItemPurchase={confirmItemPurchase}
+                    busyColor={busyColor}
+                    confirmSlimePurchase={confirmSlimePurchase}
+                  />
                 ) : null}
               </>
             )}

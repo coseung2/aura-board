@@ -27,10 +27,12 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { writeChunkedRegistry } from "../src/lib/pets/chunked-registry-writer.mjs";
+import {
+  publishStagedImportOutputs,
+  writeChunkedRegistry,
+} from "../src/lib/pets/chunked-registry-writer.mjs";
 import {
   mobileRegistryPublicationItems,
-  publishStagedFileSet,
   stageMobileGeneratedRegistry,
 } from "../apps/mobile/scripts/split-generated-slime-registries.mjs";
 import {
@@ -62,6 +64,8 @@ import {
 } from "./slime-wearable-import-helpers.mjs";
 
 export { SLIME_COLORS, IDLE_DERIVED_ROLES, UNPUBLISHED_ROLES, WEARABLE_ROLES };
+
+export const publishSlimeWearablesImportOutputs = publishStagedImportOutputs;
 
 const projectRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -639,21 +643,6 @@ async function main(argv = process.argv.slice(2)) {
     mobileRoot = canonicalMobileRoot;
     webRegistryPath = canonicalWebRegistryPath;
     mobileRegistryPath = canonicalMobileRegistryPath;
-    await fs.rm(stagingRoot, { recursive: true, force: true });
-  }
-}
-
-export async function publishSlimeWearablesImportOutputs(
-  items,
-  stagingRoot,
-  failAt = null,
-) {
-  try {
-    publishStagedFileSet(items, stagingRoot, {
-      approvedTargets: items.map((item) => item.target),
-      failAt,
-    });
-  } finally {
     await fs.rm(stagingRoot, { recursive: true, force: true });
   }
 }

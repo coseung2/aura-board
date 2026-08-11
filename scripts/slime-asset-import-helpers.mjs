@@ -11,6 +11,9 @@ import {
   SLIME_COLORS,
   SLIME_EVOLUTIONS,
 } from "../src/lib/pets/slime-asset-import-contract.mjs";
+import { exists, toPosix, writeJson } from "./slime-import-shared-helpers.mjs";
+
+export { exists, toPosix, writeJson };
 
 const execFile = promisify(execFileCallback);
 const colorSet = new Set(SLIME_COLORS);
@@ -20,19 +23,9 @@ const happyFrameCount = 12;
 const happyCanvas = { width: 64, height: 64 };
 const happyLayerNames = { body: "슬라임", heart: "하트" };
 
-export const toPosix = (value) => value.split(path.sep).join("/");
 const keyFor = ({ evolution, color, action }) =>
   `${evolution}/${color}/${action}`;
 export const overlayKeyFor = ({ evolution, color }) => `${evolution}/${color}`;
-
-export async function exists(filePath) {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export async function walk(root) {
   const result = [];
@@ -203,11 +196,6 @@ export function parseMetadata(relative, parsed, sourceRoot = null) {
 export async function copyFile(source, target) {
   await fs.mkdir(path.dirname(target), { recursive: true });
   await fs.copyFile(source, target);
-}
-
-export async function writeJson(target, value) {
-  await fs.mkdir(path.dirname(target), { recursive: true });
-  await fs.writeFile(target, `${JSON.stringify(value, null, 2)}\n`, "utf8");
 }
 
 export async function generateNearestFourX(source, target) {

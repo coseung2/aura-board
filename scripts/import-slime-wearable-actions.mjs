@@ -7,11 +7,11 @@ import sharp from "sharp";
 
 import {
   mobileRegistryPublicationItems,
-  publishStagedFileSet,
   stageMobileGeneratedRegistry,
   verifyMobileRegistryStage,
 } from "../apps/mobile/scripts/split-generated-slime-registries.mjs";
 import {
+  publishStagedImportOutputs,
   verifyChunkedRegistry,
   writeChunkedRegistry,
 } from "../src/lib/pets/chunked-registry-writer.mjs";
@@ -22,6 +22,9 @@ const repoRoot = path.resolve(
 );
 const expectedCounts = { happy: 12, "ball-hit": 18 };
 const expectedTrackCounts = { happy: 16, "ball-hit": 22 };
+
+export const publishSlimeWearableActionsImportOutputs =
+  publishStagedImportOutputs;
 
 async function directories(parent) {
   return (await fs.readdir(parent, { withFileTypes: true }))
@@ -281,21 +284,6 @@ async function verifyGeneratedRegistries(
       filename: "slime-wearable-actions.generated.ts",
       stagingLibRoot,
       targetLibRoot: mobileLibRoot,
-    });
-  } finally {
-    await fs.rm(stagingRoot, { recursive: true, force: true });
-  }
-}
-
-export async function publishSlimeWearableActionsImportOutputs(
-  items,
-  stagingRoot,
-  failAt = null,
-) {
-  try {
-    publishStagedFileSet(items, stagingRoot, {
-      approvedTargets: items.map((item) => item.target),
-      failAt,
     });
   } finally {
     await fs.rm(stagingRoot, { recursive: true, force: true });
