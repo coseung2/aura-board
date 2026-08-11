@@ -1,0 +1,571 @@
+/* DJ 월말 리캡 모달 (2026-04-22 dj-recap) */
+.dj-recap-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 24px;
+}
+
+.dj-recap-modal {
+  background: var(--color-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card-hover);
+  width: 100%;
+  max-width: 860px;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dj-recap-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 28px 16px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dj-recap-eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--color-accent);
+  margin-bottom: 4px;
+}
+
+.dj-recap-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.dj-recap-close {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  width: 36px;
+  height: 36px;
+  font-size: 18px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.dj-recap-close:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.dj-recap-monthbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 28px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.dj-recap-monthbtn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.dj-recap-monthbtn:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+.dj-recap-monthbtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dj-recap-monthpill {
+  font-size: 15px;
+  font-weight: 700;
+  padding: 4px 16px;
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  border-radius: var(--radius-pill);
+}
+
+.dj-recap-body {
+  padding: 24px 28px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.dj-recap-empty {
+  padding: 64px 20px;
+  text-align: center;
+  color: var(--color-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.dj-recap-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.dj-recap-stat {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  text-align: center;
+}
+
+.dj-recap-stat-value {
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  color: var(--color-text);
+}
+
+.dj-recap-stat-unit {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  margin-left: 4px;
+}
+
+.dj-recap-stat-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-top: 4px;
+}
+
+.dj-recap-spotlight {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .dj-recap-spotlight {
+    grid-template-columns: 1fr;
+  }
+}
+
+.dj-recap-spot {
+  background: #fff;
+  border: 1px solid rgba(201, 162, 39, 0.3);
+  border-radius: var(--radius-card);
+  padding: 20px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.dj-recap-spot-dj {
+  background: #fff;
+  border-color: rgba(0, 117, 222, 0.3);
+}
+
+.dj-recap-spot-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--color-text-muted);
+}
+
+.dj-recap-spot-thumb {
+  width: 120px;
+  height: 68px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--color-surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-faint);
+  font-size: 24px;
+}
+
+.dj-recap-spot-thumb-fallback {
+  background: #fff;
+  color: #fff;
+}
+
+.dj-recap-spot-avatar {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: #c9a227;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.dj-recap-spot-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-text);
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dj-recap-spot-meta {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.dj-recap-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dj-recap-sectiontitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.dj-recap-songlist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dj-recap-songrow {
+  display: grid;
+  grid-template-columns: 28px 56px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--color-bg);
+  border-radius: 8px;
+}
+
+.dj-recap-pos {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: 13px;
+}
+
+.dj-recap-pos.top {
+  color: #c9a227;
+}
+
+.dj-recap-songthumb {
+  width: 56px;
+  height: 32px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--color-surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.dj-recap-songinfo {
+  min-width: 0;
+}
+
+.dj-recap-songtitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dj-recap-songsub {
+  font-size: 11px;
+  color: var(--color-text-muted);
+}
+
+.dj-recap-songplays {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: var(--color-accent);
+  font-size: 13px;
+}
+
+.dj-recap-ranking {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dj-recap-rankrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.dj-recap-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.dj-recap-avatar.top {
+  background: #c9a227;
+  color: #fff;
+}
+
+.dj-recap-rankname {
+  flex: 1;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.dj-recap-rankcount {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dj-recap-bars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(4px, 1fr);
+  gap: 2px;
+  align-items: end;
+  height: 80px;
+  background: var(--color-bg);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.dj-recap-bar {
+  background: transparent;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 100%;
+}
+
+.dj-recap-bar-fill {
+  background: var(--color-accent);
+  border-radius: 2px;
+  opacity: 0.8;
+}
+
+.dj-recap-bar:hover .dj-recap-bar-fill {
+  opacity: 1;
+}
+
+.dj-recap-bars-xaxis {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--color-text-faint);
+  padding: 0 4px;
+}
+
+@media (max-width: 768px) {
+  .board-canvas-wrap-columns {
+    overflow-x: auto;
+  }
+
+  .columns-board {
+    gap: 16px;
+    min-width: max-content;
+    width: max-content;
+  }
+
+  .column {
+    flex-basis: 288px;
+    min-width: 288px;
+  }
+
+  .column-add-stack {
+    flex-basis: 288px;
+    min-width: 288px;
+  }
+
+  .column-cards-scroll {
+    min-height: 56px;
+  }
+}
+
+.presentation-prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 220;
+  background: rgba(15, 23, 42, 0.46);
+}
+
+.presentation-prompt {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: 221;
+  display: flex;
+  flex-direction: column;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(680px, calc(100vh - 32px));
+  transform: translate(-50%, -50%);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: 0 24px 64px rgba(15, 23, 42, 0.22);
+}
+
+.presentation-prompt-head {
+  display: grid;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.presentation-prompt-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.presentation-prompt-head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.presentation-prompt-list {
+  display: grid;
+  gap: 14px;
+  padding: 16px 20px;
+  overflow-y: auto;
+}
+
+.presentation-prompt-section {
+  display: grid;
+  gap: 8px;
+}
+
+.presentation-prompt-section-title {
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-text);
+}
+
+.presentation-prompt-groups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.presentation-prompt-toggle {
+  justify-self: start;
+  min-height: 30px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-accent);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.presentation-prompt-toggle:hover,
+.presentation-prompt-toggle:focus-visible {
+  color: var(--color-accent-active);
+  text-decoration: underline;
+  outline: none;
+}
+
+.presentation-prompt-group {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.presentation-prompt-group:hover,
+.presentation-prompt-group:focus-visible {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  outline: none;
+}
+
+.presentation-prompt-group.is-active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+
+.presentation-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 20px;
+  border-top: 1px solid var(--color-border);
+}
+
+.presentation-prompt-actions .ui-icon-action {
+  min-width: 72px;
+  min-height: 40px;
+  padding: 0 18px;
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.presentation-prompt-actions .ui-icon-action.is-accent {
+  border-color: var(--color-accent);
+  background: var(--color-accent);
+  color: #fff;
+}

@@ -1,0 +1,559 @@
+/* -------- Student Pages -------- */
+
+.student-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  padding: 48px 32px;
+  max-width: var(--container-max-width);
+  margin: 0 auto;
+}
+
+/* Flat student information architecture */
+.student-page-header {
+  margin: 0 0 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.student-page-eyebrow {
+  margin: 0 0 5px;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.student-page-title {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.student-flat-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.student-flat-section-heading h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-family: var(--font-display);
+  font-size: 18px;
+}
+
+.student-flat-section-heading a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-accent-tinted-text);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.student-home-boards {
+  padding-top: 24px;
+  border-top: 1px solid var(--color-border);
+}
+
+.student-board-highlight-list {
+  border-top: 1px solid var(--color-border);
+}
+
+.student-board-highlight {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 64px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.student-board-highlight:hover {
+  background: var(--color-surface-alt);
+}
+
+.student-board-highlight > span:first-child {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.student-board-highlight strong,
+.student-board-highlight small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-board-highlight strong {
+  font-size: 14px;
+}
+
+.student-board-highlight small,
+.student-board-highlight-action,
+.student-flat-empty {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.student-board-highlight-action {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.student-flat-empty {
+  margin: 0;
+  padding: 20px 4px;
+  border-top: 1px solid var(--color-border);
+}
+
+.student-boards-page .student-board-panel {
+  padding-top: 2px;
+}
+
+.student-boards-page .student-board-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 12px;
+  border-top: 0;
+}
+
+.student-boards-page .student-board-card {
+  display: flex;
+  min-width: 0;
+  min-height: 190px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  box-shadow: none;
+  transition:
+    box-shadow var(--t-slow),
+    border-color var(--t-slow),
+    transform var(--t-slow);
+}
+
+.student-boards-page .student-board-card:hover {
+  border-color: var(--color-border-hover);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
+}
+
+.student-boards-page .student-board-card.is-live {
+  border-color: var(--color-accent);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+}
+
+.student-boards-page .student-board-preview {
+  align-self: stretch;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(24, 74, 92, 0.1);
+  border-radius: 0;
+}
+
+.student-boards-page .student-board-card-body {
+  display: grid;
+  justify-content: start;
+  gap: 3px;
+  padding: 10px 12px 12px;
+}
+
+.student-boards-page .student-board-card-title {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.15px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-boards-page .student-board-card-meta {
+  min-width: 0;
+  margin-top: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-boards-page .student-board-empty {
+  min-height: 150px;
+}
+
+@media (max-width: 900px) {
+  .student-boards-page .student-board-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .student-boards-page .student-board-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .student-boards-page .student-board-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.student-board-error {
+  display: grid;
+  justify-items: start;
+  gap: 16px;
+  padding: 24px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.student-board-error h1 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.student-board-error button {
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.student-hidden-page {
+  padding-block: 32px 56px;
+}
+
+.student-hidden-sections {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.student-hidden-section {
+  min-width: 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.student-hidden-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 2px;
+}
+
+.student-hidden-section-head h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 17px;
+}
+
+.student-hidden-section-head > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  min-height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.student-hidden-list {
+  margin: 0;
+  padding: 0;
+  border-bottom: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.student-hidden-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  min-height: 64px;
+  padding: 10px 2px;
+  border-top: 1px solid var(--color-border);
+}
+
+.student-hidden-list li > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.student-hidden-list strong,
+.student-hidden-list span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-hidden-list strong {
+  color: var(--color-text);
+  font-size: 14px;
+}
+
+.student-hidden-list span {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.student-hidden-list button,
+.student-hidden-state button,
+.student-hidden-state a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 44px;
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-accent-tinted-text);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.student-hidden-list button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.student-hidden-section-empty {
+  margin: 0;
+  padding: 20px 2px;
+  border-block: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.student-hidden-state {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  min-height: 180px;
+  align-content: center;
+  padding: 28px 2px;
+  border-block: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.student-hidden-state strong {
+  color: var(--color-text);
+  font-size: 18px;
+}
+
+.student-hidden-state p {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .student-hidden-sections {
+    grid-template-columns: 1fr;
+  }
+}
+
+.student-walking-page {
+  padding-block: 24px;
+}
+
+/* The global mega navigation already owns the page identity. Activity pages
+   therefore begin with one flat, equal-width content tab row. */
+.student-activity-header {
+  width: 100%;
+  margin: 0 0 28px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.student-activity-navigation {
+  display: grid;
+  grid-template-columns: repeat(var(--student-activity-tab-count, 3), minmax(0, 1fr));
+  width: 100%;
+  min-width: 0;
+}
+
+.student-activity-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.student-activity-tab:hover {
+  color: var(--color-text);
+}
+
+.student-activity-tab[aria-selected="true"] {
+  color: var(--color-accent-active);
+}
+
+.student-activity-tab[aria-selected="true"]::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: var(--color-accent);
+  content: "";
+}
+
+.student-activity-tab:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: -3px;
+}
+
+@media (max-width: 760px) {
+  .student-activity-header {
+    margin-bottom: 22px;
+  }
+
+  .student-walking-page {
+    padding-block: 20px 44px;
+  }
+}
+
+.student-walking-days {
+  display: grid;
+  gap: 14px;
+}
+
+.student-walking-leaderboard-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  border-block: 1px solid var(--color-border);
+  list-style: none;
+}
+
+.student-walking-leaderboard-list li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 8px;
+  min-width: 0;
+  padding: 14px 12px;
+  border-right: 1px solid var(--color-border);
+}
+
+.student-walking-leaderboard-list li:last-child {
+  border-right: 0;
+}
+
+.student-walking-leaderboard-list li.is-current {
+  background: var(--color-accent-tinted-bg);
+}
+
+.student-walking-leaderboard-rank {
+  grid-row: 1 / span 2;
+  color: var(--color-accent-tinted-text);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.student-walking-leaderboard-name,
+.student-walking-leaderboard-steps {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.student-walking-leaderboard-name {
+  color: var(--color-text);
+  font-weight: 800;
+}
+
+.student-walking-leaderboard-steps {
+  color: var(--color-text-muted);
+}
+
+.student-walking-day-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) 88px;
+  align-items: center;
+  gap: 12px;
+  min-height: 24px;
+}
+
+.student-walking-day-label,
+.student-walking-step-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.student-walking-step-label {
+  color: var(--color-text);
+  text-align: right;
+}
+
+.student-walking-bar-track {
+  display: block;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--color-surface-alt);
+}
+
+.student-walking-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 180ms ease;
+}
+
+.student-walking-future-day {
+  color: var(--color-text-faint);
+}

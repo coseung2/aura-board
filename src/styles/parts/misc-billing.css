@@ -1,0 +1,334 @@
+/* -------- Billing / subscription (/billing) -------- */
+
+.billing-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin-top: 8px;
+}
+
+.billing-current {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-card);
+}
+
+.billing-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.5px;
+}
+
+.billing-badge.is-pro {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.billing-badge.is-free {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
+.billing-current-meta {
+  font-size: 13.5px;
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.billing-muted {
+  color: var(--color-text-muted);
+  font-size: 12px;
+}
+
+.billing-plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.billing-plan-card {
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 18px 16px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 150ms ease, transform 120ms ease;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+.billing-plan-card:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  transform: translateY(-1px);
+}
+
+.billing-plan-card.is-highlighted {
+  border-color: var(--color-accent);
+}
+
+.billing-plan-card:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.billing-plan-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 6px;
+}
+
+.billing-plan-price {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.billing-plan-period {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.billing-plan-note {
+  font-size: 12px;
+  color: var(--color-accent);
+  margin-top: 6px;
+}
+
+.billing-cancel {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-btn);
+  padding: 8px 16px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.billing-cancel:hover:not(:disabled) {
+  color: var(--color-danger, #dc3545);
+  border-color: var(--color-danger, #dc3545);
+}
+
+.billing-msg {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.billing-callback {
+  padding: 24px 0;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.billing-callback-success {
+  color: var(--color-accent);
+}
+
+.billing-callback-failed {
+  color: var(--color-danger, #dc3545);
+}
+
+/* -------- Event-signup public applicant page (/b/[slug]?t=…) -------- */
+
+.event-public-page {
+  min-height: 100vh;
+  background: var(--color-bg);
+  padding: 32px 16px;
+}
+
+.event-public-card {
+  max-width: 560px;
+  margin: 0 auto;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.event-public-poster {
+  width: 100%;
+  height: auto;
+  border-radius: var(--radius-card);
+  object-fit: cover;
+}
+
+.event-public-title {
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.event-public-desc {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  margin: 0;
+  white-space: pre-wrap;
+}
+
+.event-public-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 6px 14px;
+  font-size: 13px;
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+  padding: 12px 16px;
+  border-radius: var(--radius-btn);
+  margin: 0;
+}
+
+.event-public-meta dt {
+  color: var(--color-text-muted);
+  font-weight: 600;
+}
+
+.event-public-notice {
+  padding: 14px 16px;
+  background: var(--color-surface-alt);
+  border-left: 3px solid var(--color-accent);
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.event-public-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.event-public-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.event-public-field > span {
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.event-public-field em {
+  color: var(--color-danger);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.event-public-field input[type="text"],
+.event-public-field input[type="number"],
+.event-public-field input[type="url"],
+.event-public-field textarea,
+.event-public-field select {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+  transition: border-color 150ms ease;
+}
+
+.event-public-field input:focus,
+.event-public-field textarea:focus,
+.event-public-field select:focus {
+  border-color: var(--color-accent);
+}
+
+.event-public-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.event-public-hint {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.event-public-checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.event-public-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.event-public-submit {
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-btn);
+  padding: 14px 20px;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background 150ms ease;
+}
+
+.event-public-submit:hover:not(:disabled) {
+  background: var(--color-accent-active);
+}
+
+.event-public-submit:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.event-public-error {
+  padding: 10px 14px;
+  background: var(--color-surface-alt);
+  border-left: 3px solid var(--color-danger);
+  border-radius: var(--radius-btn);
+  color: var(--color-danger);
+  font-size: 13px;
+}
+
+.event-public-success {
+  text-align: center;
+  padding: 32px 16px;
+}
+
+.event-public-success h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 8px;
+}
+
+.event-public-success p {
+  font-size: 14px;
+  color: var(--color-text-muted);
+  margin: 0;
+}

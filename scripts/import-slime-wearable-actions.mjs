@@ -1,55 +1,64 @@
 import { createHash } from "node:crypto";
-import { cp, mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";
+import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import sharp from "sharp";
 
-const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const deliveryRoot = path.resolve(
-  process.argv.find((arg) => arg.startsWith("--source="))?.slice("--source=".length)
-    ?? "C:/Users/malla/Desktop/aura-board-assets/04-delivery/wearables",
-);
-const checkOnly = process.argv.includes("--check");
+import {
+  mobileRegistryPublicationItems,
+  publishStagedFileSet,
+  stageMobileGeneratedRegistry,
+  verifyMobileRegistryStage,
+} from "../apps/mobile/scripts/split-generated-slime-registries.mjs";
+import {
+  verifyChunkedRegistry,
+  writeChunkedRegistry,
+} from "../src/lib/pets/chunked-registry-writer.mjs";
 
+const repoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "..",
+);
 const expectedCounts = { happy: 12, "ball-hit": 18 };
 const expectedTrackCounts = { happy: 16, "ball-hit": 22 };
 
 async function directories(parent) {
-  return (await readdir(parent, { withFileTypes: true }))
+  return (await fs.readdir(parent, { withFileTypes: true }))
     .filter((entry) => entry.isDirectory() && !entry.name.startsWith("_"))
     .map((entry) => entry.name)
     .sort();
 }
 
 async function hash(file) {
-  return createHash("sha256").update(await readFile(file)).digest("hex");
+  return createHash("sha256")
+    .update(await fs.readFile(file))
+    .digest("hex");
 }
 
 async function assertIdentical(source, target) {
   if ((await hash(source)) !== (await hash(target))) {
-    throw new Error(`Generated file is stale: ${path.relative(repoRoot, target)}`);
+    throw new Error(
+      `Generated file is stale: ${path.relative(repoRoot, target)}`,
+    );
   }
-}
-
-async function writeText(target, value) {
-  if (checkOnly) {
-    const current = await readFile(target, "utf8");
-    if (current !== value) throw new Error(`Generated file is stale: ${path.relative(repoRoot, target)}`);
-    return;
-  }
-  await mkdir(path.dirname(target), { recursive: true });
-  await writeFile(target, value);
 }
 
 function validateMetadata(meta, role, option, action) {
   if (meta.role !== role || meta.option !== option || meta.action !== action) {
     throw new Error(`Metadata path mismatch: ${role}/${option}/${action}`);
   }
-  if (!(action in expectedCounts) || meta.frameCount !== expectedCounts[action]) {
+  if (
+    !(action in expectedCounts) ||
+    meta.frameCount !== expectedCounts[action]
+  ) {
     throw new Error(`Unexpected frame count: ${role}/${option}/${action}`);
   }
-  if (meta.canvas?.w !== 64 || meta.canvas?.h !== 64 || meta.alpha !== "binary") {
+  if (
+    meta.canvas?.w !== 64 ||
+    meta.canvas?.h !== 64 ||
+    meta.alpha !== "binary"
+  ) {
     throw new Error(`Invalid canvas or alpha: ${role}/${option}/${action}`);
   }
   if (meta.containsProp !== false || meta.frames?.length !== meta.frameCount) {
@@ -61,27 +70,34 @@ function validateMetadata(meta, role, option, action) {
   for (let index = 0; index < meta.frameCount; index += 1) {
     const frame = meta.frames[index];
     if (
-      frame?.filename !== String(index)
-      || frame.frame?.x !== index * 64
-      || frame.frame?.y !== 0
-      || frame.frame?.w !== 64
-      || frame.frame?.h !== 64
-      || frame.duration !== meta.frameDurationsMs[index]
+      frame?.filename !== String(index) ||
+      frame.frame?.x !== index * 64 ||
+      frame.frame?.y !== 0 ||
+      frame.frame?.w !== 64 ||
+      frame.frame?.h !== 64 ||
+      frame.duration !== meta.frameDurationsMs[index]
     ) {
       throw new Error(`Invalid frame ${index}: ${role}/${option}/${action}`);
     }
   }
 }
 
-function generatedSource(entries, platform) {
+function generatedRegistry(entries, platform) {
   const registry = {};
   for (const entry of entries) {
     const key = `${entry.role}/${entry.option}`;
     const current = registry[key] ?? { sheets: {}, timelines: {} };
     const assetPath = `${entry.role}/${entry.option}/${entry.action}/sheet.png`;
-    current.sheets[entry.action] = platform === "mobile"
-      ? `__REQUIRE__../assets/slimes/composition/${assetPath}`
-      : { frameCount: entry.frameCount, frameSize: { w: 64, h: 64 }, characterOffsetY: 0, grounded: true, url: `/creatures/slimes/official/composition/${assetPath}` };
+    current.sheets[entry.action] =
+      platform === "mobile"
+        ? `__REQUIRE__../assets/slimes/composition/${assetPath}`
+        : {
+            frameCount: entry.frameCount,
+            frameSize: { w: 64, h: 64 },
+            characterOffsetY: 0,
+            grounded: true,
+            url: `/creatures/slimes/official/composition/${assetPath}`,
+          };
     if (platform === "mobile") {
       current.sheets[entry.action] = {
         frameCount: entry.frameCount,
@@ -94,13 +110,23 @@ function generatedSource(entries, platform) {
     current.timelines[entry.action] = {
       sheet: entry.action,
       frameCount: entry.frameCount,
-      anchors: Array.from({ length: entry.frameCount }, (_, sourceFrame) => ({ sourceFrame, dx: 0, dy: 0 })),
+      anchors: Array.from({ length: entry.frameCount }, (_, sourceFrame) => ({
+        sourceFrame,
+        dx: 0,
+        dy: 0,
+      })),
     };
     registry[key] = current;
   }
-  const name = platform === "mobile"
-    ? "SLIME_MOBILE_WEARABLE_ACTION_REGISTRY"
-    : "SLIME_WEB_WEARABLE_ACTION_REGISTRY";
+  return registry;
+}
+
+function generatedSource(entries, platform) {
+  const registry = generatedRegistry(entries, platform);
+  const name =
+    platform === "mobile"
+      ? "SLIME_MOBILE_WEARABLE_ACTION_REGISTRY"
+      : "SLIME_WEB_WEARABLE_ACTION_REGISTRY";
   const json = JSON.stringify(registry, null, 2).replace(
     /"__REQUIRE__([^\"]+)"/g,
     (_, asset) => `require(${JSON.stringify(asset)})`,
@@ -108,69 +134,290 @@ function generatedSource(entries, platform) {
   return `// Generated by scripts/import-slime-wearable-actions.mjs. Do not edit.\n\nexport const ${name} = ${json} as const;\n`;
 }
 
-const entries = [];
-for (const role of await directories(deliveryRoot)) {
-  for (const option of await directories(path.join(deliveryRoot, role))) {
-    for (const action of await directories(path.join(deliveryRoot, role, option))) {
-      const sourceDir = path.join(deliveryRoot, role, option, action);
-      const sourcePng = path.join(sourceDir, "sheet.png");
-      const sourceJson = path.join(sourceDir, "sheet.json");
-      if (!(await stat(sourcePng)).isFile() || !(await stat(sourceJson)).isFile()) continue;
-      const meta = JSON.parse(await readFile(sourceJson, "utf8"));
-      validateMetadata(meta, role, option, action);
-      const image = sharp(sourcePng);
-      const info = await image.metadata();
-      if (info.width !== meta.frameCount * 64 || info.height !== 64) {
-        throw new Error(`Invalid sheet dimensions: ${role}/${option}/${action}`);
-      }
-      const { data, info: rawInfo } = await sharp(sourcePng).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
-      for (let offset = rawInfo.channels - 1; offset < data.length; offset += rawInfo.channels) {
-        if (data[offset] !== 0 && data[offset] !== 255) {
-          throw new Error(`Non-binary alpha: ${role}/${option}/${action}`);
+async function discoverEntries(deliveryRoot) {
+  const entries = [];
+  for (const role of await directories(deliveryRoot)) {
+    for (const option of await directories(path.join(deliveryRoot, role))) {
+      for (const action of await directories(
+        path.join(deliveryRoot, role, option),
+      )) {
+        const sourceDir = path.join(deliveryRoot, role, option, action);
+        const sourcePng = path.join(sourceDir, "sheet.png");
+        const sourceJson = path.join(sourceDir, "sheet.json");
+        const [pngStat, jsonStat] = await Promise.all([
+          fs.stat(sourcePng).catch(() => null),
+          fs.stat(sourceJson).catch(() => null),
+        ]);
+        if (!pngStat?.isFile() || !jsonStat?.isFile()) continue;
+        const meta = JSON.parse(await fs.readFile(sourceJson, "utf8"));
+        validateMetadata(meta, role, option, action);
+        const info = await sharp(sourcePng).metadata();
+        if (info.width !== meta.frameCount * 64 || info.height !== 64) {
+          throw new Error(
+            `Invalid sheet dimensions: ${role}/${option}/${action}`,
+          );
         }
+        const raw = await sharp(sourcePng)
+          .ensureAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        for (
+          let offset = raw.info.channels - 1;
+          offset < raw.data.length;
+          offset += raw.info.channels
+        ) {
+          if (raw.data[offset] !== 0 && raw.data[offset] !== 255) {
+            throw new Error(`Non-binary alpha: ${role}/${option}/${action}`);
+          }
+        }
+        entries.push({
+          role,
+          option,
+          action,
+          frameCount: meta.frameCount,
+          sourcePng,
+          sourceJson,
+        });
       }
-      entries.push({ role, option, action, frameCount: meta.frameCount, sourcePng, sourceJson });
+    }
+  }
+  if (entries.length !== 38) {
+    throw new Error(`Expected 38 tracks, found ${entries.length}`);
+  }
+  for (const [action, count] of Object.entries(expectedTrackCounts)) {
+    const actual = entries.filter((entry) => entry.action === action).length;
+    if (actual !== count) {
+      throw new Error(`Expected ${count} ${action} tracks, found ${actual}`);
+    }
+  }
+  return entries;
+}
+
+async function writeAssets(entries, webRoot, mobileRoot) {
+  for (const entry of entries) {
+    const relative = path.join(entry.role, entry.option, entry.action);
+    const webDir = path.join(webRoot, relative);
+    const mobileDir = path.join(mobileRoot, relative);
+    await fs.mkdir(webDir, { recursive: true });
+    await fs.mkdir(mobileDir, { recursive: true });
+    await fs.copyFile(entry.sourcePng, path.join(webDir, "sheet.png"));
+    await fs.copyFile(entry.sourceJson, path.join(webDir, "sheet.json"));
+    await fs.copyFile(entry.sourceJson, path.join(mobileDir, "sheet.json"));
+    await sharp(entry.sourcePng)
+      .resize({
+        width: entry.frameCount * 256,
+        height: 256,
+        kernel: "nearest",
+      })
+      .png()
+      .toFile(path.join(mobileDir, "sheet.png"));
+  }
+}
+
+async function verifyAssets(entries, webRoot, mobileRoot) {
+  for (const entry of entries) {
+    const relative = path.join(entry.role, entry.option, entry.action);
+    const webDir = path.join(webRoot, relative);
+    const mobileDir = path.join(mobileRoot, relative);
+    await assertIdentical(entry.sourcePng, path.join(webDir, "sheet.png"));
+    await assertIdentical(entry.sourceJson, path.join(webDir, "sheet.json"));
+    await assertIdentical(entry.sourceJson, path.join(mobileDir, "sheet.json"));
+    const expectedMobile = await sharp(entry.sourcePng)
+      .resize({
+        width: entry.frameCount * 256,
+        height: 256,
+        kernel: "nearest",
+      })
+      .png()
+      .toBuffer();
+    const actualMobile = await fs.readFile(path.join(mobileDir, "sheet.png"));
+    if (!expectedMobile.equals(actualMobile)) {
+      throw new Error(`Generated mobile image is stale: ${relative}`);
     }
   }
 }
 
-if (entries.length !== 38) throw new Error(`Expected 38 tracks, found ${entries.length}`);
-for (const [action, count] of Object.entries(expectedTrackCounts)) {
-  const actual = entries.filter((entry) => entry.action === action).length;
-  if (actual !== count) throw new Error(`Expected ${count} ${action} tracks, found ${actual}`);
+function webRegistryOptions(outputPath, entries, approvedRoot) {
+  return {
+    outputPath,
+    approvedRoots: [approvedRoot],
+    allowedBaseNames: ["slime-wearable-actions.generated.ts"],
+    banner:
+      "// Generated by scripts/import-slime-wearable-actions.mjs. Do not edit.",
+    registries: [
+      {
+        name: "SLIME_WEB_WEARABLE_ACTION_REGISTRY",
+        filePrefix: "wearable-actions",
+        entries: Object.entries(generatedRegistry(entries, "web")),
+      },
+    ],
+  };
 }
 
-for (const entry of entries) {
-  const relative = path.join(entry.role, entry.option, entry.action);
-  const webDir = path.join(repoRoot, "public/creatures/slimes/official/composition", relative);
-  const mobileDir = path.join(repoRoot, "apps/mobile/assets/slimes/composition", relative);
-  if (checkOnly) {
-    await assertIdentical(entry.sourcePng, path.join(webDir, "sheet.png"));
-    await assertIdentical(entry.sourceJson, path.join(webDir, "sheet.json"));
-    await assertIdentical(entry.sourceJson, path.join(mobileDir, "sheet.json"));
-    const expectedMobile = await sharp(entry.sourcePng).resize({ width: entry.frameCount * 256, height: 256, kernel: "nearest" }).png().toBuffer();
-    const actualMobile = await readFile(path.join(mobileDir, "sheet.png"));
-    if (!expectedMobile.equals(actualMobile)) throw new Error(`Generated mobile image is stale: ${relative}`);
-    continue;
+async function verifyGeneratedRegistries(
+  entries,
+  webRegistryPath,
+  mobileLibRoot,
+) {
+  await verifyChunkedRegistry(
+    webRegistryOptions(webRegistryPath, entries, path.dirname(webRegistryPath)),
+  );
+  const stagingRoot = await fs.mkdtemp(
+    path.join(path.dirname(mobileLibRoot), ".wearable-actions-check-"),
+  );
+  try {
+    const monolith = path.join(
+      stagingRoot,
+      "slime-wearable-actions.generated.ts",
+    );
+    const stagingLibRoot = path.join(stagingRoot, "mobile-lib");
+    await fs.writeFile(monolith, generatedSource(entries, "mobile"), "utf8");
+    await stageMobileGeneratedRegistry({
+      filename: "slime-wearable-actions.generated.ts",
+      sourcePath: monolith,
+      stagingLibRoot,
+    });
+    verifyMobileRegistryStage({
+      filename: "slime-wearable-actions.generated.ts",
+      stagingLibRoot,
+      targetLibRoot: mobileLibRoot,
+    });
+  } finally {
+    await fs.rm(stagingRoot, { recursive: true, force: true });
   }
-  await mkdir(webDir, { recursive: true });
-  await mkdir(mobileDir, { recursive: true });
-  await cp(entry.sourcePng, path.join(webDir, "sheet.png"));
-  await cp(entry.sourceJson, path.join(webDir, "sheet.json"));
-  await cp(entry.sourceJson, path.join(mobileDir, "sheet.json"));
-  await sharp(entry.sourcePng)
-    .resize({ width: entry.frameCount * 256, height: 256, kernel: "nearest" })
-    .png()
-    .toFile(path.join(mobileDir, "sheet.png"));
 }
 
-await writeText(
-  path.join(repoRoot, "apps/mobile/lib/slime-wearable-actions.generated.ts"),
-  generatedSource(entries, "mobile"),
-);
-await writeText(
-  path.join(repoRoot, "src/lib/pets/slime-wearable-actions.generated.ts"),
-  generatedSource(entries, "web"),
-);
+export async function publishSlimeWearableActionsImportOutputs(
+  items,
+  stagingRoot,
+  failAt = null,
+) {
+  try {
+    publishStagedFileSet(items, stagingRoot, {
+      approvedTargets: items.map((item) => item.target),
+      failAt,
+    });
+  } finally {
+    await fs.rm(stagingRoot, { recursive: true, force: true });
+  }
+}
 
-console.log(`${checkOnly ? "Verified" : "Imported"} ${entries.length} wearable action tracks.`);
+export async function main(argv = process.argv.slice(2)) {
+  const deliveryRoot = path.resolve(
+    argv
+      .find((arg) => arg.startsWith("--source="))
+      ?.slice("--source=".length) ??
+      "C:/Users/malla/Desktop/aura-board-assets/04-delivery/wearables",
+  );
+  const checkOnly = argv.includes("--check");
+  const entries = await discoverEntries(deliveryRoot);
+  const canonicalWebRoot = path.join(
+    repoRoot,
+    "public/creatures/slimes/official/composition",
+  );
+  const canonicalMobileRoot = path.join(
+    repoRoot,
+    "apps/mobile/assets/slimes/composition",
+  );
+  const canonicalWebRegistry = path.join(
+    repoRoot,
+    "src/lib/pets/slime-wearable-actions.generated.ts",
+  );
+  const canonicalMobileLib = path.join(repoRoot, "apps/mobile/lib");
+
+  if (checkOnly) {
+    await verifyAssets(entries, canonicalWebRoot, canonicalMobileRoot);
+    await verifyGeneratedRegistries(
+      entries,
+      canonicalWebRegistry,
+      canonicalMobileLib,
+    );
+    console.log(`Verified ${entries.length} wearable action tracks.`);
+    return;
+  }
+
+  const stagingParent = path.join(repoRoot, ".codex", "artifacts");
+  await fs.mkdir(stagingParent, { recursive: true });
+  const stagingRoot = await fs.mkdtemp(
+    path.join(stagingParent, "slime-wearable-actions-import-"),
+  );
+  try {
+    const stagedWebRoot = path.join(stagingRoot, "web");
+    const stagedMobileRoot = path.join(stagingRoot, "mobile");
+    await fs.cp(canonicalWebRoot, stagedWebRoot, {
+      recursive: true,
+      force: true,
+    });
+    await fs.cp(canonicalMobileRoot, stagedMobileRoot, {
+      recursive: true,
+      force: true,
+    });
+    await writeAssets(entries, stagedWebRoot, stagedMobileRoot);
+
+    const stagedWebRegistry = path.join(
+      stagingRoot,
+      "slime-wearable-actions.generated.ts",
+    );
+    await writeChunkedRegistry(
+      webRegistryOptions(stagedWebRegistry, entries, stagingRoot),
+    );
+    const mobileMonolith = path.join(
+      stagingRoot,
+      "slime-wearable-actions.mobile.generated.ts",
+    );
+    await fs.writeFile(
+      mobileMonolith,
+      generatedSource(entries, "mobile"),
+      "utf8",
+    );
+    const stagedMobileLib = path.join(stagingRoot, "mobile-lib");
+    await stageMobileGeneratedRegistry({
+      filename: "slime-wearable-actions.generated.ts",
+      sourcePath: mobileMonolith,
+      stagingLibRoot: stagedMobileLib,
+    });
+    if (process.env.SLIME_IMPORT_FAIL_AT === "after-validation") {
+      throw new Error("Forced failure after staged wearable action validation");
+    }
+
+    const canonicalWebChunks = path.join(
+      repoRoot,
+      "src/lib/pets/slime-wearable-actions.generated.chunks",
+    );
+    const publicationItems = [
+      { source: stagedWebRoot, target: canonicalWebRoot },
+      { source: stagedMobileRoot, target: canonicalMobileRoot },
+      { source: stagedWebRegistry, target: canonicalWebRegistry },
+      {
+        source: path.join(
+          stagingRoot,
+          "slime-wearable-actions.generated.chunks",
+        ),
+        target: canonicalWebChunks,
+      },
+      ...mobileRegistryPublicationItems({
+        filename: "slime-wearable-actions.generated.ts",
+        stagingLibRoot: stagedMobileLib,
+        targetLibRoot: canonicalMobileLib,
+      }),
+    ];
+    await publishSlimeWearableActionsImportOutputs(
+      publicationItems,
+      stagingRoot,
+      process.env.SLIME_IMPORT_FAIL_AT,
+    );
+  } finally {
+    await fs.rm(stagingRoot, { recursive: true, force: true });
+  }
+  console.log(`Imported ${entries.length} wearable action tracks.`);
+}
+
+if (
+  process.argv[1] &&
+  path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
+) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exitCode = 1;
+  });
+}

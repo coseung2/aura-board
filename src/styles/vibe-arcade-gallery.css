@@ -1,0 +1,318 @@
+/* ======================================================================
+   Vibe-arcade (Seed 13)
+   Notion Soft 선정안 — `design_spec.md` § 2. 기존 토큰 재사용.
+   ===================================================================== */
+
+/* Layout root */
+.va-root {
+  padding: 32px;
+  background: var(--color-bg);
+  min-height: calc(100vh - 80px);
+}
+
+.va-loading {
+  padding: 48px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.va-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+
+.va-title {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.va-subtitle {
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--color-text-muted);
+  margin: 4px 0 0 0;
+}
+
+/* Gate-off state */
+.va-gate-off {
+  padding: 64px 32px;
+  display: flex;
+  justify-content: center;
+}
+
+.va-gate-off-inner {
+  max-width: 420px;
+  text-align: center;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  padding: 40px 32px;
+  box-shadow: var(--shadow-card);
+}
+
+.va-gate-off-inner h2 {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin: 16px 0 8px;
+}
+
+.va-gate-off-inner p {
+  font-size: 15px;
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.va-gate-off-icon {
+  font-size: 32px;
+  color: var(--color-text-faint);
+}
+
+.va-gate-off-link {
+  color: var(--color-accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.va-gate-off-link:hover {
+  text-decoration: underline;
+}
+
+.va-gate-off-actions {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.va-gate-off-enable {
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-btn);
+  padding: 12px 22px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.va-gate-off-enable:hover:not(:disabled) {
+  background: var(--color-accent-active);
+}
+
+.va-gate-off-enable:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.va-gate-off-error {
+  font-size: 12px;
+  color: var(--color-danger, #dc3545);
+  margin: 0;
+}
+
+/* Tabs */
+.va-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 0 20px 0;
+}
+
+.va-tab {
+  font: 600 13px/1 var(--font-body);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 0;
+  cursor: pointer;
+}
+
+.va-tab.is-active {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+
+/* Grid */
+.va-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
+  padding: 0;
+  list-style: none;
+  margin: 0;
+}
+
+/* Card */
+.va-card {
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+  transition: box-shadow 150ms ease, border-color 150ms ease;
+}
+
+.va-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--color-border-hover);
+}
+
+.va-card-thumb {
+  aspect-ratio: 4 / 3;
+  background: var(--color-surface-alt);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.va-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.va-card-thumb-fallback {
+  width: 100%;
+  height: 100%;
+  background: var(--color-surface-alt);
+}
+
+.va-card-meta {
+  padding: 12px 14px;
+}
+
+.va-card-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.15px;
+  margin: 0 0 6px 0;
+  color: var(--color-text);
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.va-card-stats {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font: 600 12px/1 var(--font-body);
+  color: var(--color-text-muted);
+}
+
+.va-card-plays {
+  letter-spacing: 0.125px;
+}
+
+.va-card-skeleton {
+  min-height: 260px;
+  background: #fff;
+  background-size: 200% 100%;
+  animation: va-shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .va-card-skeleton {
+    animation: none;
+  }
+}
+
+@keyframes va-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Empty / error */
+.va-empty {
+  padding: 64px 32px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.va-error {
+  padding: 16px;
+  background: var(--color-status-returned-bg);
+  color: var(--color-status-returned-text);
+  border-radius: var(--radius-card);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* CTA / FAB */
+.va-cta {
+  font: 600 14px/1 var(--font-body);
+  background: var(--color-accent);
+  color: #fff;
+  border: 0;
+  padding: 10px 20px;
+  border-radius: var(--radius-btn);
+  box-shadow: var(--shadow-accent);
+  cursor: pointer;
+  margin-top: 16px;
+}
+
+.va-cta:hover {
+  background: var(--color-accent-active);
+  box-shadow: var(--shadow-accent-hover);
+}
+
+.va-fab {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent);
+  color: #fff;
+  border: 0;
+  box-shadow: var(--shadow-accent);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.va-fab:hover {
+  background: var(--color-accent-active);
+  box-shadow: var(--shadow-accent-hover);
+}
+
+/* Responsive */
+@media (max-width: 1080px) {
+  .va-root {
+    padding: 24px;
+  }
+  .va-grid {
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .va-root {
+    padding: 18px;
+  }
+  .va-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .va-grid {
+    grid-template-columns: 1fr;
+  }
+}

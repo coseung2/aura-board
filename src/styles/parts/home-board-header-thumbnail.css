@@ -1,0 +1,141 @@
+/* -------- Board Header extras -------- */
+
+.board-back-link {
+  font-size: 20px;
+  text-decoration: none;
+  color: var(--color-text-muted);
+  padding: 4px 8px;
+  border-radius: var(--radius-btn);
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+
+.board-back-link:hover {
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+}
+
+.board-layout-badge {
+  display: inline-block;
+  padding: 3px 10px;
+  background: var(--color-surface-alt);
+  color: var(--color-text-faint);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+}
+
+.board-empty-inline {
+  grid-column: 1 / -1;
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--color-text-faint);
+}
+
+.board-empty-inline p {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* -------- Board Thumbnail Picker (create/edit/settings) -------- */
+
+.board-thumbnail-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.board-thumbnail-preview {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(24, 74, 92, 0.1);
+  border-radius: 8px;
+  background: linear-gradient(180deg, #f7fbff 0%, #edf6ff 100%);
+  color: var(--color-text-muted);
+}
+
+.board-thumbnail-preview img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.board-thumbnail-preview--upload::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(7, 20, 31, 0.08),
+    rgba(7, 20, 31, 0.38)
+  );
+  pointer-events: none;
+}
+
+.board-thumbnail-overlay {
+  position: absolute;
+  inset: auto 14px 14px;
+  z-index: 1;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.board-thumbnail-help {
+  max-width: 260px;
+  margin: 0;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.28);
+}
+
+.board-thumbnail-upload-btn {
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.16);
+  transition:
+    background 150ms ease,
+    transform 150ms ease,
+    opacity 150ms ease;
+}
+
+.board-thumbnail-upload-btn:hover:not(:disabled) {
+  background: #fff;
+  transform: translateY(-1px);
+}
+
+.board-thumbnail-upload-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .board-thumbnail-overlay {
+    inset: auto 10px 10px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .board-thumbnail-help {
+    max-width: none;
+    font-size: 12px;
+  }
+}

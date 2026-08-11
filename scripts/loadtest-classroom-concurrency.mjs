@@ -1,227 +1,44 @@
-import { PrismaClient } from "@prisma/client";
-import { encode } from "@auth/core/jwt";
-import { createClient } from "@supabase/supabase-js";
-import { createHmac, randomBytes } from "node:crypto";
-import { execFile } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { promisify } from "node:util";
-import { performance } from "node:perf_hooks";
 import {
-  estimateRealtimeWave,
-  estimateRealtimeJoinSchedule,
-  evaluateRealtimeApproval,
-  evaluateRealtimeAllocation,
-  exactSyntheticOutboxSources,
-  expectedRealtimeMessageCounts,
-  parseRequestValidation,
-  recordRealtimeCallback as updateRealtimeCallbackMetrics,
-  selectRealtimeActorsRoundRobin,
+  authSecret,
+  config,
   createAbortAwareDelay,
-  nextRealtimeJoinStartAt,
-  summarizeRealtimeJoinStarts,
-  summarizeCommentRewardSettlement,
-} from "./loadtest-classroom-metrics.mjs";
-
-const execFileAsync = promisify(execFile);
-
-for (const envFile of [".env.local", ".env"]) {
-  try {
-    process.loadEnvFile?.(path.resolve(envFile));
-  } catch {
-    // The deployed service already supplies its environment. Missing local
-    // dotenv files are normal in CI and on Oracle.
-  }
-}
-
-function integerEnv(name, fallback, { min = 0, max = Number.MAX_SAFE_INTEGER } = {}) {
-  const raw = process.env[name];
-  if (raw === undefined || raw.trim() === "") return fallback;
-  const value = Number(raw);
-  if (!Number.isSafeInteger(value) || value < min || value > max) {
-    throw new Error(`${name} must be an integer between ${min} and ${max}`);
-  }
-  return value;
-}
-
-function numberEnv(name, fallback, { min = 0, max = Number.MAX_VALUE } = {}) {
-  const raw = process.env[name];
-  if (raw === undefined || raw.trim() === "") return fallback;
-  const value = Number(raw);
-  if (!Number.isFinite(value) || value < min || value > max) {
-    throw new Error(`${name} must be a number between ${min} and ${max}`);
-  }
-  return value;
-}
-
-const runId = `lt-${Date.now().toString(36)}-${randomBytes(2).toString("hex")}`;
-const target = new URL(process.env.LOADTEST_TARGET ?? "http://127.0.0.1:3010");
-const localTarget = ["127.0.0.1", "localhost", "::1"].includes(target.hostname);
-const configuredTargetGitSha = process.env.LOADTEST_TARGET_GIT_SHA?.trim();
-const targetGitSha = localTarget && !configuredTargetGitSha
-  ? "local-working-tree"
-  : configuredTargetGitSha;
-if (!localTarget && !targetGitSha) {
-  throw new Error("Remote load targets require LOADTEST_TARGET_GIT_SHA");
-}
-if (
-  (!localTarget && targetGitSha === "local-working-tree") ||
-  (targetGitSha !== "local-working-tree" && !/^[0-9a-f]{7,40}$/i.test(targetGitSha ?? ""))
-) {
-  throw new Error("LOADTEST_TARGET_GIT_SHA must be a 7-40 character hexadecimal git SHA");
-}
-const forwardedHost =
-  process.env.LOADTEST_FORWARDED_HOST?.trim() ||
-  (localTarget ? "aura-board.com" : target.host);
-const forwardedProto =
-  process.env.LOADTEST_FORWARDED_PROTO?.trim() ||
-  (localTarget ? "https" : target.protocol.replace(/:$/, ""));
-if (!localTarget && process.env.LOADTEST_ALLOW_REMOTE !== "1") {
-  throw new Error("Remote load targets require LOADTEST_ALLOW_REMOTE=1");
-}
-if (process.env.LOADTEST_ALLOW_DATABASE_WRITE !== "1") {
-  throw new Error("Synthetic seed writes require LOADTEST_ALLOW_DATABASE_WRITE=1");
-}
-
-const authSecret = process.env.AUTH_SECRET?.trim();
-const databaseUrl = process.env.DATABASE_URL?.trim();
-if (!authSecret) throw new Error("AUTH_SECRET is required");
-if (!databaseUrl) throw new Error("DATABASE_URL is required");
-
-function optionalIntegerEnv(name, options) {
-  const raw = process.env[name];
-  if (raw === undefined || raw.trim() === "") return null;
-  return integerEnv(name, null, options);
-}
-
-const approval = evaluateRealtimeApproval(
-  process.env.LOADTEST_ALLOW_APPROVED_REALTIME_OVERRIDE,
-  process.env.LOADTEST_REALTIME_APPROVAL_REFERENCE,
-);
-
-const config = {
-  classrooms: integerEnv("LOADTEST_CLASSROOMS", 50, { min: 1, max: 100 }),
-  studentsPerClass: integerEnv("LOADTEST_STUDENTS_PER_CLASS", 20, { min: 1, max: 50 }),
-  teacherWindowMs: integerEnv("LOADTEST_TEACHER_WINDOW_MS", 5_000, { min: 0, max: 120_000 }),
-  boardOpenWindowMs: integerEnv("LOADTEST_BOARD_OPEN_WINDOW_MS", 20_000, { min: 0, max: 180_000 }),
-  realtimeWindowMs: integerEnv("LOADTEST_REALTIME_WINDOW_MS", 20_000, { min: 0, max: 180_000 }),
-  snapshotWindowMs: integerEnv("LOADTEST_SNAPSHOT_WINDOW_MS", 10_000, { min: 0, max: 180_000 }),
-  cardWindowMs: integerEnv("LOADTEST_CARD_WINDOW_MS", 10_000, { min: 0, max: 180_000 }),
-  commentWindowMs: integerEnv("LOADTEST_COMMENT_WINDOW_MS", 15_000, { min: 0, max: 180_000 }),
-  likeWindowMs: integerEnv("LOADTEST_LIKE_WINDOW_MS", 15_000, { min: 0, max: 180_000 }),
-  requestTimeoutMs: integerEnv("LOADTEST_REQUEST_TIMEOUT_MS", 45_000, { min: 1_000, max: 180_000 }),
-  realtimeTimeoutMs: integerEnv("LOADTEST_REALTIME_TIMEOUT_MS", 20_000, { min: 1_000, max: 120_000 }),
-  realtimeSettleTimeoutMs: integerEnv("LOADTEST_REALTIME_SETTLE_TIMEOUT_MS", 15_000, { min: 0, max: 120_000 }),
-  commentRewardSettleTimeoutMs: integerEnv("LOADTEST_COMMENT_REWARD_SETTLE_TIMEOUT_MS", 30_000, { min: 0, max: 300_000 }),
-  commentRewardPollIntervalMs: integerEnv("LOADTEST_COMMENT_REWARD_POLL_INTERVAL_MS", 250, { min: 50, max: 5_000 }),
-  cleanupTimeoutMs: integerEnv("LOADTEST_CLEANUP_TIMEOUT_MS", 15_000, { min: 0, max: 120_000 }),
-  realtimeClients: integerEnv("LOADTEST_REALTIME_CLIENTS", -1, { min: -1, max: 5_000 }),
-  realtimeBaselineConnections: optionalIntegerEnv("LOADTEST_REALTIME_BASELINE_CONNECTIONS", { min: 0, max: 100_000 }),
-  realtimeConnectionLimit: integerEnv("LOADTEST_REALTIME_CONNECTION_LIMIT", 500, { min: 1, max: 100_000 }),
-  realtimeConnectionHeadroom: integerEnv("LOADTEST_REALTIME_CONNECTION_HEADROOM", 50, { min: 0, max: 100_000 }),
-  realtimeMaxJoinRate: numberEnv("LOADTEST_REALTIME_MAX_JOIN_RATE", 100, { min: 0.01, max: 100_000 }),
-  realtimeMaxMessageRate: numberEnv("LOADTEST_REALTIME_MAX_MESSAGE_RATE", 400, { min: 0.01, max: 100_000 }),
-  realtimeBaselineMessageRate: optionalIntegerEnv("LOADTEST_REALTIME_BASELINE_MESSAGE_RATE", { min: 0, max: 100_000 }),
-  realtimeMessageLimit: integerEnv("LOADTEST_REALTIME_MESSAGE_LIMIT", 500, { min: 1, max: 100_000 }),
-  realtimeMessageHeadroom: integerEnv("LOADTEST_REALTIME_MESSAGE_HEADROOM", 50, { min: 0, max: 100_000 }),
-  realtimeOverrideAcknowledged: approval.acknowledged,
-  realtimeApprovalReference: approval.reference,
-  sampleIntervalMs: integerEnv("LOADTEST_SAMPLE_INTERVAL_MS", 1_000, { min: 250, max: 30_000 }),
-  serverPid: integerEnv("LOADTEST_SERVER_PID", 0, { min: 0, max: 4_294_967_295 }),
+  createClient,
+  createHmac,
+  db,
+  encode,
+  estimateRealtimeJoinSchedule,
+  estimateRealtimeWave,
+  expectedRealtimeMessageCounts,
   forwardedHost,
   forwardedProto,
-  maxErrorRate: numberEnv("LOADTEST_MAX_ERROR_RATE", 0.01, { min: 0, max: 1 }),
-  maxReadP95Ms: numberEnv("LOADTEST_MAX_READ_P95_MS", 1_500, { min: 1 }),
-  maxWriteP95Ms: numberEnv("LOADTEST_MAX_WRITE_P95_MS", 2_500, { min: 1 }),
-};
-config.totalStudents = config.classrooms * config.studentsPerClass;
-if (config.realtimeClients < 0) config.realtimeClients = config.totalStudents;
-const realtimeAllocation = evaluateRealtimeAllocation({
-  totalStudents: config.totalStudents,
-  realtimeClients: config.realtimeClients,
-  baselineConnections: config.realtimeBaselineConnections,
-  connectionLimit: config.realtimeConnectionLimit,
-  connectionHeadroom: config.realtimeConnectionHeadroom,
-  realtimeWindowMs: config.realtimeWindowMs,
-  maxJoinRate: config.realtimeMaxJoinRate,
-  messageLimit: config.realtimeMessageLimit,
-  messageHeadroom: config.realtimeMessageHeadroom,
-  baselineMessageRate: config.realtimeBaselineMessageRate,
-  maxDeliveryCallbackRate: config.realtimeMaxMessageRate,
-  overrideAcknowledged: config.realtimeOverrideAcknowledged,
-});
-config.realtimeAllocation = realtimeAllocation;
-
-function databaseDescriptor(raw) {
-  try {
-    const parsed = new URL(raw);
-    return {
-      host: parsed.hostname,
-      port: parsed.port || null,
-      database: parsed.pathname.replace(/^\//, "") || null,
-    };
-  } catch {
-    return { host: "unparseable", port: null, database: null };
-  }
-}
-
-function loadGeneratorDatabaseUrl(raw) {
-  try {
-    const parsed = new URL(raw);
-    if (parsed.protocol.startsWith("postgres")) {
-      parsed.searchParams.set("connection_limit", "3");
-      parsed.searchParams.set("pool_timeout", "30");
-    }
-    return parsed.toString();
-  } catch {
-    return raw;
-  }
-}
-
-const db = new PrismaClient({
-  datasources: { db: { url: loadGeneratorDatabaseUrl(databaseUrl) } },
-  log: ["error"],
-});
-
-const resultPath = path.resolve(
-  process.env.LOADTEST_RESULT ?? path.join("tmp", "loadtests", `${runId}.json`),
-);
-const result = {
-  schema: "aura-board/classroom-loadtest/v2",
+  mkdir,
+  nextRealtimeJoinStartAt,
+  parseRequestValidation,
+  path,
+  performance,
+  randomBytes,
+  realtimeAllocation,
+  result,
+  resultPath,
   runId,
-  startedAt: new Date().toISOString(),
-  target: target.origin,
-  targetGitSha,
-  database: databaseDescriptor(databaseUrl),
-  config,
-  seed: null,
-  phases: [],
-  realtime: {
-    requested: config.realtimeClients,
-    subscribed: 0,
-    failed: 0,
-    statusCounts: {},
-    messageCounts: {},
-    transportCallbacks: {
-      total: 0,
-      perEvent: {},
-      perSecond: {},
-      peakPerSecond: 0,
-      rollingPeakPerSecond: 0,
-    },
-    expectedMessageCounts: {},
-    settle: null,
-  },
-  samples: [],
-  cleanup: null,
-  commentRewardDelivery: null,
-  gate: null,
-  fatal: null,
-};
+  selectRealtimeActorsRoundRobin,
+  sleep,
+  summarizeRealtimeJoinStarts,
+  target,
+  updateRealtimeCallbackMetrics,
+  writeFile,
+} from "./loadtest-classroom-context.mjs";
+import {
+  aggregateGate,
+  cleanupSyntheticData,
+  closeRealtimeChannels,
+  seedSyntheticClassrooms,
+  settleCommentRewards,
+  startOperationalSampler,
+} from "./loadtest-classroom-runtime.mjs";
+
 let realtimeAbort = null;
 const realtimeAbortDelay = createAbortAwareDelay();
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function hash32(value) {
   let hash = 2166136261;
@@ -248,6 +65,7 @@ function summarizeRows(rows, durationMs) {
   for (const row of rows) {
     const list = groups.get(row.op) ?? [];
     list.push(row);
+
     groups.set(row.op, list);
   }
   return Object.fromEntries(
@@ -444,128 +262,6 @@ function teacherOptions(actor) {
   };
 }
 
-async function seedSyntheticClassrooms() {
-  const teachers = [];
-  const classrooms = [];
-  const students = [];
-  const accounts = [];
-  const studentCards = [];
-  const boards = [];
-  const boardMembers = [];
-  const promptCards = [];
-  const studentActors = [];
-
-  const textPrefix = runId.replace(/[^a-z0-9]/gi, "").slice(-2).toUpperCase();
-  for (let classIndex = 0; classIndex < config.classrooms; classIndex += 1) {
-    const classSuffix = classIndex.toString(36).padStart(3, "0");
-    const teacher = {
-      id: `${runId}-teacher-${classSuffix}`,
-      email: `${runId}-teacher-${classSuffix}@load.invalid`,
-      name: `부하 교사 ${classIndex + 1}`,
-    };
-    const classroom = {
-      id: `${runId}-class-${classSuffix}`,
-      name: `부하 ${classIndex + 1}반`,
-      code: `${runId.replace(/[^a-z0-9]/gi, "").slice(-3)}${classSuffix}`
-        .slice(-6)
-        .toUpperCase(),
-      teacherId: teacher.id,
-    };
-    const board = {
-      id: `${runId}-board-${classSuffix}`,
-      slug: `${runId}-board-${classSuffix}`,
-      title: `부하 수업 보드 ${classIndex + 1}`,
-      layout: "freeform",
-      classroomId: classroom.id,
-    };
-    const prompt = {
-      id: `${runId}-prompt-${classSuffix}`,
-      boardId: board.id,
-      authorId: teacher.id,
-      title: "오늘 수업 의견",
-      content: "수업에서 알게 된 점을 남겨 주세요.",
-      order: 0,
-    };
-
-    teachers.push(teacher);
-    classrooms.push(classroom);
-    boards.push(board);
-    promptCards.push(prompt);
-    boardMembers.push({
-      id: `${runId}-member-${classSuffix}`,
-      boardId: board.id,
-      userId: teacher.id,
-      role: "owner",
-    });
-
-    for (let studentIndex = 0; studentIndex < config.studentsPerClass; studentIndex += 1) {
-      const globalIndex = classIndex * config.studentsPerClass + studentIndex;
-      const studentSuffix = globalIndex.toString(36).padStart(4, "0");
-      const student = {
-        id: `${runId}-student-${studentSuffix}`,
-        classroomId: classroom.id,
-        number: studentIndex + 1,
-        name: `${classIndex + 1}반 학생 ${studentIndex + 1}`,
-        qrToken: `${runId}-qr-${studentSuffix}`,
-        textCode: `${textPrefix}${studentSuffix}`.slice(-6).toUpperCase(),
-      };
-      const accountId = `${runId}-account-${studentSuffix}`;
-      students.push(student);
-      accounts.push({
-        id: accountId,
-        classroomId: classroom.id,
-        studentId: student.id,
-      });
-      studentCards.push({
-        id: `${runId}-bank-card-${studentSuffix}`,
-        accountId,
-        cardNumber: `${runId}-${studentSuffix}`,
-        qrSecret: randomBytes(24).toString("hex"),
-      });
-      studentActors.push({
-        id: student.id,
-        name: student.name,
-        classroomId: classroom.id,
-        boardId: board.id,
-        boardSlug: board.slug,
-        promptCardId: prompt.id,
-        classIndex,
-        studentIndex,
-        token: studentSessionToken(student),
-      });
-    }
-  }
-
-  await createManyBatches(db.user, teachers, 100);
-  await createManyBatches(db.classroom, classrooms, 100);
-  await createManyBatches(db.student, students, 500);
-  await createManyBatches(db.studentAccount, accounts, 500);
-  await createManyBatches(db.studentCard, studentCards, 500);
-  await createManyBatches(db.board, boards, 100);
-  await createManyBatches(db.boardMember, boardMembers, 100);
-  await createManyBatches(db.card, promptCards, 100);
-
-  const teacherActors = await Promise.all(
-    teachers.map(async (teacher, classIndex) => ({
-      ...teacher,
-      classIndex,
-      classroomId: classrooms[classIndex].id,
-      boardId: boards[classIndex].id,
-      cookie: await teacherSessionCookie(teacher),
-    })),
-  );
-
-  return {
-    teachers,
-    classrooms,
-    students,
-    boards,
-    promptCards,
-    studentActors,
-    teacherActors,
-  };
-}
-
 function incrementCounter(object, key, amount = 1) {
   const safeAmount = Number.isFinite(amount) && amount > 0 ? amount : 1;
   object[key] = (object[key] ?? 0) + safeAmount;
@@ -748,6 +444,7 @@ async function openRealtimeChannels(actors) {
       }));
   }
   await Promise.all(statusPromises);
+
   result.realtime.joinActual ??= summarizeRealtimeJoinStarts(
     actualJoinStarts,
     config.realtimeMaxJoinRate,
@@ -807,360 +504,36 @@ async function settleRealtimeMessages(actors, mutationRows) {
   console.log(JSON.stringify({ phase: "realtime-settle", ...result.realtime.settle }));
 }
 
-async function readCommentRewardSettlement(commentIds) {
-  if (commentIds.length === 0) {
-    return summarizeCommentRewardSettlement([], [], [], Date.now());
-  }
-  const [outboxRows, transactionRows] = await Promise.all([
-    db.notificationOutbox.findMany({
-      where: { eventType: "comment_reward", sourceId: { in: commentIds } },
-      select: { sourceId: true, status: true, createdAt: true },
-    }),
-    db.transaction.findMany({
-      where: { sourceType: "comment_reward", sourceRef: { in: commentIds } },
-      select: { id: true, sourceRef: true },
-    }),
-  ]);
-  return {
-    ...summarizeCommentRewardSettlement(commentIds, outboxRows, transactionRows, Date.now()),
-    transactionIds: transactionRows.map((row) => row.id),
-  };
-}
-
-async function settleCommentRewards(commentIds) {
-  const started = Date.now();
-  let settlement = await readCommentRewardSettlement(commentIds);
-  while (
-    !settlement.complete &&
-    !settlement.dead &&
-    Date.now() - started < config.commentRewardSettleTimeoutMs
-  ) {
-    await sleep(config.commentRewardPollIntervalMs);
-    settlement = await readCommentRewardSettlement(commentIds);
-  }
-  result.commentRewardDelivery = {
-    expected: settlement.expected,
-    outboxStatusCounts: settlement.outboxStatusCounts,
-    completedTransactionCount: settlement.completedTransactionCount,
-    durationMs: Date.now() - started,
-    complete: settlement.complete,
-    oldestOutstandingAgeMs: settlement.oldestOutstandingAgeMs,
-  };
-  console.log(JSON.stringify({ phase: "comment-reward-settle", ...result.commentRewardDelivery }));
-  return settlement.transactionIds ?? [];
-}
-
-async function closeRealtimeChannels(handles) {
-  for (let offset = 0; offset < handles.length; offset += 100) {
-    await Promise.all(
-      handles.slice(offset, offset + 100).map(async ({ client, channel }) => {
-        try {
-          await client.removeChannel(channel);
-        } catch {
-          // Best-effort load-test cleanup.
-        }
-        try {
-          client.realtime.disconnect();
-        } catch {
-          // Best-effort load-test cleanup.
-        }
-      }),
-    );
-  }
-}
-
-async function sampleServerProcess(pid) {
-  if (!pid) return null;
-  if (process.platform === "win32") {
-    const script = [
-      `$p = Get-Process -Id ${pid} -ErrorAction Stop`,
-      "$o = [pscustomobject]@{cpuSeconds=$p.CPU;workingSetBytes=$p.WorkingSet64;privateBytes=$p.PrivateMemorySize64;threads=$p.Threads.Count}",
-      "$o | ConvertTo-Json -Compress",
-    ].join("; ");
-    const { stdout } = await execFileAsync(
-      "powershell.exe",
-      ["-NoProfile", "-Command", script],
-      { windowsHide: true, timeout: 4_000 },
-    );
-    return JSON.parse(stdout.trim());
-  }
-
-  const [statusText, statText] = await Promise.all([
-    readFile(`/proc/${pid}/status`, "utf8"),
-    readFile(`/proc/${pid}/stat`, "utf8"),
-  ]);
-  const rssMatch = statusText.match(/^VmRSS:\s+(\d+)\s+kB$/m);
-  const privateMatch = statusText.match(/^RssAnon:\s+(\d+)\s+kB$/m);
-  const stat = statText.trim().split(/\s+/);
-  const clockTicks = 100;
-  return {
-    cpuSeconds: (Number(stat[13] ?? 0) + Number(stat[14] ?? 0)) / clockTicks,
-    workingSetBytes: Number(rssMatch?.[1] ?? 0) * 1_024,
-    privateBytes: Number(privateMatch?.[1] ?? 0) * 1_024,
-    threads: Number(stat[19] ?? 0),
-  };
-}
-
-function startOperationalSampler() {
-  let stopped = false;
-  let sampling = false;
-  const sample = async () => {
-    if (stopped || sampling) return;
-    sampling = true;
-    const entry = {
-      at: new Date().toISOString(),
-      generatorRssBytes: process.memoryUsage().rss,
-      db: null,
-      server: null,
-    };
-    try {
-      const rows = await db.$queryRawUnsafe(
-        `SELECT count(*)::int AS total,
-                count(*) FILTER (WHERE state = 'active')::int AS active,
-                count(*) FILTER (
-                  WHERE state = 'active' AND wait_event IS NOT NULL
-                )::int AS waiting,
-                count(*) FILTER (
-                  WHERE state = 'active' AND wait_event_type = 'Lock'
-                )::int AS lock_waiting
-           FROM pg_stat_activity
-          WHERE datname = current_database()`,
-      );
-      const row = rows?.[0];
-      if (row) {
-        entry.db = {
-          total: Number(row.total ?? 0),
-          active: Number(row.active ?? 0),
-          waiting: Number(row.waiting ?? 0),
-          lockWaiting: Number(row.lock_waiting ?? 0),
-        };
-      }
-    } catch (error) {
-      entry.dbError = error instanceof Error ? error.message.slice(0, 160) : "unknown";
-    }
-    try {
-      entry.server = await sampleServerProcess(config.serverPid);
-    } catch (error) {
-      entry.serverError = error instanceof Error ? error.message.slice(0, 160) : "unknown";
-    }
-    result.samples.push(entry);
-    sampling = false;
-  };
-
-  void sample();
-  const timer = setInterval(() => void sample(), config.sampleIntervalMs);
-  return async () => {
-    clearInterval(timer);
-    while (sampling) await sleep(25);
-    await sample().catch(() => undefined);
-    stopped = true;
-  };
-}
-
-function aggregateGate() {
-  const operations = [];
-  for (const phase of result.phases) {
-    for (const [op, summary] of Object.entries(phase.summary ?? {})) {
-      operations.push({ phase: phase.name, op, ...summary });
-    }
-  }
-  const requests = operations.reduce((sum, operation) => sum + operation.requests, 0);
-  const errors = operations.reduce((sum, operation) => sum + operation.errors, 0);
-  const reads = operations.filter((operation) =>
-    ["teacher.classrooms", "teacher.snapshot", "student.board-open", "student.snapshot"].includes(
-      operation.op,
-    ),
-  );
-  const writes = operations.filter((operation) =>
-    ["card.create", "comment.create", "like.create"].includes(operation.op),
-  );
-  const readP95 = reads.reduce(
-    (max, operation) => Math.max(max, Number(operation.p95Ms ?? 0)),
-    0,
-  );
-  const writeP95 = writes.reduce(
-    (max, operation) => Math.max(max, Number(operation.p95Ms ?? 0)),
-    0,
-  );
-  const errorRate = requests ? errors / requests : 0;
-  const failures = [];
-  if (result.fatal) failures.push("fatal");
-  if (errorRate > config.maxErrorRate) failures.push("error_rate");
-  if (readP95 > config.maxReadP95Ms) failures.push("read_p95");
-  if (writeP95 > config.maxWriteP95Ms) failures.push("write_p95");
-  if (result.realtime.failed > Math.ceil(config.realtimeClients * config.maxErrorRate)) {
-    failures.push("realtime_subscribe");
-  }
-  if (result.realtime.settle && !result.realtime.settle.complete) {
-    failures.push("realtime_delivery");
-  }
-  if (result.realtime.transportCallbacks.rollingPeakPerSecond > config.realtimeMaxMessageRate) {
-    failures.push("realtime_callback_peak");
-  }
-  if (result.realtime.joinActual && !result.realtime.joinActual.accepted) {
-    failures.push("realtime_join_actual");
-  }
-  if (result.commentRewardDelivery && !result.commentRewardDelivery.complete) {
-    failures.push("comment_reward_delivery");
-  }
-
-  const serverSamples = result.samples.map((sample) => sample.server).filter(Boolean);
-  const dbSamples = result.samples.map((sample) => sample.db).filter(Boolean);
-  return {
-    passed: failures.length === 0,
-    failures,
-    requests,
-    errors,
-    errorRate,
-    readP95Ms: readP95,
-    writeP95Ms: writeP95,
-    maxServerWorkingSetBytes: serverSamples.length
-      ? Math.max(...serverSamples.map((sample) => Number(sample.workingSetBytes ?? 0)))
-      : null,
-    serverCpuSecondsDelta:
-      serverSamples.length >= 2
-        ? Number(serverSamples.at(-1).cpuSeconds ?? 0) - Number(serverSamples[0].cpuSeconds ?? 0)
-        : null,
-    maxDatabaseConnections: dbSamples.length
-      ? Math.max(...dbSamples.map((sample) => Number(sample.total ?? 0)))
-      : null,
-    maxDatabaseActive: dbSamples.length
-      ? Math.max(...dbSamples.map((sample) => Number(sample.active ?? 0)))
-      : null,
-    maxDatabaseWaiting: dbSamples.length
-      ? Math.max(...dbSamples.map((sample) => Number(sample.waiting ?? 0)))
-      : null,
-    maxDatabaseLockWaiting: dbSamples.length
-      ? Math.max(...dbSamples.map((sample) => Number(sample.lockWaiting ?? 0)))
-      : null,
-  };
-}
-
-async function cleanupSyntheticData(data, sourceIds) {
-  if (!data) return { skipped: true };
-  const boardIds = data.boards.map((board) => board.id);
-  const promptCardIds = data.promptCards.map((card) => card.id);
-  const classroomIds = data.classrooms.map((classroom) => classroom.id);
-  const studentIds = data.students.map((student) => student.id);
-  const userIds = data.teachers.map((teacher) => teacher.id);
-
-  const [runComments, runLikes] = await Promise.all([
-    db.cardComment.findMany({
-      where: {
-        cardId: { in: promptCardIds },
-        authorStudentId: { in: studentIds },
-      },
-      select: { id: true },
-    }),
-    db.cardLike.findMany({
-      where: {
-        cardId: { in: promptCardIds },
-        likerStudentId: { in: studentIds },
-      },
-      select: { id: true },
-    }),
-  ]);
-  const commentIds = [...new Set([
-    ...sourceIds.commentIds,
-    ...runComments.map((comment) => comment.id),
-  ])];
-  const likeIds = [...new Set([
-    ...sourceIds.likeIds,
-    ...runLikes.map((like) => like.id),
-  ])];
-  const transactionIds = new Set(sourceIds.transactionIds);
-  const cleanupStarted = Date.now();
-  let processingOutbox = 0;
-  let remainingOutbox = 0;
-  let outboxSources = [];
-  let stableEmptyPasses = 0;
-  let cleanupStable = false;
-
-  while (true) {
-    const previousTransactionCount = transactionIds.size;
-    const rewardTransactions = commentIds.length > 0
-      ? await db.transaction.findMany({
-          where: {
-            sourceType: "comment_reward",
-            sourceRef: { in: commentIds },
-          },
-          select: { id: true },
-        })
-      : [];
-    for (const transaction of rewardTransactions) transactionIds.add(transaction.id);
-    outboxSources = exactSyntheticOutboxSources({
-      commentIds,
-      likeIds,
-      transactionIds: [...transactionIds],
-    });
-    if (outboxSources.length === 0) {
-      cleanupStable = true;
-      break;
-    }
-
-    await db.notificationOutbox.deleteMany({
-      where: { OR: outboxSources, status: { not: "processing" } },
-    });
-    processingOutbox = await db.notificationOutbox.count({
-      where: { OR: outboxSources, status: "processing" },
-    });
-    remainingOutbox = await db.notificationOutbox.count({
-      where: { OR: outboxSources },
-    });
-    const discoveredNewTransaction = transactionIds.size > previousTransactionCount;
-    stableEmptyPasses = remainingOutbox === 0 && !discoveredNewTransaction
-      ? stableEmptyPasses + 1
-      : 0;
-    if (stableEmptyPasses >= 2) {
-      cleanupStable = true;
-      break;
-    }
-    if (Date.now() - cleanupStarted >= config.cleanupTimeoutMs) break;
-    await sleep(Math.min(config.commentRewardPollIntervalMs, 250));
-  }
-
-  await db.board.deleteMany({ where: { id: { in: boardIds } } });
-  await db.classroom.deleteMany({ where: { id: { in: classroomIds } } });
-  await db.user.deleteMany({ where: { id: { in: userIds } } });
-
-  const [boards, classrooms, students, users, outbox] = await Promise.all([
-    db.board.count({ where: { id: { in: boardIds } } }),
-    db.classroom.count({ where: { id: { in: classroomIds } } }),
-    db.student.count({ where: { classroomId: { in: classroomIds } } }),
-    db.user.count({ where: { id: { in: userIds } } }),
-    outboxSources.length > 0
-      ? db.notificationOutbox.count({ where: { OR: outboxSources } })
-      : Promise.resolve(0),
-  ]);
-  return {
-    boards,
-    classrooms,
-    students,
-    users,
-    outbox,
-    processingOutbox,
-    cleanupTimedOut: !cleanupStable,
-    discoveredComments: commentIds.length,
-    discoveredLikes: likeIds.length,
-    discoveredRewardTransactions: transactionIds.size,
-  };
-}
-
 let seeded = null;
 let realtimeHandles = [];
 let stopSampler = async () => undefined;
 const mutationRows = [];
 const syntheticSources = { commentIds: [], likeIds: [], transactionIds: [] };
-try {
+
+async function executeLoadTest() {
   if (!realtimeAllocation.accepted) {
     throw new Error(`Unsafe Realtime allocation: ${realtimeAllocation.failures.join(", ")}`);
   }
+  if (process.env.LOADTEST_PREFLIGHT_ONLY === "1") {
+    result.preflight = {
+      mode: "startup-only",
+      accepted: true,
+      checkedAt: new Date().toISOString(),
+    };
+    return;
+  }
+
   const health = await timedRequest("health", "/api/health");
   if (!health.ok) {
     throw new Error(`Target health check failed: ${health.errorCode ?? health.status}`);
   }
 
-  seeded = await seedSyntheticClassrooms();
+  seeded = await seedSyntheticClassrooms({
+    createManyBatches,
+    randomBytes,
+    studentSessionToken,
+    teacherSessionCookie,
+  });
   result.seed = {
     teachers: seeded.teachers.length,
     classrooms: seeded.classrooms.length,
@@ -1248,6 +621,7 @@ try {
   realtimeHandles = await openRealtimeChannels(selectedRealtimeActors);
 
   await runPhase(
+
     "student-initial-snapshot",
     seeded.studentActors,
     config.snapshotWindowMs,
@@ -1351,6 +725,10 @@ try {
 
   result.gate = aggregateGate();
   if (!result.gate.passed) process.exitCode = 2;
+}
+
+try {
+  await executeLoadTest();
 } catch (error) {
   result.fatal = {
     name: error instanceof Error ? error.name : "Error",

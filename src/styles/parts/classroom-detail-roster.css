@@ -1,0 +1,365 @@
+/* ---- Detail ---- */
+
+.classroom-detail {
+  width: 100%;
+}
+
+.classroom-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 24px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+
+.classroom-detail-header-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.classroom-detail-name {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  margin: 0 0 8px;
+  color: var(--color-text);
+}
+
+.classroom-detail-meta {
+  font-size: 15px;
+  color: var(--color-text-muted);
+  margin: 0;
+}
+
+/* Invite / code card — docks to the header right (handoff T6-2).
+   Links to the full parent-access page rather than showing the raw
+   6-char code, since the teacher already manages codes there. */
+.classroom-invite-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 18px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    box-shadow var(--t-normal),
+    border-color var(--t-normal);
+}
+
+.classroom-invite-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--color-border-hover);
+}
+
+.classroom-invite-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  color: var(--color-text-muted);
+}
+
+.classroom-invite-cta {
+  margin-top: 4px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--color-text);
+}
+
+.classroom-invite-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-warning-tinted-bg);
+  color: var(--color-warning);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+/* Destructive action in the action-bar (T6-2). Subtle text-button —
+   ClassroomDeleteModal remains the confirm gate. */
+.classroom-detail-delete {
+  margin-left: auto;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-danger);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  transition:
+    background var(--t-fast),
+    border-color var(--t-fast);
+}
+
+.classroom-detail-delete:hover {
+  background: rgba(198, 40, 40, 0.08);
+  border-color: rgba(198, 40, 40, 0.3);
+}
+
+/* ---- Action bar ---- */
+
+.classroom-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+/* Red counter badge on the 초대 코드 · 승인 관리 button. Size matches
+   macOS dock-style badges — small enough not to overwhelm the label
+   but visible at tablet reading distance. */
+.classroom-action-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 8px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #fff;
+  background: #e53e3e;
+  border-radius: 999px;
+  line-height: 1;
+}
+
+.classroom-action-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 16px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: #ffffff;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.classroom-action-btn:hover {
+  background: var(--color-accent-active);
+}
+
+/* ---- Student table ---- */
+
+.classroom-table-wrap {
+  overflow-x: auto;
+}
+
+.classroom-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.classroom-th {
+  text-align: center;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.classroom-th-num {
+  width: 40px;
+}
+
+.classroom-th-actions {
+  width: auto;
+}
+
+.classroom-td {
+  padding: 10px 12px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+  text-align: center;
+}
+
+.classroom-tr:hover .classroom-td {
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.classroom-td-num {
+  color: var(--color-text-faint);
+  font-size: 13px;
+}
+
+.classroom-td-name {
+  font-weight: 600;
+}
+
+/* Roster columns (2026-07-27): name, gender, and role are separate cells so
+   headers and values line up instead of sharing one stacked cell. Data columns
+   split the remaining width evenly via table-layout: fixed. */
+.classroom-table {
+  table-layout: fixed;
+}
+
+/* Seven data columns share the width left over by the checkbox (36px) and
+   index (40px) columns. */
+.classroom-th-name,
+.classroom-th-gender,
+.classroom-th-role,
+.classroom-th-qr,
+.classroom-th-code,
+.classroom-th-actions,
+.classroom-th-parent {
+  width: calc((100% - 76px) / 7);
+}
+
+.classroom-td-gender .classroom-role-select-inline,
+.classroom-td-role .classroom-role-select-inline {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+  min-height: 0;
+  height: 26px;
+  padding: 2px 4px 2px 6px;
+  font-size: 12px;
+  text-align: center;
+  text-align-last: center;
+}
+
+.classroom-qr-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+}
+
+.classroom-qr-placeholder {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  background: var(--color-surface-alt);
+}
+
+.classroom-text-code {
+  font-family: monospace;
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--color-text-muted);
+}
+
+/* Parent-count cell: small deep-linkable chip. "–" when empty. */
+.classroom-parent-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-accent-tinted-text, var(--color-accent));
+  background: var(--color-accent-tinted-bg, var(--color-surface-alt));
+  border-radius: 999px;
+  text-decoration: none;
+  transition: background 120ms ease;
+}
+
+.classroom-parent-chip:hover {
+  background: var(--color-surface-alt);
+}
+
+.classroom-parent-chip.is-empty {
+  color: var(--color-text-faint);
+  background: transparent;
+  font-weight: 400;
+}
+
+.classroom-role-select {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  min-width: 90px;
+}
+
+.classroom-role-select:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 1px;
+}
+
+.classroom-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.classroom-row-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-btn);
+  transition:
+    color 150ms ease,
+    background 150ms ease;
+}
+
+.classroom-row-btn:hover {
+  background: var(--color-surface-alt);
+}
+
+.classroom-row-btn-reissue:hover {
+  color: var(--color-accent);
+}
+
+.classroom-row-btn-delete:hover {
+  color: #c62828;
+}
+
+/* ---- Main grid (student table + board column side-by-side) ----
+ *
+ * Wide screens: left column (2fr) = student table, right column (1fr) =
+ * board cards. `align-items: stretch` lets both columns fill the row to
+ * equal height so the board column visually balances even if it has
+ * fewer cards than the table has rows.
+ *
+ * Galaxy Tab S6 Lite portrait (1200px) collapses to a single column —
+ * the table stays full-width first, board section below. Parent counts
+ * live inside the table (classroom-td-parent) so there's no third
+ * section to lay out. */
+
+.classroom-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr);
+  gap: 32px;
+  align-items: stretch;
+  margin-top: 24px;
+}
+
+@media (max-width: 1199px) {
+  .classroom-main-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

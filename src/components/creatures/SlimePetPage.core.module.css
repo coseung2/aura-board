@@ -1,0 +1,795 @@
+.page {
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: clamp(22px, 4vw, 44px) clamp(16px, 4vw, 32px) 64px;
+  color: var(--color-text);
+  font-family: var(--font-body);
+}
+
+
+.cartEntry {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 64px;
+  min-height: 52px;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  /* Extra top/right padding so the badge is never clipped by the tab row. */
+  padding: 10px 14px 4px 10px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: transparent;
+  color: var(--color-text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: visible;
+}
+
+.cartIconWrap {
+  position: relative;
+  display: inline-grid;
+  width: 28px;
+  height: 24px;
+  place-items: center;
+  overflow: visible;
+}
+
+.cartBadge {
+  position: absolute;
+  top: -8px;
+  right: -12px;
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--color-accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
+.cartLabel {
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.cartEntry:hover,
+.cartEntry:focus-visible {
+  color: var(--color-accent);
+}
+
+.cartEntry:hover .cartLabel,
+.cartEntry:focus-visible .cartLabel {
+  color: var(--color-accent);
+}
+
+.cartEntry:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 2px;
+}
+
+.header,
+.sectionHeading,
+.breakdownHeading,
+.modalHeader,
+.drawerHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.header {
+  align-items: end;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--color-accent-tinted-text);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(24px, 4vw, 34px);
+  letter-spacing: -0.04em;
+}
+
+.subtitle,
+.sectionHeading p {
+  margin: 8px 0 0;
+  color: var(--color-text-muted);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.walletActions {
+  display: flex;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.walletSummary {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  min-width: 150px;
+  padding-left: 16px;
+  border-left: 1px solid var(--color-border);
+  text-align: right;
+}
+
+.walletLabel,
+.count {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.walletSummary strong {
+  color: var(--color-accent);
+  font-size: 22px;
+  letter-spacing: -0.03em;
+}
+
+.status,
+.drawerNotice {
+  min-height: 22px;
+  margin: 16px 0 -6px;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.drawerNotice {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+}
+
+.statusError {
+  color: var(--color-danger, #b42318);
+}
+
+.retryButton {
+  min-height: 44px;
+  margin-left: 10px;
+  padding: 8px 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-btn);
+  color: var(--color-accent-active);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.retryButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.section {
+  padding: 28px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.collectionSection {
+  padding-top: 0;
+}
+
+.collectionSection .slimeGrid {
+  margin-top: 0;
+}
+
+.section:last-child {
+  border-bottom: 0;
+}
+
+.sectionHeading h2,
+.breakdownHeading h2,
+.drawerHeader h2 {
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.03em;
+}
+
+.sectionHeading .count {
+  padding-top: 3px;
+  white-space: nowrap;
+}
+
+.slimeGrid,
+.breakdown,
+.shopList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slimeGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+  gap: 18px 16px;
+  margin-top: 20px;
+}
+
+.slimeItem {
+  position: relative;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 0;
+  border-bottom: 0;
+}
+
+.ownedChip,
+.shopOwnedChip {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-tinted-text);
+  background: var(--color-accent-tinted-bg);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.ownedChip {
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 5px 8px;
+}
+
+.representativeStar {
+  display: inline-grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--color-text-faint);
+  background: transparent;
+  cursor: pointer;
+}
+
+.representativeStarSelected {
+  color: var(--color-warning);
+}
+
+.representativeStar:disabled {
+  cursor: default;
+}
+
+.representativeStar:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.effectBadge {
+  display: inline-grid;
+  min-width: 44px;
+  min-height: 44px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.effectDetail {
+  position: relative;
+}
+
+.effectBadge:focus-visible {
+  outline: 2px solid rgba(22, 163, 74, 0.2);
+  outline-offset: 2px;
+}
+
+.effectArrowIcon {
+  display: block;
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(34, 197, 94, 0.28));
+  animation: growthBuffRise 1.15s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+@keyframes growthBuffRise {
+  0%,
+  100% {
+    opacity: 0.78;
+    transform: translateY(2px) scale(0.94);
+  }
+  48% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1.04);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .effectArrowIcon {
+    animation: none;
+  }
+}
+
+.effectPopover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 8;
+  display: grid;
+  width: min(260px, calc(100vw - 34px));
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  color: var(--color-text);
+  font-size: 12px;
+  line-height: 1.45;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 120ms ease-out,
+    transform 120ms ease-out;
+  visibility: hidden;
+}
+
+.slimeItem:nth-child(5n) .effectPopover,
+.slimeItem:last-child .effectPopover {
+  right: 0;
+  left: auto;
+}
+
+.effectDetail:hover .effectPopover,
+.effectBadge:focus-visible + .effectPopover,
+.effectPopoverOpen {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.effectGroup {
+  display: grid;
+  gap: 3px;
+}
+
+.effectGroupLabel,
+.breakdownGroupLabel {
+  color: var(--color-accent-active);
+  font-weight: 800;
+}
+
+.effectItemList {
+  margin: 0;
+  padding-left: 16px;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.shopOwnedChip {
+  padding: 6px 9px;
+  justify-content: center;
+}
+
+.slimePlaceholder {
+  min-height: 246px;
+  align-content: center;
+  justify-items: center;
+  border-bottom-color: var(--color-border);
+}
+
+.placeholderSprite {
+  width: 72px;
+  height: 72px;
+  border: 1px dashed var(--color-border-hover);
+  border-radius: 50%;
+  background: var(--color-surface-alt);
+}
+
+.placeholderLabel {
+  color: var(--color-text-faint);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.slimeItemSelected {
+  padding-top: 0;
+}
+
+.emptyState {
+  grid-column: 1 / -1;
+  padding: 18px 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.spriteFrame,
+.shopImageFrame {
+  display: grid;
+  min-height: 96px;
+  place-items: center;
+}
+
+.spriteFrame {
+  position: relative;
+  width: 128px;
+  min-height: 230px;
+  margin-inline: auto;
+}
+
+/*
+ * Keep every pet card on the tallest supported scene canvas.
+ * 230px covers a 2x sprite, the 1.5x scene inset, the largest vehicle rise,
+ * and a static floor rise, so equipment never changes the card row height.
+ */
+.spriteFrame .collectionSprite {
+  min-height: 230px;
+}
+
+.spriteFrameScene {
+  width: 100%;
+  min-height: 230px;
+  margin-inline: 0;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(24, 74, 92, 0.1);
+  background-color: transparent;
+  background-image: none;
+  image-rendering: pixelated;
+}
+
+/* Scene backgrounds feather to transparent, so a grey holder must not show. */
+.spriteFrameSceneBackground {
+  background-color: transparent;
+  background-image: none;
+}
+
+.spriteCharacterFrame {
+  display: grid;
+  width: 192px;
+  min-height: 192px;
+  place-items: center;
+}
+
+.itemCopy,
+.shopItemCopy {
+  min-width: 0;
+}
+
+.itemCopy h3,
+.shopItemCopy h3 {
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+/* Mobile name row: buff arrow | name | representative star */
+.nameRow {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) 32px;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  margin-top: 2px;
+}
+
+.nameActionSlot {
+  position: relative;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+}
+
+.petName {
+  margin: 0;
+  min-width: 0;
+  font-size: 14px;
+  letter-spacing: -0.02em;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nameRow .effectBadge {
+  min-width: 32px;
+  min-height: 32px;
+}
+
+.nameRow .representativeStar {
+  width: 32px;
+  height: 32px;
+}
+
+.itemCopy p,
+.shopItemCopy p {
+  margin: 5px 0 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.equippedTitle {
+  display: inline-flex;
+  max-width: 100%;
+  margin-bottom: 5px;
+  padding: 4px 7px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  color: var(--color-accent-tinted-text);
+  background: var(--color-accent-tinted-bg);
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titleWardrobe {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.titleWardrobe label {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.titleSelect {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 30px 8px 9px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  background: var(--color-surface);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+}
+
+.titleSelect:hover {
+  border-color: var(--color-accent);
+}
+
+.titleSelect:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.titleSelect:disabled {
+  color: var(--color-text-faint);
+  cursor: wait;
+}
+
+.growthSummary {
+  position: relative;
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: help;
+}
+
+.growthSummary:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 2px solid rgba(22, 131, 199, 0.28);
+  outline-offset: 3px;
+}
+
+.growthMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--color-accent-active);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.growthMeta strong {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.growthTrack {
+  height: 8px;
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-tinted-bg);
+}
+
+.growthFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-accent);
+  transition: width 180ms ease-out;
+}
+
+.growthPopover {
+  position: absolute;
+  z-index: 8;
+  top: calc(100% + 8px);
+  left: 0;
+  display: grid;
+  gap: 5px;
+  min-width: 210px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition:
+    opacity 120ms ease-out,
+    transform 120ms ease-out;
+  visibility: hidden;
+}
+
+.growthPopover strong {
+  color: #16a34a;
+}
+
+.growthSummary:hover .growthPopover,
+.growthSummary:focus-visible .growthPopover,
+.growthPopoverOpen {
+  opacity: 1;
+  transform: translateY(0);
+  visibility: visible;
+}
+
+.wardrobeButton,
+.representativeButton,
+.galleryLink,
+.shopBuyButton,
+.refundButton,
+.filterButton,
+.closeButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.wardrobeButton:hover,
+.representativeButton:hover,
+.galleryLink:hover,
+.shopBuyButton:hover,
+.refundButton:hover,
+.filterButton:hover,
+.closeButton:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
+}
+
+.filterButton[aria-selected="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent-active);
+  font-weight: 700;
+}
+
+.shopBuyButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.refundButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.wardrobeButton:focus-visible,
+.representativeButton:focus-visible,
+.galleryLink:focus-visible,
+.shopBuyButton:focus-visible,
+.refundButton:focus-visible,
+.filterButton:focus-visible,
+.closeButton:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.spriteSlot {
+  --sprite-size: 1.1em;
+  display: inline-grid;
+  width: var(--sprite-size);
+  height: var(--sprite-size);
+  flex: 0 0 auto;
+  place-items: center;
+  line-height: 1;
+}
+
+.buttonLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wardrobeButton {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  width: auto;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  background: var(--color-surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.slimeActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  margin-top: -2px;
+  flex-wrap: wrap;
+  min-height: 44px;
+}

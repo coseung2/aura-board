@@ -9,6 +9,10 @@ creating overlapping testing-notes documents.
 
 ## Baseline
 
+- Run `npm run check:lines` for source changes. Code, styles, tests, scripts,
+  native modules, and generated source files must each stay at or below 800
+  physical lines; split the owning generator when generated output exceeds the
+  limit.
 - Run `npm run typecheck` for TypeScript changes.
 - Run targeted tests for changed logic when they exist.
 - Run `npm run test` when the change touches shared logic or when targeted

@@ -1,0 +1,250 @@
+/* ---- Boards section ---- */
+
+.classroom-boards-section {
+  margin-top: 0;
+}
+
+.classroom-boards-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.classroom-boards-header .classroom-setting-hint {
+  max-width: none;
+}
+
+.classroom-setting-warning {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.classroom-boards-heading {
+  font-size: 16px;
+  font-weight: 700;
+  margin: 0;
+  color: var(--color-text);
+}
+
+.classroom-boards-empty {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  padding: 24px 0;
+}
+
+.classroom-board-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-card);
+}
+
+.classroom-board-picker-empty {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.classroom-board-picker-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-btn);
+  cursor: pointer;
+  font-family: var(--font-body);
+  text-align: left;
+  transition: border-color 150ms ease;
+}
+
+.classroom-board-picker-item:hover {
+  border-color: var(--color-accent);
+}
+
+.classroom-board-link-action {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+.classroom-boards-grid {
+  display: grid;
+  /* Inside the right column of classroom-main-grid (~300-400px wide on
+     S6 Lite portrait) a single column reads cleaner; desktop still gets
+     2-up via the lower minmax floor. */
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+/* "새 활동" pill on a linked-board card. Only renders when the board
+   was updated after the teacher's last visit (localStorage-tracked). */
+.classroom-board-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  color: #166534;
+  background: #dcfce7;
+  border-radius: 999px;
+}
+
+.classroom-board-new-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #22c55e;
+}
+
+.classroom-board-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  transition:
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.classroom-board-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--color-border-hover);
+}
+
+.classroom-board-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  cursor: pointer;
+  background: none;
+  border: none;
+  font-family: var(--font-body);
+  text-align: left;
+}
+
+.classroom-board-unlink {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.06);
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.classroom-board-card:hover .classroom-board-unlink {
+  display: flex;
+}
+
+.classroom-board-unlink:hover {
+  background: #fee;
+  color: #c62828;
+}
+
+.classroom-board-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.classroom-board-layout {
+  font-size: 12px;
+  color: var(--color-text-faint);
+}
+
+/* ---- Empty state ---- */
+
+.classroom-empty {
+  text-align: center;
+  padding: 48px 0;
+}
+
+.classroom-empty-text {
+  color: var(--color-text-muted);
+  font-size: 14px;
+  margin: 0 0 16px;
+}
+
+.classroom-empty-btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: #ffffff;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 160ms ease;
+}
+
+.classroom-empty-btn:hover {
+  background: var(--color-accent-active);
+}
+
+/* ---- Copy toast ---- */
+
+.classroom-copy-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-accent);
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  font-weight: 500;
+  animation: fadeInOut 2s ease forwards;
+  z-index: 200;
+}
+
+@keyframes fadeInOut {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(8px);
+  }
+  15% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  75% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px);
+  }
+}

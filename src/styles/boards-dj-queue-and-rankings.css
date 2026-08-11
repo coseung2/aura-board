@@ -1,0 +1,668 @@
+/* ── DJ Board (dj-board-queue) ── design-handoff 2026-04-22 port ───────── */
+
+/* 레이아웃: 전체 컨테이너 + 헤더 + NOW PLAYING 카드 + 2열(메인 큐 / 사이드 aside)
+   재생 완료는 고정 드로어(.is-open 클래스로 슬라이드). 드로어→큐 드래그 복귀 가능. */
+
+.dj-board {
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 24px 24px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+/* 헤더: 제목 + 메타 카운트 + 오른쪽 액션 (재생 완료 토글 + 공유) */
+.dj-board-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dj-board-header h1 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.dj-board-subtitle {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 4px 0 0;
+}
+
+.dj-header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.dj-header-btn {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.dj-header-btn:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+
+/* NOW PLAYING — 전체 폭 카드. 좌: 240x135 썸네일, 우: 제목·메타·액션 */
+.dj-nowplaying {
+  width: 100%;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-sizing: border-box;
+}
+
+.dj-nowplaying-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--color-accent);
+}
+
+.dj-nowplaying-body {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 20px;
+  align-items: center;
+}
+
+.dj-thumb {
+  width: 96px;
+  height: 54px;
+  object-fit: cover;
+  border-radius: 6px;
+  background: var(--color-surface-alt);
+  flex: 0 0 auto;
+}
+
+.dj-thumb-lg {
+  width: 240px;
+  height: 135px;
+  border-radius: 8px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 40px;
+  box-shadow: 0 4px 14px rgba(139, 121, 255, 0.35);
+}
+
+.dj-nowplaying-info {
+  min-width: 0;
+}
+
+.dj-nowplaying-empty-card {
+  min-height: 216px;
+}
+
+.dj-nowplaying-placeholder {
+  background: var(--color-surface-alt);
+  color: var(--color-accent);
+  box-shadow: none;
+}
+
+.dj-track-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  margin: 0 0 6px;
+  color: var(--color-text);
+}
+
+.dj-track-meta {
+  font-size: 13px;
+  color: var(--color-text-muted);
+  margin: 0;
+  word-break: break-word;
+}
+
+.dj-nowplaying-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.dj-play-btn {
+  background: var(--color-accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius-pill);
+  padding: 10px 20px;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.dj-play-btn:hover {
+  background: var(--color-accent-active);
+}
+
+.dj-play-btn[aria-pressed="true"] {
+  background: transparent;
+  color: var(--color-accent);
+  outline: 1px solid var(--color-accent);
+}
+
+.dj-next-btn {
+  background: transparent;
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  padding: 10px 16px;
+  font-weight: 500;
+  font-size: 14px;
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.dj-next-btn:hover {
+  background: var(--color-surface-alt);
+  border-color: var(--color-border-hover);
+}
+
+.dj-player-wrap {
+  width: 240px;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: black;
+}
+
+.dj-player-iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+/* 2열 그리드: 메인 큐 | 320px 사이드 aside */
+.dj-layout {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 24px;
+  align-items: start;
+  box-sizing: border-box;
+}
+
+/* ── 메인 대기열 카드 ── */
+.dj-queue-card {
+  min-width: 0;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.dj-queue-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.15px;
+  margin: 0 0 12px;
+  color: var(--color-text);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.dj-queue-hint {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+}
+
+.dj-queue-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* 큐 아이템 — 24 rank / 56 thumb / 1fr info / auto controls */
+.dj-queue-item {
+  display: grid;
+  grid-template-columns: 24px 56px 1fr auto;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 8px;
+  align-items: center;
+  cursor: grab;
+  transition: background 150ms ease;
+}
+
+.dj-queue-item:hover {
+  background: var(--color-surface-alt);
+}
+
+.dj-queue-item.is-pending {
+  background: rgba(245, 158, 11, 0.06);
+}
+
+.dj-queue-item.is-dragging {
+  opacity: 0.4;
+}
+
+.dj-queue-item.is-drag-over {
+  outline: 2px dashed var(--color-accent);
+  outline-offset: -2px;
+}
+
+.dj-queue-item.dj-status-played {
+  opacity: 0.55;
+}
+
+.dj-rank {
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.dj-tinythumb {
+  width: 56px;
+  height: 42px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 16px;
+}
+
+.dj-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.dj-item-info {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.dj-track {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text);
+}
+
+.dj-sub {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.dj-pending-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: #fef3c7;
+  color: #92610a;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.dj-pending-pill .dj-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.dj-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.dj-ctrl {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-family: inherit;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    color 150ms ease;
+}
+
+.dj-ctrl:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+  border-color: var(--color-border);
+}
+
+.dj-ctrl.approve:hover {
+  color: #27a35f;
+  border-color: rgba(39, 163, 95, 0.3);
+  background: rgba(39, 163, 95, 0.08);
+}
+
+.dj-ctrl.reject:hover {
+  color: var(--color-danger);
+  border-color: rgba(198, 40, 40, 0.3);
+  background: rgba(198, 40, 40, 0.08);
+}
+
+.dj-ctrl.restore:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent-tinted-bg);
+  background: var(--color-accent-tinted-bg);
+}
+
+/* 빈 상태 — 큐 비었을 때 인라인 메시지 */
+.dj-empty {
+  padding: 32px 16px;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+/* ── 사이드 aside — 신청곡 폼 + 랭킹 ── */
+.dj-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.dj-submit-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+
+.dj-submit-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 12px;
+  color: var(--color-text);
+}
+
+.dj-submit-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-sizing: border-box;
+}
+
+.dj-submit-input:focus-visible {
+  outline: 2px solid var(--color-accent-tinted-text);
+  outline-offset: 1px;
+}
+
+.dj-submit-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 10px 16px;
+  background: var(--color-accent);
+  color: white;
+  border: none;
+  border-radius: var(--radius-btn);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.dj-submit-btn:hover {
+  background: var(--color-accent-active);
+}
+
+.dj-submit-btn:disabled {
+  background: var(--color-text-faint);
+  cursor: not-allowed;
+}
+
+.dj-submit-note {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.dj-submit-error {
+  font-size: 12px;
+  color: var(--color-status-returned-text);
+  margin: 10px 0 0;
+}
+
+.dj-submit-success {
+  font-size: 12px;
+  color: var(--color-status-reviewed-text);
+  margin: 10px 0 0;
+  line-height: 1.5;
+}
+
+.dj-my-requests {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 16px;
+}
+
+.dj-my-requests-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 10px;
+  color: var(--color-text);
+}
+
+.dj-my-requests-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.dj-my-request {
+  border-top: 1px solid var(--color-border);
+  padding-top: 10px;
+}
+
+.dj-my-request:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.dj-my-request-main {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dj-my-request-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.dj-my-request p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+/* 랭킹 */
+.dj-ranking {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 20px;
+}
+
+.dj-ranking-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dj-ranking-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.dj-ranking-pos {
+  width: 22px;
+  font-family: "SF Mono", ui-monospace, monospace;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.dj-ranking-pos.top {
+  color: #c9a227;
+}
+
+.dj-ranking-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.dj-ranking-avatar.top {
+  background: #c9a227;
+  color: #fff;
+}
+
+.dj-ranking-name {
+  flex: 1;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.dj-ranking-count {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.dj-ranking-meta {
+  font-size: 11px;
+  color: var(--color-text-faint);
+  margin: 0 0 8px;
+}
+
+.dj-ranking-loading,
+.dj-ranking-empty {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  margin: 8px 0 0;
+}
+
+.dj-ranking-thumb {
+  width: 48px;
+  height: 27px;
+  object-fit: cover;
+  border-radius: 3px;
+  background: var(--color-surface-alt);
+}
+
+.dj-ranking-thumb-blank {
+  display: inline-block;
+}
+
+.dj-ranking-section {
+  margin-bottom: 16px;
+}
+
+.dj-ranking-title {
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--color-text);
+}
+
+.dj-ranking-rank {
+  font-weight: 700;
+  color: var(--color-text-faint);
+  text-align: right;
+}
+
+.dj-ranking-tag {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  font-size: 10px;
+  font-weight: 600;
+}

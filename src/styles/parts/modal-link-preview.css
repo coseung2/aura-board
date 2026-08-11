@@ -1,0 +1,45 @@
+/* ---- Link Preview in Modal ---- */
+
+.link-preview-loading {
+  font-size: 12px;
+  color: var(--color-text-faint);
+  padding: 8px 0;
+}
+
+.link-preview-card {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.link-preview-card-image {
+  max-height: 160px;
+  overflow: hidden;
+  background: var(--color-bg);
+}
+
+.link-preview-card-image img {
+  display: block;
+  width: 100%;
+  object-fit: cover;
+}
+
+.link-preview-card-body {
+  padding: 10px 12px;
+}
+
+.link-preview-card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.link-preview-card-desc {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

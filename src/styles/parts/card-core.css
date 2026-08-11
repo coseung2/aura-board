@@ -1,0 +1,192 @@
+/* -------- Card -------- */
+
+.padlet-card {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 12px 18px 18px;
+  /* IMPORTANT: do not transition `transform` — dnd-kit updates it per frame
+     during drag; transitioning causes visible lag-then-jump. */
+  transition: box-shadow 180ms ease, border-color 180ms ease;
+  will-change: transform;
+  user-select: none;
+  touch-action: none;
+}
+
+.padlet-card.is-draggable {
+  cursor: grab;
+}
+
+.padlet-card:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--color-border-hover);
+}
+
+.padlet-card.is-dragging {
+  cursor: grabbing;
+  box-shadow: var(--shadow-card-hover);
+  opacity: 0.96;
+}
+
+.padlet-card-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.25px;
+  margin: 0 28px 8px 0;
+  line-height: 1.3;
+  color: var(--color-text);
+}
+
+.padlet-card-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.padlet-card-title-row .padlet-card-title {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.padlet-card-title-row .canva-attribution {
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+.padlet-card-content {
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.5;
+  margin: 0;
+  color: var(--color-text-muted);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.padlet-card-content.is-collapsed {
+  display: -webkit-box;
+  max-height: 7.5em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--card-content-preview-lines, 5);
+}
+
+.padlet-card-content-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-top: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 120ms ease;
+}
+
+.padlet-card-content-toggle:hover {
+  color: var(--color-accent);
+}
+
+.padlet-card-content-toggle:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.card-author-footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+  font-size: 12px;
+}
+
+.card-author-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1;
+  max-width: 160px;
+  pointer-events: none;
+}
+
+.card-author-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-author-time {
+  color: var(--color-text-muted);
+}
+
+.padlet-card:has(.card-link-preview) .card-author-footer {
+  margin-top: 4px;
+  padding-top: 0;
+  border-top: 0;
+}
+
+@media (forced-colors: active) {
+  .card-author-chip {
+    border: 1px solid CanvasText;
+  }
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.padlet-card-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+  padding: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.padlet-card:hover .padlet-card-delete,
+.padlet-card:focus-within .padlet-card-delete {
+  display: flex;
+}
+
+.padlet-card-delete:hover {
+  background: rgba(0, 0, 0, 0.12);
+  color: var(--color-text);
+}

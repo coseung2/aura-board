@@ -1,0 +1,273 @@
+/* Read-only classroom overview: a flat metric row, not a feature card grid. */
+.classroom-overview {
+  padding-top: 20px;
+}
+
+.classroom-overview h2 {
+  margin: 0 0 12px;
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.classroom-overview-summary {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+}
+
+.classroom-overview-summary-item {
+  display: grid;
+  min-width: 0;
+  gap: 6px;
+  padding: 16px 20px;
+  border-right: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.classroom-overview-summary-item:first-child {
+  padding-left: 0;
+}
+
+.classroom-overview-summary-item:last-child {
+  border-right: 0;
+}
+
+.classroom-overview-summary-item dt {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.classroom-overview-summary-item dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0;
+}
+
+@media (max-width: 960px) {
+  .classroom-overview-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .classroom-overview-summary-item:nth-child(3n) {
+    border-right: 0;
+  }
+
+  .classroom-overview-summary-item:nth-child(3n + 1) {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .classroom-overview-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .classroom-overview-summary-item:nth-child(3n) {
+    border-right: 1px solid var(--color-border);
+  }
+
+  .classroom-overview-summary-item:nth-child(2n) {
+    border-right: 0;
+  }
+
+  .classroom-overview-summary-item:nth-child(2n + 1) {
+    padding-left: 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .classroom-overview-summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .classroom-overview-summary-item,
+  .classroom-overview-summary-item:first-child {
+    padding-inline: 0;
+    border-right: 0;
+  }
+
+  .classroom-overview-summary-item:last-child {
+    border-bottom: 0;
+  }
+}
+
+/* Classroom finance summary keeps the shared flat KPI strip. */
+.classroom-section-page .classroom-dashboard-kpis {
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  grid-template-columns: none;
+  gap: 0;
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* The KPI strip butts against the section header's bottom rule so the column
+   dividers start exactly where that line ends. */
+.classroom-section-page .classroom-section-header {
+  margin-bottom: 0;
+}
+
+.classroom-section-page .classroom-dashboard-kpi {
+  padding: 16px 20px;
+  border: 0;
+  border-right: 1px solid var(--color-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.classroom-section-page .classroom-dashboard-kpi:first-child {
+  padding-left: 0;
+}
+
+.classroom-section-page .classroom-dashboard-kpi:last-child {
+  border-right: 0;
+}
+
+/* Interest-rate control replaces the value line in its KPI cell, so it matches
+   the height of the sibling cells' <strong> values. */
+.classroom-dashboard-kpi .bank-summary-rate {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.classroom-dashboard-kpi .bank-rate-input {
+  width: 76px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.classroom-dashboard-kpi .bank-rate-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+.classroom-dashboard-kpi .bank-rate-unit {
+  color: var(--color-text);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.classroom-dashboard-kpi .bank-rate-save {
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: var(--color-accent);
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.classroom-dashboard-kpi .bank-rate-save:hover {
+  background: var(--color-accent-active);
+}
+
+/* 은행 panel groups savings and fixed deposits side by side on wide screens. */
+.classroom-dashboard-bank {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.classroom-dashboard-bank-group {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.classroom-dashboard-bank-title {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+@media (max-width: 720px) {
+  .classroom-dashboard-bank {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 960px) {
+  .classroom-dashboard-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .classroom-dashboard-kpis,
+  .classroom-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+  .classroom-section-page .classroom-dashboard-kpis {
+    grid-auto-flow: row;
+    grid-auto-columns: auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .classroom-section-page .classroom-dashboard-kpi:nth-child(2n) {
+    border-right: 0;
+  }
+  .classroom-showcase-strip {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .classroom-page {
+    padding-inline: 16px;
+  }
+
+  .classroom-section-page .classroom-dashboard-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .classroom-section-page .classroom-dashboard-kpi {
+    padding-inline: 0 16px;
+  }
+
+  .student-walking-rewards .classroom-dashboard-panel-head {
+    flex-direction: column;
+  }
+
+  .classroom-showcase-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .classroom-role-mini-columns,
+  .classroom-role-mini-row {
+    grid-template-columns: minmax(0, 1.05fr) minmax(72px, 0.7fr) minmax(0, 1.3fr);
+    column-gap: 10px;
+    padding-inline: 6px;
+  }
+
+  .classroom-role-mini-students {
+    gap: 2px 8px;
+  }
+
+  .walking-student-row {
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+  }
+
+  .walking-activity-cell {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

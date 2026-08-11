@@ -14,8 +14,7 @@ describe("GET /api/mobile/version-policy", () => {
     await expect(response.json()).resolves.toEqual({
       latestVersion: "1.0.4",
       minimumSupportedVersion: "1.0.4",
-      message:
-        "더 안정적인 Aura Board를 사용하려면 최신 버전으로 업데이트해 주세요.",
+      message: "안정성 개선",
       storeUrls: {
         android:
           "https://play.google.com/store/apps/details?id=com.auraboard.app",

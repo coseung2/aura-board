@@ -1,0 +1,285 @@
+/* Wardrobe modal content parity with mobile owned-item cards. */
+.wardrobeList {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 18px;
+  list-style: none;
+  padding: 0;
+}
+
+.wardrobeItem {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  gap: 0;
+}
+
+.wardrobeItemEquipped,
+.wardrobeItemWornByOther {
+  background: transparent;
+}
+
+.wardrobeItemEquipped .shopImageFrame,
+.wardrobeItemEquipped .shopMedia {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+.wardrobePreview {
+  position: relative;
+  display: grid;
+  width: 100%;
+  min-height: 192px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 0;
+  background: var(--color-surface-alt);
+}
+
+.wardrobePreviewScene {
+  min-height: 192px;
+}
+
+.wardrobePreviewSceneBackground {
+  background-image: none;
+  background-color: transparent;
+}
+
+.wardrobePreviewVisual {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.wardrobeContentDimmed {
+  opacity: 0.48;
+}
+
+.wardrobeWornOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 4px;
+  padding: 8px;
+  pointer-events: none;
+}
+
+.wardrobeWornOverlayIcon {
+  color: var(--color-danger);
+  font-size: 16px;
+  line-height: 1;
+}
+
+.wardrobeWornOverlayText {
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.wardrobeModal .shopProductCard {
+  gap: 0;
+}
+
+.wardrobeCardBody {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 0 0;
+}
+
+.wardrobeCardBody .shopCardCopy {
+  min-height: 0;
+}
+
+.wardrobeItemCopy {
+  min-width: 0;
+  text-align: left;
+}
+
+.wardrobeItemCopy h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.wardrobeItemCopy p {
+  margin: 4px 0 0;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.wardrobeItemActions {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 6px;
+  width: 100%;
+  min-height: 44px;
+}
+
+.wardrobeInlineAction {
+  display: inline-flex;
+  flex: 1 1 0;
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.wardrobeInlineAction:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.wardrobeInlineAction:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.wardrobeInlineAction:hover {
+  border-color: var(--color-accent);
+}
+
+.wardrobeInlineActionPrimary {
+  border-color: color-mix(in srgb, var(--color-accent) 48%, var(--color-border));
+  color: var(--color-accent-tinted-text);
+}
+
+.wardrobeInlineActionDanger {
+  border-color: color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
+  color: var(--color-danger);
+}
+
+.wardrobeInventoryCount {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.itemPreviewBuff {
+  position: static;
+  z-index: auto;
+  display: inline-flex;
+  max-width: calc(100% - 12px);
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  pointer-events: none;
+}
+
+.itemPreviewBuffIcon {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  display: block;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.itemPreviewBuffText {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shopCardTitleRow .itemPreviewBuff {
+  position: static;
+  z-index: auto;
+  flex: 0 1 auto;
+  max-width: 52%;
+  pointer-events: none;
+}
+
+@media (max-width: 560px) {
+  .wardrobeList {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+}
+
+
+/* Fixed bottom-right toast stack (same placement language as Kordle/ui Toast). */
+.petToastHost {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: var(--z-modal-top, 2147483600);
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.petToast {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 44px;
+  padding: 12px 16px;
+  border-radius: var(--radius-card, 12px);
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-surface, #fff);
+  box-shadow: var(--shadow-card-hover, 0 12px 34px rgba(0, 0, 0, 0.08));
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.petToastError {
+  border-left-color: var(--color-danger, #b42318);
+}
+
+.petToastText {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.petToastClose {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  margin: -12px -12px -12px 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}

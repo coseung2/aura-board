@@ -60,6 +60,7 @@ import {
   tapMin,
   typography,
 } from "../theme/tokens";
+import { styles } from "./comment-bottom-sheet.styles";
 
 type CommentItem = MobileCommentItem;
 
@@ -116,45 +117,50 @@ export function CommentBottomSheet({
     [onClose, router, viewer],
   );
 
-  const loadComments = useCallback(async (nextAudience: CommentAudience) => {
-    if (!cardId) return;
-    const version = ++requestVersion.current;
-    setLoading(true);
-    try {
-      setError(null);
-      const request = viewer === "parent" ? parentApiFetch : apiFetch;
-      const response = await request<{
-        items: CommentItem[];
-        guardianAvailable?: boolean;
-      }>(
-        commentsPath(cardId, nextAudience),
-      );
-      if (version !== requestVersion.current) return;
-      const nextGuardianAvailable = response.guardianAvailable === true;
-      setGuardianAvailable(nextGuardianAvailable);
-      setItems(
-        visibleCommentsForViewer(
-          viewer,
-          nextGuardianAvailable,
-          response.items ?? [],
-        ),
-      );
-      if (viewer === "parent" && !nextGuardianAvailable) {
-        setError("가족 댓글을 열 수 없어요. 앱과 서버를 최신 버전으로 업데이트해 주세요.");
+  const loadComments = useCallback(
+    async (nextAudience: CommentAudience) => {
+      if (!cardId) return;
+      const version = ++requestVersion.current;
+      setLoading(true);
+      try {
+        setError(null);
+        const request = viewer === "parent" ? parentApiFetch : apiFetch;
+        const response = await request<{
+          items: CommentItem[];
+          guardianAvailable?: boolean;
+        }>(commentsPath(cardId, nextAudience));
+        if (version !== requestVersion.current) return;
+        const nextGuardianAvailable = response.guardianAvailable === true;
+        setGuardianAvailable(nextGuardianAvailable);
+        setItems(
+          visibleCommentsForViewer(
+            viewer,
+            nextGuardianAvailable,
+            response.items ?? [],
+          ),
+        );
+        if (viewer === "parent" && !nextGuardianAvailable) {
+          setError(
+            "가족 댓글을 열 수 없어요. 앱과 서버를 최신 버전으로 업데이트해 주세요.",
+          );
+        }
+      } catch (nextError) {
+        if (version !== requestVersion.current) return;
+        if (await handleAuthError(nextError)) return;
+        setError(
+          viewer === "student" &&
+            nextAudience === "guardian" &&
+            nextError instanceof ApiError &&
+            nextError.status === 403
+            ? FAMILY_THREAD_PRIVATE_MESSAGE
+            : "댓글을 불러오지 못했어요.",
+        );
+      } finally {
+        if (version === requestVersion.current) setLoading(false);
       }
-    } catch (nextError) {
-      if (version !== requestVersion.current) return;
-      if (await handleAuthError(nextError)) return;
-      setError(
-        viewer === "student" && nextAudience === "guardian" &&
-        nextError instanceof ApiError && nextError.status === 403
-          ? FAMILY_THREAD_PRIVATE_MESSAGE
-          : "댓글을 불러오지 못했어요.",
-      );
-    } finally {
-      if (version === requestVersion.current) setLoading(false);
-    }
-  }, [cardId, handleAuthError, viewer]);
+    },
+    [cardId, handleAuthError, viewer],
+  );
 
   useEffect(() => {
     if (!visible || !cardId) return;
@@ -176,7 +182,11 @@ export function CommentBottomSheet({
     setCommentText("");
     setReplyText("");
     setReplyTarget(null);
-    if (viewer === "student" && nextAudience === "guardian" && !guardianAvailable) {
+    if (
+      viewer === "student" &&
+      nextAudience === "guardian" &&
+      !guardianAvailable
+    ) {
       setItems([]);
       setError(FAMILY_THREAD_PRIVATE_MESSAGE);
       return;
@@ -203,10 +213,15 @@ export function CommentBottomSheet({
         // Do not render a possibly-public response from an outdated server.
         // The composer is unavailable until guardianAvailable is confirmed,
         // but retain this boundary for malformed or cached responses too.
-        setError("가족 댓글을 확인할 수 없어요. 앱과 서버를 최신 버전으로 업데이트해 주세요.");
+        setError(
+          "가족 댓글을 확인할 수 없어요. 앱과 서버를 최신 버전으로 업데이트해 주세요.",
+        );
         return;
       }
-      setItems((current) => [{ ...item, replies: item.replies ?? [] }, ...current]);
+      setItems((current) => [
+        { ...item, replies: item.replies ?? [] },
+        ...current,
+      ]);
       setCommentText("");
       setError(null);
       if (audience === "public") onCommentCountChange?.(1);
@@ -294,9 +309,15 @@ export function CommentBottomSheet({
   }
 
   /** Mark one comment hidden or visible in local state. */
-  function applyHiddenReason(commentId: string, hiddenReason: HiddenReason | null) {
+  function applyHiddenReason(
+    commentId: string,
+    hiddenReason: HiddenReason | null,
+  ) {
     setItems((current) =>
-      updateThreadComment(current, commentId, (item) => ({ ...item, hiddenReason })),
+      updateThreadComment(current, commentId, (item) => ({
+        ...item,
+        hiddenReason,
+      })),
     );
   }
 
@@ -435,7 +456,9 @@ export function CommentBottomSheet({
           <BarePressable
             style={styles.commentTextBlock}
             onPress={() => setModerationTarget(null)}
-            onLongPress={item.canModerate ? () => openModerationMenu(item) : undefined}
+            onLongPress={
+              item.canModerate ? () => openModerationMenu(item) : undefined
+            }
             delayLongPress={350}
             accessible={item.canModerate}
             accessibilityRole={item.canModerate ? "button" : undefined}
@@ -450,7 +473,9 @@ export function CommentBottomSheet({
                 <Text style={styles.commentAuthor} numberOfLines={1}>
                   {item.authorLabel || "작성자"}
                 </Text>
-                <Text style={styles.commentDate}>{formatCommentDate(item.createdAt)}</Text>
+                <Text style={styles.commentDate}>
+                  {formatCommentDate(item.createdAt)}
+                </Text>
               </View>
             </View>
             <Text style={styles.commentContent}>{item.content}</Text>
@@ -578,7 +603,10 @@ export function CommentBottomSheet({
                   {error}
                 </Text>
                 {!isFamilyAccessNotice ? (
-                  <AppButton variant="quiet" onPress={() => void loadComments(audience)}>
+                  <AppButton
+                    variant="quiet"
+                    onPress={() => void loadComments(audience)}
+                  >
                     다시 시도
                   </AppButton>
                 ) : null}
@@ -586,13 +614,19 @@ export function CommentBottomSheet({
             ) : null}
             {!error && items.length === 0 ? (
               <Text style={styles.emptyText}>
-                아직 {viewer === "parent" ? "가족 댓글" : commentAudienceLabel(audience)}이 없어요
+                아직{" "}
+                {viewer === "parent"
+                  ? "가족 댓글"
+                  : commentAudienceLabel(audience)}
+                이 없어요
               </Text>
             ) : null}
             {items.map((root) => (
               <View key={root.id} style={styles.thread}>
                 {renderCommentItem(root, false)}
-                {(root.replies ?? []).map((reply) => renderCommentItem(reply, true))}
+                {(root.replies ?? []).map((reply) =>
+                  renderCommentItem(reply, true),
+                )}
                 {replyTarget?.rootId === root.id ? (
                   <View style={styles.replyComposer}>
                     <Text style={styles.replyTargetLabel} numberOfLines={1}>
@@ -636,7 +670,9 @@ export function CommentBottomSheet({
         )}
         {canComposeComment(viewer, audience) &&
         (viewer !== "parent" || guardianAvailable) &&
-        (viewer !== "student" || audience !== "guardian" || guardianAvailable) ? (
+        (viewer !== "student" ||
+          audience !== "guardian" ||
+          guardianAvailable) ? (
           <View style={styles.composer}>
             <TextField
               value={commentText}
@@ -667,143 +703,3 @@ function formatCommentDate(value: string): string {
   if (Number.isNaN(date.getTime())) return "";
   return `${date.getMonth() + 1}/${date.getDate()}`;
 }
-
-const styles = StyleSheet.create({
-  sheet: {
-    height: "89%",
-    maxHeight: "89%",
-    borderTopLeftRadius: radii.card,
-    borderTopRightRadius: radii.card,
-    backgroundColor: colors.bg,
-    paddingBottom: spacing.sm,
-  },
-  title: {
-    ...typography.section,
-    color: colors.text,
-    textAlign: "center",
-    marginTop: -spacing.sm,
-    paddingBottom: spacing.xs,
-  },
-  tabsInset: {
-    marginHorizontal: spacing.lg,
-    marginTop: -spacing.xxl,
-  },
-  familyThreadTitle: {
-    ...typography.label,
-    color: colors.textMuted,
-    marginHorizontal: spacing.lg,
-    paddingBottom: spacing.sm,
-  },
-  flex: { flex: 1 },
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  listContent: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: spacing.lg,
-    gap: spacing.lg,
-  },
-  thread: { gap: spacing.sm },
-  commentItem: { gap: spacing.xs },
-  replyItem: {
-    marginLeft: spacing.xl,
-    paddingLeft: spacing.md,
-    borderLeftWidth: borders.hairline,
-    borderLeftColor: colors.border,
-  },
-  commentItemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  commentTextBlock: { flex: 1, gap: spacing.xs },
-  commentHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  commentIdentity: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.xs,
-    flex: 1,
-  },
-  commentAuthor: { ...typography.label, color: colors.text, flexShrink: 1 },
-  commentDate: { ...typography.micro, color: colors.textMuted },
-  commentContent: { ...typography.body, color: colors.text },
-  commentActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.md,
-  },
-  commentAction: {
-    minHeight: tapMin,
-    justifyContent: "center",
-    paddingHorizontal: spacing.none,
-    paddingVertical: spacing.none,
-  },
-  replyLabel: { ...typography.micro, color: colors.textMuted },
-  deleteLabel: { ...typography.micro, color: colors.danger },
-  replyComposer: {
-    marginLeft: spacing.xl,
-    paddingLeft: spacing.md,
-    gap: spacing.xs,
-    borderLeftWidth: borders.hairline,
-    borderLeftColor: colors.accent,
-  },
-  replyTargetLabel: { ...typography.micro, color: colors.accentTintedText },
-  replyComposerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  replyInput: { flex: 1, minHeight: controls.inputHeight },
-  replySubmitButton: { minWidth: tapMin },
-  replyCancel: {
-    alignSelf: "flex-start",
-    minHeight: tapMin,
-    justifyContent: "center",
-  },
-  replyCancelLabel: { ...typography.micro, color: colors.textMuted },
-  // Placeholder that replaces a hidden comment in place.
-  hiddenItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    borderRadius: radii.control,
-    backgroundColor: colors.surfaceAlt,
-  },
-  hiddenText: { ...typography.label, color: colors.textMuted, flex: 1 },
-  hiddenAction: { minHeight: tapMin, justifyContent: "center" },
-  hiddenActionLabel: { ...typography.micro, color: colors.accent },
-  emptyText: {
-    ...typography.body,
-    color: colors.textMuted,
-    paddingVertical: spacing.xl,
-  },
-  errorBlock: { gap: spacing.xs, alignItems: "flex-start" },
-  errorText: { ...typography.body, color: colors.danger },
-  familyNoticeBlock: {
-    width: "100%",
-    alignItems: "center",
-    paddingVertical: spacing.xl,
-  },
-  familyNoticeText: {
-    color: colors.textMuted,
-    textAlign: "center",
-  },
-  composer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-    borderTopWidth: borders.hairline,
-    borderTopColor: colors.border,
-  },
-  commentInput: { flex: 1, minHeight: controls.inputHeight },
-  submitButton: { minWidth: tapMin },
-});

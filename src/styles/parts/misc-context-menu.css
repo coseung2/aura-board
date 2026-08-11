@@ -1,0 +1,157 @@
+/* -------- Context Menu -------- */
+
+.ctx-menu-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.ctx-menu-trigger {
+  /* Desktop default — compact 28px hit area. Tablet (pointer: coarse)
+     promotes to --tap-min so students can reliably tap it. */
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-faint);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 150ms ease, color 150ms ease;
+  padding: 0;
+  line-height: 1;
+}
+
+@media (pointer: coarse) {
+  .ctx-menu-trigger {
+    width: var(--tap-min);
+    height: var(--tap-min);
+    font-size: 22px;
+  }
+}
+
+.ctx-menu-trigger:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--color-text);
+}
+
+.ctx-menu-dropdown {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 4px;
+  box-sizing: border-box;
+  width: max-content;
+  min-width: 140px;
+  max-width: min(220px, calc(100vw - 16px));
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: 10px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08);
+  z-index: 50;
+  padding: 4px;
+}
+/* context-menu-stacking (2026-04-26): portal 변형은 document.body 직속이라
+   부모 stacking context 영향 X. 다른 카드/모달과 충돌 방지를 위해 z-index
+   상향 (모달 backdrop 90 보다 낮게 — 모달이 뜨면 그 위에 올라가지 않도록). */
+.ctx-menu-dropdown-portal {
+  /* portal 변형은 JS 가 position: fixed + top/right 인라인으로 위치를 잡는다.
+     인라인 right 가 클래스의 right: 0 보다 우선해 너비가 옳게 계산된다. */
+  z-index: 70;
+  margin-top: 0; /* fixed 위치는 이미 +4px 여백 포함 */
+  animation: menuIn 120ms ease;
+}
+
+@keyframes menuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ctx-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: background 100ms ease;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.ctx-menu-item:hover {
+  background: var(--color-surface-alt);
+}
+
+.ctx-menu-item-danger {
+  color: #dc3545;
+}
+
+.ctx-menu-item-danger:hover {
+  background: rgba(220, 53, 69, 0.08);
+}
+
+.ctx-menu-icon {
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Section label inside a dropdown — e.g., "정렬" group header (T5-1). */
+.ctx-menu-label {
+  padding: 6px 12px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  color: var(--color-text-faint);
+  text-transform: none;
+}
+
+.ctx-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--color-border);
+}
+
+.ctx-menu-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  padding: 8px 10px 4px;
+  border-top: 1px solid var(--color-border);
+}
+
+.ctx-menu-item-radio {
+  /* Radio option — ✓ mark sits in a fixed-width leading slot so labels align. */
+  padding-left: 8px;
+}
+
+.ctx-menu-item-radio .ctx-menu-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  flex-shrink: 0;
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.ctx-menu-item-radio.is-selected {
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+}
+
+.ctx-menu-item-radio.is-selected:hover {
+  background: var(--color-accent-tinted-bg);
+}

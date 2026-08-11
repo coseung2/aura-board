@@ -1,0 +1,218 @@
+/* Keep the unit suffix inside the modal instead of overflowing its edge. */
+.classroom-role-add-modal .classroom-role-input-wrap,
+.classroom-role-edit-modal .classroom-role-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.classroom-role-add-modal .classroom-role-input-wrap > span,
+.classroom-role-edit-modal .classroom-role-input-wrap > span {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
+
+.classroom-role-add-modal .classroom-role-salary,
+.classroom-role-edit-modal .classroom-role-salary,
+.classroom-role-add-modal .classroom-role-name-input,
+.classroom-role-edit-modal .classroom-role-name-input {
+  padding-inline: 10px;
+}
+
+.classroom-role-add-label {
+  color: var(--color-text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.classroom-role-add-modal .classroom-role-select {
+  width: 100%;
+  min-height: 40px;
+}
+
+/* Pay controls render inside the section divider row, right-aligned. */
+.classroom-role-pay-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-left: auto;
+  padding-bottom: 6px;
+}
+
+.classroom-role-pay-bar .segmented-control-item {
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.classroom-role-pay-bar .classroom-role-select {
+  min-height: 36px;
+  font-size: 13px;
+}
+
+.classroom-role-pay-note {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.classroom-role-pay-bar .classroom-role-pay-now {
+  min-height: 36px;
+  padding: 7px 16px;
+  font-size: 13px;
+}
+
+.classroom-role-pay-bar button:disabled,
+.classroom-role-pay-bar select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.classroom-role-edit-modal .modal-body {
+  display: grid;
+  gap: 16px;
+}
+
+/* Title removed, so the header only carries the close button. */
+.classroom-role-edit-header {
+  justify-content: flex-end;
+}
+
+/* Align modal label/value text with where the input's --radius-btn (10px)
+   corner ends and its straight edge begins. */
+.classroom-role-add-modal .classroom-role-field label,
+.classroom-role-edit-modal .classroom-role-field label,
+.classroom-role-add-modal .classroom-role-add-label,
+.classroom-role-edit-modal .classroom-role-add-label {
+  padding-left: 10px;
+}
+
+.classroom-role-student-chip {
+  padding-inline: 10px;
+}
+
+/* Five student columns need more room than the default 520px modal. */
+.classroom-role-edit-modal,
+.classroom-role-add-modal {
+  width: 640px;
+}
+
+.classroom-role-add-pay {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.classroom-role-name-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.classroom-role-name-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+/* 역할 이름 + 급여 split the row evenly. */
+.classroom-role-add-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 12px;
+}
+
+.classroom-role-field-name,
+.classroom-role-field-salary {
+  min-width: 0;
+}
+
+/* Name and salary inputs share one height so the row reads as a single band. */
+.classroom-role-add-modal .classroom-role-name-input,
+.classroom-role-edit-modal .classroom-role-name-input,
+.classroom-role-add-modal .classroom-role-salary,
+.classroom-role-edit-modal .classroom-role-salary {
+  min-height: 40px;
+  font-size: 14px;
+}
+
+@media (max-width: 560px) {
+  .classroom-role-add-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.classroom-role-add-modal .modal-actions,
+.classroom-role-edit-modal .modal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 20px 20px;
+}
+
+.classroom-role-student-picker {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.classroom-role-student-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.classroom-role-student-chip.is-assigned {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+@media (max-width: 560px) {
+  .classroom-role-student-picker {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.classroom-role-edit-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.classroom-role-edit-actions .classroom-role-remove-btn {
+  margin-right: auto;
+}
+
+.classroom-dashboard-empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+}
