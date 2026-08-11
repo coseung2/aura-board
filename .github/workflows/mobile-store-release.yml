@@ -11,11 +11,17 @@ on:
         options:
           - all
           - android
+          - android-promote
           - ios
       expected_version:
         description: App version that must be present in app.config.ts
         required: true
         default: 1.0.6
+        type: string
+      android_version_code:
+        description: Existing Google Play versionCode to promote when platform is android-promote
+        required: false
+        default: "0"
         type: string
 
 permissions:
@@ -195,8 +201,8 @@ jobs:
       - name: Submit AAB to Google Play closed testing
         run: eas submit --platform android --profile closed --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
 
-      - name: Submit AAB to Google Play production
-        run: eas submit --platform android --profile production --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
+      - name: Promote AAB to Google Play production
+        run: node ../../.github/scripts/promote-google-play-track.mjs --package com.auraboard.app --track production --version-code "${{ steps.build.outputs.build_number }}"
 
       - name: Preserve submitted AAB
         if: ${{ always() && steps.build.outcome == 'success' }}
@@ -221,6 +227,44 @@ jobs:
       - name: Remove Google Play service account
         if: always()
         run: rm -f "$RUNNER_TEMP/google-play-service-account.json" "$RUNNER_TEMP/google-services.json"
+
+  android-promote:
+    name: Promote existing Android version to production
+    environment: production
+    if: ${{ inputs.platform == 'android-promote' }}
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v5
+
+      - name: Load release secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: oidc
+          identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
+          oidc-audience: https://github.com/coseung2
+          project-slug: mobile-release-d-w6g
+          env-slug: prod
+          secret-path: /aura-board
+
+      - name: Validate promotion input
+        run: test "${{ inputs.android_version_code }}" -gt 0
+
+      - name: Promote existing AAB to Google Play production
+        run: node .github/scripts/promote-google-play-track.mjs --package com.auraboard.app --track production --version-code "${{ inputs.android_version_code }}"
+
+      - name: Write Android promotion summary
+        if: always()
+        run: |
+          {
+            echo "## Android production promotion"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Version: ${{ inputs.expected_version }}"
+            echo "- Version code: ${{ inputs.android_version_code }}"
+            echo "- Play track: production"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   ios:
     name: iOS production submission
