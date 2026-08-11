@@ -23,16 +23,12 @@ CREATE TABLE "FeedPost" (
       CHECK ("authorKind" IN ('PLATFORM', 'TEACHER', 'STUDENT')),
     CONSTRAINT "FeedPost_status_check"
       CHECK ("status" IN ('DRAFT', 'PUBLISHED', 'ARCHIVED')),
-    CONSTRAINT "FeedPost_content_check"
-      CHECK (
-        ("title" IS NOT NULL AND char_length(btrim("title")) > 0)
-        OR ("body" IS NOT NULL AND char_length(btrim("body")) > 0)
-      ),
+    CONSTRAINT "FeedPost_author_display_name_check"
+      CHECK (char_length(btrim("authorDisplayName")) > 0),
     CONSTRAINT "FeedPost_author_identity_check"
       CHECK (
-        ("authorKind" = 'PLATFORM' AND "authorStudentId" IS NULL)
-        OR ("authorKind" = 'TEACHER' AND "authorUserId" IS NOT NULL AND "authorStudentId" IS NULL)
-        OR ("authorKind" = 'STUDENT' AND "authorStudentId" IS NOT NULL AND "authorUserId" IS NULL)
+        ("authorKind" IN ('PLATFORM', 'TEACHER') AND "authorStudentId" IS NULL)
+        OR ("authorKind" = 'STUDENT' AND "authorUserId" IS NULL)
       )
 );
 
@@ -97,7 +93,7 @@ CREATE TABLE "FeedPublication" (
 CREATE TABLE "FeedPoolEntry" (
     "postId" TEXT NOT NULL,
     "status" TEXT NOT NULL DEFAULT 'AVAILABLE',
-    "createdByUserId" TEXT NOT NULL,
+    "createdByUserId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -105,7 +101,7 @@ CREATE TABLE "FeedPoolEntry" (
     CONSTRAINT "FeedPoolEntry_postId_fkey"
       FOREIGN KEY ("postId") REFERENCES "FeedPost"("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "FeedPoolEntry_createdByUserId_fkey"
-      FOREIGN KEY ("createdByUserId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+      FOREIGN KEY ("createdByUserId") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE,
     CONSTRAINT "FeedPoolEntry_status_check"
       CHECK ("status" IN ('AVAILABLE', 'WITHDRAWN'))
 );
