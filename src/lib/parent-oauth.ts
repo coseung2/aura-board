@@ -21,6 +21,7 @@ const CANONICAL_APP_ORIGIN = "https://aura-board.com";
 const VERCEL_APP_ORIGIN_ALIAS = "https://aura-board-app.vercel.app";
 
 export type ProviderId = "google" | "kakao";
+export type ParentOAuthProvider = ProviderId | "apple";
 
 export function normalizeParentOAuthBaseUrl(value: string): string {
   try {
@@ -248,7 +249,7 @@ export async function fetchKakaoUserInfo(
  * 이 placeholder 는 발송 처리에서 도메인 체크로 skip 가능 (별도 task).
  */
 export async function upsertParentFromOAuth(
-  provider: ProviderId,
+  provider: ParentOAuthProvider,
   info: OAuthUserInfo
 ): Promise<{ parentId: string; isNewParent: boolean }> {
   // (1) 기존 link 매칭

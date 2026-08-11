@@ -15,7 +15,7 @@ on:
       expected_version:
         description: App version that must be present in app.config.ts
         required: true
-        default: 1.0.5
+        default: 1.0.6
         type: string
 
 permissions:
@@ -103,7 +103,7 @@ jobs:
           test -f "$RUNNER_TEMP/ios-archive/apps/mobile/modules/aura-board-health-connect/ios/AuraBoardHealthConnect.podspec"
 
   android:
-    name: Android AAB to production
+    name: Android AAB to closed testing and production
     environment: production
     if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
     needs: validate
@@ -175,6 +175,7 @@ jobs:
           fs.writeFileSync(output, serviceAccount + "\n", { encoding: "utf8", mode: 0o600 });
           const easPath = path.join(process.cwd(), "eas.json");
           const eas = JSON.parse(fs.readFileSync(easPath, "utf8"));
+          eas.submit.closed.android.serviceAccountKeyPath = output;
           eas.submit.production.android.serviceAccountKeyPath = output;
           fs.writeFileSync(easPath, JSON.stringify(eas, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
           NODE
@@ -191,6 +192,9 @@ jobs:
           echo "aab_path=$AAB_PATH" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
+      - name: Submit AAB to Google Play closed testing
+        run: eas submit --platform android --profile closed --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
+
       - name: Submit AAB to Google Play production
         run: eas submit --platform android --profile production --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
 
@@ -206,12 +210,12 @@ jobs:
         if: always()
         run: |
           {
-            echo "## Android production"
+            echo "## Android closed testing and production"
             echo "- Commit: $GITHUB_SHA"
             echo "- Version: ${{ inputs.expected_version }}"
             echo "- Version code: ${{ steps.build.outputs.build_number }}"
             echo "- Build: GitHub Ubuntu runner (local EAS build)"
-            echo "- Play track: production"
+            echo "- Play tracks: alpha (closed testing), production"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove Google Play service account

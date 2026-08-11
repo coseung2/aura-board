@@ -454,6 +454,7 @@ export function StreamBoard({
     handleSectionWritingGuidanceSave,
     handleSaveBreakout,
     handleDisableBreakout,
+    handleToggleGuide,
   } = sectionActions;
   const showComposerSections =
     streamSectionsEnabled && sectionOptions.length > 0;

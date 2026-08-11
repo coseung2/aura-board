@@ -4,7 +4,7 @@ import type { GroupEditorDraft } from "../classroom/GroupRosterEditor";
 import { sortSections } from "@/lib/sort-sections";
 import { normalizeStreamActivityTemplateState, type StreamActivityTemplate, type StreamActivityTemplateState } from "@/lib/stream-activity-templates";
 import {
-  cardHasAnyStudentAuthor, getGroupIdForCardAuthors, isSectionSlideshowEnabled,
+  cardHasAnyStudentAuthor, cardHasStudentAuthor, getGroupIdForCardAuthors, isSectionSlideshowEnabled,
   normalizeBreakoutStateForViewer, sortPosts,
   type BreakoutState, type StreamContentItem, type StreamSection,
 } from "./stream-board-model";

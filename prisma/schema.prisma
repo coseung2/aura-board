@@ -3315,7 +3315,7 @@ model ParentOAuthAccount {
 
   parentId String
 
-  provider String // "google" | "kakao"
+  provider String // "google" | "kakao" | "apple"
 
   providerAccountId String
 

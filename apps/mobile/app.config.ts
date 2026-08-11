@@ -12,13 +12,14 @@ const config: ExpoConfig = {
   name: "Aura-board",
   slug: "aura-board-mobile",
   scheme: "auraboard",
-  version: "1.0.5",
+  version: "1.0.6",
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
   newArchEnabled: true,
   ios: {
     bundleIdentifier: "com.auraboard.app",
+    usesAppleSignIn: true,
     supportsTablet: true,
     requireFullScreen: false,
     infoPlist: {
@@ -30,7 +31,6 @@ const config: ExpoConfig = {
     predictiveBackGestureEnabled: false,
     softwareKeyboardLayoutMode: "resize",
     package: "com.auraboard.app",
-    versionCode: 17,
     ...(googleServicesFile ? { googleServicesFile } : {}),
   },
   web: {
@@ -48,6 +48,7 @@ const config: ExpoConfig = {
       },
     ],
     "expo-font",
+    "expo-apple-authentication",
     "expo-secure-store",
     [
       "expo-audio",

@@ -13,6 +13,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Device from "expo-device";
+import * as AppleAuthentication from "expo-apple-authentication";
 import * as Linking from "expo-linking";
 import * as WebBrowser from "expo-web-browser";
 import Svg, { Path } from "react-native-svg";
@@ -69,6 +70,11 @@ import type {
   StudentAuthResponse,
 } from "../lib/types";
 import { styles } from "./landing.styles";
+import {
+  isAppleLoginCancellation,
+  isAppleParentLoginAvailable,
+  signInWithAppleParent,
+} from "../lib/parent-apple-login";
 import {
   TermsNotice,
   RoleLineIcon,
@@ -136,6 +142,7 @@ export function Landing() {
   const [studentLoading, setStudentLoading] = useState(false);
   const [studentError, setStudentError] = useState<string | null>(null);
   const [parentLoading, setParentLoading] = useState(false);
+  const [appleLoginAvailable, setAppleLoginAvailable] = useState(false);
   const [parentAuthMode, setParentAuthMode] = useState<
     "social" | "login" | "signup"
   >("social");
@@ -155,6 +162,13 @@ export function Landing() {
     inset: responsive.roleWebSafeInset,
     maxWidth: layout.roleCardNarrowMaxWidth,
   });
+
+  useEffect(() => {
+    if (Platform.OS !== "ios") return;
+    void isAppleParentLoginAvailable()
+      .then(setAppleLoginAvailable)
+      .catch(() => setAppleLoginAvailable(false));
+  }, []);
 
   useEffect(() => {
     if (requestedRole || logoutRole) {
@@ -316,6 +330,23 @@ export function Landing() {
     } catch {
       const providerLabel = provider === "google" ? "Google" : "Kakao";
       setParentError(`${providerLabel} 로그인을 시작하지 못했어요.`);
+    } finally {
+      setParentLoading(false);
+    }
+  }
+
+  async function handleParentAppleSignIn() {
+    if (parentLoading) return;
+    setParentError(null);
+    setParentLoading(true);
+    try {
+      const result = await signInWithAppleParent();
+      await saveParentToken(result.token);
+      router.replace("/(parent)");
+    } catch (error) {
+      if (!isAppleLoginCancellation(error)) {
+        setParentError("Apple 로그인을 완료하지 못했어요. 다시 시도해 주세요.");
+      }
     } finally {
       setParentLoading(false);
     }
@@ -559,6 +590,19 @@ export function Landing() {
               ) : null}
               {parentAuthMode === "social" ? (
                 <View style={styles.oauthActions}>
+                  {Platform.OS === "ios" && appleLoginAvailable ? (
+                    <AppleAuthentication.AppleAuthenticationButton
+                      buttonType={
+                        AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN
+                      }
+                      buttonStyle={
+                        AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                      }
+                      cornerRadius={radii.btn}
+                      style={styles.oauthApple}
+                      onPress={handleParentAppleSignIn}
+                    />
+                  ) : null}
                   <ControlPressable
                     style={styles.oauthGoogle}
                     onPress={() => handleParentOAuth("google")}

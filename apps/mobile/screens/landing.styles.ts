@@ -140,6 +140,10 @@ export const styles = StyleSheet.create({
     width: "100%",
     gap: spacing.sm,
   },
+  oauthApple: {
+    width: "100%",
+    height: tapMin,
+  },
   credentialForm: {
     width: "100%",
     gap: spacing.sm,
