@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
   content: {
     flexGrow: 1,
     paddingHorizontal: spacing.lg,
-    paddingTop: pageChrome.contentStartGap + spacing.lg,
+    paddingTop: spacing.lg,
     paddingBottom: spacing.xxxl + spacing.xxl,
     gap: spacing.lg,
   },
