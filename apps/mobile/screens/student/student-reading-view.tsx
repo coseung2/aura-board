@@ -246,6 +246,14 @@ export function StudentReadingScreenView({
                               <Text style={styles.entryTitle} numberOfLines={1}>
                                 {entry.title}
                               </Text>
+                              {entry.aiFeedbackStatus === "generated" ? (
+                                <Text
+                                  style={styles.entryScoreCollapsed}
+                                  numberOfLines={1}
+                                >
+                                  {entry.aiScore ?? 0}점
+                                </Text>
+                              ) : null}
                               {expanded ? (
                                 <ChevronUp
                                   size={16}

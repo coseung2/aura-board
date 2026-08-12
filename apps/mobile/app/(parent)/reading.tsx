@@ -328,6 +328,14 @@ export default function ParentReadingScreen() {
                           <Text style={styles.entryTitle} numberOfLines={1}>
                             {entry.title}
                           </Text>
+                          {entry.aiFeedback ? (
+                            <Text
+                              style={styles.entryScoreCollapsed}
+                              numberOfLines={1}
+                            >
+                              {entry.aiScore ?? 0}점
+                            </Text>
+                          ) : null}
                           {expanded ? (
                             <ChevronUp
                               size={16}
@@ -482,6 +490,10 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   entryTitle: { ...typography.section, color: colors.text, flex: 1 },
+  entryScoreCollapsed: {
+    ...typography.badge,
+    color: colors.accentTintedText,
+  },
   entryType: { ...typography.badge, color: colors.accentTintedText },
   entryDate: { ...typography.micro, color: colors.textMuted },
   meta: { ...typography.micro, color: colors.textMuted },

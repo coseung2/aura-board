@@ -224,6 +224,10 @@ export const styles = StyleSheet.create({
   entryType: { ...typography.badge, color: colors.accentTintedText },
   entryDate: { ...typography.micro, color: colors.textMuted },
   entryTitle: { ...typography.section, color: colors.text, flex: 1 },
+  entryScoreCollapsed: {
+    ...typography.badge,
+    color: colors.accentTintedText,
+  },
   entryDetails: { gap: spacing.sm },
   meta: { ...typography.micro, color: colors.textMuted },
   body: { ...typography.body, color: colors.text },
