@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, parentApiFetch } from "../lib/api";
+import {
+  parentPostCollectionCacheKey,
+  readParentDataCache,
+  revalidateParentDataCache,
+  writeParentDataCache,
+} from "../lib/parent-data-cache";
 import { isParentLogoutInProgress } from "../lib/session";
 import type {
   ParentFeedResponse,
@@ -41,6 +47,16 @@ type ParentPostCollectionWithCounts = ParentPostCollectionResult & {
   counts: ParentPostCounts;
 };
 
+function readCollection(endpoint: string | null): ParentFeedResponse | null {
+  if (!endpoint) return null;
+  return (
+    readParentDataCache<ParentFeedResponse>(
+      parentPostCollectionCacheKey(endpoint),
+      { kind: "feed" },
+    )?.data ?? null
+  );
+}
+
 export function useParentPostCollection(
   options: CollectionOptions & { includeCounts: true },
 ): ParentPostCollectionWithCounts;
@@ -52,19 +68,37 @@ export function useParentPostCollection({
   onUnauthorized,
   includeCounts = false,
 }: CollectionOptions): ParentPostCollectionResult {
-  const [items, setItems] = useState<ParentPostDTO[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(Boolean(endpoint));
+  const initial = readCollection(endpoint);
+  const [items, setItems] = useState<ParentPostDTO[]>(initial?.items ?? []);
+  const [nextCursor, setNextCursor] = useState<string | null>(
+    initial?.nextCursor ?? null,
+  );
+  const [loading, setLoading] = useState(Boolean(endpoint) && !initial);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
-  const [counts, setCounts] = useState<ParentPostCounts>({ media: 0, text: 0 });
+  const [total, setTotal] = useState(initial?.total ?? 0);
+  const [counts, setCounts] = useState<ParentPostCounts>(
+    initial?.counts ?? { media: 0, text: 0 },
+  );
   const requestVersion = useRef(0);
+
+  const applyCollection = useCallback(
+    (response: ParentFeedResponse) => {
+      setItems(response.items);
+      setNextCursor(response.nextCursor);
+      if (includeCounts) {
+        setTotal(response.total ?? 0);
+        setCounts(response.counts ?? { media: 0, text: 0 });
+      }
+    },
+    [includeCounts],
+  );
 
   const loadFirstPage = useCallback(
     async (asRefresh: boolean) => {
+      const version = ++requestVersion.current;
       if (!endpoint) {
         setItems([]);
         setNextCursor(null);
@@ -79,13 +113,16 @@ export function useParentPostCollection({
         return;
       }
 
-      const version = ++requestVersion.current;
-      if (asRefresh) {
-        setRefreshing(true);
-      } else {
+      const cacheKey = parentPostCollectionCacheKey(endpoint);
+      const cached = readParentDataCache<ParentFeedResponse>(cacheKey, {
+        kind: "feed",
+      });
+      if (cached) {
+        applyCollection(cached.data);
+        setLoading(false);
+      } else if (!asRefresh) {
         setItems([]);
         setNextCursor(null);
-        setError(null);
         setLoadMoreError(null);
         setLoading(true);
         if (includeCounts) {
@@ -93,19 +130,24 @@ export function useParentPostCollection({
           setCounts({ media: 0, text: 0 });
         }
       }
+      if (asRefresh) setRefreshing(true);
 
       try {
         const separator = endpoint.includes("?") ? "&" : "?";
-        const response = await parentApiFetch<ParentFeedResponse>(
-          `${endpoint}${separator}limit=${PAGE_SIZE}`,
+        await revalidateParentDataCache(
+          cacheKey,
+          () =>
+            parentApiFetch<ParentFeedResponse>(
+              `${endpoint}${separator}limit=${PAGE_SIZE}`,
+              { forceRefresh: asRefresh },
+            ),
+          { kind: "feed", force: asRefresh },
         );
         if (version !== requestVersion.current) return;
-        setItems(response.items);
-        setNextCursor(response.nextCursor);
-        if (includeCounts) {
-          setTotal(response.total ?? 0);
-          setCounts(response.counts ?? { media: 0, text: 0 });
-        }
+        const latest = readParentDataCache<ParentFeedResponse>(cacheKey, {
+          kind: "feed",
+        });
+        if (latest) applyCollection(latest.data);
         setError(null);
       } catch (cause) {
         if (version !== requestVersion.current) return;
@@ -114,18 +156,20 @@ export function useParentPostCollection({
           await onUnauthorized();
           return;
         }
-        setItems([]);
-        setNextCursor(null);
-        if (includeCounts) {
-          setTotal(0);
-          setCounts({ media: 0, text: 0 });
+        if (!cached) {
+          setItems([]);
+          setNextCursor(null);
+          if (includeCounts) {
+            setTotal(0);
+            setCounts({ media: 0, text: 0 });
+          }
         }
         setError(
           cause instanceof ApiError && cause.status === 403
             ? "자녀 정보를 볼 권한이 없어요."
             : cause instanceof ApiError && cause.status === 404
               ? "요청한 게시물을 찾을 수 없어요."
-            : "게시물을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+              : "게시물을 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
         );
       } finally {
         if (version === requestVersion.current) {
@@ -134,7 +178,7 @@ export function useParentPostCollection({
         }
       }
     },
-    [endpoint, includeCounts, onUnauthorized],
+    [applyCollection, endpoint, includeCounts, onUnauthorized],
   );
 
   useEffect(() => {
@@ -148,20 +192,39 @@ export function useParentPostCollection({
     if (!endpoint || !nextCursor || loading || refreshing || loadingMore) return;
     const version = requestVersion.current;
     const cursor = nextCursor;
+    const cacheKey = parentPostCollectionCacheKey(endpoint);
     setLoadingMore(true);
     setLoadMoreError(null);
     try {
-      const paginationEndpoint = endpoint.replace(/([?&])post=[^&]*&?/, "$1").replace(/[?&]$/, "");
+      const paginationEndpoint = endpoint
+        .replace(/([?&])post=[^&]*&?/, "$1")
+        .replace(/[?&]$/, "");
       const separator = paginationEndpoint.includes("?") ? "&" : "?";
       const response = await parentApiFetch<ParentFeedResponse>(
         `${paginationEndpoint}${separator}limit=${PAGE_SIZE}&cursor=${encodeURIComponent(cursor)}`,
       );
       if (version !== requestVersion.current) return;
-      setItems((current) => {
-        const seen = new Set(current.map((item) => item.id));
-        return [...current, ...response.items.filter((item) => !seen.has(item.id))];
-      });
-      setNextCursor(response.nextCursor);
+
+      const cached = readParentDataCache<ParentFeedResponse>(cacheKey, {
+        kind: "feed",
+      })?.data;
+      const baseItems = cached?.items ?? items;
+      const seen = new Set(baseItems.map((item) => item.id));
+      const merged: ParentFeedResponse = {
+        items: [
+          ...baseItems,
+          ...response.items.filter((item) => !seen.has(item.id)),
+        ],
+        nextCursor: response.nextCursor,
+        ...(includeCounts
+          ? {
+              total: response.total ?? cached?.total ?? total,
+              counts: response.counts ?? cached?.counts ?? counts,
+            }
+          : {}),
+      };
+      writeParentDataCache(cacheKey, merged, { kind: "feed" });
+      applyCollection(merged);
     } catch (cause) {
       if (version !== requestVersion.current) return;
       if (cause instanceof ApiError && cause.status === 401) {
@@ -174,12 +237,17 @@ export function useParentPostCollection({
       if (version === requestVersion.current) setLoadingMore(false);
     }
   }, [
+    applyCollection,
+    counts,
     endpoint,
+    includeCounts,
+    items,
     loading,
     loadingMore,
     nextCursor,
     onUnauthorized,
     refreshing,
+    total,
   ]);
 
   return {

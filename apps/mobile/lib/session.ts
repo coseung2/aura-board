@@ -1,6 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { clearBoardCache } from "./board-cache";
+import { clearParentDataCache } from "./parent-data-cache";
 import { clearRequestCache } from "./request-cache";
 
 // 학생 세션 토큰 · 학생 프로필 캐시.
@@ -17,6 +18,8 @@ let studentTokenCache: string | null | undefined;
 let studentTokenInFlight: Promise<string | null> | null = null;
 let parentTokenCache: string | null | undefined;
 let parentTokenInFlight: Promise<string | null> | null = null;
+let parentSelectedChildCache: string | null | undefined;
+let parentSelectedChildInFlight: Promise<string | null> | null = null;
 const parentSelectedChildListeners = new Set<
   (studentId: string | null) => void
 >();
@@ -166,6 +169,7 @@ export type CachedParent = {
 
 export async function saveParentToken(token: string): Promise<void> {
   logoutInProgressRole = null;
+  clearParentDataCache();
   clearRequestCache();
   await setStoredItem(PARENT_TOKEN_KEY, token);
   parentTokenCache = token;
@@ -186,11 +190,14 @@ export async function loadParentToken(): Promise<string | null> {
 }
 
 export async function clearParentSession(): Promise<void> {
+  clearParentDataCache();
   clearRequestCache();
   await deleteStoredItem(PARENT_TOKEN_KEY).catch(() => undefined);
   await deleteStoredItem(PARENT_KEY).catch(() => undefined);
   await deleteStoredItem(PARENT_SELECTED_CHILD_KEY).catch(() => undefined);
   parentTokenCache = null;
+  parentSelectedChildCache = null;
+  parentSelectedChildInFlight = null;
   notifyParentSelectedChild(null);
 }
 
@@ -201,6 +208,7 @@ export async function clearParentSession(): Promise<void> {
  */
 export async function clearAllMobileSessions(): Promise<void> {
   clearBoardCache();
+  clearParentDataCache();
   clearRequestCache();
   const studentAuthorizationToken = await loadSessionToken();
   if (studentAuthorizationToken) {
@@ -219,6 +227,8 @@ export async function clearAllMobileSessions(): Promise<void> {
   ]);
   studentTokenCache = null;
   parentTokenCache = null;
+  parentSelectedChildCache = null;
+  parentSelectedChildInFlight = null;
   notifyParentSelectedChild(null);
 }
 
@@ -237,12 +247,23 @@ export async function loadParentCache(): Promise<CachedParent | null> {
 }
 
 export async function saveParentSelectedChild(studentId: string): Promise<void> {
-  await setStoredItem(PARENT_SELECTED_CHILD_KEY, studentId);
+  parentSelectedChildCache = studentId;
   notifyParentSelectedChild(studentId);
+  await setStoredItem(PARENT_SELECTED_CHILD_KEY, studentId);
 }
 
 export async function loadParentSelectedChild(): Promise<string | null> {
-  return getStoredItem(PARENT_SELECTED_CHILD_KEY);
+  if (parentSelectedChildCache !== undefined) return parentSelectedChildCache;
+  if (parentSelectedChildInFlight) return parentSelectedChildInFlight;
+  parentSelectedChildInFlight = getStoredItem(PARENT_SELECTED_CHILD_KEY)
+    .then((studentId) => {
+      parentSelectedChildCache = studentId;
+      return studentId;
+    })
+    .finally(() => {
+      parentSelectedChildInFlight = null;
+    });
+  return parentSelectedChildInFlight;
 }
 
 export function subscribeParentSelectedChild(

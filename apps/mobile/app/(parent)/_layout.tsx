@@ -1,11 +1,13 @@
 import { Stack, useRouter, type Href } from "expo-router";
 import { useEffect } from "react";
-import { StyleSheet, View } from "react-native";
+import { InteractionManager, StyleSheet, View } from "react-native";
 import { colors } from "../../theme/tokens";
 import { useParentSessionWatchdog } from "../../hooks/use-parent-session-watchdog";
 import { DailyBannerProvider } from "../../components/DailyBanner";
 import { WalkingPermissionOnboarding } from "../../components/WalkingPermissionOnboarding";
 import { subscribeParentPushNavigation } from "../../lib/parent-push-notifications";
+import { prefetchParentTabs } from "../../lib/parent-data-prefetch";
+import { loadParentToken } from "../../lib/session";
 
 // Parent segment 전체 공통 layout.
 export default function ParentLayout() {
@@ -21,6 +23,22 @@ export default function ParentLayout() {
     });
     return () => unsubscribe();
   }, [router]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const task = InteractionManager.runAfterInteractions(() => {
+      void loadParentToken()
+        .then((token) => {
+          if (!cancelled && token) return prefetchParentTabs();
+          return undefined;
+        })
+        .catch(() => undefined);
+    });
+    return () => {
+      cancelled = true;
+      task.cancel();
+    };
+  }, []);
 
   return (
     <View style={styles.shell}>
