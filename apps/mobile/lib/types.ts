@@ -615,6 +615,28 @@ export type ParentPostDTO = PortfolioCardDTO & {
   contentKind: "media" | "text";
 };
 
+export type ParentFeedPublicationMedia = {
+  id: string;
+  kind: "IMAGE" | "YOUTUBE";
+  url: string;
+  youtubeVideoId: string | null;
+  altText: string | null;
+};
+
+export type ParentFeedPublicationDTO = {
+  source: "publication";
+  id: string;
+  authorKind: "PLATFORM" | "TEACHER" | "STUDENT";
+  authorDisplayName: string;
+  title: string | null;
+  body: string | null;
+  scope: "GLOBAL" | "CLASSROOM";
+  publishedAt: string;
+  media: ParentFeedPublicationMedia[];
+};
+
+export type ParentFeedItem = ParentPostDTO | ParentFeedPublicationDTO;
+
 export type ParentPostCounts = {
   media: number;
   text: number;
@@ -688,14 +710,14 @@ export type PortfolioStudentDTO = {
   cards: PortfolioCardDTO[];
 };
 
-export type ParentFeedResponse = {
-  items: ParentPostDTO[];
+export type ParentFeedResponse<T extends ParentFeedItem = ParentPostDTO> = {
+  items: T[];
   nextCursor: string | null;
   total?: number;
   counts?: ParentPostCounts;
 };
 
-export type ParentChildPostsResponse = ParentFeedResponse & {
+export type ParentChildPostsResponse = ParentFeedResponse<ParentPostDTO> & {
   child: ParentChildSummary;
   total: number;
   counts: ParentPostCounts;

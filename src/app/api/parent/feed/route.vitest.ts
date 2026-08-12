@@ -1,9 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { encodeParentFeedCursor } from "@/lib/parent-feed-cursor";
+import {
+  encodeParentFeedCursor,
+  encodeParentMergedFeedCursor,
+} from "@/lib/parent-feed-cursor";
 
 const mocks = vi.hoisted(() => ({
   studentFindMany: vi.fn(),
   cardFindMany: vi.fn(),
+  queryRaw: vi.fn(),
   withParentScope: vi.fn(),
 }));
 
@@ -11,6 +15,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     student: { findMany: mocks.studentFindMany },
     card: { findMany: mocks.cardFindMany },
+    $queryRaw: mocks.queryRaw,
   },
 }));
 
@@ -19,7 +24,10 @@ vi.mock("@/lib/parent-scope", () => ({
 }));
 
 vi.mock("@/lib/portfolio-card-mapper", () => ({
-  mapPortfolioCard: (card: { id: string }) => ({ id: card.id }),
+  mapPortfolioCard: (card: { id: string; createdAt?: Date }) => ({
+    id: card.id,
+    ...(card.createdAt ? { createdAt: card.createdAt.toISOString() } : {}),
+  }),
 }));
 
 vi.mock("@/lib/portfolio-acl-pure", () => ({
@@ -59,6 +67,7 @@ describe("GET /api/parent/feed", () => {
     );
     mocks.studentFindMany.mockResolvedValue(CHILDREN);
     mocks.cardFindMany.mockResolvedValue([]);
+    mocks.queryRaw.mockResolvedValue([]);
   });
 
   it("rejects an invalid cursor before resolving parent scope", async () => {
@@ -129,6 +138,7 @@ describe("GET /api/parent/feed", () => {
     expect(body.items).toEqual([
       {
         id: "card_shared",
+        createdAt: first.createdAt.toISOString(),
         contentKind: "media",
         linkedChildren: [
           {
@@ -149,9 +159,70 @@ describe("GET /api/parent/feed", () => {
       },
     ]);
     expect(body.nextCursor).toBe(
-      encodeParentFeedCursor({ createdAt: first.createdAt, id: first.id }),
+      encodeParentMergedFeedCursor({
+        card: { createdAt: first.createdAt, id: first.id },
+        publication: null,
+      }),
     );
     expect(body).not.toHaveProperty("child");
+  });
+
+  it("merges published feed posts with card posts in one time-ordered stream", async () => {
+    const card = {
+      id: "card_old",
+      createdAt: new Date("2026-07-10T02:00:00.000Z"),
+      studentAuthorId: "student_1",
+      authors: [],
+      imageUrl: null,
+      thumbUrl: null,
+      videoUrl: null,
+      linkImage: null,
+      attachments: [],
+    };
+    mocks.cardFindMany.mockResolvedValue([card]);
+    mocks.queryRaw.mockResolvedValue([
+      {
+        publicationId: "pub_1",
+        postId: "post_1",
+        scope: "GLOBAL",
+        classroomId: null,
+        authorKind: "PLATFORM",
+        authorDisplayName: "Aura Board",
+        title: "공지",
+        body: "새 소식",
+        publishedAt: new Date("2026-08-11T00:00:00.000Z"),
+        media: [],
+      },
+    ]);
+
+    const res = await GET(
+      new Request("https://example.test/api/parent/feed?limit=1"),
+    );
+    const body = await res.json();
+
+    expect(mocks.queryRaw).toHaveBeenCalled();
+    expect(body.items).toEqual([
+      {
+        source: "publication",
+        id: "pub_1",
+        authorKind: "PLATFORM",
+        authorDisplayName: "Aura Board",
+        title: "공지",
+        body: "새 소식",
+        scope: "GLOBAL",
+        publishedAt: "2026-08-11T00:00:00.000Z",
+        media: [],
+      },
+    ]);
+    expect(body.nextCursor).toBe(
+      encodeParentMergedFeedCursor({
+        card: null,
+        publication: {
+          publishedAt: new Date("2026-08-11T00:00:00.000Z"),
+          publicationId: "pub_1",
+        },
+      }),
+    );
   });
 
   it("returns an empty page without querying cards when there are no active children", async () => {

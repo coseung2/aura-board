@@ -8,6 +8,7 @@ import {
 } from "../lib/parent-data-cache";
 import { isParentLogoutInProgress } from "../lib/session";
 import type {
+  ParentFeedItem,
   ParentFeedResponse,
   ParentPostCounts,
   ParentPostDTO,
@@ -20,7 +21,10 @@ type Options = {
 };
 
 export function useParentFeed({ onUnauthorized }: Options) {
-  return useParentPostCollection({ endpoint: "/api/parent/feed", onUnauthorized });
+  return useParentPostCollection<ParentFeedItem>({
+    endpoint: "/api/parent/feed",
+    onUnauthorized,
+  });
 }
 
 type CollectionOptions = {
@@ -29,8 +33,8 @@ type CollectionOptions = {
   includeCounts?: boolean;
 };
 
-type ParentPostCollectionResult = {
-  items: ParentPostDTO[];
+type ParentPostCollectionResult<T extends ParentFeedItem = ParentPostDTO> = {
+  items: T[];
   loading: boolean;
   refreshing: boolean;
   loadingMore: boolean;
@@ -42,15 +46,19 @@ type ParentPostCollectionResult = {
   loadMore: () => Promise<void>;
 };
 
-type ParentPostCollectionWithCounts = ParentPostCollectionResult & {
+type ParentPostCollectionWithCounts<
+  T extends ParentFeedItem = ParentPostDTO,
+> = ParentPostCollectionResult<T> & {
   total: number;
   counts: ParentPostCounts;
 };
 
-function readCollection(endpoint: string | null): ParentFeedResponse | null {
+function readCollection<T extends ParentFeedItem>(
+  endpoint: string | null,
+): ParentFeedResponse<T> | null {
   if (!endpoint) return null;
   return (
-    readParentDataCache<ParentFeedResponse>(
+    readParentDataCache<ParentFeedResponse<T>>(
       parentPostCollectionCacheKey(endpoint),
       { kind: "feed" },
     )?.data ?? null
@@ -59,17 +67,19 @@ function readCollection(endpoint: string | null): ParentFeedResponse | null {
 
 export function useParentPostCollection(
   options: CollectionOptions & { includeCounts: true },
-): ParentPostCollectionWithCounts;
+): ParentPostCollectionWithCounts<ParentPostDTO>;
 export function useParentPostCollection(
   options: CollectionOptions,
-): ParentPostCollectionResult;
-export function useParentPostCollection({
+): ParentPostCollectionResult<ParentPostDTO>;
+export function useParentPostCollection<
+  T extends ParentFeedItem = ParentPostDTO,
+>({
   endpoint,
   onUnauthorized,
   includeCounts = false,
-}: CollectionOptions): ParentPostCollectionResult {
-  const initial = readCollection(endpoint);
-  const [items, setItems] = useState<ParentPostDTO[]>(initial?.items ?? []);
+}: CollectionOptions): ParentPostCollectionResult<T> {
+  const initial = readCollection<T>(endpoint);
+  const [items, setItems] = useState<T[]>(initial?.items ?? []);
   const [nextCursor, setNextCursor] = useState<string | null>(
     initial?.nextCursor ?? null,
   );
@@ -85,7 +95,7 @@ export function useParentPostCollection({
   const requestVersion = useRef(0);
 
   const applyCollection = useCallback(
-    (response: ParentFeedResponse) => {
+    (response: ParentFeedResponse<T>) => {
       setItems(response.items);
       setNextCursor(response.nextCursor);
       if (includeCounts) {
@@ -114,7 +124,7 @@ export function useParentPostCollection({
       }
 
       const cacheKey = parentPostCollectionCacheKey(endpoint);
-      const cached = readParentDataCache<ParentFeedResponse>(cacheKey, {
+      const cached = readParentDataCache<ParentFeedResponse<T>>(cacheKey, {
         kind: "feed",
       });
       if (cached) {
@@ -137,14 +147,14 @@ export function useParentPostCollection({
         await revalidateParentDataCache(
           cacheKey,
           () =>
-            parentApiFetch<ParentFeedResponse>(
+            parentApiFetch<ParentFeedResponse<T>>(
               `${endpoint}${separator}limit=${PAGE_SIZE}`,
               { forceRefresh: asRefresh },
             ),
           { kind: "feed", force: asRefresh },
         );
         if (version !== requestVersion.current) return;
-        const latest = readParentDataCache<ParentFeedResponse>(cacheKey, {
+        const latest = readParentDataCache<ParentFeedResponse<T>>(cacheKey, {
           kind: "feed",
         });
         if (latest) applyCollection(latest.data);
@@ -205,12 +215,12 @@ export function useParentPostCollection({
       );
       if (version !== requestVersion.current) return;
 
-      const cached = readParentDataCache<ParentFeedResponse>(cacheKey, {
+      const cached = readParentDataCache<ParentFeedResponse<T>>(cacheKey, {
         kind: "feed",
       })?.data;
       const baseItems = cached?.items ?? items;
       const seen = new Set(baseItems.map((item) => item.id));
-      const merged: ParentFeedResponse = {
+      const merged: ParentFeedResponse<T> = {
         items: [
           ...baseItems,
           ...response.items.filter((item) => !seen.has(item.id)),

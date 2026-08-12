@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
 import { ParentFeedCard } from "../../components/parent-feed-card";
+import { ParentPublicationCard } from "../../components/parent-publication-card";
 import { ParentHeaderActions } from "../../components/parent-header-actions";
 import { AppButton, AppHeader, EmptyState } from "../../components/ui";
 import { useParentFeed } from "../../hooks/use-parent-feed";
@@ -13,7 +14,7 @@ import {
   isParentLogoutInProgress,
   loadParentToken,
 } from "../../lib/session";
-import type { ParentPostDTO } from "../../lib/types";
+import type { ParentFeedItem } from "../../lib/types";
 import {
   borders,
   colors,
@@ -26,7 +27,7 @@ export default function ParentFeedScreen() {
   const router = useRouter();
   const params = useLocalSearchParams<{ post?: string | string[] }>();
   const focusPostId = Array.isArray(params.post) ? params.post[0] : params.post;
-  const listRef = useRef<FlatList<ParentPostDTO>>(null);
+  const listRef = useRef<FlatList<ParentFeedItem>>(null);
   const scrolledToFocusRef = useRef<string | null>(null);
 
   const handleUnauthorized = useCallback(async () => {
@@ -117,7 +118,13 @@ export default function ParentFeedScreen() {
         ref={listRef}
         data={feed.items}
         keyExtractor={(item) => item.id}
-        renderItem={({ item }) => <ParentFeedCard card={item} />}
+        renderItem={({ item }) =>
+          item.source === "publication" ? (
+            <ParentPublicationCard item={item} />
+          ) : (
+            <ParentFeedCard card={item} />
+          )
+        }
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         contentContainerStyle={styles.listContent}
         contentInsetAdjustmentBehavior="automatic"

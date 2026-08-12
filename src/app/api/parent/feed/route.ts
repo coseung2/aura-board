@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import {
-  fetchParentPosts,
+  fetchParentFeedMerged,
   loadParentChildSummaries,
   PARENT_PRIVATE_NO_STORE_HEADERS,
-  parseParentPostPagination,
+  parseParentFeedPagination,
 } from "@/lib/parent-posts";
 import { withParentScope } from "@/lib/parent-scope";
 
@@ -20,14 +20,14 @@ function json(body: unknown, status = 200) {
 // GET /api/parent/feed?limit=12&cursor=:opaqueCursor
 export async function GET(req: Request) {
   const searchParams = new URL(req.url).searchParams;
-  const pagination = parseParentPostPagination(searchParams);
+  const pagination = parseParentFeedPagination(searchParams);
   if ("error" in pagination) return json({ error: pagination.error }, 400);
 
   const response = await withParentScope(req, async (ctx) => {
     const children = await loadParentChildSummaries(
       ctx.childLinks.map((link) => link.studentId),
     );
-    return json(await fetchParentPosts({ children, ...pagination }));
+    return json(await fetchParentFeedMerged({ children, ...pagination }));
   });
 
   response.headers.set("Cache-Control", PARENT_PRIVATE_NO_STORE_HEADERS["Cache-Control"]);
