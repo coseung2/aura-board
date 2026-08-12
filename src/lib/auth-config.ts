@@ -59,6 +59,10 @@ if (kakaoClientId && kakaoClientSecret) {
       // different person can pick (or add) their own Kakao account instead of
       // being auto-logged-in with the previous browser Kakao session.
       authorization: {
+        // The built-in Kakao provider declares its authorization URL as a
+        // string; object form must repeat it or Auth.js drops the URL and
+        // fails with `TypeError: Invalid URL` at sign-in time.
+        url: "https://kauth.kakao.com/oauth/authorize?scope",
         params: { prompt: "select_account" },
       },
       profile(profile) {
