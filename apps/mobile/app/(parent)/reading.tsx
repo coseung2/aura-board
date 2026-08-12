@@ -9,11 +9,13 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
 import { ParentHeaderActions } from "../../components/parent-header-actions";
 import {
   AppButton,
   AppHeader,
+  ControlPressable,
   SectionHeader,
 } from "../../components/ui";
 import { SectionNav, SectionNavItem } from "../../components/NavigationTabs";
@@ -66,6 +68,7 @@ export default function ParentReadingScreen() {
   const [selectedChildRestored, setSelectedChildRestored] = useState(false);
   const selectedChildRestoredRef = useRef(false);
   const [bookType, setBookType] = useState<BookType>("story");
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
   const [loading, setLoading] = useState(!initial);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -261,34 +264,75 @@ export default function ParentReadingScreen() {
                   없어요.
                 </Text>
               ) : (
-                visibleEntries.map((entry) => (
-                  <View key={entry.id} style={styles.entry}>
-                    <View style={styles.entryIndex} accessible={false} />
-                    <View style={styles.entryContent}>
-                      <View style={styles.entryHeading}>
-                        <View style={styles.entryTitleWrap}>
-                          <Text style={styles.entryTitle}>{entry.title}</Text>
-                          <Text style={styles.meta}>{entry.author}</Text>
-                        </View>
-                        <Text style={styles.entryDate}>
-                          {new Date(entry.createdAt).toLocaleDateString("ko-KR")}
-                        </Text>
-                      </View>
-                      <Text style={styles.entryType}>
-                        {entry.bookType === "comic" ? "만화책" : "이야기책"}
-                      </Text>
-                      <Text style={styles.body}>{entry.reflection}</Text>
-                      {entry.aiFeedback ? (
-                        <View style={styles.feedbackRow}>
-                          <Text style={styles.feedbackScore}>
-                            {entry.aiScore ?? 0}점
+                visibleEntries.map((entry) => {
+                  const expanded = expandedEntryId === entry.id;
+                  return (
+                    <View key={entry.id} style={styles.entry}>
+                      <View style={styles.entryIndex} accessible={false} />
+                      <View
+                        style={[
+                          styles.entryContent,
+                          expanded && styles.entryExpanded,
+                        ]}
+                      >
+                        <ControlPressable
+                          style={styles.entryToggle}
+                          onPress={() =>
+                            setExpandedEntryId((current) =>
+                              current === entry.id ? null : entry.id,
+                            )
+                          }
+                          accessibilityRole="button"
+                          accessibilityLabel={`${entry.title} ${expanded ? "접기" : "펼치기"}`}
+                          accessibilityState={{ expanded }}
+                        >
+                          <Text style={styles.entryTitle} numberOfLines={1}>
+                            {entry.title}
                           </Text>
-                          <Text style={styles.feedback}>{entry.aiFeedback}</Text>
-                        </View>
-                      ) : null}
+                          {expanded ? (
+                            <ChevronUp
+                              size={16}
+                              color={colors.textFaint}
+                              strokeWidth={2}
+                              accessible={false}
+                            />
+                          ) : (
+                            <ChevronDown
+                              size={16}
+                              color={colors.textFaint}
+                              strokeWidth={2}
+                              accessible={false}
+                            />
+                          )}
+                        </ControlPressable>
+                        {expanded ? (
+                          <View style={styles.entryDetails}>
+                            <View style={styles.entryHeading}>
+                              <Text style={styles.entryType}>
+                                {entry.bookType === "comic" ? "만화책" : "이야기책"}
+                              </Text>
+                              <Text style={styles.entryDate}>
+                                {new Date(entry.createdAt).toLocaleDateString("ko-KR")}
+                              </Text>
+                            </View>
+                            <Text style={styles.meta}>{entry.author}</Text>
+                            <Text style={styles.body}>{entry.reflection}</Text>
+                            {entry.aiFeedback ? (
+                              <View style={styles.feedbackRow}>
+                                <Text style={styles.feedbackScore}>
+                                  {entry.aiScore ?? 0}점
+                                </Text>
+                                <Text style={styles.feedback}>
+                                  {entry.aiFeedback}
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        ) : null}
+                      </View>
                     </View>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -348,6 +392,24 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
     paddingBottom: spacing.lg,
   },
+  entryExpanded: {
+    padding: spacing.sm,
+    borderRadius: radii.control,
+    backgroundColor: colors.surfaceAlt,
+    borderBottomWidth: borders.none,
+    paddingBottom: spacing.sm,
+  },
+  entryToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    minHeight: tapMin,
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+  },
+  entryDetails: { gap: spacing.sm },
   entryHeading: {
     flexDirection: "row",
     alignItems: "flex-start",
