@@ -43,6 +43,21 @@ function providerDisabledRedirect(req: Request) {
   );
 }
 
+/**
+ * Next.js standalone always exposes `req.url` as http://localhost:3000, so the
+ * origin seen by the app cannot be trusted behind nginx. Derive the public
+ * origin from the proxy headers instead (nginx sets X-Forwarded-Proto and
+ * Host), falling back to req.url for direct local development requests.
+ */
+function requestPublicOrigin(req: Request): string {
+  const fallback = new URL(req.url);
+  const proto =
+    req.headers.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
+    fallback.protocol.replace(/:$/, "");
+  const host = req.headers.get("host")?.split(",")[0]?.trim() ?? fallback.host;
+  return `${proto}://${host}`;
+}
+
 // GET /api/parent/auth/{provider} — OAuth 시작
 //   1) state + (Google) PKCE codeVerifier 발급
 //   2) state cookie set (HMAC signed, 10분 TTL)
@@ -74,7 +89,7 @@ export async function GET(
   // will read it; web and already-canonical requests stay unchanged.
   if (
     isMobile &&
-    requestUrl.origin !== new URL(getCallbackUrl(providerId)).origin
+    requestPublicOrigin(req) !== new URL(getCallbackUrl(providerId)).origin
   ) {
     return NextResponse.redirect(
       new URL(
