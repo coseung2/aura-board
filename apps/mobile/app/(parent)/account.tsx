@@ -164,9 +164,6 @@ export default function ParentAccountScreen() {
 
             <View style={styles.sectionCard}>
               <SectionHeader title="자녀 연결" />
-              <Text selectable style={styles.help}>
-                승인 전에는 신청 취소, 승인 후에는 연결 해제를 할 수 있어요.
-              </Text>
               {links.length === 0 ? (
                 <Text selectable style={styles.help}>연결된 자녀나 대기 중인 신청이 없어요.</Text>
               ) : (
@@ -209,9 +206,6 @@ export default function ParentAccountScreen() {
         )}
         <View style={styles.accountDeletionSection}>
           <SectionHeader title="계정 관리" />
-          <Text selectable style={styles.help}>
-            계정을 삭제하면 자녀 연결과 로그인 정보가 즉시 삭제되며 되돌릴 수 없습니다.
-          </Text>
           <AppButton
             variant="danger"
             style={styles.flatAction}
