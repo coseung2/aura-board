@@ -41,6 +41,7 @@ import {
   colors,
   iconSizes,
   pageChrome,
+  parent,
   radii,
   spacing,
   tapMin,
@@ -264,8 +265,12 @@ export default function ParentReadingScreen() {
               <SectionHeader
                 title={`${selectedChild?.name ?? ""}(${selectedChild?.classroom?.name ?? "학급 미배정"})`}
                 right={
-                  <SectionNav accessibilityLabel="독서 기록 종류">
+                  <SectionNav
+                    style={styles.kindNav}
+                    accessibilityLabel="독서 기록 종류"
+                  >
                     <SectionNavItem
+                      style={styles.kindNavItem}
                       selected={bookType === "story"}
                       onPress={() => setBookType("story")}
                       accessibilityLabel={`이야기책 ${counts.story}개`}
@@ -273,6 +278,7 @@ export default function ParentReadingScreen() {
                       {`이야기책 ${counts.story}`}
                     </SectionNavItem>
                     <SectionNavItem
+                      style={styles.kindNavItem}
                       selected={bookType === "comic"}
                       onPress={() => setBookType("comic")}
                       accessibilityLabel={`만화책 ${counts.comic}개`}
@@ -385,12 +391,12 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: {
     flexGrow: 1,
-    paddingHorizontal: spacing.xl,
+    paddingHorizontal: spacing.lg,
     paddingTop: pageChrome.contentStartGap + spacing.lg,
     paddingBottom: spacing.xxxl + spacing.xxl,
-    gap: spacing.xl,
+    gap: spacing.lg,
   },
-  childSelector: { alignItems: "center", paddingHorizontal: spacing.lg },
+  childSelector: { alignItems: "center" },
   childSelectTrigger: {
     flexDirection: "row",
     alignItems: "center",
@@ -422,6 +428,8 @@ const styles = StyleSheet.create({
   },
   childOptionText: { ...typography.label, color: colors.text },
   historyColumn: { gap: spacing.md },
+  kindNav: { borderBottomWidth: borders.none },
+  kindNavItem: { width: parent.navMinWidth },
   state: {
     flex: 1,
     minHeight: tapMin * 8 + spacing.sm,
