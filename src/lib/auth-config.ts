@@ -55,6 +55,12 @@ if (kakaoClientId && kakaoClientSecret) {
       clientId: kakaoClientId,
       clientSecret: kakaoClientSecret,
       allowDangerousEmailAccountLinking: true,
+      // Shared/classroom devices: always show the Kakao account chooser so a
+      // different person can pick (or add) their own Kakao account instead of
+      // being auto-logged-in with the previous browser Kakao session.
+      authorization: {
+        params: { prompt: "select_account" },
+      },
       profile(profile) {
         const account = profile.kakao_account;
         const emailVerified =

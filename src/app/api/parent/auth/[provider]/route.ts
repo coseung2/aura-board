@@ -107,6 +107,14 @@ export async function GET(
     ]);
   }
 
+  // Shared/classroom devices: always show the Kakao account chooser on web so
+  // a different person can pick (or add) their own Kakao account instead of
+  // being auto-logged-in with the previous browser Kakao session. Mobile keeps
+  // the friction-free auto-login flow.
+  if (providerId === "kakao" && !isMobile) {
+    url.searchParams.set("prompt", "select_account");
+  }
+
   await setStateCookie({
     state,
     codeVerifier,
