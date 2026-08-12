@@ -106,4 +106,50 @@ describe("GET /api/canva/thumbnail public design page", () => {
     expect(response.status).toBe(200);
     expect(String(mocks.fetch.mock.calls[1][0])).toBe(legacy);
   });
+
+  it("streams the Canva oEmbed /screen thumbnail when the design page has no image candidate", async () => {
+    const screenThumbnail =
+      "https://www.canva.com/design/DESIGN123/share456/screen?type=thumbnail";
+    mocks.fetch
+      .mockResolvedValueOnce(htmlResponse("<html><head></head><body></body></html>"))
+      // In production Canva responds 303 and fetch follows it to the final
+      // media.canva.com image. The route receives that final image response.
+      .mockResolvedValueOnce(imageResponse());
+    mocks.resolveCanvaEmbedUrl.mockResolvedValueOnce({
+      iframeSrc: `${designUrl}?embed&meta`,
+      thumbnailUrl: screenThumbnail,
+      title: "Canva design",
+      authorName: "Teacher",
+      width: 340,
+      height: 189,
+      designId: "DESIGN123",
+    });
+
+    const response = await GET(requestForDesign());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("content-type")).toBe("image/png");
+    expect(String(mocks.fetch.mock.calls[1][0])).toBe(screenThumbnail);
+  });
+
+  it("rejects a non-Canva oEmbed thumbnail URL", async () => {
+    mocks.fetch.mockResolvedValueOnce(
+      htmlResponse("<html><head></head><body></body></html>"),
+    );
+    mocks.resolveCanvaEmbedUrl.mockResolvedValueOnce({
+      iframeSrc: `${designUrl}?embed&meta`,
+      thumbnailUrl: "https://example.com/thumbnail.png",
+      title: "Canva design",
+      authorName: "Teacher",
+      width: 340,
+      height: 189,
+      designId: "DESIGN123",
+    });
+
+    const response = await GET(requestForDesign());
+
+    expect(response.status).toBe(404);
+    expect(await response.json()).toEqual({ error: "thumbnail_unavailable" });
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
+  });
 });

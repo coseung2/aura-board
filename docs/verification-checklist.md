@@ -46,6 +46,19 @@ creating overlapping testing-notes documents.
 - Inspect production data shape when the symptom is data-dependent.
 - Re-test the exact route, board, classroom, or student flow named by the user.
 
+### Canva card thumbnails
+
+- Test the design-page `media.canva.com ... page=1` path, the oEmbed
+  `/screen?type=thumbnail` redirect path, and the no-thumbnail fallback as
+  separate contracts. Do not classify `/screen` from its pathname alone.
+- Keep upstream thumbnail URLs restricted to HTTPS Canva hosts and stream only
+  a final `image/*` response. A Canva-external oEmbed URL must remain rejected.
+- In production, verify a representative public design returns `200 image/*`
+  from `/api/canva/thumbnail` and
+  `X-Canva-Thumbnail-Source: resolved` from
+  `/api/canva/card-thumbnail`. An image element with non-zero dimensions is not
+  sufficient because the fallback SVG is also a successful 640x360 image.
+
 ### Scheduled Job Changes
 
 - Parse the workflow syntax and verify the exact endpoint method/path mapping.

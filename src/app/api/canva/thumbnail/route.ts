@@ -213,10 +213,19 @@ function normalizeResolvedThumbnailUrl(url: string | null | undefined): string |
   if (!url) return null;
   try {
     const parsed = new URL(url);
+    if (parsed.protocol !== "https:") return null;
     const host = parsed.hostname.toLowerCase();
-    if (host.endsWith("canva.com") && parsed.pathname.endsWith("/screen")) {
-      return null;
-    }
+    const allowed =
+      host === "canva.com" ||
+      ALLOWED_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
+    if (!allowed) return null;
+
+    // Canva's current oEmbed contract returns a
+    // /design/:id/:shareToken/screen?type=thumbnail URL. It is not an HTML
+    // page: the endpoint responds with a 303 to an allowlisted
+    // media.canva.com image, and fetch follows that redirect to image/png.
+    // Do not reject /screen by pathname alone. The protocol/host checks above
+    // and the response Content-Type check in GET remain the safety boundary.
     return parsed.toString();
   } catch {
     return null;

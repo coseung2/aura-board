@@ -22,6 +22,7 @@
 | [2026-08-12-kakao-koe101-env-quote.md](./2026-08-12-kakao-koe101-env-quote.md) | 2026-08-12 | high | 해결 | 서버 env 값 끝 `"`+CRLF → Kakao client_id 오염 → KOE101 |
 | [2026-08-12-teacher-kakao-configuration-error.md](./2026-08-12-teacher-kakao-configuration-error.md) | 2026-08-12 | medium | 해결 | Kakao provider authorization 오버라이드가 URL 상실 → 교사 로그인 Configuration 에러 |
 | [2026-08-12-mobile-oauth-redirect-loop.md](./2026-08-12-mobile-oauth-redirect-loop.md) | 2026-08-12 (발생 2026-07-23) | high | 해결 | 모바일 parent OAuth origin 정규화 리다이렉트 무한 루프 |
+| [2026-08-13-canva-thumbnail-screen-regression.md](./2026-08-13-canva-thumbnail-screen-regression.md) | 2026-08-13 | medium | 해결 | 정상 oEmbed `/screen` 썸네일 URL을 무효화해 모든 Canva 카드가 fallback으로 표시됨 |
 
 ## 작성 기준
 
