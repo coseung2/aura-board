@@ -40,7 +40,6 @@ import {
   borders,
   colors,
   iconSizes,
-  pageChrome,
   parent,
   radii,
   spacing,
