@@ -109,7 +109,7 @@ jobs:
           test -f "$RUNNER_TEMP/ios-archive/apps/mobile/modules/aura-board-health-connect/ios/AuraBoardHealthConnect.podspec"
 
   android:
-    name: Android AAB to closed testing and production
+    name: Android AAB to production
     environment: production
     if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
     needs: validate
@@ -198,11 +198,8 @@ jobs:
           echo "aab_path=$AAB_PATH" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
-      - name: Submit AAB to Google Play closed testing
-        run: eas submit --platform android --profile closed --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
-
-      - name: Promote AAB to Google Play production
-        run: node ../../.github/scripts/promote-google-play-track.mjs --package com.auraboard.app --track production --version-code "${{ steps.build.outputs.build_number }}"
+      - name: Submit AAB to Google Play production
+        run: eas submit --platform android --profile production --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
 
       - name: Preserve submitted AAB
         if: ${{ always() && steps.build.outcome == 'success' }}
@@ -221,7 +218,7 @@ jobs:
             echo "- Version: ${{ inputs.expected_version }}"
             echo "- Version code: ${{ steps.build.outputs.build_number }}"
             echo "- Build: GitHub Ubuntu runner (local EAS build)"
-            echo "- Play tracks: alpha (closed testing), production"
+            echo "- Play track: production"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove Google Play service account

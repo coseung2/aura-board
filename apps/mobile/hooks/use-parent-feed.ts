@@ -65,12 +65,16 @@ function readCollection<T extends ParentFeedItem>(
   );
 }
 
-export function useParentPostCollection(
+export function useParentPostCollection<
+  T extends ParentFeedItem = ParentPostDTO,
+>(
   options: CollectionOptions & { includeCounts: true },
-): ParentPostCollectionWithCounts<ParentPostDTO>;
-export function useParentPostCollection(
+): ParentPostCollectionWithCounts<T>;
+export function useParentPostCollection<
+  T extends ParentFeedItem = ParentPostDTO,
+>(
   options: CollectionOptions,
-): ParentPostCollectionResult<ParentPostDTO>;
+): ParentPostCollectionResult<T>;
 export function useParentPostCollection<
   T extends ParentFeedItem = ParentPostDTO,
 >({
@@ -210,7 +214,7 @@ export function useParentPostCollection<
         .replace(/([?&])post=[^&]*&?/, "$1")
         .replace(/[?&]$/, "");
       const separator = paginationEndpoint.includes("?") ? "&" : "?";
-      const response = await parentApiFetch<ParentFeedResponse>(
+      const response = await parentApiFetch<ParentFeedResponse<T>>(
         `${paginationEndpoint}${separator}limit=${PAGE_SIZE}&cursor=${encodeURIComponent(cursor)}`,
       );
       if (version !== requestVersion.current) return;

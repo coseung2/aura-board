@@ -14,7 +14,10 @@ import {
   isParentLogoutInProgress,
   loadParentToken,
 } from "../../lib/session";
-import type { ParentFeedItem } from "../../lib/types";
+import type {
+  ParentFeedItem,
+  ParentFeedPublicationDTO,
+} from "../../lib/types";
 import {
   borders,
   colors,
@@ -119,7 +122,7 @@ export default function ParentFeedScreen() {
         data={feed.items}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) =>
-          item.source === "publication" ? (
+          isParentPublication(item) ? (
             <ParentPublicationCard item={item} />
           ) : (
             <ParentFeedCard card={item} />
@@ -190,6 +193,12 @@ export default function ParentFeedScreen() {
       />
     </SafeAreaView>
   );
+}
+
+function isParentPublication(
+  item: ParentFeedItem,
+): item is ParentFeedPublicationDTO {
+  return "source" in item && item.source === "publication";
 }
 
 const styles = StyleSheet.create({
