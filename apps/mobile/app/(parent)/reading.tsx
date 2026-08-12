@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -23,6 +23,7 @@ import {
   readParentDataCache,
   revalidateParentDataCache,
 } from "../../lib/parent-data-cache";
+import { resolveParentSelectedChildId } from "../../lib/parent-overview-state";
 import {
   clearParentSession,
   getUnifiedLoginRoute,
@@ -62,6 +63,8 @@ export default function ParentReadingScreen() {
   const [selectedChildId, setSelectedChildId] = useState<string | null>(
     initial?.children[0]?.studentId ?? null,
   );
+  const [selectedChildRestored, setSelectedChildRestored] = useState(false);
+  const selectedChildRestoredRef = useRef(false);
   const [bookType, setBookType] = useState<BookType>("story");
   const [loading, setLoading] = useState(!initial);
   const [refreshing, setRefreshing] = useState(false);
@@ -130,12 +133,12 @@ export default function ParentReadingScreen() {
     let active = true;
     void loadParentSelectedChild().then((stored) => {
       if (!active) return;
-      setSelectedChildId((current) => {
-        const candidate = current ?? stored;
-        return children.some((child) => child.studentId === candidate)
-          ? candidate
-          : children[0]?.studentId ?? null;
-      });
+      const preferStored = !selectedChildRestoredRef.current;
+      setSelectedChildId((current) =>
+        resolveParentSelectedChildId(children, current, stored, preferStored),
+      );
+      selectedChildRestoredRef.current = true;
+      setSelectedChildRestored(true);
     });
     return () => {
       active = false;
@@ -143,8 +146,10 @@ export default function ParentReadingScreen() {
   }, [children]);
 
   useEffect(() => {
-    if (selectedChildId) void saveParentSelectedChild(selectedChildId);
-  }, [selectedChildId]);
+    if (selectedChildRestored && selectedChildId) {
+      void saveParentSelectedChild(selectedChildId);
+    }
+  }, [selectedChildId, selectedChildRestored]);
 
   const selectedChild =
     children.find((child) => child.studentId === selectedChildId) ?? null;

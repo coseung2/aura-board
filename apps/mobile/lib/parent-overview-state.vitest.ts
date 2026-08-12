@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { removeParentLinkFromOverview } from "./parent-overview-state";
+import {
+  removeParentLinkFromOverview,
+  resolveParentSelectedChildId,
+} from "./parent-overview-state";
 import type { ParentChildrenResponse } from "./types";
 
 const overview: ParentChildrenResponse = {
@@ -27,7 +30,32 @@ const overview: ParentChildrenResponse = {
   ],
 };
 
-describe("removeParentLinkFromOverview", () => {
+describe("parent overview state", () => {
+  it("restores the stored child before a cached first-child fallback", () => {
+    expect(
+      resolveParentSelectedChildId(
+        [{ studentId: "student-1" }, { studentId: "student-2" }],
+        "student-1",
+        "student-2",
+        true,
+      ),
+    ).toBe("student-2");
+  });
+
+  it("keeps the current child after initial restoration, then falls back", () => {
+    const children = [{ studentId: "student-1" }, { studentId: "student-2" }];
+    expect(resolveParentSelectedChildId(children, "student-2", "student-1")).toBe(
+      "student-2",
+    );
+    expect(resolveParentSelectedChildId(children, "student-2", "missing")).toBe(
+      "student-2",
+    );
+    expect(resolveParentSelectedChildId(children, "missing", "missing")).toBe(
+      "student-1",
+    );
+    expect(resolveParentSelectedChildId([], "student-1", "student-2")).toBeNull();
+  });
+
   it("removes active and pending links without mutating the rollback snapshot", () => {
     const withoutActive = removeParentLinkFromOverview(overview, "active-link");
     const withoutPending = removeParentLinkFromOverview(overview, "pending-link");
