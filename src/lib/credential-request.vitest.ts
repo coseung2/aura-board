@@ -25,6 +25,17 @@ describe("credential request boundary", () => {
       .toEqual({ ok: false, status: 400 });
   });
 
+  it("accepts the public origin when the standalone server sees a loopback request URL", () => {
+    const req = new Request("http://localhost:3000/api/parent/credentials/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://aura-board.com",
+      },
+    });
+    expect(validateCredentialRequest(req)).toEqual({ ok: true });
+  });
+
   it("accepts native JSON only with the custom mobile header", () => {
     expect(validateCredentialRequest(request({
       "content-type": "application/json",
