@@ -58,6 +58,10 @@ creating overlapping testing-notes documents.
   `X-Canva-Thumbnail-Source: resolved` from
   `/api/canva/card-thumbnail`. An image element with non-zero dimensions is not
   sufficient because the fallback SVG is also a successful 640x360 image.
+- Verify the direct thumbnail route and the card-thumbnail wrapper separately.
+  The wrapper must not depend on a public-origin self-fetch; Oracle standalone
+  loopback, nginx, Cloudflare, and Vercel can otherwise produce different
+  results for identical application code.
 
 ### Scheduled Job Changes
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { expandCanvaShortLink, isCanvaDesignUrl } from "@/lib/canva";
+import { GET as getCanvaThumbnail } from "../thumbnail/route";
 
 const ALLOWED_WIDTHS = new Set([160, 320, 640]);
 const PUBLIC_CACHE_CONTROL =
@@ -59,12 +60,14 @@ export async function GET(req: Request) {
   }
 
   try {
-    const upstream = await fetch(sourceUrl, {
-      headers: forwardedHeaders,
-      cache: "no-store",
-      redirect: "follow",
-      signal: AbortSignal.timeout(20_000),
-    });
+    // Invoke the owned route directly instead of making a public-origin
+    // self-fetch. In Oracle standalone, req.url is the loopback origin while
+    // the public hostname terminates at Cloudflare/nginx; re-entering through
+    // that public path is environment-dependent and previously collapsed a
+    // healthy thumbnail response into the fallback SVG.
+    const upstream = await getCanvaThumbnail(
+      new Request(sourceUrl, { headers: forwardedHeaders }),
+    );
     const contentType = upstream.headers.get("content-type") ?? "";
     if (upstream.ok && upstream.body && contentType.startsWith("image/")) {
       const upstreamCacheControl =

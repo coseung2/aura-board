@@ -75,6 +75,13 @@
 - 디자인 HTML에 이미지 후보가 없고 oEmbed만 `/screen`을 반환하는 실제 장애
   형태를 회귀 테스트로 추가했다.
 - oEmbed가 Canva 외부 호스트를 반환하면 404로 거부하는 보안 테스트를 추가했다.
+- 첫 Oracle 배포 후 내부 `/api/canva/thumbnail`은 `200 image/png`으로 복구됐지만
+  카드 래퍼 `/api/canva/card-thumbnail`은 계속 fallback을 반환했다. 래퍼가 소유한
+  thumbnail handler를 직접 호출하지 않고 `req.url` 기준 public-origin HTTP
+  self-fetch를 수행한 두 번째 배포환경 의존성이 원인이었다.
+- 카드 래퍼는 동일 프로세스의 thumbnail route handler를 직접 호출하도록 바꿨다.
+  URL parameter와 요청의 cookie/authorization header는 유지하면서
+  Cloudflare/nginx/public DNS 재진입을 제거했다.
 
 변경 파일:
 
@@ -94,6 +101,9 @@ history/blame으로 확인한다. 데이터베이스 마이그레이션과 환�
 - Canva 외 링크, 일반 이미지, YouTube 썸네일에는 영향이 없다.
 - fallback이 HTTP 200 이미지였기 때문에 가용성 모니터와 5xx 로그만으로는 감지할
   수 없었다.
+- Oracle standalone에서 직접 thumbnail handler는 정상이어도 public-origin
+  self-fetch 래퍼는 실패할 수 있었다. 따라서 내부 경로와 최종 사용자 경로를
+  각각 검증해야 한다.
 
 ## 재발 방지
 
@@ -108,6 +118,9 @@ history/blame으로 확인한다. 데이터베이스 마이그레이션과 환�
   `resolved`인지 확인하고, 응답 MIME이 실제 PNG/WebP/JPEG인지 확인한다.
 - fallback 응답 수를 별도 신호로 관찰해야 한다. `200` 비율만 보는 모니터링은
   이번 장애를 정상으로 오인한다.
+- 같은 애플리케이션의 route를 조합할 때 공개 도메인 self-fetch를 사용하지 않는다.
+  공통 서버 함수 또는 소유 handler 직접 호출을 사용하고 최종 외부 route까지
+  별도 통합 검증한다.
 - Canva upstream 동작을 설명하는 주석을 복원하거나 변경할 때는 같은 날 현재
   upstream을 실측하고 그 계약을 테스트로 먼저 고정한다.
 
@@ -121,6 +134,15 @@ history/blame으로 확인한다. 데이터베이스 마이그레이션과 환�
   - 내부 thumbnail route `200 image/*`
   - card-thumbnail `X-Canva-Thumbnail-Source: resolved`
   - 실제 디자인별 이미지가 서로 다르게 렌더링
+
+첫 Oracle 배포 관찰:
+
+- workflow run `31619096622`, SHA `d78e63f4`, attempt 3 성공
+- 내부 thumbnail route: `200 image/png`
+- card-thumbnail route: `200 image/svg+xml`,
+  `X-Canva-Thumbnail-Source: fallback`
+- 이 관찰로 public-origin self-fetch 문제를 추가로 분리했고, 최종 route 수정 후
+  같은 검증을 다시 수행한다.
 
 ## 상세
 
