@@ -201,6 +201,20 @@ export default function StudentMoreScreen() {
           </AppButton>
         </View>
 
+        <View style={styles.bannerCallout}>
+          <View style={styles.bannerCalloutCopy}>
+            <Text style={styles.bannerCalloutTitle} selectable>
+              우리 반 피드에서 소식을 나눠 보세요.
+            </Text>
+          </View>
+          <AppButton
+            variant="secondary"
+            onPress={() => router.push("/(student)/feed" as Href)}
+          >
+            피드 열기
+          </AppButton>
+        </View>
+
         <View style={styles.menuSection}>
           {saveError ? (
             <Text style={styles.saveError} accessibilityRole="alert">

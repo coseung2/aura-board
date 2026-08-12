@@ -355,6 +355,13 @@ export function TopNav({ showAdmin = false }: Props) {
       ],
     },
     {
+      id: "feed",
+      label: "피드",
+      href: "/teacher/feed",
+      active: pathname.startsWith("/teacher/feed"),
+      groups: [],
+    },
+    {
       id: "community",
       label: "공유",
       href: "/teacher/share",
@@ -408,6 +415,11 @@ export function TopNav({ showAdmin = false }: Props) {
               href: "/admin/daily-banners",
               label: "일일 배너",
               active: pathname.startsWith("/admin/daily-banners"),
+            },
+            {
+              href: "/admin/feed",
+              label: "공식 피드",
+              active: pathname.startsWith("/admin/feed"),
             },
             {
               href: "/teacher/settings",
