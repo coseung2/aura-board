@@ -28,7 +28,10 @@ import type { Href } from "expo-router";
 export default function StudentLayout() {
   const router = useRouter();
   const pathname = usePathname();
-  const hideNav = pathname === "/login" || pathname.endsWith("/login");
+  const hideNav =
+    pathname === "/login" ||
+    pathname.endsWith("/login") ||
+    pathname.includes("/feed/compose");
   const [cacheReady, setCacheReady] = useState(false);
   const [me, setMe] = useState<MeResponse | null>(
     () =>

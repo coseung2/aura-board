@@ -195,6 +195,91 @@ export async function listPublishedFeed(input: {
   };
 }
 
+/**
+ * Feed for a set of classrooms: every GLOBAL publication plus every
+ * CLASSROOM publication targeting one of the given classrooms, in one
+ * time-ordered stream. Used by the student feed, which no longer separates
+ * "our class" and "global" into tabs.
+ */
+export async function listPublishedFeedForClassrooms(input: {
+  classroomIds: string[];
+  limit: number;
+  cursor: FeedCursor | null;
+}): Promise<FeedPage> {
+  const cursorFilter = input.cursor
+    ? Prisma.sql`
+        AND (
+          publication."publishedAt" < ${input.cursor.publishedAt}
+          OR (
+            publication."publishedAt" = ${input.cursor.publishedAt}
+            AND publication."id" < ${input.cursor.publicationId}
+          )
+        )
+      `
+    : Prisma.sql``;
+
+  const audienceFilter =
+    input.classroomIds.length === 0
+      ? Prisma.sql`AND publication."classroomId" IS NULL`
+      : Prisma.sql`AND (
+          publication."classroomId" IS NULL
+          OR publication."classroomId" IN (${Prisma.join(input.classroomIds)})
+        )`;
+
+  const rows = await db.$queryRaw<FeedRow[]>(Prisma.sql`
+    SELECT
+      publication."id" AS "publicationId",
+      post."id" AS "postId",
+      publication."scope" AS "scope",
+      publication."classroomId" AS "classroomId",
+      post."authorKind" AS "authorKind",
+      post."authorDisplayName" AS "authorDisplayName",
+      post."title" AS "title",
+      post."body" AS "body",
+      publication."publishedAt" AS "publishedAt",
+      COALESCE(
+        (
+          SELECT json_agg(
+            json_build_object(
+              'id', media."id",
+              'kind', media."kind",
+              'url', media."url",
+              'youtubeVideoId', media."youtubeVideoId",
+              'altText', media."altText",
+              'position', media."position"
+            ) ORDER BY media."position" ASC
+          )
+          FROM "FeedPostMedia" media
+          WHERE media."postId" = post."id"
+        ),
+        '[]'::json
+      ) AS "media"
+    FROM "FeedPublication" publication
+    INNER JOIN "FeedPost" post ON post."id" = publication."postId"
+    WHERE publication."status" = 'ACTIVE'
+      AND post."status" = 'PUBLISHED'
+      ${audienceFilter}
+      ${cursorFilter}
+    ORDER BY publication."publishedAt" DESC, publication."id" DESC
+    LIMIT ${input.limit + 1}
+  `);
+
+  const hasMore = rows.length > input.limit;
+  const visibleRows = hasMore ? rows.slice(0, input.limit) : rows;
+  const last = visibleRows.at(-1);
+
+  return {
+    items: visibleRows.map(toFeedItem),
+    nextCursor:
+      hasMore && last
+        ? encodeFeedCursor({
+            publishedAt: last.publishedAt,
+            publicationId: last.publicationId,
+          })
+        : null,
+  };
+}
+
 export async function listAvailablePool(limit = 50): Promise<FeedPoolItem[]> {
   const rows = await db.$queryRaw<FeedPoolRow[]>(Prisma.sql`
     SELECT

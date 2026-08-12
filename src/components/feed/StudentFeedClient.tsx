@@ -5,8 +5,6 @@ import type { FeedItem, FeedPage } from "@/lib/feed/types";
 import { FeedComposer, type FeedDraft } from "./FeedComposer";
 import { FeedList } from "./FeedList";
 
-type Scope = "classroom" | "global";
-
 function responseError(body: unknown, fallback: string) {
   if (body && typeof body === "object" && "error" in body && typeof body.error === "string") {
     if (body.error === "invalid_media") return "YouTube 주소 또는 미디어 정보를 확인해 주세요.";
@@ -16,7 +14,6 @@ function responseError(body: unknown, fallback: string) {
 }
 
 export function StudentFeedClient() {
-  const [scope, setScope] = useState<Scope>("classroom");
   const [items, setItems] = useState<FeedItem[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,7 +21,7 @@ export function StudentFeedClient() {
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
 
-  const loadFeed = useCallback(async (nextScope: Scope, cursor?: string | null) => {
+  const loadFeed = useCallback(async (cursor?: string | null) => {
     const append = Boolean(cursor);
     const requestId = ++requestIdRef.current;
     if (append) setLoadingMore(true);
@@ -32,7 +29,7 @@ export function StudentFeedClient() {
     setError(null);
 
     try {
-      const params = new URLSearchParams({ scope: nextScope, limit: "20" });
+      const params = new URLSearchParams({ limit: "20" });
       if (cursor) params.set("cursor", cursor);
       const response = await fetch(`/api/student/feed?${params.toString()}`, {
         headers: { accept: "application/json" },
@@ -58,8 +55,8 @@ export function StudentFeedClient() {
   useEffect(() => {
     setItems([]);
     setNextCursor(null);
-    void loadFeed(scope);
-  }, [loadFeed, scope]);
+    void loadFeed();
+  }, [loadFeed]);
 
   async function createPost(draft: FeedDraft) {
     const response = await fetch("/api/student/feed", {
@@ -71,7 +68,7 @@ export function StudentFeedClient() {
     if (!response.ok) {
       throw new Error(responseError(body, "게시물을 저장하지 못했어요."));
     }
-    await loadFeed("classroom");
+    await loadFeed();
   }
 
   return (
@@ -84,36 +81,11 @@ export function StudentFeedClient() {
         </div>
       </header>
 
-      <div className="ab-feed-tabs" role="tablist" aria-label="피드 범위">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={scope === "classroom"}
-          className={scope === "classroom" ? "is-active" : ""}
-          onClick={() => setScope("classroom")}
-        >
-          우리 반
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={scope === "global"}
-          className={scope === "global" ? "is-active" : ""}
-          onClick={() => setScope("global")}
-        >
-          전체
-        </button>
-      </div>
-
-      {scope === "classroom" ? (
-        <FeedComposer
-          heading="새 게시물"
-          description="이미지와 YouTube 영상도 함께 올릴 수 있어요."
-          onSubmit={createPost}
-        />
-      ) : (
-        <div className="ab-feed-global-note">전체 피드는 Aura 공식 소식을 보는 공간이에요.</div>
-      )}
+      <FeedComposer
+        heading="새 게시물"
+        description="이미지와 YouTube 영상도 함께 올릴 수 있어요."
+        onSubmit={createPost}
+      />
 
       <FeedList
         items={items}
@@ -121,9 +93,9 @@ export function StudentFeedClient() {
         loadingMore={loadingMore}
         error={error}
         nextCursor={nextCursor}
-        emptyMessage={scope === "classroom" ? "아직 우리 반 게시물이 없어요." : "아직 전체 소식이 없어요."}
-        onRetry={() => void loadFeed(scope)}
-        onLoadMore={() => void loadFeed(scope, nextCursor)}
+        emptyMessage="아직 게시물이 없어요."
+        onRetry={() => void loadFeed()}
+        onLoadMore={() => void loadFeed(nextCursor)}
       />
     </section>
   );

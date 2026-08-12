@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { getCurrentStudent } from "@/lib/student-auth";
-import { createFeedPost, listPublishedFeed } from "@/lib/feed/repository";
+import {
+  createFeedPost,
+  listPublishedFeedForClassrooms,
+} from "@/lib/feed/repository";
 import {
   decodeFeedCursor,
   feedListQuerySchema,
@@ -31,9 +34,11 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "invalid_cursor" }, { status: 400 });
   }
 
-  const page = await listPublishedFeed({
-    scope: parsed.data.scope === "global" ? "GLOBAL" : "CLASSROOM",
-    classroomId: parsed.data.scope === "classroom" ? student.classroomId : null,
+  // The student feed is a single merged stream: our classroom publications
+  // plus GLOBAL (developer/approved) publications. The legacy scope parameter
+  // is accepted but no longer switches tabs.
+  const page = await listPublishedFeedForClassrooms({
+    classroomIds: student.classroomId ? [student.classroomId] : [],
     limit: parsed.data.limit,
     cursor,
   });
