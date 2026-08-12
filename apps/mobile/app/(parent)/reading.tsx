@@ -260,19 +260,9 @@ export default function ParentReadingScreen() {
               </View>
             ) : null}
 
-            <View style={styles.heading}>
-              <Text style={styles.childName}>{selectedChild?.name}</Text>
-              <Text style={styles.childMeta}>
-                {selectedChild?.classroom?.name ?? "학급 미배정"}
-                {selectedChild?.number != null
-                  ? ` · ${selectedChild.number}번`
-                  : ""}
-              </Text>
-            </View>
-
             <View style={styles.historyColumn}>
               <SectionHeader
-                title="기록 목록"
+                title={`${selectedChild?.name ?? ""}(${selectedChild?.classroom?.name ?? "학급 미배정"})`}
                 right={
                   <SectionNav accessibilityLabel="독서 기록 종류">
                     <SectionNavItem
@@ -431,9 +421,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.transparent,
   },
   childOptionText: { ...typography.label, color: colors.text },
-  heading: { gap: spacing.xxs },
-  childName: { ...typography.title, color: colors.text },
-  childMeta: { ...typography.badge, color: colors.textMuted },
   historyColumn: { gap: spacing.md },
   state: {
     flex: 1,
