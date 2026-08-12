@@ -22,6 +22,14 @@ import {
 } from "../../components/ui";
 import { ApiError, getApiBase, parentApiFetch } from "../../lib/api";
 import {
+  PARENT_WALKING_CACHE_KEY,
+  PARENT_WALKING_DEVICE_CACHE_KEY,
+  PARENT_WALKING_HEALTH_CACHE_KEY,
+  readParentDataCache,
+  revalidateParentDataCache,
+  writeParentDataCache,
+} from "../../lib/parent-data-cache";
+import {
   fillCurrentWalkingWeek,
   getCurrentWalkingWeekRange,
   getGrantedHealthConnectPermissions,
@@ -92,14 +100,53 @@ function walkingErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function cachedParentWalking(): ParentWalkingResponse | null {
+  return (
+    readParentDataCache<ParentWalkingResponse>(PARENT_WALKING_CACHE_KEY, {
+      kind: "walking",
+    })?.data ?? null
+  );
+}
+
+function cachedDeviceWalking(): WalkingDay[] {
+  return (
+    readParentDataCache<WalkingDay[]>(PARENT_WALKING_DEVICE_CACHE_KEY, {
+      kind: "walking",
+    })?.data ?? []
+  );
+}
+
+type CachedWalkingHealth = {
+  status: HealthConnectStatus;
+  permissions: HealthConnectPermission[];
+};
+
+function cachedWalkingHealth(): CachedWalkingHealth | null {
+  return (
+    readParentDataCache<CachedWalkingHealth>(PARENT_WALKING_HEALTH_CACHE_KEY, {
+      kind: "walking",
+    })?.data ?? null
+  );
+}
+
 export default function ParentWalkingScreen() {
   const router = useRouter();
-  const [week, setWeek] = useState<WalkingWeekRange>(getCurrentWalkingWeekRange());
-  const [ownRows, setOwnRows] = useState<WalkingDay[]>([]);
-  const [children, setChildren] = useState<ParentWalkingResponse["children"]>([]);
-  const [status, setStatus] = useState<HealthConnectStatus>("unavailable");
-  const [permissions, setPermissions] = useState<HealthConnectPermission[]>([]);
-  const [loading, setLoading] = useState(true);
+  const initialWalking = cachedParentWalking();
+  const [week, setWeek] = useState<WalkingWeekRange>(
+    initialWalking?.week ?? getCurrentWalkingWeekRange(),
+  );
+  const [ownRows, setOwnRows] = useState<WalkingDay[]>(cachedDeviceWalking);
+  const [children, setChildren] = useState<ParentWalkingResponse["children"]>(
+    initialWalking?.children ?? [],
+  );
+  const initialHealth = cachedWalkingHealth();
+  const [status, setStatus] = useState<HealthConnectStatus>(
+    initialHealth?.status ?? "unavailable",
+  );
+  const [permissions, setPermissions] = useState<HealthConnectPermission[]>(
+    initialHealth?.permissions ?? [],
+  );
+  const [loading, setLoading] = useState(!initialWalking);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState<"connect" | "sync" | null>(null);
   const [settingsVisible, setSettingsVisible] = useState(false);
@@ -118,50 +165,86 @@ export default function ParentWalkingScreen() {
     return false;
   }, [router]);
 
-  const readOwnWalking = useCallback(async () => {
-    const rows = await readWalkingDaysFromDevice();
-    setOwnRows(rows);
+  const readOwnWalking = useCallback(async (force = false) => {
+    await revalidateParentDataCache(
+      PARENT_WALKING_DEVICE_CACHE_KEY,
+      readWalkingDaysFromDevice,
+      { kind: "walking", force },
+    );
+    setOwnRows(cachedDeviceWalking());
   }, []);
 
   const load = useCallback(async (syncNative = true, refresh = false) => {
+    const cached = cachedParentWalking();
+    if (cached) {
+      setWeek(cached.week);
+      setChildren(cached.children);
+      setLoading(false);
+    } else if (!refresh) {
+      setLoading(true);
+    }
     if (refresh) setRefreshing(true);
-    else setLoading(true);
     setApiError(null);
     setHealthError(null);
     setMessage(null);
 
     try {
-      const response = await parentApiFetch<ParentWalkingResponse>(
-        __DEV__
-          ? `${getApiBase()}/api/parent/walking`
-          : "/api/parent/walking",
+      await revalidateParentDataCache(
+        PARENT_WALKING_CACHE_KEY,
+        () =>
+          parentApiFetch<ParentWalkingResponse>(
+            __DEV__
+              ? `${getApiBase()}/api/parent/walking`
+              : "/api/parent/walking",
+            { forceRefresh: refresh },
+          ),
+        { kind: "walking", force: refresh },
       );
-      setWeek(response.week);
-      setChildren(response.children);
+      const latest = cachedParentWalking();
+      if (latest) {
+        setWeek(latest.week);
+        setChildren(latest.children);
+      }
     } catch (error) {
       if (await handleAuthError(error)) return;
-      setApiError(walkingErrorMessage(error, "자녀 걷기 기록을 불러오지 못했어요."));
+      setApiError(
+        walkingErrorMessage(error, "자녀 걷기 기록을 불러오지 못했어요."),
+      );
     }
 
     try {
-      if (!isHealthConnectModuleAvailable()) {
-        setStatus("unavailable");
-        setPermissions([]);
-        return;
-      }
-      const nextStatus = await getHealthConnectStatus();
-      setStatus(nextStatus);
-      if (nextStatus !== "available") {
-        setPermissions([]);
-        return;
-      }
-      const nextPermissions = await getGrantedHealthConnectPermissions();
-      setPermissions(nextPermissions);
-      if (syncNative && hasRequiredHealthConnectPermissions(nextPermissions)) {
-        await readOwnWalking();
+      await revalidateParentDataCache<CachedWalkingHealth>(
+        PARENT_WALKING_HEALTH_CACHE_KEY,
+        async () => {
+          if (!isHealthConnectModuleAvailable()) {
+            return { status: "unavailable", permissions: [] };
+          }
+          const nextStatus = await getHealthConnectStatus();
+          if (nextStatus !== "available") {
+            return { status: nextStatus, permissions: [] };
+          }
+          return {
+            status: nextStatus,
+            permissions: await getGrantedHealthConnectPermissions(),
+          };
+        },
+        { kind: "walking", force: refresh },
+      );
+      const nextHealth = cachedWalkingHealth();
+      if (nextHealth) {
+        setStatus(nextHealth.status);
+        setPermissions(nextHealth.permissions);
+        if (
+          syncNative &&
+          hasRequiredHealthConnectPermissions(nextHealth.permissions)
+        ) {
+          await readOwnWalking(refresh);
+        }
       }
     } catch (error) {
-      setHealthError(walkingErrorMessage(error, "내 걷기 기록을 불러오지 못했어요."));
+      setHealthError(
+        walkingErrorMessage(error, "내 걷기 기록을 불러오지 못했어요."),
+      );
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -179,11 +262,16 @@ export default function ParentWalkingScreen() {
     try {
       const granted = await requestHealthConnectPermissions();
       setPermissions(granted);
+      writeParentDataCache(
+        PARENT_WALKING_HEALTH_CACHE_KEY,
+        { status: "available", permissions: granted },
+        { kind: "walking" },
+      );
       if (!hasRequiredHealthConnectPermissions(granted)) {
         setHealthError("걸음 수 권한이 필요해요. 권한 설정에서 허용해 주세요.");
         return;
       }
-      await readOwnWalking();
+      await readOwnWalking(true);
       setStatus("available");
       setMessage("걷기 연동을 완료했어요.");
     } catch (error) {
@@ -198,7 +286,7 @@ export default function ParentWalkingScreen() {
     setHealthError(null);
     setMessage(null);
     try {
-      await readOwnWalking();
+      await readOwnWalking(true);
       setMessage("최신 걸음 수를 불러왔어요.");
     } catch (error) {
       setHealthError(walkingErrorMessage(error, "걸음 수를 불러오지 못했어요."));

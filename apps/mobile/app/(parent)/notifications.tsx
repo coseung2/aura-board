@@ -92,7 +92,7 @@ export default function ParentNotificationsScreen() {
             <ActivityIndicator size="large" color={colors.accent} />
             <Text selectable style={styles.muted}>알림을 불러오는 중이에요.</Text>
           </View>
-        ) : overview.error ? (
+        ) : overview.error && overview.pendingLinks.length === 0 ? (
           <EmptyState
             title="알림을 불러오지 못했어요"
             description={overview.error}

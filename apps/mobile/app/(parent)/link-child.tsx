@@ -22,6 +22,15 @@ import {
   typography,
 } from "../../theme/tokens";
 import { ApiError, parentApiFetch } from "../../lib/api";
+import {
+  PARENT_OVERVIEW_CACHE_KEY,
+  PARENT_POST_COLLECTION_CACHE_PREFIX,
+  PARENT_READING_CACHE_KEY,
+  PARENT_WALKING_CACHE_KEY,
+  invalidateParentDataCache,
+  removeParentDataCache,
+  removeParentDataCacheByPrefix,
+} from "../../lib/parent-data-cache";
 import { clearParentSession } from "../../lib/session";
 import type {
   ParentMatchCodeRequest,
@@ -151,6 +160,12 @@ export default function LinkChildScreen() {
         },
       );
       setResult(res);
+      invalidateParentDataCache(PARENT_OVERVIEW_CACHE_KEY);
+      if (res.status === "approved" || res.status === "linked") {
+        removeParentDataCacheByPrefix(PARENT_POST_COLLECTION_CACHE_PREFIX);
+        removeParentDataCache(PARENT_READING_CACHE_KEY);
+        removeParentDataCache(PARENT_WALKING_CACHE_KEY);
+      }
       setStep("done");
     } catch (e) {
       if (e instanceof ApiError && e.status === 401) {
