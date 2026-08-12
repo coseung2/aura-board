@@ -9,6 +9,7 @@
 import NextAuth from "next-auth";
 import Google from "next-auth/providers/google";
 import Kakao, { type KakaoProfile } from "next-auth/providers/kakao";
+import Apple from "next-auth/providers/apple";
 import Credentials from "next-auth/providers/credentials";
 import type { Provider } from "@auth/core/providers";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -68,6 +69,19 @@ if (kakaoClientId && kakaoClientSecret) {
           image: account?.profile?.profile_image_url,
         };
       },
+    }),
+  );
+}
+
+const appleClientId = process.env.AUTH_APPLE_ID?.trim();
+const appleClientSecret = process.env.AUTH_APPLE_SECRET?.trim();
+
+if (appleClientId && appleClientSecret) {
+  providers.push(
+    Apple({
+      clientId: appleClientId,
+      clientSecret: appleClientSecret,
+      allowDangerousEmailAccountLinking: true,
     }),
   );
 }

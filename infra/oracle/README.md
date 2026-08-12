@@ -61,6 +61,17 @@ Build the Next.js standalone output and Rust binary on the A1 so Prisma, Sharp, 
 
 Builds must never source `/etc/aura-board/app.env`. Create `/etc/aura-board/build.env` from `build.env.example`, keep only non-production placeholders or explicitly public build-time values, and set it to `root:aura-app` mode `0640`. A repository build can execute package lifecycle and Next.js build code, so any value in this file must be safe to disclose to someone who can push `main`.
 
+OAuth runtime values belong only in `/etc/aura-board/app.env`. Google uses
+`AUTH_GOOGLE_ID`/`AUTH_GOOGLE_SECRET`; Kakao uses
+`KAKAO_PARENT_CLIENT_ID`/`KAKAO_PARENT_CLIENT_SECRET`; Apple web uses an Apple
+Services ID in `AUTH_APPLE_ID` and its signed client-secret JWT in
+`AUTH_APPLE_SECRET`. Register both
+`https://aura-board.com/api/auth/callback/apple` and
+`https://aura-board.com/api/parent/auth/apple/web/callback` as Apple web return
+URLs. `prepare-app-env.mjs` forces `NEXTAUTH_URL` and
+`PARENT_OAUTH_REDIRECT_BASE_URL` to the canonical HTTPS origin so internal
+loopback hostnames never become public OAuth redirects.
+
 Before switching public traffic, verify all three layers locally:
 
 ```bash

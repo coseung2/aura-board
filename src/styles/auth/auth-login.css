@@ -288,6 +288,17 @@
   border-color: #fada0a;
 }
 
+.login-role-oauth-apple {
+  background: #000;
+  border-color: #000;
+  color: #fff;
+}
+
+.login-role-oauth-apple:hover {
+  background: #1f1f1f;
+  border-color: #1f1f1f;
+}
+
 .login-reviewer-separator {
   width: 100%;
   display: flex;

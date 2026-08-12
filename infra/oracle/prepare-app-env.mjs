@@ -64,6 +64,8 @@ const overrides = {
     "https://aura-board.com",
   ),
   AUTH_URL: "https://aura-board.com",
+  NEXTAUTH_URL: "https://aura-board.com",
+  PARENT_OAUTH_REDIRECT_BASE_URL: "https://aura-board.com",
   AUTH_TRUST_HOST: "true",
   PLAY_ENGINE_URL: "http://127.0.0.1:8081",
   PLAY_ENGINE_BIND: "127.0.0.1:8081",

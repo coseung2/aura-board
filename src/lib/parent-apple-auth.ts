@@ -40,6 +40,7 @@ export type VerifiedAppleIdentity = {
  */
 export async function verifyAppleIdentityToken(
   identityToken: string,
+  audience = APPLE_PARENT_AUDIENCE,
 ): Promise<VerifiedAppleIdentity> {
   const token = typeof identityToken === "string" ? identityToken.trim() : "";
   if (!token || token.length > MAX_APPLE_IDENTITY_TOKEN_LENGTH) {
@@ -50,7 +51,7 @@ export async function verifyAppleIdentityToken(
     const { payload } = await jwtVerify(token, getAppleJwks(), {
       algorithms: ["RS256"],
       issuer: APPLE_IDENTITY_ISSUER,
-      audience: APPLE_PARENT_AUDIENCE,
+      audience,
     });
 
     // jwtVerify checks an exp claim when present, but Apple identity tokens

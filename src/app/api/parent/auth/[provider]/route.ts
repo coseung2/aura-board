@@ -37,8 +37,9 @@ function providerDisabledRedirect(req: Request) {
       mobileCallbackUrl(requestUrl.searchParams.get("returnUrl")),
     );
   }
+  const publicOrigin = new URL(getCallbackUrl("google")).origin;
   return NextResponse.redirect(
-    new URL("/parent/onboard/signup?error=provider_disabled", req.url),
+    new URL("/login?role=parent&error=provider_disabled", publicOrigin),
   );
 }
 

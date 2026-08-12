@@ -494,9 +494,24 @@ VibeCodingStudio · PlayModal · ReviewPanel · TeacherModerationDashboard · 8 
 | `--color-oauth-kakao` | `#FEE500` | Kakao brand 배경 |
 
 ### Environment
-4개 env 추가 필요 (사용자 작업): `GOOGLE_PARENT_CLIENT_ID/SECRET`,
-`KAKAO_PARENT_CLIENT_ID/SECRET`, `PARENT_OAUTH_REDIRECT_BASE_URL`.
-미설정 시 OAuth 버튼 disabled + 매직링크 fallback.
+- Google: `AUTH_GOOGLE_ID/SECRET` (교사·학부모 공용) 또는
+  `GOOGLE_PARENT_CLIENT_ID/SECRET` (학부모 전용 fallback)
+- Kakao: `KAKAO_PARENT_CLIENT_ID/SECRET`
+- Apple web: `AUTH_APPLE_ID` (Apple Services ID), `AUTH_APPLE_SECRET`
+- 운영 callback origin: `PARENT_OAUTH_REDIRECT_BASE_URL=https://aura-board.com`
+
+로그인 화면은 `/api/auth/capabilities`의 역할별 활성 상태를 사용해 자격정보가
+완전히 설정된 provider만 표시한다. Apple web Services ID에는
+다음 역할별 callback을 provider 콘솔에 등록한다.
+
+- Google: `https://aura-board.com/api/auth/callback/google`,
+  `https://aura-board.com/api/parent/auth/callback/google`
+- Kakao: `https://aura-board.com/api/auth/callback/kakao`,
+  `https://aura-board.com/api/parent/auth/callback/kakao`
+- Apple Services ID: `https://aura-board.com/api/auth/callback/apple`,
+  `https://aura-board.com/api/parent/auth/apple/web/callback`
+
+Apple web 로그인은 localhost HTTP를 지원하지 않는다.
 
 ### 회귀 테스트
 - `parent-oauth-state.vitest.ts` 8 tests (HMAC sign/verify + 만료 + 위조 + 형식)

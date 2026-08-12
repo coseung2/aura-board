@@ -17,6 +17,11 @@ import {
 type LoginRole = "teacher" | "student" | "parent";
 type PasswordRole = "teacher" | "parent";
 type PasswordMode = "social" | "login" | "signup";
+type WebOAuthProvider = "google" | "kakao" | "apple";
+type AuthCapabilities = {
+  teacher: Record<WebOAuthProvider, boolean>;
+  parent: Record<WebOAuthProvider, boolean>;
+};
 
 const LOGIN_ROLES: Array<{
   id: LoginRole;
@@ -57,6 +62,8 @@ const LOGIN_ERROR_MESSAGES: Record<string, string> = {
     "로그인 토큰 교환에 실패했어요. 잠시 후 다시 시도해 주세요.",
   userinfo_failed: "사용자 정보 조회에 실패했어요. 잠시 후 다시 시도해 주세요.",
   upsert_failed: "계정 생성에 실패했어요. 잠시 후 다시 시도해 주세요.",
+  apple_account_missing:
+    "Apple 계정 정보를 확인하지 못했어요. 다시 로그인해 주세요.",
 };
 
 function loginErrorMessage(value: string | null): string {
@@ -87,6 +94,8 @@ export default function LoginPage() {
   const [passwordConfirm, setPasswordConfirm] = useState("");
   const [passwordError, setPasswordError] = useState("");
   const [passwordBusy, setPasswordBusy] = useState(false);
+  const [authCapabilities, setAuthCapabilities] =
+    useState<AuthCapabilities | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -94,6 +103,29 @@ export default function LoginPage() {
     setActiveRole(isLoginRole(role) ? role : "teacher");
     setLoginError(loginErrorMessage(params.get("error")));
     setShowReviewerLogin(params.get("review") === "canva");
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/auth/capabilities", { cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("provider_lookup_failed");
+        return response.json() as Promise<AuthCapabilities>;
+      })
+      .then((capabilities) => {
+        if (!cancelled) setAuthCapabilities(capabilities);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAuthCapabilities({
+            teacher: { google: false, kakao: false, apple: false },
+            parent: { google: false, kakao: false, apple: false },
+          });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function handleStudentLogin(e: FormEvent) {
@@ -150,9 +182,13 @@ export default function LoginPage() {
     );
   }
 
-  async function startTeacherSignIn(provider: "google" | "kakao") {
+  async function startTeacherSignIn(provider: WebOAuthProvider) {
     await signOut({ redirect: false });
     await signIn(provider, { redirectTo: safeTeacherReturnTarget() });
+  }
+
+  async function startParentAppleSignIn() {
+    window.location.assign("/api/parent/auth/apple/web");
   }
 
   async function handleReviewerLogin(e: FormEvent) {
@@ -410,24 +446,39 @@ export default function LoginPage() {
           {activeRole === "teacher" ? (
             <>
               {passwordMode === "social" ? <div className="login-role-oauth-actions">
-                <button
-                  type="button"
-                  className="login-role-oauth login-role-oauth-google"
-                  onClick={() => startTeacherSignIn("google")}
-                  aria-label="Google로 교사 로그인"
-                >
-                  <GoogleGlyph />
-                  <span>Google로 로그인</span>
-                </button>
-                <button
-                  type="button"
-                  className="login-role-oauth login-role-oauth-kakao"
-                  onClick={() => startTeacherSignIn("kakao")}
-                  aria-label="Kakao로 교사 로그인"
-                >
-                  <KakaoGlyph />
-                  <span>Kakao로 로그인</span>
-                </button>
+                {authCapabilities?.teacher.google ? (
+                  <button
+                    type="button"
+                    className="login-role-oauth login-role-oauth-google"
+                    onClick={() => startTeacherSignIn("google")}
+                    aria-label="Google로 교사 로그인"
+                  >
+                    <GoogleGlyph />
+                    <span>Google로 로그인</span>
+                  </button>
+                ) : null}
+                {authCapabilities?.teacher.kakao ? (
+                  <button
+                    type="button"
+                    className="login-role-oauth login-role-oauth-kakao"
+                    onClick={() => startTeacherSignIn("kakao")}
+                    aria-label="Kakao로 교사 로그인"
+                  >
+                    <KakaoGlyph />
+                    <span>Kakao로 로그인</span>
+                  </button>
+                ) : null}
+                {authCapabilities?.teacher.apple ? (
+                  <button
+                    type="button"
+                    className="login-role-oauth login-role-oauth-apple"
+                    onClick={() => startTeacherSignIn("apple")}
+                    aria-label="Apple로 교사 로그인"
+                  >
+                    <AppleGlyph />
+                    <span>Apple로 로그인</span>
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className="login-inline-action"
@@ -529,22 +580,37 @@ export default function LoginPage() {
 
           {activeRole === "parent" ? (
             passwordMode === "social" ? <div className="login-role-oauth-actions">
-              <a
-                href="/api/parent/auth/google"
-                className="login-role-oauth login-role-oauth-google"
-                aria-label="Google로 학부모 로그인"
-              >
-                <GoogleGlyph />
-                <span>Google로 로그인</span>
-              </a>
-              <a
-                href="/api/parent/auth/kakao"
-                className="login-role-oauth login-role-oauth-kakao"
-                aria-label="Kakao로 학부모 로그인"
-              >
-                <KakaoGlyph />
-                <span>Kakao로 로그인</span>
-              </a>
+              {authCapabilities?.parent.google ? (
+                <a
+                  href="/api/parent/auth/google"
+                  className="login-role-oauth login-role-oauth-google"
+                  aria-label="Google로 학부모 로그인"
+                >
+                  <GoogleGlyph />
+                  <span>Google로 로그인</span>
+                </a>
+              ) : null}
+              {authCapabilities?.parent.kakao ? (
+                <a
+                  href="/api/parent/auth/kakao"
+                  className="login-role-oauth login-role-oauth-kakao"
+                  aria-label="Kakao로 학부모 로그인"
+                >
+                  <KakaoGlyph />
+                  <span>Kakao로 로그인</span>
+                </a>
+              ) : null}
+              {authCapabilities?.parent.apple ? (
+                <button
+                  type="button"
+                  className="login-role-oauth login-role-oauth-apple"
+                  onClick={startParentAppleSignIn}
+                  aria-label="Apple로 학부모 로그인"
+                >
+                  <AppleGlyph />
+                  <span>Apple로 로그인</span>
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="login-inline-action"
@@ -598,6 +664,17 @@ function KakaoGlyph() {
       <path
         fill="#000"
         d="M12 4C7.03 4 3 7.21 3 11.16c0 2.6 1.74 4.87 4.34 6.13l-.83 3.06c-.07.27.22.49.46.34l3.62-2.4c.46.05.93.07 1.41.07 4.97 0 9-3.21 9-7.2C21 7.21 16.97 4 12 4z"
+      />
+    </svg>
+  );
+}
+
+function AppleGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden>
+      <path
+        fill="currentColor"
+        d="M16.7 12.9c0-2.3 1.9-3.4 2-3.5-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.9-3.5.9-.7 0-1.8-.9-3-.9-1.5 0-3 .9-3.8 2.3-1.6 2.8-.4 7 1.1 9.2.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3.1-.7 1.4 0 1.9.7 3.1.7 1.3 0 2.1-1.1 2.8-2.2.9-1.3 1.3-2.6 1.3-2.7-.1 0-2.6-1-2.6-3.6ZM14.4 6.1c.6-.8 1.1-1.9 1-3.1-1 .1-2.2.7-2.9 1.5-.6.7-1.1 1.8-1 2.9 1.1.1 2.2-.5 2.9-1.3Z"
       />
     </svg>
   );

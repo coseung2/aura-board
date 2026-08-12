@@ -94,7 +94,17 @@ export default function ParentAccountScreen() {
     try {
       await parentApiFetch("/api/parent/account/withdraw", { method: "POST" });
       await clearParentSession();
-      router.replace(getUnifiedLoginRoute("parent"));
+      Alert.alert(
+        "계정이 삭제되었습니다",
+        "개인정보와 로그인 정보가 삭제되었어요. Apple로 로그인했다면 iPhone 설정의 Apple 계정 > Apple로 로그인에서 Aura Board 접근도 해제할 수 있어요.",
+        [
+          {
+            text: "확인",
+            onPress: () => router.replace(getUnifiedLoginRoute("parent")),
+          },
+        ],
+        { cancelable: false },
+      );
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
         await handleUnauthorized();
@@ -107,11 +117,11 @@ export default function ParentAccountScreen() {
 
   const confirmWithdraw = () => {
     Alert.alert(
-      "학부모 계정 탈퇴",
-      "모든 자녀 연결이 즉시 해제됩니다. 탈퇴 후 90일이 지나면 개인정보가 익명화돼요.",
+      "계정을 삭제할까요?",
+      "자녀 연결, 로그인 정보와 개인정보가 즉시 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
       [
         { text: "돌아가기", style: "cancel" },
-        { text: "탈퇴하기", style: "destructive", onPress: () => void handleWithdraw() },
+        { text: "계정 삭제", style: "destructive", onPress: () => void handleWithdraw() },
       ],
     );
   };
@@ -192,19 +202,28 @@ export default function ParentAccountScreen() {
             >
               로그아웃
             </AppButton>
-            <AppButton
-              variant="danger"
-              style={styles.flatAction}
-              loading={accountBusy === "withdraw"}
-              onPress={confirmWithdraw}
-            >
-              학부모 계정 탈퇴
-            </AppButton>
-            {actionError || overview.error ? (
-              <Text selectable style={styles.error}>{actionError || overview.error}</Text>
+            {overview.error ? (
+              <Text selectable style={styles.error}>{overview.error}</Text>
             ) : null}
           </View>
         )}
+        <View style={styles.accountDeletionSection}>
+          <SectionHeader title="계정 관리" />
+          <Text selectable style={styles.help}>
+            계정을 삭제하면 자녀 연결과 로그인 정보가 즉시 삭제되며 되돌릴 수 없습니다.
+          </Text>
+          <AppButton
+            variant="danger"
+            style={styles.flatAction}
+            loading={accountBusy === "withdraw"}
+            onPress={confirmWithdraw}
+          >
+            계정 삭제
+          </AppButton>
+          {actionError ? (
+            <Text selectable style={styles.error}>{actionError}</Text>
+          ) : null}
+        </View>
       </ScrollView>
       <ParentBottomNav
         active="account"
@@ -224,6 +243,7 @@ const styles = StyleSheet.create({
   },
   center: { minHeight: parent.portfolioEmptyMinHeight, alignItems: "center", justifyContent: "center" },
   sections: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.lg },
+  accountDeletionSection: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.md, paddingTop: spacing.xl },
   profileCard: { flexDirection: "row", alignItems: "center", paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: borders.hairline, borderBottomColor: colors.border },
   avatar: { width: parent.childAvatarSize, height: parent.childAvatarSize, borderRadius: radii.pill, backgroundColor: colors.accentTintedBg, borderWidth: borders.hairline, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   avatarText: { ...typography.title, color: colors.accent },

@@ -6,6 +6,7 @@ import {
   popStateCookie,
   fetchGoogleUserInfo,
   fetchKakaoUserInfo,
+  getCallbackUrl,
   upsertParentFromOAuth,
   type ProviderId,
 } from "@/lib/parent-oauth";
@@ -53,7 +54,7 @@ function mobileRedirect(
 }
 
 function errRedirect(
-  req: Request,
+  _req: Request,
   code: string,
   isMobile = false,
   callbackUrl = MOBILE_DEEP_LINK,
@@ -61,14 +62,14 @@ function errRedirect(
   if (isMobile) return mobileRedirect({ error: code }, callbackUrl);
   // 학부모 OAuth 에러는 진입점(/parent/onboard/signup) 으로 되돌림.
   // /parent/auth 는 page.tsx 가 없는 디렉토리(callback route handler 만 존재).
-  const url = new URL("/login", req.url);
+  const url = new URL("/login", getCallbackUrl("google"));
   url.searchParams.set("role", "parent");
   url.searchParams.set("error", code);
   return NextResponse.redirect(url);
 }
 
-function restartAuth(req: Request, provider: ProviderId) {
-  const url = new URL(`/api/parent/auth/${provider}`, req.url);
+function restartAuth(_req: Request, provider: ProviderId) {
+  const url = new URL(`/api/parent/auth/${provider}`, getCallbackUrl(provider));
   return NextResponse.redirect(url);
 }
 
@@ -184,5 +185,5 @@ export async function GET(
   }
 
   // redirect 분기 — 활성/대기 자녀 link 있으면 dashboard, 없으면 onboard
-  return NextResponse.redirect(new URL("/parent/home", req.url));
+  return NextResponse.redirect(new URL("/parent/home", getCallbackUrl(providerId)));
 }
