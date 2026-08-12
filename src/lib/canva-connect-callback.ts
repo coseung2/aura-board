@@ -7,6 +7,14 @@ import {
 } from "./canva";
 import { getCurrentUser } from "./auth";
 
+// Next.js standalone builds req.url from the server's bind address
+// (localhost:3000) instead of the public Host header, so redirects must use
+// the configured public origin.
+const APP_ORIGIN =
+  process.env.AURA_BOARD_BASE_URL ??
+  process.env.NEXT_PUBLIC_APP_BASE_URL ??
+  "https://aura-board.com";
+
 function safeReturnTo(
   value: string | null | undefined,
   fallback = "/dashboard",
@@ -25,13 +33,13 @@ export async function handleCanvaConnectCallback(req: Request) {
   if (oauthError) {
     const canvaState = state ? decodeCanvaAuthState(state) : null;
     const returnTo = safeReturnTo(canvaState?.returnTo);
-    const url = new URL(returnTo, req.url);
+    const url = new URL(returnTo, APP_ORIGIN);
     url.searchParams.set("canva", oauthError);
     return NextResponse.redirect(url);
   }
 
   if (!code || !state) {
-    const url = new URL("/dashboard", req.url);
+    const url = new URL("/dashboard", APP_ORIGIN);
     url.searchParams.set("canva", "missing_oauth_params");
     return NextResponse.redirect(url);
   }
@@ -50,5 +58,5 @@ export async function handleCanvaConnectCallback(req: Request) {
   }
 
   const returnTo = safeReturnTo(canvaState.returnTo);
-  return NextResponse.redirect(new URL(returnTo, req.url));
+  return NextResponse.redirect(new URL(returnTo, APP_ORIGIN));
 }
