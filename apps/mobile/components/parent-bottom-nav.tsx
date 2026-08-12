@@ -1,12 +1,12 @@
 import { forwardRef } from "react";
 import { useRouter, type Href } from "expo-router";
-import { BookOpen, Footprints, StretchHorizontal, type LucideIcon, type LucideProps } from "lucide-react-native";
+import { BookOpen, Footprints, StretchHorizontal, User, type LucideIcon, type LucideProps } from "lucide-react-native";
 import { StyleSheet, View } from "react-native";
 import { borders } from "../theme/tokens";
 import { MobileBottomNav } from "./MobileBottomNav";
 
-export type ParentNavItem = "feed" | "home" | "reading" | "walking";
-type LegacyParentDestination = "notifications" | "add" | "account";
+export type ParentNavItem = "feed" | "home" | "reading" | "walking" | "account";
+type LegacyParentDestination = "notifications" | "add";
 type Props = { active: ParentNavItem | LegacyParentDestination; notificationCount?: number; onFeedPress?: () => void; onHomePress?: () => void };
 
 export function ParentBottomNav({ active, onFeedPress, onHomePress }: Props) {
@@ -59,6 +59,7 @@ const ITEMS: Array<{ name: ParentNavItem; label: string; route: Href; Icon: Luci
   { name: "home", label: "홈", route: "/(parent)/home", Icon: NineGridIcon },
   { name: "reading", label: "독서", route: "/(parent)/reading" as Href, Icon: BookOpen },
   { name: "walking", label: "걷기", route: "/(parent)/walking" as Href, Icon: Footprints },
+  { name: "account", label: "계정", route: "/(parent)/account" as Href, Icon: User },
 ];
 
 const styles = StyleSheet.create({
