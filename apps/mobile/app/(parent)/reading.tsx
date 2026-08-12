@@ -346,7 +346,7 @@ export default function ParentReadingScreen() {
                         </ControlPressable>
                         {expanded ? (
                           <View style={styles.entryDetails}>
-                            <View style={styles.entryHeading}>
+                            <View style={styles.entryTopline}>
                               <Text style={styles.entryType}>
                                 {entry.bookType === "comic" ? "만화책" : "이야기책"}
                               </Text>
@@ -456,51 +456,47 @@ const styles = StyleSheet.create({
   },
   entryContent: {
     flex: 1,
-    gap: spacing.sm,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-    paddingBottom: spacing.lg,
+    minWidth: 0,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs,
+    borderRadius: radii.btn,
   },
   entryExpanded: {
     padding: spacing.sm,
-    borderRadius: radii.control,
     backgroundColor: colors.surfaceAlt,
-    borderBottomWidth: borders.none,
-    paddingBottom: spacing.sm,
   },
   entryToggle: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    minHeight: tapMin,
     borderWidth: borders.none,
     borderColor: colors.transparent,
     borderRadius: radii.none,
     backgroundColor: colors.transparent,
   },
   entryDetails: { gap: spacing.sm },
-  entryHeading: {
+  entryTopline: {
     flexDirection: "row",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  entryTitleWrap: { flex: 1, minWidth: 0, gap: spacing.xxs },
-  entryTitle: { ...typography.label, color: colors.text },
-  entryType: { ...typography.badge, color: colors.accent },
-  entryDate: { ...typography.badge, color: colors.textFaint },
-  meta: { ...typography.badge, color: colors.textMuted },
+  entryTitle: { ...typography.section, color: colors.text, flex: 1 },
+  entryType: { ...typography.badge, color: colors.accentTintedText },
+  entryDate: { ...typography.micro, color: colors.textMuted },
+  meta: { ...typography.micro, color: colors.textMuted },
   body: {
     ...typography.body,
     color: colors.text,
-    lineHeight: typography.body.lineHeight + spacing.xxs,
   },
   feedbackRow: {
-    borderRadius: radii.control,
-    backgroundColor: colors.surfaceAlt,
-    padding: spacing.md,
-    gap: spacing.xs,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.border,
   },
-  feedbackScore: { ...typography.label, color: colors.accent },
-  feedback: { ...typography.badge, color: colors.textMuted },
+  feedbackScore: { ...typography.label, color: colors.accentTintedText },
+  feedback: { ...typography.body, color: colors.accentTintedText, flex: 1 },
 });
