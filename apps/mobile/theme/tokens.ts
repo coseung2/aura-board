@@ -532,6 +532,13 @@ export const composer = {
   contentMinHeight: 120,
 } as const;
 
+export const feed = {
+  emptyStateMinHeight: 240,
+  mediaHeight: 230,
+  playButtonSize: 52,
+  mediaRowMinHeight: 48,
+} as const;
+
 export const dj = {
   pollIntervalMs: 2000,
   rankingLimit: 8,

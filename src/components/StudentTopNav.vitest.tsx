@@ -103,11 +103,12 @@ afterEach(() => {
 });
 
 describe("StudentTopNav information architecture", () => {
-  it("renders the six primary destinations in order with canonical links", () => {
+  it("renders the seven primary destinations in order with canonical links", () => {
     renderAt("/student");
 
     expect(renderedItems.map(({ label }) => label)).toEqual([
       "홈",
+      "피드",
       "보드",
       "펫",
       "독서",
@@ -116,6 +117,7 @@ describe("StudentTopNav information architecture", () => {
     ]);
     expect(renderedItems.map(({ href }) => href)).toEqual([
       "/student",
+      "/student/feed",
       "/student/boards?category=lesson",
       "/student/aura-pet?section=mine",
       "/student/reading",
@@ -133,6 +135,7 @@ describe("StudentTopNav information architecture", () => {
       "/student/aura-pet?section=classroom",
       "/student/aura-pet?section=shop",
     ]);
+    expect(item("feed").groups).toEqual([]);
     expect(item("reading").groups).toEqual([]);
     expect(item("walking").groups).toEqual([]);
   });
@@ -165,6 +168,7 @@ describe("StudentTopNav information architecture", () => {
 
   it.each([
     ["home", "/student", ""],
+    ["feed", "/student/feed", ""],
     ["boards", "/student/boards", "category=records"],
     ["pet", "/student/aura-pet", "section=shop"],
     ["reading", "/student/reading", ""],

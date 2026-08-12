@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -8,19 +8,28 @@ import {
   View,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
-import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
 import { ParentHeaderActions } from "../../components/parent-header-actions";
 import {
   AppButton,
   AppHeader,
-  ControlPressable,
   SectionHeader,
 } from "../../components/ui";
 import { SectionNav, SectionNavItem } from "../../components/NavigationTabs";
 import { ApiError, getApiBase, parentApiFetch } from "../../lib/api";
-import { clearParentSession, getUnifiedLoginRoute } from "../../lib/session";
+import {
+  PARENT_READING_CACHE_KEY,
+  readParentDataCache,
+  revalidateParentDataCache,
+} from "../../lib/parent-data-cache";
+import { resolveParentSelectedChildId } from "../../lib/parent-overview-state";
+import {
+  clearParentSession,
+  getUnifiedLoginRoute,
+  loadParentSelectedChild,
+  saveParentSelectedChild,
+} from "../../lib/session";
 import type {
   ParentReadingEntry,
   ParentReadingResponse,
@@ -37,13 +46,27 @@ import {
 
 type BookType = ParentReadingEntry["bookType"];
 
+function cachedReading(): ParentReadingResponse | null {
+  return (
+    readParentDataCache<ParentReadingResponse>(PARENT_READING_CACHE_KEY, {
+      kind: "reading",
+    })?.data ?? null
+  );
+}
+
 export default function ParentReadingScreen() {
   const router = useRouter();
-  const [children, setChildren] = useState<ParentReadingResponse["children"]>([]);
-  const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
+  const initial = cachedReading();
+  const [children, setChildren] = useState<ParentReadingResponse["children"]>(
+    initial?.children ?? [],
+  );
+  const [selectedChildId, setSelectedChildId] = useState<string | null>(
+    initial?.children[0]?.studentId ?? null,
+  );
+  const [selectedChildRestored, setSelectedChildRestored] = useState(false);
+  const selectedChildRestoredRef = useRef(false);
   const [bookType, setBookType] = useState<BookType>("story");
-  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!initial);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -56,22 +79,40 @@ export default function ParentReadingScreen() {
     return false;
   }, [router]);
 
+  const applyResponse = useCallback((response: ParentReadingResponse) => {
+    setChildren(response.children);
+    setSelectedChildId((current) =>
+      response.children.some((child) => child.studentId === current)
+        ? current
+        : response.children[0]?.studentId ?? null,
+    );
+  }, []);
+
   const load = useCallback(async (refresh = false) => {
+    const cached = cachedReading();
+    if (cached) {
+      applyResponse(cached);
+      setLoading(false);
+    } else if (!refresh) {
+      setLoading(true);
+    }
     if (refresh) setRefreshing(true);
-    else setLoading(true);
     setError(null);
 
     try {
-      const response = await parentApiFetch<ParentReadingResponse>(
-        __DEV__ ? `${getApiBase()}/api/parent/reading` : "/api/parent/reading",
-        { forceRefresh: refresh },
+      await revalidateParentDataCache(
+        PARENT_READING_CACHE_KEY,
+        () =>
+          parentApiFetch<ParentReadingResponse>(
+            __DEV__
+              ? `${getApiBase()}/api/parent/reading`
+              : "/api/parent/reading",
+            { forceRefresh: refresh },
+          ),
+        { kind: "reading", force: refresh },
       );
-      setChildren(response.children);
-      setSelectedChildId((current) =>
-        response.children.some((child) => child.studentId === current)
-          ? current
-          : response.children[0]?.studentId ?? null,
-      );
+      const latest = cachedReading();
+      if (latest) applyResponse(latest);
     } catch (cause) {
       if (!(await handleAuthError(cause))) {
         setError("자녀 독서 기록을 불러오지 못했어요.");
@@ -80,20 +121,52 @@ export default function ParentReadingScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [handleAuthError]);
+  }, [applyResponse, handleAuthError]);
 
-  useFocusEffect(useCallback(() => {
-    void load();
-  }, [load]));
+  useFocusEffect(
+    useCallback(() => {
+      void load();
+    }, [load]),
+  );
+
+  useEffect(() => {
+    let active = true;
+    void loadParentSelectedChild().then((stored) => {
+      if (!active) return;
+      const preferStored = !selectedChildRestoredRef.current;
+      setSelectedChildId((current) =>
+        resolveParentSelectedChildId(children, current, stored, preferStored),
+      );
+      selectedChildRestoredRef.current = true;
+      setSelectedChildRestored(true);
+    });
+    return () => {
+      active = false;
+    };
+  }, [children]);
+
+  useEffect(() => {
+    if (selectedChildRestored && selectedChildId) {
+      void saveParentSelectedChild(selectedChildId);
+    }
+  }, [selectedChildId, selectedChildRestored]);
 
   const selectedChild =
     children.find((child) => child.studentId === selectedChildId) ?? null;
-  const counts = useMemo(() => ({
-    story: selectedChild?.entries.filter((entry) => entry.bookType === "story").length ?? 0,
-    comic: selectedChild?.entries.filter((entry) => entry.bookType === "comic").length ?? 0,
-  }), [selectedChild]);
+  const counts = useMemo(
+    () => ({
+      story:
+        selectedChild?.entries.filter((entry) => entry.bookType === "story")
+          .length ?? 0,
+      comic:
+        selectedChild?.entries.filter((entry) => entry.bookType === "comic")
+          .length ?? 0,
+    }),
+    [selectedChild],
+  );
   const visibleEntries = useMemo(
-    () => selectedChild?.entries.filter((entry) => entry.bookType === bookType) ?? [],
+    () =>
+      selectedChild?.entries.filter((entry) => entry.bookType === bookType) ?? [],
     [bookType, selectedChild],
   );
 
@@ -124,7 +197,9 @@ export default function ParentReadingScreen() {
         ) : children.length === 0 ? (
           <View style={styles.state}>
             <Text style={styles.stateTitle}>연결된 자녀가 없어요.</Text>
-            <Text style={styles.muted}>자녀 연결이 승인되면 독서 기록을 볼 수 있어요.</Text>
+            <Text style={styles.muted}>
+              자녀 연결이 승인되면 독서 기록을 볼 수 있어요.
+            </Text>
           </View>
         ) : (
           <>
@@ -134,10 +209,7 @@ export default function ParentReadingScreen() {
                   <SectionNavItem
                     key={child.studentId}
                     selected={child.studentId === selectedChildId}
-                    onPress={() => {
-                      setSelectedChildId(child.studentId);
-                      setExpandedEntryId(null);
-                    }}
+                    onPress={() => setSelectedChildId(child.studentId)}
                     accessibilityLabel={`${child.name} 독서 기록`}
                   >
                     {child.name}
@@ -150,7 +222,9 @@ export default function ParentReadingScreen() {
               <Text style={styles.childName}>{selectedChild?.name}</Text>
               <Text style={styles.childMeta}>
                 {selectedChild?.classroom?.name ?? "학급 미배정"}
-                {selectedChild?.number != null ? ` · ${selectedChild.number}번` : ""}
+                {selectedChild?.number != null
+                  ? ` · ${selectedChild.number}번`
+                  : ""}
               </Text>
             </View>
 
@@ -183,49 +257,38 @@ export default function ParentReadingScreen() {
                 </View>
               ) : visibleEntries.length === 0 ? (
                 <Text style={styles.emptyType}>
-                  아직 {bookType === "story" ? "이야기책" : "만화책"} 기록이 없어요.
+                  아직 {bookType === "story" ? "이야기책" : "만화책"} 기록이
+                  없어요.
                 </Text>
               ) : (
-                visibleEntries.map((entry) => {
-                  const expanded = expandedEntryId === entry.id;
-                  return (
-                    <View key={entry.id} style={styles.entry}>
-                      <View style={styles.entryIndex} accessible={false} />
-                      <View style={[styles.entryContent, expanded && styles.entryExpanded]}>
-                        <ControlPressable
-                          style={styles.entryToggle}
-                          onPress={() => setExpandedEntryId((current) => current === entry.id ? null : entry.id)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${entry.title} ${expanded ? "접기" : "펼치기"}`}
-                          accessibilityState={{ expanded }}
-                        >
-                          <Text style={styles.entryTitle} numberOfLines={1}>{entry.title}</Text>
-                          {expanded ? (
-                            <ChevronUp size={16} color={colors.textFaint} accessible={false} />
-                          ) : (
-                            <ChevronDown size={16} color={colors.textFaint} accessible={false} />
-                          )}
-                        </ControlPressable>
-                        {expanded ? (
-                          <View style={styles.entryDetails}>
-                            <View style={styles.entryTopline}>
-                              <Text style={styles.entryType}>{entry.bookType === "comic" ? "만화책" : "이야기책"}</Text>
-                              <Text style={styles.entryDate}>{new Date(entry.createdAt).toLocaleDateString("ko-KR")}</Text>
-                            </View>
-                            <Text style={styles.meta}>{entry.author}</Text>
-                            <Text style={styles.body}>{entry.reflection}</Text>
-                            {entry.aiFeedback ? (
-                              <View style={styles.feedbackRow}>
-                                <Text style={styles.feedbackScore}>{entry.aiScore ?? 0}점</Text>
-                                <Text style={styles.feedback}>{entry.aiFeedback}</Text>
-                              </View>
-                            ) : null}
-                          </View>
-                        ) : null}
+                visibleEntries.map((entry) => (
+                  <View key={entry.id} style={styles.entry}>
+                    <View style={styles.entryIndex} accessible={false} />
+                    <View style={styles.entryContent}>
+                      <View style={styles.entryHeading}>
+                        <View style={styles.entryTitleWrap}>
+                          <Text style={styles.entryTitle}>{entry.title}</Text>
+                          <Text style={styles.meta}>{entry.author}</Text>
+                        </View>
+                        <Text style={styles.entryDate}>
+                          {new Date(entry.createdAt).toLocaleDateString("ko-KR")}
+                        </Text>
                       </View>
+                      <Text style={styles.entryType}>
+                        {entry.bookType === "comic" ? "만화책" : "이야기책"}
+                      </Text>
+                      <Text style={styles.body}>{entry.reflection}</Text>
+                      {entry.aiFeedback ? (
+                        <View style={styles.feedbackRow}>
+                          <Text style={styles.feedbackScore}>
+                            {entry.aiScore ?? 0}점
+                          </Text>
+                          <Text style={styles.feedback}>{entry.aiFeedback}</Text>
+                        </View>
+                      ) : null}
                     </View>
-                  );
-                })
+                  </View>
+                ))
               )}
             </View>
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -251,35 +314,56 @@ const styles = StyleSheet.create({
   childName: { ...typography.title, color: colors.text },
   childMeta: { ...typography.badge, color: colors.textMuted },
   historyColumn: { gap: spacing.md },
-  state: { flex: 1, minHeight: tapMin * 8 + spacing.sm, alignItems: "center", justifyContent: "center", gap: spacing.md },
+  state: {
+    flex: 1,
+    minHeight: tapMin * 8 + spacing.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.md,
+  },
   stateCompact: { paddingVertical: spacing.xxl, alignItems: "center" },
-  stateTitle: { ...typography.section, color: colors.text, textAlign: "center" },
+  stateTitle: {
+    ...typography.section,
+    color: colors.text,
+    textAlign: "center",
+  },
   muted: { ...typography.body, color: colors.textMuted, textAlign: "center" },
-  emptyType: { ...typography.body, color: colors.textMuted, paddingVertical: spacing.xl, textAlign: "center" },
+  emptyType: {
+    ...typography.body,
+    color: colors.textMuted,
+    paddingVertical: spacing.xl,
+    textAlign: "center",
+  },
   error: { ...typography.body, color: colors.danger, textAlign: "center" },
   entry: { flexDirection: "row", gap: spacing.sm },
-  entryIndex: { width: borders.medium, borderRadius: radii.pill, backgroundColor: colors.accent },
+  entryIndex: {
+    width: borders.medium,
+    borderRadius: radii.pill,
+    backgroundColor: colors.accent,
+  },
   entryContent: {
     flex: 1,
+    gap: spacing.sm,
     borderBottomWidth: borders.hairline,
     borderBottomColor: colors.border,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.lg,
   },
-  entryExpanded: { paddingBottom: spacing.lg },
-  entryToggle: {
-    minHeight: tapMin,
+  entryHeading: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-start",
     justifyContent: "space-between",
     gap: spacing.md,
   },
-  entryTitle: { ...typography.label, color: colors.text, flex: 1 },
-  entryDetails: { gap: spacing.sm, paddingTop: spacing.xs },
-  entryTopline: { flexDirection: "row", justifyContent: "space-between", gap: spacing.md },
+  entryTitleWrap: { flex: 1, minWidth: 0, gap: spacing.xxs },
+  entryTitle: { ...typography.label, color: colors.text },
   entryType: { ...typography.badge, color: colors.accent },
   entryDate: { ...typography.badge, color: colors.textFaint },
   meta: { ...typography.badge, color: colors.textMuted },
-  body: { ...typography.body, color: colors.text, lineHeight: typography.body.lineHeight + spacing.xxs },
+  body: {
+    ...typography.body,
+    color: colors.text,
+    lineHeight: typography.body.lineHeight + spacing.xxs,
+  },
   feedbackRow: {
     borderRadius: radii.control,
     backgroundColor: colors.surfaceAlt,
