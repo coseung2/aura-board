@@ -40,8 +40,8 @@ Canva Integration ID: `OC-AZ134Kp64WVh`
 - reviewer 소유 보드: `test for review`
 - 직접 보드 URL: `https://aura-board.com/board/board-mrirxqwp`
 - 보드 내 테스트 섹션 이름: `test`
-- 운영 Vercel에 Canva client secret, token encryption key, `AUTH_SECRET`, reviewer
-  password hash가 설정돼 있다.
+- 운영 Oracle 서버(`/etc/aura-board/app.env`)에 Canva client secret, token
+  encryption key, `AUTH_SECRET`, reviewer password hash가 설정돼 있다.
 - Canva OAuth 토큰과 PKCE verifier는 AES-256-GCM으로 암호화된다.
 - 교사 Canva 테이블에는 `canvaUserId`, `canvaTeamId`가 있고 학생 Connect
   테이블은 제거됐다.
@@ -191,7 +191,8 @@ Pen test 날짜는 실제 외부 침투 테스트가 없으므로 비워 둔다.
 - Privacy: `https://aura-board.com/privacy`
 - Security contact: `mallagaenge@gmail.com`, `https://aura-board.com/support`
 - Normal traffic: `Average below 0.1 RPS; observed peak about 2 RPS; expected peak below 5 RPS`
-- Hosting: Vercel web/backend (`icn1`), Supabase PostgreSQL/Storage
+- Hosting: Oracle Cloud A1 서버(운영 primary, Cloudflare 경유), Vercel은
+  폴백 origin 전용, Supabase PostgreSQL/Storage
 - Authentication: Auth.js/NextAuth + Prisma
 
 ## 관련 파일

@@ -130,9 +130,10 @@ server-only environment variables and are not exposed to browser code.
 
 **Hosting**
 
-Aura Board is cloud-hosted. The web application and backend functions are
-hosted on Vercel. Managed PostgreSQL and object storage are provided through
-Supabase infrastructure.
+Aura Board is cloud-hosted. The web application and backend run on an Oracle
+Cloud Infrastructure (OCI) A1 server as the primary origin behind Cloudflare,
+with a Vercel deployment kept only as a fallback origin. Managed PostgreSQL
+and object storage are provided through Supabase infrastructure.
 
 **Date of last pen test**
 
@@ -148,8 +149,8 @@ steps but must not include passwords or active access tokens.
 
 Average: below 0.1 requests per second. Observed peak: approximately 2
 requests per second during active user operations. Expected peak remains below
-5 requests per second. Measurement source: Vercel production runtime logs,
-24-hour window ending 13 July 2026.
+5 requests per second. Measurement source: production runtime logs, 24-hour
+window ending 13 July 2026.
 
 ## Questionnaire selections
 

@@ -96,7 +96,8 @@ Save/publish 흐름은 UI 표시만 보지 말고 API 성공, 서버 상태, 새
 - `/terms`, `/privacy`, `/support`가 로그아웃 상태에서 200으로 열리는지 확인한다.
 - 운영 환경에 전용 `CANVA_TOKEN_ENCRYPTION_KEY`가 설정되어 있는지 확인한다.
 - 마지막 침투 테스트가 없다면 Canva 설문의 pen test 날짜는 비워 둔다.
-- 실제 평균/peak API 트래픽은 Vercel 로그 또는 관측 지표로 확인한 값을 기입한다.
+- 실제 평균/peak API 트래픽은 Oracle 서버(nginx/앱 로그) 또는 관측 지표로
+  확인한 값을 기입한다.
 
 ## 제출 전 결정이 필요한 약관 항목
 
