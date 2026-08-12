@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ChevronDown, ChevronUp } from "lucide-react-native";
+import { Check, ChevronDown, ChevronUp } from "lucide-react-native";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
 import { ParentHeaderActions } from "../../components/parent-header-actions";
 import {
@@ -39,6 +39,7 @@ import type {
 import {
   borders,
   colors,
+  iconSizes,
   pageChrome,
   radii,
   spacing,
@@ -69,6 +70,7 @@ export default function ParentReadingScreen() {
   const selectedChildRestoredRef = useRef(false);
   const [bookType, setBookType] = useState<BookType>("story");
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null);
+  const [childMenuOpen, setChildMenuOpen] = useState(false);
   const [loading, setLoading] = useState(!initial);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -206,19 +208,56 @@ export default function ParentReadingScreen() {
           </View>
         ) : (
           <>
-            {children.length > 1 ? (
-              <SectionNav accessibilityLabel="자녀 선택" style={styles.childNav}>
-                {children.map((child) => (
-                  <SectionNavItem
-                    key={child.studentId}
-                    selected={child.studentId === selectedChildId}
-                    onPress={() => setSelectedChildId(child.studentId)}
-                    accessibilityLabel={`${child.name} 독서 기록`}
-                  >
-                    {child.name}
-                  </SectionNavItem>
-                ))}
-              </SectionNav>
+            {selectedChild ? (
+              <View style={styles.childSelector}>
+                <ControlPressable
+                  style={styles.childSelectTrigger}
+                  onPress={() => setChildMenuOpen((open) => !open)}
+                  accessibilityLabel="자녀 전환"
+                  accessibilityState={{ expanded: childMenuOpen }}
+                >
+                  <Text style={styles.childSelectText} numberOfLines={1}>
+                    {selectedChild.name}(
+                    {selectedChild.classroom?.name ?? "학급 미배정"})
+                  </Text>
+                  <ChevronDown
+                    size={iconSizes.sm}
+                    color={colors.textMuted}
+                    accessible={false}
+                  />
+                </ControlPressable>
+                {childMenuOpen ? (
+                  <View style={styles.childMenu} accessibilityRole="menu">
+                    {children.map((child) => {
+                      const selected = child.studentId === selectedChildId;
+                      return (
+                        <ControlPressable
+                          key={child.studentId}
+                          style={styles.childOption}
+                          onPress={() => {
+                            setSelectedChildId(child.studentId);
+                            setChildMenuOpen(false);
+                          }}
+                          accessibilityRole="menuitem"
+                          accessibilityState={{ selected }}
+                        >
+                          <Text style={styles.childOptionText} numberOfLines={1}>
+                            {child.name}(
+                            {child.classroom?.name ?? "학급 미배정"})
+                          </Text>
+                          {selected ? (
+                            <Check
+                              size={iconSizes.sm}
+                              color={colors.accent}
+                              accessible={false}
+                            />
+                          ) : null}
+                        </ControlPressable>
+                      );
+                    })}
+                  </View>
+                ) : null}
+              </View>
             ) : null}
 
             <View style={styles.heading}>
@@ -353,7 +392,37 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxxl + spacing.xxl,
     gap: spacing.xl,
   },
-  childNav: { alignSelf: "flex-start" },
+  childSelector: { alignItems: "center", paddingHorizontal: spacing.lg },
+  childSelectTrigger: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    backgroundColor: colors.transparent,
+    borderWidth: borders.none,
+  },
+  childSelectText: { ...typography.label, color: colors.text },
+  childMenu: {
+    width: "100%",
+    marginTop: spacing.xs,
+    borderTopWidth: borders.hairline,
+    borderTopColor: colors.border,
+  },
+  childOption: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderWidth: borders.none,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+    borderRadius: radii.none,
+    backgroundColor: colors.transparent,
+  },
+  childOptionText: { ...typography.label, color: colors.text },
   heading: { gap: spacing.xxs },
   childName: { ...typography.title, color: colors.text },
   childMeta: { ...typography.badge, color: colors.textMuted },
