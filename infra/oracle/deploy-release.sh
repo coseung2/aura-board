@@ -224,4 +224,26 @@ wait_for_health nginx -H 'Host: aura-board.com' http://127.0.0.1/api/health
 
 rm -f -- "${state_file}"
 trap - ERR INT TERM HUP
+
+prune_releases() {
+  local root=$1
+  local keep=$2
+  local dir
+  while IFS= read -r dir; do
+    [[ -n ${dir} ]] || continue
+    rm -rf -- "${dir}"
+    echo "pruned_release=${dir##*/}"
+  done < <(
+    find "${root}/releases" -mindepth 1 -maxdepth 1 -type d -printf '%T@ %p\n' \
+      | sort -rn \
+      | tail -n +"$((keep + 1))" \
+      | cut -d' ' -f2-
+  )
+}
+
+# Keep the newest release plus one known-good rollback; older release
+# directories are rebuildable artifacts and had filled the boot volume.
+prune_releases "${app_root}" 2
+prune_releases "${engine_root}" 2
+
 echo "deployment_complete=${release_id}"
