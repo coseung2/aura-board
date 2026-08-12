@@ -163,7 +163,7 @@ export default function ParentAccountScreen() {
             </View>
 
             <View style={styles.sectionCard}>
-              <SectionHeader title="자녀 연결" />
+              <SectionHeader title="자녀 연결" style={styles.noSectionDivider} />
               {links.length === 0 ? (
                 <Text selectable style={styles.help}>연결된 자녀나 대기 중인 신청이 없어요.</Text>
               ) : (
@@ -205,7 +205,7 @@ export default function ParentAccountScreen() {
           </View>
         )}
         <View style={styles.accountDeletionSection}>
-          <SectionHeader title="계정 관리" />
+          <SectionHeader title="계정 관리" style={styles.noSectionDivider} />
           <AppButton
             variant="danger"
             style={styles.flatAction}
@@ -239,6 +239,7 @@ const styles = StyleSheet.create({
   sections: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.lg },
   accountDeletionSection: { width: "100%", maxWidth: parent.portfolioCardMinWidth * 2 - spacing.lg, alignSelf: "center", gap: spacing.md, paddingTop: spacing.xl },
   profileCard: { flexDirection: "row", alignItems: "center", paddingVertical: spacing.lg, gap: spacing.md, borderBottomWidth: borders.hairline, borderBottomColor: colors.border },
+  noSectionDivider: { borderBottomWidth: borders.none },
   avatar: { width: parent.childAvatarSize, height: parent.childAvatarSize, borderRadius: radii.pill, backgroundColor: colors.accentTintedBg, borderWidth: borders.hairline, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   avatarText: { ...typography.title, color: colors.accent },
   profileCopy: { flex: 1, gap: spacing.xs },
