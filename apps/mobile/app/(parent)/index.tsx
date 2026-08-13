@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
-import { ActivityIndicator, BackHandler, FlatList, StyleSheet, Text, View } from "react-native";
+import { BackHandler, FlatList, StyleSheet, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
 import { ParentFeedCard } from "../../components/parent-feed-card";
 import { ParentPublicationCard } from "../../components/parent-publication-card";
 import { ParentHeaderActions } from "../../components/parent-header-actions";
+import { FeedListSkeleton, FeedLoadMoreSkeleton } from "../../components/loading-skeletons";
 import { AppButton, AppHeader, EmptyState } from "../../components/ui";
 import { useParentFeed } from "../../hooks/use-parent-feed";
 import {
@@ -153,10 +154,7 @@ export default function ParentFeedScreen() {
         }
         ListEmptyComponent={
           feed.loading ? (
-            <View style={styles.center} accessibilityLabel="피드를 불러오는 중">
-              <ActivityIndicator size="large" color={colors.accent} />
-              <Text selectable style={styles.muted}>게시물을 불러오는 중이에요.</Text>
-            </View>
+            <FeedListSkeleton />
           ) : feed.error ? (
             <EmptyState
               title="피드를 불러오지 못했어요"
@@ -177,7 +175,7 @@ export default function ParentFeedScreen() {
         }
         ListFooterComponent={
           feed.loadingMore ? (
-            <ActivityIndicator style={styles.footer} color={colors.accent} />
+            <FeedLoadMoreSkeleton />
           ) : feed.loadMoreError ? (
             <View style={styles.footerError}>
               <Text selectable style={styles.muted}>{feed.loadMoreError}</Text>
@@ -218,6 +216,5 @@ const styles = StyleSheet.create({
     padding: spacing.xl,
   },
   muted: { ...typography.body, color: colors.textMuted, textAlign: "center" },
-  footer: { padding: spacing.xl },
   footerError: { alignItems: "center", gap: spacing.sm, padding: spacing.lg },
 });

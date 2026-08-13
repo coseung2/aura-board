@@ -30,6 +30,7 @@ export function ParentAccountActions({ initialLinks }: Props) {
         credentials: "same-origin",
       });
       if (!res.ok) throw new Error(`status ${res.status}`);
+      window.dispatchEvent(new CustomEvent("parent-auth-lost"));
       router.replace("/login");
     } catch (e) {
       console.error("[ParentAccountActions] logout", e);

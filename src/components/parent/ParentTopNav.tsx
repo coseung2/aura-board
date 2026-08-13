@@ -41,6 +41,7 @@ export function ParentTopNav({
     try {
       const response = await fetch("/api/parent/logout", { method: "POST" });
       if (!response.ok) throw new Error(`status ${response.status}`);
+      window.dispatchEvent(new CustomEvent("parent-auth-lost"));
       router.replace("/login");
       router.refresh();
     } catch (error) {

@@ -14,13 +14,6 @@ import { typography } from "../../theme/tokens";
 
 export const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
-  loadingCenter: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: spacing.md,
-  },
-  loadingText: { ...typography.body, color: colors.textMuted },
 
   errorCenter: {
     flex: 1,

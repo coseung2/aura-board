@@ -413,6 +413,21 @@ export const states = {
   visibleOpacity: 1,
 } as const;
 
+/** Shared geometry for cold-load placeholders. Keep screen components free of
+ * route-local magic numbers so loading layouts follow the same design-system
+ * checks as their final content. */
+export const loadingUx = {
+  homeHeroHeight: 176,
+  homeMetricHeight: 76,
+  boardCardHeight: 176,
+  boardDetailHeroHeight: 84,
+  boardDetailCardHeight: 132,
+  feedAvatarSize: 40,
+  feedMediaHeight: 230,
+  lineHeight: 14,
+  lineSmallHeight: 11,
+} as const;
+
 export const layers = {
   spriteFloor: 0,
   spriteItem: 1,

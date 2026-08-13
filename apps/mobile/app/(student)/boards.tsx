@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   InteractionManager,
   RefreshControl,
@@ -18,6 +17,7 @@ import {
   useRouter,
 } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { BoardListSkeleton } from "../../components/loading-skeletons";
 import { layoutLabel, layoutThumbnail } from "../../theme/layout-meta";
 import {
   borders,
@@ -342,10 +342,13 @@ export default function StudentBoardsScreen() {
       {loading && contentBoards.length === 0 ? (
         <View style={styles.screenBody}>
           {filterHeader}
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={colors.accent} />
-            <Text style={styles.loadingText}>보드를 불러오는 중…</Text>
-          </View>
+          <ScrollView
+            contentInsetAdjustmentBehavior="automatic"
+            contentContainerStyle={styles.content}
+            scrollEnabled={false}
+          >
+            <BoardListSkeleton />
+          </ScrollView>
         </View>
       ) : error && contentBoards.length === 0 ? (
         <View style={styles.screenBody}>
@@ -495,7 +498,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xl,
   },
-  loadingText: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger, textAlign: "center" },
   emptyWrap: {
     flex: 1,

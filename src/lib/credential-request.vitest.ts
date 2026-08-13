@@ -36,6 +36,41 @@ describe("credential request boundary", () => {
     expect(validateCredentialRequest(req)).toEqual({ ok: true });
   });
 
+  it("accepts same-port loopback aliases during local development", () => {
+    const req = new Request("http://127.0.0.1:3000/api/parent/credentials/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+      },
+    });
+    expect(validateCredentialRequest(req)).toEqual({ ok: true });
+  });
+
+  it("accepts a loopback browser origin when dev rewrites the request URL", () => {
+    const req = new Request("https://aura-board.com/api/parent/credentials/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3000",
+        host: "localhost:3000",
+        "x-forwarded-proto": "http",
+      },
+    });
+    expect(validateCredentialRequest(req)).toEqual({ ok: true });
+  });
+
+  it("does not treat a different loopback port as the same origin", () => {
+    const req = new Request("http://127.0.0.1:3000/api/parent/credentials/login", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "http://localhost:3001",
+      },
+    });
+    expect(validateCredentialRequest(req)).toEqual({ ok: false, status: 403 });
+  });
+
   it("accepts native JSON only with the custom mobile header", () => {
     expect(validateCredentialRequest(request({
       "content-type": "application/json",

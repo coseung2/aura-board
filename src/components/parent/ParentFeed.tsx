@@ -62,11 +62,17 @@ export function ParentFeed({ pendingLinks = [], childCount }: Props) {
 
       <ParentPendingLinks links={pendingLinks} compact />
 
-      {loading ? <ParentFeedSkeleton /> : error ? (
+      {loading ? <ParentFeedSkeleton /> : error && !data ? (
         <ParentPostsError error={error} retry={retry} />
       ) : (
         <div className="parent-feed-layout">
           <section className="parent-feed-stream" aria-label="모든 자녀 게시물">
+            {error ? (
+              <div className="parent-feed-inline-error" role="alert">
+                <span>새 게시물을 불러오지 못했어요. 지금 보이는 내용은 유지했어요.</span>
+                <button type="button" onClick={retry}>다시 불러오기</button>
+              </div>
+            ) : null}
             {data?.items.length ? data.items.map((post) => (
               <ParentPostCard
                 key={post.id}
@@ -84,7 +90,7 @@ export function ParentFeed({ pendingLinks = [], childCount }: Props) {
             )}
             {data?.nextCursor ? (
               <button type="button" className="parent-feed-more" onClick={loadMore} disabled={loadingMore}>
-                {loadingMore ? "불러오는 중…" : "이전 게시물 더 보기"}
+                {loadingMore ? <span className="parent-feed-more-skeleton" aria-label="이전 게시물을 불러오는 중" /> : "이전 게시물 더 보기"}
               </button>
             ) : data?.items.length ? <p className="parent-feed-end">모든 게시물을 확인했어요</p> : null}
           </section>

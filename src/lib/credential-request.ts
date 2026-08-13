@@ -16,14 +16,40 @@ export type CredentialRequestVerdict =
   | { ok: true }
   | { ok: false; status: 400 | 403 };
 
-function isAllowedOrigin(originHeader: string, requestUrl: string): boolean {
+function isAllowedOrigin(originHeader: string, req: Request): boolean {
   try {
-    const candidate = new URL(originHeader).origin;
+    const candidateUrl = new URL(originHeader);
+    const requestOriginUrl = new URL(req.url);
+    const candidate = candidateUrl.origin;
     const allowed = new Set([
-      new URL(requestUrl).origin,
+      requestOriginUrl.origin,
       new URL(PUBLIC_ORIGIN).origin,
     ]);
-    return allowed.has(candidate);
+
+    const forwardedHost = req.headers.get("x-forwarded-host")?.split(",", 1)[0]?.trim();
+    const host = forwardedHost || req.headers.get("host")?.trim();
+    if (host) {
+      const forwardedProto = req.headers
+        .get("x-forwarded-proto")
+        ?.split(",", 1)[0]
+        ?.trim();
+      const protocol = forwardedProto || requestOriginUrl.protocol.slice(0, -1);
+      allowed.add(new URL(`${protocol}://${host}`).origin);
+    }
+
+    if (allowed.has(candidate)) return true;
+
+    // Next dev can receive a browser request through localhost while exposing
+    // req.url as 127.0.0.1 (or the reverse). Treat only same-port HTTP
+    // loopback aliases as the same development origin.
+    const loopbackHosts = new Set(["localhost", "127.0.0.1", "[::1]"]);
+    return (
+      candidateUrl.protocol === "http:" &&
+      requestOriginUrl.protocol === "http:" &&
+      loopbackHosts.has(candidateUrl.hostname) &&
+      loopbackHosts.has(requestOriginUrl.hostname) &&
+      candidateUrl.port === requestOriginUrl.port
+    );
   } catch {
     return false;
   }
@@ -41,7 +67,7 @@ export function validateCredentialRequest(req: Request): CredentialRequestVerdic
 
   const origin = req.headers.get("origin");
   if (origin) {
-    return isAllowedOrigin(origin, req.url) ? { ok: true } : { ok: false, status: 403 };
+    return isAllowedOrigin(origin, req) ? { ok: true } : { ok: false, status: 403 };
   }
 
   const fetchSite = req.headers.get("sec-fetch-site");

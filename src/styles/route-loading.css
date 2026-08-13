@@ -1,0 +1,100 @@
+.route-skeleton-shell {
+  min-height: 60vh;
+  padding: 28px clamp(18px, 4vw, 48px) 72px;
+  background: var(--color-bg, #f7fbfd);
+}
+
+.route-skeleton-content {
+  width: min(100%, 960px);
+  margin-inline: auto;
+}
+
+.route-skeleton-block,
+.route-skeleton-hero,
+.route-skeleton-post,
+.route-skeleton-child-card,
+.route-skeleton-board-head,
+.route-skeleton-board-canvas {
+  background: color-mix(in srgb, var(--color-primary, #1683c7) 8%, #fff);
+}
+
+.route-skeleton-block {
+  border-radius: 12px;
+}
+
+.route-skeleton-hero {
+  display: flex;
+  align-items: center;
+  min-height: 190px;
+  padding: 28px;
+  border: 1px solid color-mix(in srgb, var(--color-primary, #1683c7) 14%, transparent);
+  border-radius: 18px;
+}
+
+.route-skeleton-copy {
+  display: grid;
+  flex: 1;
+  gap: 12px;
+}
+
+.route-skeleton-block.is-line { height: 14px; border-radius: 999px; }
+.route-skeleton-block.is-wide { width: 78%; }
+.route-skeleton-block.is-medium { width: 58%; }
+.route-skeleton-block.is-short { width: 34%; height: 11px; }
+.route-skeleton-block.is-illustration { width: 32%; height: 130px; margin-left: 24px; }
+.route-skeleton-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+.route-skeleton-block.is-metric { height: 82px; }
+.route-skeleton-block.is-heading { width: 180px; height: 18px; margin: 28px 0 14px; }
+.route-skeleton-list { display: grid; gap: 12px; }
+.route-skeleton-block.is-row { height: 76px; }
+.route-skeleton-block.is-row.is-tall { height: 108px; }
+.route-skeleton-tabs { display: flex; gap: 10px; margin-bottom: 24px; }
+.route-skeleton-block.is-chip { width: 112px; height: 38px; border-radius: 999px; }
+.route-skeleton-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.route-skeleton-block.is-board-card { aspect-ratio: 1.25; }
+.route-skeleton-feed { display: grid; gap: 22px; width: min(100%, 680px); margin-inline: auto; }
+.route-skeleton-post { overflow: hidden; border: 1px solid color-mix(in srgb, var(--color-primary, #1683c7) 14%, transparent); border-radius: 18px; }
+.route-skeleton-post-head { display: flex; align-items: center; gap: 12px; padding: 16px; }
+.route-skeleton-block.is-avatar { width: 42px; height: 42px; border-radius: 999px; }
+.route-skeleton-block.is-avatar.is-large { width: 54px; height: 54px; }
+.route-skeleton-block.is-post-media { height: 320px; border-radius: 0; }
+.route-skeleton-post-copy { display: grid; gap: 10px; padding: 16px; }
+.route-skeleton-activity-summary { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 20px; }
+.route-skeleton-block.is-summary-main,
+.route-skeleton-block.is-summary-side { height: 160px; }
+.route-skeleton-child-card { display: flex; align-items: center; gap: 16px; padding: 20px; border-radius: 18px; }
+.route-skeleton-grid.is-parent-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.route-skeleton-block.is-parent-tile { aspect-ratio: 1; border-radius: 4px; }
+.route-skeleton-board-head { display: grid; gap: 12px; padding: 22px; border-radius: 18px; }
+.route-skeleton-board-canvas { position: relative; min-height: 460px; margin-top: 18px; border-radius: 18px; }
+.route-skeleton-block.is-board-note { position: absolute; top: 42px; left: 6%; width: 30%; height: 150px; }
+.route-skeleton-block.is-board-note.is-offset { top: 96px; left: 39%; width: 34%; }
+.route-skeleton-block.is-board-note.is-small { top: 260px; left: 21%; width: 24%; height: 112px; }
+
+@keyframes route-skeleton-pulse {
+  from { opacity: 0.58; }
+  to { opacity: 1; }
+}
+
+.route-skeleton-content .route-skeleton-block,
+.route-skeleton-content .route-skeleton-hero,
+.route-skeleton-content .route-skeleton-post,
+.route-skeleton-content .route-skeleton-child-card,
+.route-skeleton-content .route-skeleton-board-head,
+.route-skeleton-content .route-skeleton-board-canvas {
+  animation: route-skeleton-pulse 1.2s ease-in-out infinite alternate;
+}
+
+@media (max-width: 700px) {
+  .route-skeleton-shell { padding: 20px 16px 56px; }
+  .route-skeleton-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .route-skeleton-grid.is-parent-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; }
+  .route-skeleton-metrics { grid-template-columns: repeat(2, 1fr); }
+  .route-skeleton-activity-summary { grid-template-columns: 1fr; }
+  .route-skeleton-block.is-summary-side { height: 92px; }
+  .route-skeleton-block.is-post-media { height: 240px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-skeleton-content * { animation: none !important; }
+}

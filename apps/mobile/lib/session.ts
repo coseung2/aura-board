@@ -3,6 +3,7 @@ import { Platform } from "react-native";
 import { clearBoardCache } from "./board-cache";
 import { clearParentDataCache } from "./parent-data-cache";
 import { clearRequestCache } from "./request-cache";
+import { clearStudentFeedCache } from "./student-feed-cache";
 
 // 학생 세션 토큰 · 학생 프로필 캐시.
 // SecureStore = 안드로이드에선 AndroidKeystore 로 AES 암호화.
@@ -110,6 +111,7 @@ export async function saveSessionToken(token: string): Promise<void> {
   logoutInProgressRole = null;
   clearBoardCache();
   clearRequestCache();
+  clearStudentFeedCache();
   await setStoredItem(TOKEN_KEY, token);
   studentTokenCache = token;
 }
@@ -131,6 +133,7 @@ export async function loadSessionToken(): Promise<string | null> {
 export async function clearSessionToken(): Promise<void> {
   clearBoardCache();
   clearRequestCache();
+  clearStudentFeedCache();
   const authorizationToken = await loadSessionToken();
   if (authorizationToken) {
     await import("./student-push-notifications")
@@ -210,6 +213,7 @@ export async function clearAllMobileSessions(): Promise<void> {
   clearBoardCache();
   clearParentDataCache();
   clearRequestCache();
+  clearStudentFeedCache();
   const studentAuthorizationToken = await loadSessionToken();
   if (studentAuthorizationToken) {
     await import("./student-push-notifications")

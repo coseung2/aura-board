@@ -138,13 +138,19 @@ export function ParentHomeGrid({
             <h2>{selected.studentName}</h2>
             <p>{selected.classroomName}의 게시물</p>
           </div>
-          {!loading && !error ? <span>{data?.items.length ?? 0}{data?.nextCursor ? "+" : ""}개</span> : null}
+          {!loading && data ? <span>{data.items.length}{data.nextCursor ? "+" : ""}개</span> : null}
         </div>
 
-        {loading ? <ParentHomeSkeleton /> : error ? (
+        {loading ? <ParentHomeSkeleton /> : error && !data ? (
           <ParentPostsError error={error} retry={retry} />
         ) : data?.items.length ? (
           <>
+            {error ? (
+              <div className="parent-feed-inline-error" role="alert">
+                <span>새 게시물을 불러오지 못했어요. 지금 보이는 내용은 유지했어요.</span>
+                <button type="button" onClick={retry}>다시 불러오기</button>
+              </div>
+            ) : null}
             <div className={`parent-home-grid is-${category}`}>
               {data.items.map((post) => (
                 <ParentHomeGridItem key={post.id} post={post} category={category} />
@@ -152,7 +158,7 @@ export function ParentHomeGrid({
             </div>
             {data.nextCursor ? (
               <button type="button" className="parent-home-more" onClick={loadMore} disabled={loadingMore}>
-                {loadingMore ? "불러오는 중…" : "게시물 더 보기"}
+                {loadingMore ? <span className="parent-feed-more-skeleton" aria-label="게시물을 불러오는 중" /> : "게시물 더 보기"}
               </button>
             ) : <p className="parent-feed-end">모든 게시물을 확인했어요</p>}
           </>

@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   BackHandler,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -17,6 +17,7 @@ import {
 import { CircleAlert } from "lucide-react-native";
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { BoardDetailSkeleton } from "../../../components/loading-skeletons";
 import {
   boardThemes,
   colors,
@@ -223,10 +224,13 @@ export default function BoardDetail() {
   if (loading) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>보드 열기…</Text>
-        </View>
+        <BoardHeader title="보드" layout="stream" onBack={handleBoardBack} />
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          scrollEnabled={false}
+        >
+          <BoardDetailSkeleton />
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -411,6 +415,5 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     padding: spacing.xxl,
   },
-  loadingText: { ...typography.body, color: colors.textMuted },
   errorTitle: { ...typography.title, color: colors.text, textAlign: "center" },
 });

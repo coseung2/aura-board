@@ -206,7 +206,10 @@
 .parent-home-more { min-height: 46px; border: 1px solid var(--color-border); border-radius: 12px; background: #fff; color: #4f46e5; cursor: pointer; font: inherit; font-size: 13px; font-weight: 750; }
 .parent-feed-more:disabled,
 .parent-home-more:disabled { cursor: wait; opacity: .65; }
+.parent-feed-more-skeleton { display: block; width: min(70%, 220px); height: 12px; margin-inline: auto; border-radius: 999px; background: #ececf0; animation: parent-feed-pulse 1.25s ease-in-out infinite alternate; }
 .parent-feed-end { margin: 4px 0; color: #a1a1aa; font-size: 11px; text-align: center; }
+.parent-feed-inline-error { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; padding: 11px 13px; border: 1px solid color-mix(in srgb, var(--color-danger, #c62828) 18%, transparent); border-radius: 11px; background: color-mix(in srgb, var(--color-danger, #c62828) 7%, #fff); color: var(--color-text); font-size: 12px; gap: 12px; }
+.parent-feed-inline-error button { min-height: 36px; padding: 0 12px; border: 1px solid var(--color-border); border-radius: 9px; background: #fff; color: var(--color-text); cursor: pointer; font: inherit; font-weight: 700; white-space: nowrap; }
 
 .parent-feed-empty,
 .parent-feed-state {
@@ -373,7 +376,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .parent-feed-skeleton > *,
-  .parent-home-grid-skeleton { animation: none; }
+  .parent-home-grid-skeleton,
+  .parent-feed-more-skeleton { animation: none; }
   .parent-home-grid-item img,
   .parent-home-grid-overlay { transition: none; }
 }

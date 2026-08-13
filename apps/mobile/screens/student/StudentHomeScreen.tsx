@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  ActivityIndicator,
   InteractionManager,
   RefreshControl,
   ScrollView,
@@ -11,6 +10,7 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StudentHomeSkeleton } from "../../components/loading-skeletons";
 import {
   BookOpen,
   CalendarCheck,
@@ -289,10 +289,12 @@ export default function StudentHome() {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <AppHeader title="홈" />
-        <View style={styles.loadingCenter}>
-          <ActivityIndicator size="large" color={colors.accent} />
-          <Text style={styles.loadingText}>보드를 불러오는 중…</Text>
-        </View>
+        <ScrollView
+          contentInsetAdjustmentBehavior="automatic"
+          scrollEnabled={false}
+        >
+          <StudentHomeSkeleton />
+        </ScrollView>
       </SafeAreaView>
     );
   }

@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from "react";
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { SquarePen } from "lucide-react-native";
@@ -7,18 +7,28 @@ import { ApiError, apiFetch } from "../../lib/api";
 import { feedApiMessage, type FeedItem, type FeedPage } from "../../lib/feed";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import { FeedCard } from "../../components/FeedCard";
+import { FeedListSkeleton, FeedLoadMoreSkeleton } from "../../components/loading-skeletons";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { AppButton, AppHeader, IconButton } from "../../components/ui";
-import { colors, feed, iconSizes, layout, pageChrome, spacing, typography } from "../../theme/tokens";
+import { colors, feed, iconSizes, layout, pageChrome, radii, spacing, typography } from "../../theme/tokens";
+import {
+  appendStudentFeedCache,
+  readStudentFeedCache,
+  revalidateStudentFeedCache,
+} from "../../lib/student-feed-cache";
 
 export default function StudentFeedScreen() {
   const router = useRouter();
-  const [items, setItems] = useState<FeedItem[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const initialCache = readStudentFeedCache();
+  const [items, setItems] = useState<FeedItem[]>(() => initialCache?.data.items ?? []);
+  const [nextCursor, setNextCursor] = useState<string | null>(
+    () => initialCache?.data.nextCursor ?? null,
+  );
+  const [loading, setLoading] = useState(() => !initialCache);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
+  const loadMoreCursorRef = useRef<string | null>(null);
 
   const handleUnauthorized = useCallback(async () => {
     await clearSessionToken();
@@ -30,6 +40,8 @@ export default function StudentFeedScreen() {
     forceRefresh = false,
   ) => {
     const append = Boolean(cursor);
+    if (append && loadMoreCursorRef.current === cursor) return;
+    if (append) loadMoreCursorRef.current = cursor ?? null;
     const requestId = ++requestIdRef.current;
     if (append) setLoadingMore(true);
     else setLoading(true);
@@ -37,12 +49,18 @@ export default function StudentFeedScreen() {
     try {
       const params = new URLSearchParams({ limit: "20" });
       if (cursor) params.set("cursor", cursor);
-      const page = await apiFetch<FeedPage>(`/api/student/feed?${params.toString()}`, {
+      const loader = () => apiFetch<FeedPage>(`/api/student/feed?${params.toString()}`, {
         forceRefresh,
       });
+      const page = append
+        ? await loader()
+        : await revalidateStudentFeedCache(loader, { force: forceRefresh });
       if (requestId !== requestIdRef.current) return;
-      setItems((current) => append ? [...current, ...page.items] : page.items);
-      setNextCursor(page.nextCursor);
+      const cachedPage = append
+        ? appendStudentFeedCache(page).data
+        : readStudentFeedCache()?.data ?? page;
+      setItems(cachedPage.items);
+      setNextCursor(cachedPage.nextCursor);
     } catch (nextError) {
       if (requestId !== requestIdRef.current) return;
       if (nextError instanceof ApiError && nextError.status === 401) {
@@ -55,13 +73,20 @@ export default function StudentFeedScreen() {
         setLoading(false);
         setLoadingMore(false);
       }
+      if (append && loadMoreCursorRef.current === cursor) {
+        loadMoreCursorRef.current = null;
+      }
     }
   }, [handleUnauthorized]);
 
   useFocusEffect(
     useCallback(() => {
-      setItems([]);
-      setNextCursor(null);
+      const cached = readStudentFeedCache();
+      if (cached) {
+        setItems(cached.data.items);
+        setNextCursor(cached.data.nextCursor);
+        setLoading(false);
+      }
       void loadFeed();
     }, [loadFeed]),
   );
@@ -95,8 +120,20 @@ export default function StudentFeedScreen() {
         data={items}
         keyExtractor={(item) => item.publicationId}
         renderItem={({ item }) => <FeedCard item={item} />}
+        onEndReached={() => {
+          if (nextCursor && !loading && !loadingMore) void loadFeed(nextCursor);
+        }}
+        onEndReachedThreshold={0.4}
         contentContainerStyle={styles.listContent}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListHeaderComponent={items.length > 0 && error ? (
+          <View style={styles.inlineError} accessibilityRole="alert">
+            <Text style={styles.error}>{error}</Text>
+            <AppButton variant="quiet" onPress={() => void loadFeed(null, true)}>
+              다시 불러오기
+            </AppButton>
+          </View>
+        ) : null}
         refreshControl={(
           <RefreshControl
             refreshing={loading && items.length > 0}
@@ -106,24 +143,14 @@ export default function StudentFeedScreen() {
         )}
         ListEmptyComponent={(
           <View style={styles.emptyState}>
-            {initialLoading ? <ActivityIndicator color={colors.accent} /> : null}
-            {initialLoading ? <Text style={styles.muted}>피드를 불러오는 중…</Text> : null}
+            {initialLoading ? <FeedListSkeleton /> : null}
             {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
             {error ? <AppButton variant="secondary" onPress={() => void loadFeed(null, true)}>다시 시도</AppButton> : null}
             {showEmpty ? <Text style={styles.muted}>아직 게시물이 없어요.</Text> : null}
           </View>
         )}
-        ListFooterComponent={items.length && nextCursor ? (
-          <View style={styles.footer}>
-            <AppButton
-              variant="quiet"
-              loading={loadingMore}
-              disabled={loadingMore}
-              onPress={() => void loadFeed(nextCursor)}
-            >
-              이전 게시물 더 보기
-            </AppButton>
-          </View>
+        ListFooterComponent={loadingMore ? (
+          <FeedLoadMoreSkeleton />
         ) : null}
       />
 
@@ -152,5 +179,12 @@ const styles = StyleSheet.create({
   },
   muted: { ...typography.body, color: colors.textMuted, textAlign: "center" },
   error: { ...typography.body, color: colors.danger, textAlign: "center" },
-  footer: { alignItems: "center", paddingTop: spacing.lg },
+  inlineError: {
+    alignItems: "center",
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+    padding: spacing.md,
+    borderRadius: radii.control,
+    backgroundColor: colors.noticeErrorBg,
+  },
 });
