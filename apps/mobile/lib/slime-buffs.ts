@@ -54,7 +54,7 @@ export function mobileSlimeBuffGroups(
       entries.push({
         source: "slime",
         key: slime.key,
-        label: "펫 기본 효과",
+        label: `${slime.nameKo} 고유 버프`,
         effectKey: slime.effectKey,
         bps: baseBps,
       });

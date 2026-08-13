@@ -378,7 +378,7 @@ describe("mobile slime parity model", () => {
       color: "blue",
       label: "파란 슬라임",
       entries: [
-        { source: "slime", key: "blue", label: "펫 기본 효과", effectKey: "growth_speed", bps: 100 },
+        { source: "slime", key: "blue", label: "파란 슬라임 고유 버프", effectKey: "growth_speed", bps: 100 },
         { source: "background", key: "reading-background", label: "독서 배경", effectKey: "reading_reward", bps: 100 },
         { source: "title", key: "reading-title", label: "독서 칭호", effectKey: "reading_reward", bps: 200 },
       ],

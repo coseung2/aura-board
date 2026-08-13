@@ -244,7 +244,12 @@ export function AppModal({
         importantForAccessibility="yes"
         style={[styles.modalSheet, sheetStyle]}
       >
-        {children}
+        {/*
+          React Native can retain a hidden Modal's native TextInput state on
+          Android. Unmount the content while closed so each open gets fresh
+          native inputs, while the caller-owned React draft state is preserved.
+        */}
+        {visible ? children : null}
       </SurfaceCard>
     </View>
   );
@@ -392,7 +397,8 @@ export function AppBottomSheet({
       >
         <View style={styles.bottomSheetHandle} />
       </View>
-      {children}
+      {/* See AppModal: preserve caller state, but recreate native inputs. */}
+      {visible ? children : null}
     </Animated.View>
   );
 
@@ -423,7 +429,7 @@ export function AppBottomSheet({
         ) : (
           sheet
         )}
-        {overlay}
+        {visible ? overlay : null}
       </View>
     </Modal>
   );

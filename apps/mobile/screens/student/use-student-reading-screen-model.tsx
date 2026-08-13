@@ -21,10 +21,17 @@ import {
   type WalkingRepresentativeSlime,
 } from "../../lib/walking-health";
 import { studentRewardNumberFormatter as numberFormatter } from "./student-reward-format";
+import {
+  EMPTY_READING_COMPOSER_DRAFT,
+  nextReadingComposerInstanceId,
+  presentReadingComposerDraft,
+  type ReadingComposerBookType,
+  type ReadingComposerField,
+} from "../../lib/reading-composer-draft";
 
-type BookType = "comic" | "story";
+type BookType = ReadingComposerBookType;
 type ReadingTab = "records" | "missions" | "titles";
-type ComposerField = "title" | "author" | "reflection";
+type ComposerField = ReadingComposerField;
 type ReadingRank = {
   studentId: string;
   studentNumber: number | null;
@@ -117,9 +124,12 @@ export function useStudentReadingScreenModel() {
     requestedView === "missions" ? "missions" : "records",
   );
   const [composerVisible, setComposerVisible] = useState(false);
-  const [title, setTitle] = useState("");
-  const [author, setAuthor] = useState("");
-  const [reflection, setReflection] = useState("");
+  const [composerInstanceId, setComposerInstanceId] = useState(0);
+  const [title, setTitle] = useState(EMPTY_READING_COMPOSER_DRAFT.title);
+  const [author, setAuthor] = useState(EMPTY_READING_COMPOSER_DRAFT.author);
+  const [reflection, setReflection] = useState(
+    EMPTY_READING_COMPOSER_DRAFT.reflection,
+  );
   const composerScrollRef = useRef<ScrollView>(null);
   const composerFieldOffsets = useRef<Record<ComposerField, number>>({
     title: 0,
@@ -454,9 +464,10 @@ export function useStudentReadingScreenModel() {
       );
       setEntries((current) => [payload.entry, ...current]);
       setHistoryBookType(payload.entry.bookType);
-      setTitle("");
-      setAuthor("");
-      setReflection("");
+      setTitle(EMPTY_READING_COMPOSER_DRAFT.title);
+      setAuthor(EMPTY_READING_COMPOSER_DRAFT.author);
+      setReflection(EMPTY_READING_COMPOSER_DRAFT.reflection);
+      setComposerInstanceId((current) => nextReadingComposerInstanceId(current));
       setNotice("저장했어요. AI 피드백을 만들고 있어요.");
       setComposerVisible(false);
       void requestFeedback(payload.entry.id);
@@ -488,8 +499,21 @@ export function useStudentReadingScreenModel() {
   function openComposer() {
     setError(null);
     setNotice(null);
+    // Remount TextInputs on every open so controlled draft values always win
+    // over any native TextInput cache left from a previous close/clear.
+    setComposerInstanceId((current) => nextReadingComposerInstanceId(current));
     setComposerVisible(true);
   }
+
+  const composerFieldKeys = presentReadingComposerDraft(
+    {
+      bookType,
+      title,
+      author,
+      reflection,
+    },
+    composerInstanceId,
+  ).fieldKeys;
 
   return {
     title,
@@ -538,6 +562,7 @@ export function useStudentReadingScreenModel() {
     composerScrollRef,
     setBookType,
     composerFieldOffsets,
+    composerFieldKeys,
     titleInputRef,
     setTitle,
     focusComposerField,

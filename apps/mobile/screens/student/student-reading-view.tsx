@@ -81,6 +81,7 @@ export function StudentReadingScreenView({
     composerScrollRef,
     setBookType,
     composerFieldOffsets,
+    composerFieldKeys,
     titleInputRef,
     setTitle,
     focusComposerField,
@@ -521,6 +522,7 @@ export function StudentReadingScreenView({
           >
             <Text style={styles.fieldLabel}>책 제목</Text>
             <TextField
+              key={composerFieldKeys.title}
               ref={titleInputRef}
               value={title}
               onChangeText={setTitle}
@@ -541,6 +543,7 @@ export function StudentReadingScreenView({
           >
             <Text style={styles.fieldLabel}>지은이</Text>
             <TextField
+              key={composerFieldKeys.author}
               ref={authorInputRef}
               value={author}
               onChangeText={setAuthor}
@@ -562,6 +565,7 @@ export function StudentReadingScreenView({
           >
             <Text style={styles.fieldLabel}>독서 감상</Text>
             <TextField
+              key={composerFieldKeys.reflection}
               ref={reflectionInputRef}
               style={styles.reflectionInput}
               value={reflection}
