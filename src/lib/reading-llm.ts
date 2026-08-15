@@ -8,7 +8,9 @@ import {
 } from "./reading-evaluator";
 import type { AiProvider } from "./ai/model-catalog";
 
-const EVALUATION_TIMEOUT_MS = 25_000;
+// Gemma 계열은 응답에 추론 텍스트를 섞어 내보내 20~40초까지 걸리는 경우가
+// 잦다. 25초로는 504(timeout)가 반복되어 60초로 넉넉히 잡는다. (2026-08-15)
+const EVALUATION_TIMEOUT_MS = 60_000;
 
 const SYSTEM_PROMPT = `당신은 한국 초등·중등 학생의 독서 기록을 돕는 독서 코치입니다.
 학생을 평가하거나 진단하지 말고, 제공된 독서 감상에 실제로 드러난 내용만 근거로 평가하세요.

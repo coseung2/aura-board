@@ -408,6 +408,9 @@ export function useStudentReadingScreenModel() {
           `/api/student/reading/${encodeURIComponent(readingLogId)}/feedback`,
           {
             method: "POST",
+            // Gemma 독서 평가는 서버에서 최대 60초까지 걸릴 수 있어 기본
+            // 12초 타임아웃으로는 항상 실패로 보인다. (2026-08-15)
+            timeoutMs: 65_000,
           },
         );
         setEntries((current) =>
