@@ -67,25 +67,44 @@ export function sanitizeReadingEvaluationInput(
   };
 }
 
-function parseEvaluationResponse(text: string): unknown {
+/**
+ * 모델 응답에서 평가 JSON 객체를 추출한다.
+ *
+ * Gemma 계열은 "JSON만 출력" 지시를 어기고 추론·분석 텍스트 앞뒤에 붙이는
+ * 경우가 잦다. 텍스트 중간의 중괄호 때문에 첫 "{"~마지막 "}" 슬라이스가
+ * 깨질 수 있으므로, 마지막 "}"를 기준으로 각 "{" 후보를 오른쪽부터 시도해
+ * 가장 뒤에 있는 온전한 JSON 객체를 사용한다.
+ */
+export function parseEvaluationResponse(text: string): unknown {
   const unfenced = text
     .trim()
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/, "")
     .trim();
 
-  try {
-    return JSON.parse(unfenced);
-  } catch {
-    const start = unfenced.indexOf("{");
-    const end = unfenced.lastIndexOf("}");
-    if (start < 0 || end <= start) return null;
+  const tryParse = (candidate: string): unknown => {
     try {
-      return JSON.parse(unfenced.slice(start, end + 1));
+      return JSON.parse(candidate) as unknown;
     } catch {
-      return null;
+      return undefined;
     }
+  };
+
+  const direct = tryParse(unfenced);
+  if (direct !== undefined) return direct;
+
+  const end = unfenced.lastIndexOf("}");
+  if (end < 0) return null;
+
+  let start = unfenced.lastIndexOf("{", end);
+  while (start >= 0) {
+    const parsed = tryParse(unfenced.slice(start, end + 1));
+    if (parsed !== undefined) return parsed;
+    const next = unfenced.lastIndexOf("{", start - 1);
+    if (next === start) break;
+    start = next;
   }
+  return null;
 }
 
 function providerStatus(error: string): number | null {

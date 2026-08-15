@@ -13,9 +13,11 @@ const MODELS: Record<Exclude<LlmProvider, "ollama">, string> = {
 };
 
 // 평어는 짧지만(60~100자) thinking 모델(Gemini 2.5 Flash 등)이 thinking
-// 토큰을 먼저 소비하면 본문 자리가 모자라 잘리는 사고가 났다. 여유 있게 잡아도
-// 호출당 비용은 출력 토큰 기준 < $0.0002 수준이라 무시 가능. (2026-04-24)
-const MAX_OUTPUT_TOKENS = 1024;
+// 토큰을 먼저 소비하면 본문 자리가 모자라 잘리는 사고가 났다. 독서 피드백의
+// Gemma 계열은 응답에 추론·분석 텍스트를 섞어 내보내는데, 1024 토큰이면
+// 마지막 JSON 객체가 잘려 파싱 실패(502)로 이어진다. 여유 있게 잡아도 호출당
+// 비용은 출력 토큰 기준 < $0.0005 수준이라 무시 가능. (2026-04-24 / 2026-08-15)
+const MAX_OUTPUT_TOKENS = 4096;
 
 function geminiThinkingConfig(model: string) {
   if (model.startsWith("gemini-3")) {
