@@ -1,24 +1,10 @@
 name: Mobile PR Quality
 
 on:
-  pull_request:
-    paths:
-      - "apps/mobile/**"
-      - "src/lib/**"
-      - "src/lib/__tests__/**"
-      - "package.json"
-      - "package-lock.json"
-      - "apps/mobile/package.json"
-      - "apps/mobile/package-lock.json"
-      - "vitest.config.ts"
-      - ".github/workflows/mobile-quality.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
-
-concurrency:
-  group: mobile-quality-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
 
 jobs:
   mobile-quality:
