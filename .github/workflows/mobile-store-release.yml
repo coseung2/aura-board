@@ -4,15 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       platform:
-        description: Store platform to build and submit
+        description: Release action to validate, build, submit, or promote
         required: true
         default: all
         type: choice
         options:
           - all
           - validate
+          - android-build
           - android
           - android-promote
+          - ios-build
           - ios
       expected_version:
         description: App version that must be present in app.config.ts
@@ -103,7 +105,7 @@ jobs:
           npm run assets:check
 
       - name: Materialize Firebase Android config for preflight
-        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android' }}
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android-build' || inputs.platform == 'android' }}
         env:
           GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.AURA_BOARD_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
@@ -124,7 +126,7 @@ jobs:
           NODE
 
       - name: Verify production Android release inputs
-        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android' }}
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android-build' || inputs.platform == 'android' }}
         env:
           EAS_BUILD_PLATFORM: android
           EAS_BUILD_PROFILE: production
@@ -132,20 +134,20 @@ jobs:
         run: npm run release:check
 
       - name: Inspect iOS upload archive
-        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'ios' }}
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'ios-build' || inputs.platform == 'ios' }}
         run: |
           eas build:inspect --platform ios --stage archive --profile production --output "$RUNNER_TEMP/ios-archive" --force
           test -f "$RUNNER_TEMP/ios-archive/apps/mobile/modules/aura-board-health-connect/ios/AuraBoardHealthConnectModule.swift"
           test -f "$RUNNER_TEMP/ios-archive/apps/mobile/modules/aura-board-health-connect/ios/AuraBoardHealthConnect.podspec"
 
       - name: Remove preflight Firebase config
-        if: ${{ always() && (inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android') }}
+        if: ${{ always() && (inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android-build' || inputs.platform == 'android') }}
         run: rm -f "$RUNNER_TEMP/google-services.json"
 
   android:
-    name: Android AAB to production
+    name: Android AAB build and optional production submission
     environment: production
-    if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'android-build' || inputs.platform == 'android' }}
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 120
@@ -233,9 +235,10 @@ jobs:
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Submit AAB to Google Play production
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
         run: eas submit --platform android --profile production --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
 
-      - name: Preserve submitted AAB
+      - name: Preserve built AAB
         if: ${{ always() && steps.build.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
@@ -247,12 +250,16 @@ jobs:
         if: always()
         run: |
           {
-            echo "## Android closed testing and production"
+            echo "## Android AAB"
             echo "- Commit: $GITHUB_SHA"
             echo "- Version: ${{ inputs.expected_version }}"
             echo "- Version code: ${{ steps.build.outputs.build_number }}"
             echo "- Build: GitHub Ubuntu runner (local EAS build)"
-            echo "- Play track: production"
+            if [ "${{ inputs.platform }}" = "android-build" ]; then
+              echo "- Submission: skipped (build-only)"
+            else
+              echo "- Play track: production"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Remove Google Play service account
@@ -298,9 +305,9 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
   ios:
-    name: iOS production submission
+    name: iOS IPA build and optional App Store Connect submission
     environment: production
-    if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
+    if: ${{ inputs.platform == 'all' || inputs.platform == 'ios-build' || inputs.platform == 'ios' }}
     needs: validate
     runs-on: macos-26
     timeout-minutes: 180
@@ -347,9 +354,10 @@ jobs:
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
       - name: Submit IPA to App Store Connect
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
         run: eas submit --platform ios --profile production --path "${{ steps.build.outputs.ipa_path }}" --wait --non-interactive
 
-      - name: Preserve submitted IPA
+      - name: Preserve built IPA
         if: ${{ always() && steps.build.outcome == 'success' }}
         uses: actions/upload-artifact@v4
         with:
@@ -361,10 +369,14 @@ jobs:
         if: always()
         run: |
           {
-            echo "## iOS production submission"
+            echo "## iOS IPA"
             echo "- Commit: $GITHUB_SHA"
             echo "- Version: ${{ inputs.expected_version }}"
             echo "- Build number: ${{ steps.build.outputs.build_number }}"
             echo "- Build: GitHub macOS runner (local EAS build)"
-            echo "- Destination: App Store Connect"
+            if [ "${{ inputs.platform }}" = "ios-build" ]; then
+              echo "- Submission: skipped (build-only)"
+            else
+              echo "- Destination: App Store Connect"
+            fi
           } >> "$GITHUB_STEP_SUMMARY"
