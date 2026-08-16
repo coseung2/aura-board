@@ -10,6 +10,7 @@ on:
         type: choice
         options:
           - all
+          - validate
           - android
           - android-promote
           - ios
@@ -101,12 +102,45 @@ jobs:
           npm run release:check
           npm run assets:check
 
+      - name: Materialize Firebase Android config for preflight
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android' }}
+        env:
+          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.AURA_BOARD_GOOGLE_SERVICES_JSON_BASE64 }}
+        run: |
+          test -n "$GOOGLE_SERVICES_JSON_BASE64"
+          GOOGLE_SERVICES_PATH="$RUNNER_TEMP/google-services.json"
+          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > "$GOOGLE_SERVICES_PATH"
+          chmod 600 "$GOOGLE_SERVICES_PATH"
+          node - "$GOOGLE_SERVICES_PATH" <<'NODE'
+          const fs = require("node:fs");
+          const config = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
+          const packageNames = (config.client ?? []).flatMap((client) => {
+            const packageName = client?.client_info?.android_client_info?.package_name;
+            return typeof packageName === "string" ? [packageName] : [];
+          });
+          if (!packageNames.includes("com.auraboard.app")) {
+            throw new Error("Firebase config does not belong to com.auraboard.app");
+          }
+          NODE
+
+      - name: Verify production Android release inputs
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android' }}
+        env:
+          EAS_BUILD_PLATFORM: android
+          EAS_BUILD_PROFILE: production
+          GOOGLE_SERVICES_JSON: ${{ runner.temp }}/google-services.json
+        run: npm run release:check
+
       - name: Inspect iOS upload archive
-        if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'ios' }}
         run: |
           eas build:inspect --platform ios --stage archive --profile production --output "$RUNNER_TEMP/ios-archive" --force
           test -f "$RUNNER_TEMP/ios-archive/apps/mobile/modules/aura-board-health-connect/ios/AuraBoardHealthConnectModule.swift"
           test -f "$RUNNER_TEMP/ios-archive/apps/mobile/modules/aura-board-health-connect/ios/AuraBoardHealthConnect.podspec"
+
+      - name: Remove preflight Firebase config
+        if: ${{ always() && (inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android') }}
+        run: rm -f "$RUNNER_TEMP/google-services.json"
 
   android:
     name: Android AAB to production
