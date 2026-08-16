@@ -1,4 +1,4 @@
-name: Mobile APK Build (EAS Preview)
+name: Mobile APK Build (Manual EAS Preview)
 
 # Actions 사용량을 보존하기 위해 EAS APK 빌드는 수동 실행만 지원합니다.
 # 사전 조건: Expo 프로젝트가 app.config.ts에 연결되어 있고 GitHub Actions secret

@@ -1,4 +1,4 @@
-name: Mobile PR Quality
+name: Mobile Quality (Manual)
 
 on:
   workflow_dispatch:
