@@ -27,26 +27,35 @@ type ExpoTicket = {
 export class ExpoPushSendError extends Error {
   readonly reason: "http_error" | "invalid_response" | "ticket_error" | "request_error";
   readonly status?: number;
+  readonly ticketErrors?: Readonly<Record<string, number>>;
 
   constructor(
     reason: ExpoPushSendError["reason"],
-    options: { status?: number } = {},
+    options: {
+      status?: number;
+      ticketErrors?: Readonly<Record<string, number>>;
+    } = {},
   ) {
     super(`expo_push_${reason}`);
     this.name = "ExpoPushSendError";
     this.reason = reason;
     this.status = options.status;
+    this.ticketErrors = options.ticketErrors;
   }
 }
 
 export function expoPushFailureDetails(error: unknown): {
   reason: string;
   status?: number;
+  ticketErrors?: Readonly<Record<string, number>>;
 } {
   if (error instanceof ExpoPushSendError) {
     return {
       reason: error.reason,
       ...(error.status == null ? {} : { status: error.status }),
+      ...(error.ticketErrors == null
+        ? {}
+        : { ticketErrors: error.ticketErrors }),
     };
   }
   return { reason: "unexpected_error" };
@@ -101,17 +110,24 @@ export async function sendExpoPushMessages(
       if (!Array.isArray(payload?.data) || payload.data.length !== batch.length) {
         throw new ExpoPushSendError("invalid_response");
       }
-      let hasRetryableTicketError = false;
+      const retryableTicketErrors: Record<string, number> = {};
       batch.forEach(({ device }, index) => {
         const ticket = payload.data?.[index];
         if (ticket?.details?.error === "DeviceNotRegistered") {
           invalidDeviceIds.push(device.id);
         } else if (ticket?.status !== "ok") {
-          hasRetryableTicketError = true;
+          const code = safeTicketErrorCode(ticket?.details?.error);
+          retryableTicketErrors[code] = (retryableTicketErrors[code] ?? 0) + 1;
         }
       });
-      if (hasRetryableTicketError) {
-        throw new ExpoPushSendError("ticket_error");
+      if (Object.keys(retryableTicketErrors).length > 0) {
+        throw new ExpoPushSendError("ticket_error", {
+          ticketErrors: Object.fromEntries(
+            Object.entries(retryableTicketErrors).sort(([left], [right]) =>
+              left.localeCompare(right),
+            ),
+          ),
+        });
       }
       attempted += batch.length;
     } catch (error) {
@@ -121,4 +137,10 @@ export async function sendExpoPushMessages(
   }
 
   return { attempted, invalidDeviceIds };
+}
+
+function safeTicketErrorCode(value: unknown): string {
+  return typeof value === "string" && /^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(value)
+    ? value
+    : "UnknownTicketError";
 }

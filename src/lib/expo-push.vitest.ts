@@ -63,9 +63,33 @@ describe("sendExpoPush", () => {
     await expect(sendExpoPush(devices, message)).rejects.toMatchObject({
       reason: "invalid_response",
     });
-    await expect(sendExpoPush(devices, message)).rejects.toMatchObject({
+    const ticketError = await sendExpoPush(devices, message).catch((value) => value);
+    expect(ticketError).toBeInstanceOf(ExpoPushSendError);
+    expect(expoPushFailureDetails(ticketError)).toEqual({
       reason: "ticket_error",
+      ticketErrors: { MessageTooBig: 1 },
     });
+  });
+
+  it("logs only bounded ticket error codes and counts", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue({
+        data: [
+          {
+            status: "error",
+            details: { error: "InvalidCredentials" },
+          },
+        ],
+      }),
+    }));
+
+    const error = await sendExpoPush(devices, message).catch((value) => value);
+    expect(expoPushFailureDetails(error)).toEqual({
+      reason: "ticket_error",
+      ticketErrors: { InvalidCredentials: 1 },
+    });
+    expect(JSON.stringify(expoPushFailureDetails(error))).not.toContain("token1");
   });
 
   it("splits 2,000 device-specific messages into batches of 100", async () => {
