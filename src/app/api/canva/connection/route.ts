@@ -12,6 +12,18 @@ function privateJson(body: unknown, status = 200) {
   });
 }
 
+function configuredPublicOrigin(): string | null {
+  const value =
+    process.env.AURA_BOARD_BASE_URL?.trim() ||
+    process.env.NEXT_PUBLIC_APP_BASE_URL?.trim();
+  if (!value) return null;
+  try {
+    return new URL(value).origin;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET() {
   const teacher = await getCurrentUser().catch(() => null);
   if (!teacher) return privateJson({ error: "Unauthorized" }, 401);
@@ -22,7 +34,10 @@ export async function GET() {
 export async function DELETE(request: Request) {
   const requestOrigin = new URL(request.url).origin;
   const origin = request.headers.get("origin");
-  if (!origin || origin !== requestOrigin) {
+  const allowedOrigins = new Set([requestOrigin]);
+  const publicOrigin = configuredPublicOrigin();
+  if (publicOrigin) allowedOrigins.add(publicOrigin);
+  if (!origin || !allowedOrigins.has(origin)) {
     return privateJson({ error: "Invalid request origin" }, 403);
   }
   const teacher = await getCurrentUser().catch(() => null);

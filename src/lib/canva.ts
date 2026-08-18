@@ -372,7 +372,8 @@ async function revokeCanvaToken(token: string): Promise<boolean> {
   } | null;
   return (
     error?.code === "bad_request_params" &&
-    /neither an access token nor a refresh token/i.test(error.message ?? "")
+    (/neither an access token nor a refresh token/i.test(error.message ?? "") ||
+      /neither an access or refresh token/i.test(error.message ?? ""))
   );
 }
 
