@@ -5,7 +5,7 @@ import { LayoutGrid, Search, ShoppingCart } from "lucide-react";
 
 import type { SlimeDefinition, SlimeShopItem } from "@/lib/pets/types";
 
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import {
   shopFilterForItem,
   wardrobeFilterForItem,

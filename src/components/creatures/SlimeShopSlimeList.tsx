@@ -8,7 +8,7 @@ import type { SlimeColor, SlimeDefinition } from "@/lib/pets/types";
 
 import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
 import { SlimeBuffTierChip } from "./SlimeBuffTierChip";
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import { EFFECT_LABELS } from "./SlimePetModel";
 
 const SHOP_PREVIEW_SLOT_PX = 192;

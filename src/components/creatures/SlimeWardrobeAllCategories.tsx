@@ -5,7 +5,7 @@ import { useState } from "react";
 import { prioritizeEquippedSlimeItems } from "@/lib/pets/item-visibility";
 import type { SlimeColor, SlimeShopItem } from "@/lib/pets/types";
 
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import {
   wardrobeFilterForItem,
   type EquippedItemsByColor,

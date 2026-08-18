@@ -9,7 +9,7 @@ import type {
   SlimeShopItem,
 } from "@/lib/pets/types";
 
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import { shopFilterForItem, type ShopFilter } from "./SlimePetModel";
 import { SlimeShopFlatItemList, type SlimeShopItemCardContext } from "./SlimeShopItemLists";
 import { SlimeShopSlimeList } from "./SlimeShopSlimeList";

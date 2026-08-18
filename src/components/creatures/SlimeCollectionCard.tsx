@@ -17,7 +17,7 @@ import type {
 } from "@/lib/pets/types";
 
 import { SlimeCharacterSprite } from "./SlimeCharacterSprite";
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import {
   calculateGrowthTimeComparison,
   calculateSlimeGrowthPercent,

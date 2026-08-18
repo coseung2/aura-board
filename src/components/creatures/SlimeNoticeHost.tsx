@@ -1,7 +1,7 @@
 "use client";
 
 import type { Notice } from "./SlimePetModel";
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 
 type SlimeNoticeHostProps = {
   notices: readonly Notice[];

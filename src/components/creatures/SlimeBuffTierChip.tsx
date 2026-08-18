@@ -1,4 +1,4 @@
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import { slimeBuffChipTier } from "./SlimeShopPresentation";
 
 const BUFF_TIER_ICON: Record<"bronze" | "silver" | "gold", string> = {

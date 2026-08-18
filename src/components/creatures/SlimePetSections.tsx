@@ -11,7 +11,7 @@ import type {
 } from "@/lib/pets/types";
 
 import { SlimeCollectionCard } from "./SlimeCollectionCard";
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import {
   EFFECT_LABELS,
   type ClaimedTitle,

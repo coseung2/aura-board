@@ -13,7 +13,7 @@ import type { SlimeColor, SlimeShopItem } from "@/lib/pets/types";
 
 import { OfficialSlimeSprite } from "./OfficialSlimeSprite";
 import { SlimeBuffTierChip } from "./SlimeBuffTierChip";
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import {
   SLIME_COOKIE_ITEM_KEY,
   formatGrowthHours,

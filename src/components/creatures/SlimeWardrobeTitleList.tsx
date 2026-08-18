@@ -4,7 +4,7 @@ import { prioritizeEquippedSlimeItems } from "@/lib/pets/item-visibility";
 import { formatBpsPercent } from "@/lib/pets/math";
 import type { SlimeColor } from "@/lib/pets/types";
 
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import type { ClaimedTitle } from "./SlimePetModel";
 
 type SlimeWardrobeTitleListProps = {

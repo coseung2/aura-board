@@ -1,6 +1,6 @@
 "use client";
 
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import { SlimePetLoadState } from "./SlimePetLoadState";
 import { SlimePetMineContent } from "./SlimePetMineContent";
 import { SlimePetPageOverlays } from "./SlimePetPageOverlays";

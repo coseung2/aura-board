@@ -1,4 +1,4 @@
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 
 type SlimePetLoadStateProps = {
   loading: boolean;

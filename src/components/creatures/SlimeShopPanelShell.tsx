@@ -3,7 +3,7 @@
 import type { ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
 
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 
 type SlimeShopPanelShellProps = {
   presentation: "modal" | "inline";

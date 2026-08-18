@@ -5,7 +5,7 @@ import type {
   SlimeShopItem,
 } from "@/lib/pets/types";
 
-import styles from "./SlimePetPage.module.css";
+import { styles } from "./SlimePetPage.styles";
 import {
   groupSlimeOutfitsByRole,
   groupSlimePropsByKind,
