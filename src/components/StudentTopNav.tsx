@@ -21,6 +21,7 @@ type Props = {
   studentName: string;
   classroomName: string;
   duties?: Duty[];
+  isAdminClassroom?: boolean;
 };
 
 function pathMatches(pathname: string, href: string) {
@@ -32,6 +33,7 @@ export function StudentTopNav({
   studentName,
   classroomName,
   duties = [],
+  isAdminClassroom = false,
 }: Props) {
   const pathname = usePathname() ?? "";
   const router = useRouter();
@@ -55,10 +57,12 @@ export function StudentTopNav({
 
   const legacyLessonActive = pathname === "/student" && legacyBoard === "lesson";
   const legacyPlayActive =
+    isAdminClassroom &&
     pathname === "/student" &&
     legacyBoard === "play" &&
     boardPlayTab !== "records";
   const legacyRecordsActive =
+    isAdminClassroom &&
     pathname === "/student" &&
     legacyBoard === "play" &&
     boardPlayTab === "records";
@@ -72,10 +76,12 @@ export function StudentTopNav({
   const lessonBoardActive =
     pathname === "/student/boards" && boardCategory === "lesson";
   const playBoardActive =
+    isAdminClassroom &&
     pathname === "/student/boards" &&
     boardCategory === "play" &&
     boardPlayTab !== "records";
   const recordsBoardActive =
+    isAdminClassroom &&
     pathname === "/student/boards" &&
     (rawBoardCategory === "records" ||
       (rawBoardCategory === "play" && boardPlayTab === "records"));
@@ -107,13 +113,17 @@ export function StudentTopNav({
       active: homeActive,
       groups: [],
     },
-    {
-      id: "feed",
-      label: "피드",
-      href: "/student/feed",
-      active: feedActive,
-      groups: [],
-    },
+    ...(isAdminClassroom
+      ? [
+          {
+            id: "feed",
+            label: "피드",
+            href: "/student/feed",
+            active: feedActive,
+            groups: [],
+          },
+        ]
+      : []),
     {
       id: "boards",
       label: "보드",
@@ -128,16 +138,20 @@ export function StudentTopNav({
               label: "수업보드",
               active: lessonBoardActive || legacyLessonActive,
             },
-            {
-              href: "/student/boards?category=play",
-              label: "놀이보드",
-              active: playBoardActive || legacyPlayActive,
-            },
-            {
-              href: "/student/boards?category=records",
-              label: "나의 전적",
-              active: recordsBoardActive || legacyRecordsActive,
-            },
+            ...(isAdminClassroom
+              ? [
+                  {
+                    href: "/student/boards?category=play",
+                    label: "놀이보드",
+                    active: playBoardActive || legacyPlayActive,
+                  },
+                  {
+                    href: "/student/boards?category=records",
+                    label: "나의 전적",
+                    active: recordsBoardActive || legacyRecordsActive,
+                  },
+                ]
+              : []),
           ],
         },
       ],

@@ -3,6 +3,7 @@ import { StudentFeedClient } from "@/components/feed/StudentFeedClient";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentHomePayload } from "@/lib/student-home";
+import { isAdminEmail } from "@/lib/admin";
 
 export const metadata = {
   title: "피드 · Aura-board",
@@ -11,6 +12,8 @@ export const metadata = {
 export default async function StudentFeedPage() {
   const student = await getCurrentStudent();
   if (!student) redirect("/login?from=/student/feed");
+  const isAdminClassroom = isAdminEmail(student.classroom.teacher.email);
+  if (!isAdminClassroom) redirect("/student");
 
   const home = await getStudentHomePayload(student);
   return (
@@ -19,6 +22,7 @@ export default async function StudentFeedPage() {
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={home.duties}
+        isAdminClassroom={isAdminClassroom}
       />
       <main className="student-page ab-feed-page">
         <StudentFeedClient />

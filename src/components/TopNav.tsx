@@ -322,10 +322,14 @@ export function TopNav({ showAdmin = false }: Props) {
           title: "수업보드",
           links: lessonBoardLinks,
         },
-        {
-          title: "놀이보드",
-          links: playBoardLinks,
-        },
+        ...(showAdmin
+          ? [
+              {
+                title: "놀이보드",
+                links: playBoardLinks,
+              },
+            ]
+          : []),
       ],
     },
     {
@@ -354,36 +358,40 @@ export function TopNav({ showAdmin = false }: Props) {
         },
       ],
     },
-    {
-      id: "feed",
-      label: "피드",
-      href: "/teacher/feed",
-      active: pathname.startsWith("/teacher/feed"),
-      groups: [],
-    },
-    {
-      id: "community",
-      label: "공유",
-      href: "/teacher/share",
-      active: pathname.startsWith("/teacher/share"),
-      groups: [
-        {
-          title: "교사 공유",
-          links: [
-            {
-              href: "/teacher/share",
-              label: "공유 보드 둘러보기",
-              active: pathname === "/teacher/share",
-            },
-            {
-              href: "/teacher/share?view=mine",
-              label: "내 보드 게시 관리",
-              active: false,
-            },
-          ],
-        },
-      ],
-    },
+    ...(showAdmin
+      ? [
+          {
+            id: "feed",
+            label: "피드",
+            href: "/teacher/feed",
+            active: pathname.startsWith("/teacher/feed"),
+            groups: [],
+          },
+          {
+            id: "community",
+            label: "공유",
+            href: "/teacher/share",
+            active: pathname.startsWith("/teacher/share"),
+            groups: [
+              {
+                title: "교사 공유",
+                links: [
+                  {
+                    href: "/teacher/share",
+                    label: "공유 보드 둘러보기",
+                    active: pathname === "/teacher/share",
+                  },
+                  {
+                    href: "/teacher/share?view=mine",
+                    label: "내 보드 게시 관리",
+                    active: false,
+                  },
+                ],
+              },
+            ],
+          },
+        ]
+      : []),
   ];
 
   if (showAdmin) {

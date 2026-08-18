@@ -5,6 +5,7 @@ import { ReadingTitles } from "@/components/student/ReadingTitles";
 import { StudentActivityTabs } from "@/components/student/StudentActivityTabs";
 import { WeeklyReadingMission } from "@/components/student/WeeklyReadingMission";
 import { StudentTopNav } from "@/components/StudentTopNav";
+import { isAdminEmail } from "@/lib/admin";
 import { db } from "@/lib/db";
 import {
   buildReadingWeeklyMissionReward,
@@ -116,6 +117,7 @@ export default async function StudentReadingPage({
         studentName={student.name}
         classroomName={classroom.name}
         duties={duties}
+        isAdminClassroom={isAdminEmail(student.classroom.teacher.email)}
       />
       <main className={`student-page student-reading-page ${styles.page}`}>
         <StudentActivityTabs

@@ -23,6 +23,7 @@ export default async function ClassroomDetailLayout({
           studentName={student.name}
           classroomName={student.classroom.name}
           duties={duties}
+          isAdminClassroom={isAdminEmail(student.classroom.teacher.email)}
         />
       ) : null}
       {children}

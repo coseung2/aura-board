@@ -23,6 +23,8 @@ export default async function TeacherSharePage({
 }) {
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?callbackUrl=/teacher/share");
+  const isAdmin = isAdminEmail(user.email);
+  if (!isAdmin) redirect("/dashboard");
 
   const [{ view }, publishedRows, ownedMemberships, classrooms] = await Promise.all([
     searchParams,
@@ -111,7 +113,7 @@ export default async function TeacherSharePage({
 
   return (
     <>
-      <TopNav showAdmin={isAdminEmail(user.email)} />
+      <TopNav showAdmin={isAdmin} />
       <main className="community-page">
         <header className="community-hero">
           <div>

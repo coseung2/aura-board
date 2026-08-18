@@ -67,7 +67,12 @@ vi.mock("./StudentNotificationBell", () => ({
   StudentNotificationBell: () => <button aria-label="알림" />,
 }));
 
-function renderAt(pathname: string, search = "", duties: React.ComponentProps<typeof StudentTopNav>["duties"] = []) {
+function renderAt(
+  pathname: string,
+  search = "",
+  duties: React.ComponentProps<typeof StudentTopNav>["duties"] = [],
+  isAdminClassroom = true,
+) {
   navigation.pathname = pathname;
   navigation.search = search;
   render(
@@ -75,6 +80,7 @@ function renderAt(pathname: string, search = "", duties: React.ComponentProps<ty
       studentName="학생"
       classroomName="1반"
       duties={duties}
+      isAdminClassroom={isAdminClassroom}
     />,
   );
 }
@@ -138,6 +144,15 @@ describe("StudentTopNav information architecture", () => {
     expect(item("feed").groups).toEqual([]);
     expect(item("reading").groups).toEqual([]);
     expect(item("walking").groups).toEqual([]);
+  });
+
+  it("hides admin-only feed and play destinations for other classrooms", () => {
+    renderAt("/student", "", [], false);
+
+    expect(renderedItems.map(({ label }) => label)).not.toContain("피드");
+    expect(item("boards").groups[0].links.map(({ label }) => label)).toEqual([
+      "수업보드",
+    ]);
   });
 
   it("keeps wallet, portfolio, duties, and hidden content in More without duplicating notifications", () => {

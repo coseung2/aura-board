@@ -4,6 +4,7 @@ import { HiddenContentManager } from "@/components/student/HiddenContentManager"
 import { db } from "@/lib/db";
 import { getStudentDuties } from "@/lib/role-portals";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { isAdminEmail } from "@/lib/admin";
 
 export default async function StudentHiddenContentPage() {
   const student = await getCurrentStudent().catch(() => null);
@@ -24,6 +25,7 @@ export default async function StudentHiddenContentPage() {
         studentName={student.name}
         classroomName={classroom.name}
         duties={duties}
+        isAdminClassroom={isAdminEmail(student.classroom.teacher.email)}
       />
       <main className="student-page student-hidden-page">
         <header className="student-activity-header">

@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentHomePayload } from "@/lib/student-home";
+import { isAdminEmail } from "@/lib/admin";
 
 import {
   normalizeActivityView,
@@ -32,6 +33,7 @@ export default async function StudentWalkingPage({
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={home.duties}
+        isAdminClassroom={isAdminEmail(student.classroom.teacher.email)}
       />
       <main className={`student-page student-walking-page ${styles.page}`}>
         <WalkingDashboard initialView={initialView} />

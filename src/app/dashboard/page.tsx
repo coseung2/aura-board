@@ -52,29 +52,33 @@ export default async function DashboardPage() {
     getCurrentTierAsync(user.id),
   ]);
 
+  const isAdmin = isAdminEmail(user.email);
+
   const classroomItems = classrooms.map((c) => ({
     id: c.id,
     name: c.name,
     studentCount: c._count.students,
   }));
 
-  const boardItems = memberships.map((m) => ({
-    id: m.board.id,
-    slug: m.board.slug,
-    title: m.board.title || "제목 없음",
-    layout: m.board.layout,
-    thumbnailMode: m.board.thumbnailMode,
-    thumbnailUrl: (m.board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null,
-    classroomId: m.board.classroomId,
-    category: m.board.category,
-    cardCount: m.board._count.cards,
-    memberCount: m.board._count.members,
-    role: m.role,
-  }));
+  const boardItems = memberships
+    .filter(({ board }) => isAdmin || board.category !== "PLAY")
+    .map((m) => ({
+      id: m.board.id,
+      slug: m.board.slug,
+      title: m.board.title || "제목 없음",
+      layout: m.board.layout,
+      thumbnailMode: m.board.thumbnailMode,
+      thumbnailUrl: (m.board as { thumbnailUrl?: string | null }).thumbnailUrl ?? null,
+      classroomId: m.board.classroomId,
+      category: m.board.category,
+      cardCount: m.board._count.cards,
+      memberCount: m.board._count.members,
+      role: m.role,
+    }));
 
   return (
     <>
-      <TopNav showAdmin={isAdminEmail(user.email)} />
+      <TopNav showAdmin={isAdmin} />
       <main className="home-page">
         <header className="home-header">
           <div className="home-header-top">
@@ -88,7 +92,7 @@ export default async function DashboardPage() {
           boards={boardItems}
           classrooms={classroomItems}
           userTier={tier}
-          isAdmin={isAdminEmail(user.email)}
+          isAdmin={isAdmin}
         />
       </main>
     </>

@@ -159,6 +159,7 @@ function BoardGrid({
 
 type BoardSectionTabsProps = BoardGridProps & {
   classrooms: ClassroomItem[];
+  isAdmin: boolean;
 };
 
 function BoardSectionTabs({
@@ -170,12 +171,13 @@ function BoardSectionTabs({
   onEdit,
   onDuplicate,
   onDelete,
+  isAdmin,
 }: BoardSectionTabsProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const requestedCategory =
-    searchParams.get("category") === "play" ||
-    !boards.some((board) => board.category === "LESSON")
+    (isAdmin && searchParams.get("category") === "play") ||
+    (isAdmin && !boards.some((board) => board.category === "LESSON"))
       ? "PLAY"
       : "LESSON";
   const [activeCategory, setActiveCategory] =
@@ -221,21 +223,23 @@ function BoardSectionTabs({
             수업
             <span className="board-section-tab-count">{lessonBoards.length}</span>
           </button>
-          <button
-            type="button"
-            role="tab"
-            id="teacher-board-tab-play"
-            aria-controls="teacher-board-panel"
-            aria-selected={activeCategory === "PLAY"}
-            tabIndex={activeCategory === "PLAY" ? 0 : -1}
-            className={`board-section-tab ${
-              activeCategory === "PLAY" ? "is-active" : ""
-            }`}
-            onClick={() => selectCategory("PLAY")}
-          >
-            놀이
-            <span className="board-section-tab-count">{playEntryCount}</span>
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              role="tab"
+              id="teacher-board-tab-play"
+              aria-controls="teacher-board-panel"
+              aria-selected={activeCategory === "PLAY"}
+              tabIndex={activeCategory === "PLAY" ? 0 : -1}
+              className={`board-section-tab ${
+                activeCategory === "PLAY" ? "is-active" : ""
+              }`}
+              onClick={() => selectCategory("PLAY")}
+            >
+              놀이
+              <span className="board-section-tab-count">{playEntryCount}</span>
+            </button>
+          ) : null}
         </div>
       </div>
 
@@ -249,7 +253,7 @@ function BoardSectionTabs({
             : "teacher-board-tab-lesson"
         }
       >
-        {activeCategory === "PLAY" ? (
+        {isAdmin && activeCategory === "PLAY" ? (
           <GameHubCatalog viewer="teacher" classrooms={classrooms} />
         ) : (
           <BoardGrid
@@ -325,6 +329,7 @@ export function Dashboard({
         onEdit={setEditingBoard}
         onDuplicate={handleDuplicate}
         onDelete={handleDelete}
+        isAdmin={isAdmin}
       />
 
       {menuOpen ? (

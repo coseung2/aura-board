@@ -3,6 +3,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentHomePayload } from "@/lib/student-home";
 import { StudentDashboard } from "@/components/StudentDashboard";
 import { StudentTopNav } from "@/components/StudentTopNav";
+import { isAdminEmail } from "@/lib/admin";
 import {
   legacyStudentBoardRedirect,
   type StudentBoardSearchParams,
@@ -26,6 +27,7 @@ export default async function StudentPage({ searchParams }: StudentPageProps) {
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={home.duties}
+        isAdminClassroom={isAdminEmail(student.classroom.teacher.email)}
       />
       <main className="student-page">
         <StudentDashboard

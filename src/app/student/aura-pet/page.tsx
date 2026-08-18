@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { getStudentDuties } from "@/lib/role-portals";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { StudentTopNav } from "@/components/StudentTopNav";
+import { isAdminEmail } from "@/lib/admin";
 import { SlimePetPage } from "@/components/creatures/SlimePetPage";
 import { ClassroomSlimeGallery } from "./classroom/ClassroomSlimeGallery";
 
@@ -33,6 +34,7 @@ export default async function StudentAuraPetPage({
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={duties}
+        isAdminClassroom={isAdminEmail(student.classroom.teacher.email)}
       />
       {section === "classroom" ? (
         <ClassroomSlimeGallery classroomId={student.classroomId} />

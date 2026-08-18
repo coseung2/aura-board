@@ -16,6 +16,7 @@ import Link from "next/link";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentDuties } from "@/lib/role-portals";
 import { StudentTopNav } from "@/components/StudentTopNav";
+import { isAdminEmail } from "@/lib/admin";
 import { issueStudentCanvaPairCode } from "@/lib/canva-pair";
 import { CopyButton } from "./CopyButton";
 
@@ -41,6 +42,7 @@ export default async function CanvaPairPage() {
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={duties}
+        isAdminClassroom={isAdminEmail(student.classroom.teacher.email)}
       />
       <main
         style={{

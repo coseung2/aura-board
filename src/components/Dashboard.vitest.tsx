@@ -80,7 +80,7 @@ afterEach(() => {
 
 describe("teacher dashboard board sections", () => {
   it("keeps lesson creation in the lesson tab and uses the game hub for play", () => {
-    render(<Dashboard boards={boards} classrooms={classrooms} />);
+    render(<Dashboard boards={boards} classrooms={classrooms} isAdmin />);
 
     expect(screen.getByText("우리 반 수업")).toBeTruthy();
     expect(screen.getByRole("button", { name: /새 보드 만들기/ })).toBeTruthy();
@@ -98,5 +98,13 @@ describe("teacher dashboard board sections", () => {
     expect(screen.queryByRole("heading", { name: "기존 놀이보드" })).toBeNull();
     expect(screen.queryByText("예전 놀이보드")).toBeNull();
     expect(screen.queryByRole("link", { name: /학급 관리/ })).toBeNull();
+  });
+
+  it("hides the play tab for a non-admin teacher", () => {
+    render(<Dashboard boards={boards} classrooms={classrooms} />);
+
+    expect(screen.getByText("우리 반 수업")).toBeTruthy();
+    expect(screen.queryByRole("tab", { name: /놀이/ })).toBeNull();
+    expect(screen.queryByText("예전 놀이보드")).toBeNull();
   });
 });

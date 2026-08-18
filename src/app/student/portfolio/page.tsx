@@ -5,6 +5,7 @@ import { getStudentDuties } from "@/lib/role-portals";
 import { PortfolioPage } from "@/components/portfolio/PortfolioPage";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import type { PortfolioRosterDTO } from "@/lib/portfolio-dto";
+import { isAdminEmail } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -65,6 +66,7 @@ export default async function StudentPortfolioPage() {
         studentName={student.name}
         classroomName={classroom.name}
         duties={duties}
+        isAdminClassroom={isAdminEmail(student.classroom.teacher.email)}
       />
       <main className="student-page-portfolio-shell">
         {/* 헤더는 PortfolioPage 가 own — DJ 보드 패턴 일치 (제목 + action 동일

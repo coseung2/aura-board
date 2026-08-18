@@ -63,11 +63,24 @@ export default async function BoardPage({
   const [board, user, student] = await Promise.all([
     db.board.findFirst({
       where: { OR: [{ id }, { slug: id }] },
+      include: {
+        classroom: { select: { teacher: { select: { email: true } } } },
+      },
     }),
     getCurrentUser().catch(() => null),
     getCurrentStudent(),
   ]);
   if (!board) notFound();
+  const canSeeAdminOnlyPlay =
+    isAdminEmail(user?.email) ||
+    Boolean(
+      student &&
+        student.classroomId === board.classroomId &&
+        isAdminEmail(student.classroom.teacher.email),
+    );
+  if (board.category === "PLAY" && !canSeeAdminOnlyPlay) {
+    redirect(student ? "/student" : "/dashboard");
+  }
   const studentViewRequested = viewParam === "student";
   const useStudentViewer = shouldUseStudentBoardViewer({
     boardClassroomId: board.classroomId,

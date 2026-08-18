@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { layoutLabel, layoutThumbnail } from "@/lib/layout-meta";
 import type { StudentHomeBoard as BoardItem, StudentHomeBreakout as StudentBreakout } from "@/lib/student-home-types";
-import { parseStudentBoardCategory, STUDENT_BOARD_CATEGORIES, type StudentBoardCategory } from "@/components/student/student-board-navigation";
+import { parseStudentBoardCategory, type StudentBoardCategory } from "@/components/student/student-board-navigation";
 import { GameHubCatalog } from "@/components/game-platform/GameHubCatalog";
 import { GameRecordsPanel } from "@/components/game-platform/GameRecordsPanel";
 import { GAME_HUB_ORDER } from "@/lib/game-platform/catalog";
@@ -22,6 +22,7 @@ type BreakoutGroup = {
 
 type StudentBoardHubProps = {
   boards: BoardItem[];
+  showPlayFeatures?: boolean;
 };
 
 function boardListState(board: BoardItem) {
@@ -36,7 +37,10 @@ function boardListState(board: BoardItem) {
   return { label: layoutLabel(board.layout), live: false };
 }
 
-export function StudentBoardHub({ boards }: StudentBoardHubProps) {
+export function StudentBoardHub({
+  boards,
+  showPlayFeatures = true,
+}: StudentBoardHubProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [breakoutModal, setBreakoutModal] = useState<{
@@ -54,11 +58,12 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
     ? (searchParams.get("range") as GameRecordRange)
     : "30d";
   const categoryTabRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const requestedCategory =
-    searchParams.get("category") === "play" &&
-    searchParams.get("playTab") === "records"
+  const requestedCategory = showPlayFeatures
+    ? searchParams.get("category") === "play" &&
+      searchParams.get("playTab") === "records"
       ? "records"
-      : parseStudentBoardCategory(searchParams.get("category"));
+      : parseStudentBoardCategory(searchParams.get("category"))
+    : "lesson";
   const [activeCategory, setActiveCategory] =
     useState<StudentBoardCategory>(requestedCategory);
   const lessonBoards = boards
@@ -203,8 +208,12 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
     count?: number;
   }> = [
     { id: "lesson", label: "수업", count: lessonBoards.length },
-    { id: "play", label: "놀이", count: GAME_HUB_ORDER.length + 1 },
-    { id: "records", label: "전적" },
+    ...(showPlayFeatures
+      ? [
+          { id: "play" as const, label: "놀이", count: GAME_HUB_ORDER.length + 1 },
+          { id: "records" as const, label: "전적" },
+        ]
+      : []),
   ];
 
   return (
@@ -231,7 +240,7 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
                 handleRovingKeys(
                   event,
                   index,
-                  STUDENT_BOARD_CATEGORIES.length,
+                  categoryTabs.length,
                   categoryTabRefs,
                   (nextIndex) => selectCategory(categoryTabs[nextIndex].id),
                 )
@@ -251,13 +260,13 @@ export function StudentBoardHub({ boards }: StudentBoardHubProps) {
         role="tabpanel"
         aria-labelledby={`student-board-tab-${activeCategory}`}
       >
-        {activeCategory === "records" ? (
+        {showPlayFeatures && activeCategory === "records" ? (
           <GameRecordsPanel
             key={`${requestedRecordKind}:${requestedRecordRange}`}
             initialGameKind={requestedRecordKind}
             initialRange={requestedRecordRange}
           />
-        ) : activeCategory === "play" ? (
+        ) : showPlayFeatures && activeCategory === "play" ? (
           <GameHubCatalog />
         ) : (
           <>

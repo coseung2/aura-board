@@ -16,6 +16,8 @@ export default async function TeacherFeedPage({
 }) {
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?callbackUrl=/teacher/feed");
+  const isAdmin = isAdminEmail(user.email);
+  if (!isAdmin) redirect("/dashboard");
 
   const [{ view }, classrooms] = await Promise.all([
     searchParams,
@@ -29,7 +31,7 @@ export default async function TeacherFeedPage({
 
   return (
     <>
-      <TopNav showAdmin={isAdminEmail(user.email)} />
+      <TopNav showAdmin={isAdmin} />
       <main className="ab-feed-page">
         <TeacherFeedHub classrooms={classrooms} initialView={initialView} />
       </main>

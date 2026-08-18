@@ -3,6 +3,7 @@ import { StudentBoardHub } from "@/app/student/_components/StudentBoardHub";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getStudentHomePayload } from "@/lib/student-home";
+import { isAdminEmail } from "@/lib/admin";
 
 export default async function StudentBoardsPage() {
   const student = await getCurrentStudent();
@@ -15,10 +16,14 @@ export default async function StudentBoardsPage() {
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={home.duties}
+        isAdminClassroom={isAdminEmail(student.classroom.teacher.email)}
       />
       <main className="student-page student-boards-page">
         <h1 className="sr-only">보드</h1>
-        <StudentBoardHub boards={home.boards} />
+        <StudentBoardHub
+          boards={home.boards}
+          showPlayFeatures={isAdminEmail(student.classroom.teacher.email)}
+        />
       </main>
     </>
   );

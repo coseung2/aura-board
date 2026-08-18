@@ -4,6 +4,7 @@ import { LiveQuizExperience } from "@/components/live-quiz/LiveQuizExperience";
 import { StudentTopNav } from "@/components/StudentTopNav";
 import { getStudentDuties } from "@/lib/role-portals";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { isAdminEmail } from "@/lib/admin";
 
 export const metadata = {
   title: "오늘의 라이브 퀴즈 · Aura-board",
@@ -22,6 +23,7 @@ export default async function StudentLiveQuizPage() {
         studentName={student.name}
         classroomName={student.classroom.name}
         duties={duties}
+        isAdminClassroom={isAdminEmail(student.classroom.teacher.email)}
       />
       <LiveQuizExperience viewerKind="student" displayName={student.name} />
     </>

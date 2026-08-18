@@ -19,6 +19,7 @@ export default async function TeacherSharePreviewPage({
 }) {
   const user = await getCurrentUser().catch(() => null);
   if (!user) redirect("/login?callbackUrl=/teacher/share");
+  if (!isAdminEmail(user.email)) redirect("/dashboard");
 
   const { id } = await params;
   const [board, classrooms] = await Promise.all([
