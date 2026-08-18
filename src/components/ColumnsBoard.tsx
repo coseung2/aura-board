@@ -13,6 +13,7 @@ import { useBoardAnonymityChange } from "@/hooks/useBoardAnonymityChange";
 import { useColumnRoster } from "./columns/useColumnRoster";
 import { useCardMutations } from "./columns/useCardMutations";
 import { useSectionMutations } from "./columns/useSectionMutations";
+import { useSectionLibraryImport } from "./columns/useSectionLibraryImport";
 import type { SavedAuthor } from "./cards/CardAuthorEditor";
 import {
   applySectionAssignmentState,
@@ -85,7 +86,6 @@ export function ColumnsBoard({
   const [openCard, setOpenCard] = useState<CardData | null>(null);
   const [panelState, setPanelState] = useState<ColumnsPanelState | null>(null);
   const [addForSection, setAddForSection] = useState<string | null>(null);
-  const [exportSectionId, setExportSectionId] = useState<string | null>(null);
   const [folderSectionId, setFolderSectionId] = useState<string | null>(null);
   const [organizing, setOrganizing] = useState<string | null>(null);
   const [draggingSectionId, setDraggingSectionId] = useState<string | null>(
@@ -230,9 +230,6 @@ export function ColumnsBoard({
         sectionId: overSectionId ?? draggingSectionId,
       };
     }
-    if (exportSectionId) {
-      return { mode: "viewing", sectionId: exportSectionId };
-    }
     if (openCard) {
       return {
         mode: "viewing",
@@ -247,7 +244,6 @@ export function ColumnsBoard({
     cardDropPreview,
     draggingSectionId,
     editingCard,
-    exportSectionId,
     feedbackTarget,
     folderSectionId,
     openCard,
@@ -361,6 +357,8 @@ export function ColumnsBoard({
     setCards,
     boardSubjectOrder,
   });
+  const { libraryAddingSectionId, handleAddToLibrary } =
+    useSectionLibraryImport(sections);
 
   const openSeedDialog = useCallback(() => {
     if (seedingStudents) return;
@@ -687,6 +685,7 @@ export function ColumnsBoard({
         draggingSectionId={draggingSectionId}
         cardDropPreview={cardDropPreview}
         organizing={organizing}
+        libraryAddingSectionId={libraryAddingSectionId}
         assignmentBusySectionId={assignmentBusySectionId}
         roster={roster}
         authorsForSection={authorsForSection}
@@ -716,7 +715,7 @@ export function ColumnsBoard({
         onRename={(sectionId) => setPanelState({ sectionId, tab: "rename" })}
         onDelete={(sectionId) => setPanelState({ sectionId, tab: "delete" })}
         onFolder={(sectionId) => setFolderSectionId(sectionId)}
-        onExport={(sectionId) => setExportSectionId(sectionId)}
+        onAddToLibrary={handleAddToLibrary}
         onOrganize={handleOrganizeToCanva}
         onFeedback={(args) => setFeedbackTarget(args)}
         onCardOpen={(card) => setOpenCard(card)}
@@ -775,9 +774,6 @@ export function ColumnsBoard({
             : undefined
         }
         onCloseFolder={() => setFolderSectionId(null)}
-        exportSectionId={exportSectionId}
-        onCloseExport={() => setExportSectionId(null)}
-        getCardsForSection={getCardsForSection}
         feedbackTarget={feedbackTarget}
         onCloseFeedback={() => setFeedbackTarget(null)}
         seedDialogOpen={seedDialogOpen}

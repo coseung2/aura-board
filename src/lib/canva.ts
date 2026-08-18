@@ -369,11 +369,15 @@ async function revokeCanvaToken(token: string): Promise<boolean> {
   const error = (await response.json().catch(() => null)) as {
     code?: string;
     message?: string;
+    error?: string;
+    error_description?: string;
   } | null;
+  const code = error?.code ?? error?.error;
+  const message = error?.message ?? error?.error_description ?? "";
   return (
-    error?.code === "bad_request_params" &&
-    (/neither an access token nor a refresh token/i.test(error.message ?? "") ||
-      /neither an access or refresh token/i.test(error.message ?? ""))
+    code === "bad_request_params" &&
+    (/neither an access token nor a refresh token/i.test(message) ||
+      /neither an access or refresh token/i.test(message))
   );
 }
 

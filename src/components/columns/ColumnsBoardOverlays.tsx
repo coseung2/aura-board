@@ -5,7 +5,6 @@ import { AddCardModal, type AddCardData } from "../AddCardModal";
 import { CardDetailModal } from "../cards/CardDetailModal";
 import { CardAuthorEditor, type SavedAuthor } from "../cards/CardAuthorEditor";
 import { EditCardModal, type EditCardUpdates } from "../EditCardModal";
-import { ExportModal } from "../ExportModal";
 import { CanvaFolderModal } from "../CanvaFolderModal";
 import { SectionActionsPanel } from "../SectionActionsPanel";
 import { AiFeedbackModal } from "../feedback/AiFeedbackModal";
@@ -63,9 +62,6 @@ export type ColumnsBoardOverlaysProps = {
     designs: { id: string; title: string; thumbnail?: string }[],
   ) => void | Promise<void>;
   onCloseFolder: () => void;
-  exportSectionId: string | null;
-  onCloseExport: () => void;
-  getCardsForSection: (sectionId: string) => CardData[];
   feedbackTarget: ColumnsFeedbackTarget | null;
   onCloseFeedback: () => void;
   seedDialogOpen: boolean;
@@ -115,9 +111,6 @@ export function ColumnsBoardOverlays({
   folderSectionId,
   onImportFromCanva,
   onCloseFolder,
-  exportSectionId,
-  onCloseExport,
-  getCardsForSection,
   feedbackTarget,
   onCloseFeedback,
   seedDialogOpen,
@@ -130,9 +123,6 @@ export function ColumnsBoardOverlays({
     : null;
   const folderSection = folderSectionId
     ? sections.find((section) => section.id === folderSectionId)
-    : null;
-  const exportSection = exportSectionId
-    ? sections.find((section) => section.id === exportSectionId)
     : null;
 
   return (
@@ -219,14 +209,6 @@ export function ColumnsBoardOverlays({
           sectionTitle={folderSection.title}
           onImport={onImportFromCanva}
           onClose={onCloseFolder}
-        />
-      )}
-
-      {exportSection && (
-        <ExportModal
-          sectionTitle={exportSection.title}
-          cards={getCardsForSection(exportSection.id)}
-          onClose={onCloseExport}
         />
       )}
 

@@ -358,6 +358,13 @@ export function TopNav({ showAdmin = false }: Props) {
         },
       ],
     },
+    {
+      id: "library",
+      label: "라이브러리",
+      href: "/teacher/library",
+      active: pathname.startsWith("/teacher/library"),
+      groups: [],
+    },
     ...(showAdmin
       ? [
           {

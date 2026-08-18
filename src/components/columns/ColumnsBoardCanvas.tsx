@@ -37,6 +37,7 @@ export type ColumnsBoardCanvasProps = {
   draggingSectionId: string | null;
   cardDropPreview: ColumnsCardDropPreview;
   organizing: string | null;
+  libraryAddingSectionId: string | null;
   assignmentBusySectionId: string | null;
   roster: RosterEntry[];
   authorsForSection: (cards: CardData[]) => RosterEntry[];
@@ -67,7 +68,7 @@ export type ColumnsBoardCanvasProps = {
   onRename: (sectionId: string) => void;
   onDelete: (sectionId: string) => void;
   onFolder: (sectionId: string) => void;
-  onExport: (sectionId: string) => void;
+  onAddToLibrary: (sectionId: string) => void;
   onOrganize: (sectionId: string) => void;
   onFeedback: (args: {
     studentId: string | null;
@@ -108,6 +109,7 @@ export function ColumnsBoardCanvas({
   draggingSectionId,
   cardDropPreview,
   organizing,
+  libraryAddingSectionId,
   assignmentBusySectionId,
   roster,
   authorsForSection,
@@ -129,7 +131,7 @@ export function ColumnsBoardCanvas({
   onRename,
   onDelete,
   onFolder,
-  onExport,
+  onAddToLibrary,
   onOrganize,
   onFeedback,
   onCardOpen,
@@ -165,6 +167,7 @@ export function ColumnsBoardCanvas({
               draggingSectionId={draggingSectionId}
               cardDropPreview={cardDropPreview}
               organizing={organizing}
+              addingToLibrary={libraryAddingSectionId === section.id}
               assignmentState={getAssignmentState(
                 section,
                 assignmentBusySectionId === section.id,
@@ -191,7 +194,7 @@ export function ColumnsBoardCanvas({
               onRename={() => onRename(section.id)}
               onDelete={() => onDelete(section.id)}
               onFolder={() => onFolder(section.id)}
-              onExport={() => onExport(section.id)}
+              onAddToLibrary={() => onAddToLibrary(section.id)}
               onOrganize={() => onOrganize(section.id)}
               onFeedback={onFeedback}
               onCardOpen={onCardOpen}

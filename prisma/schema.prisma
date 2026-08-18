@@ -126,6 +126,9 @@ model User {
   // scope to a single teacher (no classroom-level sharing in v1).
   speedGameWordSets SpeedGameWordSet[]
 
+  libraryCollections TeacherLibraryCollection[]
+  libraryItems       TeacherLibraryItem[]
+
   // Global daily banner moderation/publication.
   dailyBannerReviews      DailyBannerSubmission[]  @relation("DailyBannerReviewedBy")
   dailyBannerPublications DailyBannerPublication[] @relation("DailyBannerPublishedBy")
@@ -462,6 +465,80 @@ model CanvaConnectAccount {
   createdAt DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Teacher content library. Aura-owned media keeps the existing public object
+// URL and participates in reference-aware blob cleanup. Canva entries retain
+// only the design identity; export bytes are created on demand and discarded.
+model TeacherLibraryCollection {
+  id String @id @default(cuid())
+
+  userId String
+
+  name String
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  items TeacherLibraryItem[]
+
+  @@unique([userId, name])
+  @@index([userId, updatedAt])
+}
+
+model TeacherLibraryItem {
+  id String @id @default(cuid())
+
+  userId String
+
+  collectionId String?
+
+  // "image" | "canva"
+  kind String
+
+  title String
+
+  // Stable per-teacher dedupe identity (for example image URL or Canva design ID).
+  sourceKey String
+
+  // Aura/Supabase object URL. External images are copied here once.
+  assetUrl String?
+
+  // Display-only thumbnail. Canva thumbnails may expire and are refreshed when possible.
+  previewUrl String?
+
+  mimeType String?
+
+  fileSize Int?
+
+  canvaDesignId String?
+
+  canvaViewUrl String?
+
+  pageCount Int?
+
+  sourceBoardId String?
+
+  sourceSectionId String?
+
+  sourceCardId String?
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  collection TeacherLibraryCollection? @relation(fields: [collectionId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, sourceKey])
+  @@index([userId, createdAt])
+  @@index([collectionId, createdAt])
+  @@index([canvaDesignId])
+  @@index([sourceSectionId])
 }
 
 model Account {

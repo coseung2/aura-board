@@ -136,6 +136,20 @@ npm run loadtest:mobile-tenancy
 
 ## 데이터베이스와 시드
 
+로컬 개발 DB는 Docker PostgreSQL을 사용한다. 데이터는
+`aura_board_dev_postgres_data` named volume에 유지되며 `down`으로 삭제되지 않는다.
+
+```bash
+npm run db:docker:up
+npm run db:docker:sync
+infisical run --env=dev -- npm run dev:docker-db
+```
+
+종료할 때는 `npm run db:docker:down`을 사용한다. 이 명령은 컨테이너와 네트워크만
+내리며 볼륨은 보존한다. 개발 DB는 `127.0.0.1:54329`에서만 접근할 수 있다.
+새 Docker 개발 DB는 현재 Prisma schema를 `db push`로 동기화한다. 운영 배포는
+기존 원칙대로 검토된 migration에 `prisma migrate deploy`를 사용한다.
+
 Prisma 명령:
 
 ```bash

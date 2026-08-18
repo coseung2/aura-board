@@ -77,7 +77,8 @@ type Props = {
   onRename: () => void;
   onDelete: () => void;
   onFolder: () => void;
-  onExport: () => void;
+  onAddToLibrary: () => void;
+  addingToLibrary?: boolean;
   onOrganize: () => void;
   onAssignmentAction?: (action: ColumnAssignmentAction) => void | Promise<void>;
   onFeedback: (args: {
@@ -133,7 +134,8 @@ export function ColumnView(props: Props) {
     onRename,
     onDelete,
     onFolder,
-    onExport,
+    onAddToLibrary,
+    addingToLibrary = false,
     onOrganize,
     onFeedback,
     onCardOpen,
@@ -308,6 +310,7 @@ export function ColumnView(props: Props) {
       icon: string;
       onClick: () => void;
       danger?: boolean;
+      disabled?: boolean;
     }> = [{ label: "이름 변경", icon: "✏️", onClick: onRename }];
 
     if (classroomId) {
@@ -365,9 +368,10 @@ export function ColumnView(props: Props) {
     });
 
     items.push({
-      label: "PDF 내보내기",
-      icon: "📄",
-      onClick: onExport,
+      label: addingToLibrary ? "라이브러리에 추가 중…" : "라이브러리에 추가",
+      icon: "📚",
+      onClick: onAddToLibrary,
+      disabled: addingToLibrary,
     });
 
     if (hasCanva) {

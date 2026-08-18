@@ -310,6 +310,9 @@ async function isStorageUrlReferenced(url: string): Promise<boolean> {
         UNION ALL
         SELECT 1 FROM "AvatarItem"
         WHERE "imageUrl" = ${url} OR "thumbnailUrl" = ${url}
+        UNION ALL
+        SELECT 1 FROM "TeacherLibraryItem"
+        WHERE "assetUrl" = ${url} OR "previewUrl" = ${url}
       ) AS "storage_references"
       LIMIT 1
     ) AS "referenced"

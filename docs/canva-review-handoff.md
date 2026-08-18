@@ -105,20 +105,23 @@ Canva Integration ID: `OC-AZ134Kp64WVh`
 이 수정 전에는 설문의 “30일 내 토큰 폐기·개인정보 삭제” 답을 **No**로 둔다.
 수정 및 운영 검증 후 **Yes**로 변경한다.
 
-### 4. Canva PDF 개별 다운로드 대응
+### 4. 교사 라이브러리 기반 Canva PDF 내보내기
 
-Canva Developer Terms의 media 처리 조항에 맞춰 `/api/export/canva-pdf`는 요청당
-정확히 한 항목만 처리한다. Canva 디자인은 Canva export 결과를 `pdf-lib`로
-읽거나 재배치하지 않고 원본 PDF 바이트 그대로 반환한다. 화면에서 여러 항목을
-선택하면 최대 10개까지 순차 요청하고 각 항목을 별도 PDF 파일로 다운로드한다.
-일반 이미지도 항목별 단일 PDF로만 생성하며 Canva 디자인과 합치지 않는다.
+심사 제출 당시에는 `/api/export/canva-pdf`가 요청당 정확히 한 항목만 처리했고,
+여러 항목을 선택하면 최대 10개까지 순차 요청해 별도 PDF로 다운로드했다.
+
+승인 후 직접 내보내기 화면은 교사 라이브러리 흐름으로 대체한다. 라이브러리에는
+Canva PDF 바이트를 영구 저장하지 않고 디자인 ID와 표시 메타데이터만 보관한다.
+교사가 라이브러리에서 항목을 선택하고 순서를 정해 다운로드할 때 Canva PDF를
+새로 export하고, Aura 이미지 페이지와 함께 하나의 임시 PDF를 만든다. 어느 한
+항목이라도 처리하지 못하면 일부만 담긴 PDF를 내려주지 않고 전체 요청을 실패시킨다.
 
 제출 전 다음을 운영에서 검증한다.
 
-1. Canva 디자인 여러 개를 선택해도 다운로드 파일이 항목별로 분리되는지 확인한다.
-2. Canva가 반환한 다중 페이지 PDF가 페이지 병합·재배치 없이 유지되는지 확인한다.
-3. 일반 이미지와 Canva 디자인이 하나의 PDF로 합쳐지지 않는지 확인한다.
-4. 브라우저의 다중 다운로드 허용 안내와 실패 항목 표시를 확인한다.
+1. 컬럼을 라이브러리에 추가해 Canva 디자인 ID만 저장되는지 확인한다.
+2. Canva 디자인 여러 개를 선택하면 다운로드가 한 번만 시작되는지 확인한다.
+3. 결과 PDF에서 선택 순서와 Canva 다중 페이지의 순서·크기가 유지되는지 확인한다.
+4. Canva 연결 해제 시 저장 항목은 남고 다운로드는 재연결 안내로 차단되는지 확인한다.
 
 구현과 운영 검증이 끝난 뒤 “Canva API 및 Developer Terms 준수”를 **Yes**로
 변경한다.
@@ -201,7 +204,8 @@ Pen test 날짜는 실제 외부 침투 테스트가 없으므로 비워 둔다.
 - `docs/canva-review-checklist.md`: 내부 기능·보안 검증 체크리스트
 - `src/lib/canva.ts`: OAuth, token refresh/revoke, design/folder API
 - `src/lib/canva-token-crypto.ts`: OAuth 비밀값 암호화
-- `src/app/api/export/canva-pdf/route.ts`: PDF 처리 방식
+- `src/app/api/teacher/library/export/route.ts`: 라이브러리 PDF 처리 방식
+- `src/lib/teacher-library.ts`: Aura 파일 참조 및 Canva 디자인 ID 저장 방식
 - `src/app/api/teacher/me/route.ts`: 계정 삭제 revoke 보완 대상
 - `src/app/terms/page.tsx`: 아동 이용 조건 보완 대상
 - `src/app/privacy/page.tsx`: Canva 데이터 수집·삭제·보관 고지

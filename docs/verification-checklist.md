@@ -63,6 +63,24 @@ creating overlapping testing-notes documents.
   loopback, nginx, Cloudflare, and Vercel can otherwise produce different
   results for identical application code.
 
+### Teacher content library and Canva PDF export
+
+- Add a columns-board section containing an Aura-hosted image, an external
+  image, and a Canva design. Confirm the Aura image keeps its existing object
+  URL, the external image is copied once into teacher-library storage, and the
+  Canva item stores only its design identity and display metadata.
+- Delete the source card and run blob cleanup after its delay. Confirm an Aura
+  image referenced by a library item remains. Delete the final library item and
+  confirm the object becomes eligible for cleanup.
+- Select two or more library items and confirm the browser starts exactly one
+  PDF download in the builder order. Canva pages retain source dimensions and
+  image pages are fitted to A4 without cropping.
+- Disconnect Canva and confirm saved Canva entries remain visible but export is
+  blocked with a reconnect action. Reconnect, refresh, and confirm export works.
+- Verify the server rejects duplicate IDs, more than 20 items, and any item not
+  owned by the authenticated teacher. Any failed Canva or image download must
+  fail the whole request; never return a silently incomplete PDF.
+
 ### Scheduled Job Changes
 
 - Parse the workflow syntax and verify the exact endpoint method/path mapping.

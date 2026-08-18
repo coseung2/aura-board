@@ -138,6 +138,7 @@ describe("blob cleanup leases and retries", () => {
       '"VibeProject"',
       '"PlantObservationImage"',
       '"DjPlayEvent"',
+      '"TeacherLibraryItem"',
     ]) {
       expect(sql).toContain(reference);
     }
