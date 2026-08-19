@@ -170,6 +170,18 @@ sudo systemd-run \
 sudo journalctl -u aura-storage-migrate.service -f
 ```
 
+dry-run 로그의 `manifest_sha256`는 object metadata 순서·이름·크기·MIME manifest의
+식별자다. 중단 후 재개할 때는 같은 dry-run에서 확인한 digest를 함께 지정한다.
+재개 실행은 `status=partial`과 exit code `2`를 반환하므로, 전체 bucket 완료로
+간주하지 말고 마지막에 전체 dry-run/count와 sample hash를 다시 확인한다.
+
+```bash
+python3 /srv/aura-board/migration/migrate-storage.py \
+  --start-index <next-index> \
+  --expected-manifest-sha256 <dry-run-manifest-sha256> \
+  --verify-samples 8
+```
+
 기본 source credential은 `/etc/aura-board/app.env`의 `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`, target credential은 `/srv/aura-board/supabase/.env`의 `SERVICE_ROLE_KEY`에서 읽는다. source는 읽기만 하고 target staging만 갱신한다. 성공 후 크기 구간별 sample object를 source/target에서 다시 다운로드해 SHA-256을 비교한다.
 
 ### OCI Object Storage backend 전환 전제
