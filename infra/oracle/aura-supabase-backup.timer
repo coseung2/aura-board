@@ -1,5 +1,5 @@
 [Unit]
-Description=Run Aura Board Supabase backup daily
+Description=Run Aura Board PostgreSQL logical backup daily (not WAL/PITR)
 Wants=network-online.target
 After=network-online.target
 

@@ -1,6 +1,8 @@
 # Oracle Cloud application and worker operations
 
-This directory contains the production runtime contract for Aura Board on Oracle Cloud. The Osaka A1 instance hosts the public Next.js application, the private Rust play engine, scheduled API jobs, media workers, and the daily logical backup. Supabase remains the primary Postgres/Auth/Realtime/Storage service and OCI Object Storage keeps the backup copy.
+This directory contains the production runtime contract for Aura Board on Oracle Cloud. The Osaka A1 instance hosts the public Next.js application, the private Rust play engine, scheduled API jobs, media workers, and the daily PostgreSQL logical backup. Supabase remains the primary Postgres/Auth/Realtime/Storage service and OCI Object Storage keeps the backup copy.
+
+The backup contains PostgreSQL data and metadata only; it is not an object-payload copy and it does not archive WAL. `BACKUP_SOURCE` is a non-secret source label for the `DATABASE_URL` supplied to the script. Until the managed-to-self-hosted cutover, set `BACKUP_SOURCE=managed-supabase` and use the direct managed-Supabase PostgreSQL endpoint. After cutover, change both together to `BACKUP_SOURCE=oracle-self-hosted` and the local/self-hosted Oracle PostgreSQL primary endpoint. The script never discovers, migrates, or switches the database source automatically.
 
 The production compute target is one `VM.Standard.A1.Flex` instance with **4 OCPUs and 24 GB RAM** in Japan Central (Osaka), `ap-osaka-1`. The resize was verified on-host on 2026-08-19 as `aarch64`, 4 online CPUs, and 23 GiB visible RAM. All runtime artifacts and native dependencies must be built for Linux ARM64.
 
@@ -11,10 +13,11 @@ OCI resource creation remains an operator action. The checked-in systemd and ngi
 - One OCI Ampere A1 Compute instance in the Osaka home region (`ap-osaka-1`), shape `VM.Standard.A1.Flex`, configured with 4 OCPUs and 24 GB RAM, plus dedicated `aura-app`, `aura-backup`, and `aura-media` system users and groups.
 - Node.js 22 for Linux ARM64. Install dependencies and run `prisma generate` on the A1 itself; never copy `node_modules` or generated native binaries from an AMD64 host.
 - ARM64-compatible PostgreSQL 17 client, OCI CLI, Rust toolchain, nginx, and FFmpeg binaries.
-- PostgreSQL 17 client tools (`pg_dump` and `pg_restore`). Keep the client major version compatible with or newer than the Supabase server version.
+- PostgreSQL 17 client tools (`pg_dump` and `pg_restore`). Keep the client major version compatible with or newer than the active PostgreSQL source.
 - OCI CLI with instance-principal authentication available to the service user. No API signing-key file is needed.
 - A private Object Storage bucket. OCI Object Storage encrypts data at rest with AES-256 by default.
-- Network access from the Compute instance to Supabase Postgres and OCI Object Storage.
+- A direct PostgreSQL primary endpoint for the active source: managed Supabase before cutover, or the local/self-hosted Oracle PostgreSQL primary after cutover. Do not use a transaction pooler or a DR subscriber as the backup source.
+- Network access from the Compute instance to the active PostgreSQL source and OCI Object Storage.
 
 After the A1 instance exists and its OCID is verified, place that one instance in a dynamic group and create the bucket-scoped policy. These resources do not exist yet because their matching rule depends on the future instance OCID. Replace every placeholder below with reviewed tenancy values; OCI policy syntax and supported bucket conditions can vary by tenancy configuration.
 
@@ -51,7 +54,7 @@ Allow dynamic-group aura-board-bastion-runner to inspect work-requests in tenanc
 
 The current DevSpace SSH public key is embedded in the trusted workflow because public keys are not secrets. Its matching private key remains outside the repository. Rotate this transitional key to a dedicated DevSpace-only SSH key when the execution environment gains a supported secret/key store; do not copy a private key into source control.
 
-Configure a bucket lifecycle policy for retention and expiry after recovery requirements are approved. The upload script never lists or deletes remote objects. Keep the bucket private and disable public access.
+Configure an approved bucket lifecycle policy for retention and expiry after recovery requirements are approved. Apply the same retention treatment to each `.dump` and sibling `.dump.sha256` pair under the configured prefix. The upload script never lists or deletes remote objects. Keep the bucket private and disable public access.
 
 ## A1 operating model
 
@@ -196,7 +199,7 @@ Install the repository backup files at these paths, matching the unit files:
 /etc/tmpfiles.d/aura-board-workers.conf
 ```
 
-The script and `/opt/aura-board/infra/oracle` should be owned by root and not writable by `aura-backup`. Create `/etc/aura-board/oracle-backup.env` from `oracle-backup.env.example`, replace placeholders outside source control, set ownership to `root:aura-backup`, and permissions to `0640`. Ensure the script is executable (`0755`). The script creates private temporary files under systemd's private temporary directory and removes them on exit.
+The script and `/opt/aura-board/infra/oracle` should be owned by root and not writable by `aura-backup`. Create `/etc/aura-board/oracle-backup.env` from `oracle-backup.env.example`, replace placeholders outside source control, set ownership to `root:aura-backup`, and permissions to `0640`. Before cutover, use `BACKUP_SOURCE=managed-supabase` with the managed direct PostgreSQL endpoint. At cutover, update the same file in one reviewed change to `BACKUP_SOURCE=oracle-self-hosted` and the local/self-hosted primary `DATABASE_URL`; do not leave the managed URL in place or put either real value in source control. Ensure the script is executable (`0755`). The script creates private temporary files under systemd's private temporary directory and removes them on exit.
 
 Create `/etc/aura-board/oracle-video-thumbnail.env` from `oracle-video-thumbnail.env.example`, set ownership to `root:aura-media`, and permissions to `0640`. Store the values in Infisical under the operator-selected production environment at `/oracle/aura-board/video-thumbnail` with the names `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_STORAGE_BUCKET`. `AURA_FFMPEG_PATH=/usr/bin/ffmpeg` and optional exact `AURA_LEGACY_VIDEO_SOURCE_ORIGINS` are non-secret configuration. Keep backup secrets in the separate `/oracle/aura-board/backup` path. Do not copy either secret set into source control, cloud-init, instance metadata, or handoff logs.
 
@@ -245,7 +248,7 @@ Any failed item makes the unit fail after the remaining claimed items finish, so
 
 ## Safe review and dry-run
 
-The default mode does not check external commands, contact the database, or call OCI. It validates required variable presence and prints only generated object names and stages—never values, credentials, or the database URL.
+The default mode does not check external commands, contact the database, or call OCI. It validates the allowed source label and required variable presence and prints only generated object names, the non-secret source label, and stages—never values, credentials, or the database URL.
 
 ```bash
 set -a
@@ -255,6 +258,15 @@ set +a
 ```
 
 Only `--write` enables `pg_dump`, archive validation, checksum creation, and uploads. In write mode the script converts `DATABASE_URL` into a short-lived, mode-0600 `pg_service.conf` under the private temporary directory, invokes `pg_dump` through `PGSERVICEFILE`/`PGSERVICE`, then removes the file with the rest of the temporary directory. The original `DATABASE_URL` shell variable is unset before `pg_dump` starts, so the connection string is not placed in the process argument list.
+
+### Database source selection
+
+The source selector is intentionally explicit in the environment file, but it is not endpoint discovery:
+
+- Before cutover, `BACKUP_SOURCE=managed-supabase` and `DATABASE_URL` must address the current managed Supabase primary directly.
+- After cutover, `BACKUP_SOURCE=oracle-self-hosted` and `DATABASE_URL` must address the host-visible local/self-hosted Oracle PostgreSQL primary directly. Do not use a Supavisor transaction-pooler URL, a read-only endpoint, or the Supabase Free DR subscriber.
+
+The script accepts a legacy environment file without `BACKUP_SOURCE` as `managed-supabase` so that adding the selector does not stop the current managed backup unexpectedly. That compatibility default must be replaced explicitly before a self-hosted cutover; the script cannot prove that a URL's endpoint matches its label.
 
 After installation and review, an operator can load and enable the timer:
 
@@ -268,16 +280,37 @@ Do not run `systemctl start aura-supabase-backup.service` until database connect
 
 ## Operation and verification
 
-The timer runs once daily at 03:00 UTC (12:00 in Osaka/Korea) with up to 30 minutes of randomized delay and catches up after downtime. Every OCI upload explicitly targets `ap-osaka-1`; the script rejects another region to avoid silently writing backups outside the home-region plan. Inspect stage/object-only logs with:
+The timer runs once daily at 03:00 UTC (12:00 in Osaka/Korea) with up to 30 minutes of randomized delay and catches up after downtime. This is the full logical-dump schedule; it does not provide a 15-minute RPO or PITR. Every OCI upload explicitly targets `ap-osaka-1`; the script rejects another region to avoid silently writing backups outside the home-region plan. Inspect source/stage/object-only logs with:
 
 ```bash
 journalctl -u aura-supabase-backup.service
 systemctl status aura-supabase-backup.timer
 ```
 
-Each run writes a PostgreSQL custom-format archive plus a sibling SHA-256 manifest. Before upload, `pg_restore --list` verifies that the archive is readable. OCI CLI uploads both objects using instance-principal authentication, checksum verification, and no-overwrite protection.
+Each run writes a PostgreSQL custom-format archive plus a sibling SHA-256 manifest. Before upload, `pg_restore --list` verifies that the archive is readable. OCI CLI uploads both objects using instance-principal authentication, checksum verification, and no-overwrite protection. The archive does not include object payloads stored outside PostgreSQL.
 
-Periodically perform a restore rehearsal in an isolated, disposable scratch database—not production:
+### Retention contract
+
+Retention is deliberately outside the script and systemd timer:
+
+- Keep the archive and its `.dump.sha256` manifest as one backup set under the same `OCI_OBJECT_PREFIX`; any approved expiry rule must treat the pair consistently.
+- No retention duration, lifecycle rule, cross-region copy, or Oracle-external copy is configured by these checked-in files. Do not infer that a retention policy or offsite copy exists until an operator has configured and verified it.
+- At each retention review, confirm that the private OCI lifecycle rule targets only the approved backup prefix, does not expire the newest restore-validated set, and covers both archive and manifest objects. The script remains no-overwrite and never performs remote deletion.
+
+### WAL/PITR status and future activation contract
+
+WAL archiving and point-in-time recovery are not implemented here. This repository contains no PostgreSQL `archive_command`/WAL archive configuration, archive monitor, WAL shipping service, or PITR restore automation. A custom-format `pg_dump` is a logical backup, not a physical base backup, and cannot by itself support PITR.
+
+Before claiming a self-hosted RPO better than the latest validated logical dump, a separate reviewed change must provide and test all of the following:
+
+1. WAL archiving from the self-hosted primary to a private durable destination outside the replaceable boot volume and outside the same single failure domain; archive writes must be idempotent, non-overwriting, and fail visibly.
+2. Monitoring for archive failures, backlog, destination capacity, and retention gaps.
+3. A compatible physical base-backup/snapshot plus a retention rule that keeps every required WAL segment from that base through the recovery window. This logical-dump script is not that base backup.
+4. An isolated restore rehearsal to a specified recovery time, with the WAL chain, data integrity, RPO, and RTO recorded before the path is relied upon.
+
+Until that work is separately implemented and verified, recovery coverage is limited to the latest checksum- and archive-validated logical dump. Do not describe the daily timer as WAL/PITR protection.
+
+Periodically perform a logical-dump restore rehearsal in an isolated, disposable scratch database—not production. This validates the custom-format backup path; it does not validate WAL/PITR:
 
 1. Download one archive and its manifest through an approved operator workflow.
 2. Run `sha256sum --check <archive>.sha256` in the directory containing the archive.

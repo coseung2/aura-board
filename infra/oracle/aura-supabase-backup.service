@@ -1,5 +1,5 @@
 [Unit]
-Description=Aura Board Supabase logical backup to OCI Object Storage
+Description=Aura Board PostgreSQL logical backup (full dump only) to OCI Object Storage
 Wants=network-online.target
 After=network-online.target
 

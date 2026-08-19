@@ -7,7 +7,7 @@ mode="dry-run"
 temp_dir=""
 
 log() {
-  printf '[oracle-backup] stage=%s object=%s\n' "$1" "$2"
+  printf '[oracle-backup] source=%s stage=%s object=%s\n' "$BACKUP_SOURCE" "$1" "$2"
 }
 
 fail() {
@@ -55,6 +55,17 @@ fi
 : "${DATABASE_URL:?DATABASE_URL is required}"
 : "${OCI_NAMESPACE:?OCI_NAMESPACE is required}"
 : "${OCI_BUCKET_NAME:?OCI_BUCKET_NAME is required}"
+
+# Keep legacy installations on the current managed-Supabase source until the
+# operator explicitly changes this label together with DATABASE_URL at cutover.
+BACKUP_SOURCE="${BACKUP_SOURCE:-managed-supabase}"
+case "$BACKUP_SOURCE" in
+  managed-supabase|oracle-self-hosted)
+    ;;
+  *)
+    fail "none"
+    ;;
+esac
 
 OCI_OBJECT_PREFIX="${OCI_OBJECT_PREFIX:-aura-board/postgres}"
 OCI_REGION="${OCI_REGION:-ap-osaka-1}"
@@ -180,5 +191,6 @@ log "upload-started" "$manifest_object"
 log "upload-complete" "$manifest_object"
 log "success" "$manifest_object"
 
-# Retention and deletion belong to the private bucket lifecycle policy.
-# This script intentionally never deletes remote objects.
+# Retention and any remote deletion belong to an approved private bucket
+# lifecycle policy. This script intentionally never archives WAL or deletes
+# remote objects.
