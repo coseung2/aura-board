@@ -98,11 +98,12 @@ replacements = {
     '      - ${API_GW_HTTP_PORT:-${KONG_HTTP_PORT:-8000}}:8000/tcp': f'      - 127.0.0.1:{api_port}:8000/tcp',
     '      - ${POSTGRES_PORT}:5432': f'      - 127.0.0.1:{session_port}:5432',
     '      - ${POOLER_PROXY_PORT_TRANSACTION}:6543': f'      - 127.0.0.1:{transaction_port}:6543',
+    '      FILE_SIZE_LIMIT: 52428800': '      FILE_SIZE_LIMIT: 104857600',
 }
 for old, new in replacements.items():
     count = text.count(old)
     if count != 1:
-        raise SystemExit(f"expected exactly one compose port mapping for {old!r}, got {count}")
+        raise SystemExit(f"expected exactly one compose staging replacement for {old!r}, got {count}")
     text = text.replace(old, new)
 path.write_text(text, encoding="utf-8")
 PY

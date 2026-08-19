@@ -24,6 +24,33 @@ Allow dynamic-group <BACKUP_DYNAMIC_GROUP> to manage objects in compartment <BAC
 
 If your tenancy requires separate permissions to inspect the bucket or namespace, add only the minimum read permissions needed by the deployed OCI CLI workflow. Do not grant tenancy-wide object-management access.
 
+### DevSpace Bastion session keeper
+
+Keep public SSH closed. DevSpace administration uses OCI Bastion SSH port-forwarding sessions to the instance private IP and port 22. Because Bastion sessions are intentionally short-lived, the self-hosted `aura-board-prod` GitHub runner can refresh the session through the instance principal after the dedicated IAM policy below is installed and verified. Until then, create Bastion sessions manually.
+
+Create a dedicated dynamic group named `aura-board-bastion-runner` with exactly this matching rule for the current production instance:
+
+```text
+instance.id = 'ocid1.instance.oc1.ap-osaka-1.anvwsljrwauhlkacvztijko427vjz6f4zcau64mjjmz7muur34ygd5t72jda'
+```
+
+Create a root policy named `aura-board-bastion-session-policy` with the following statements. The session-management permission is constrained to the one Bastion name and one target Compute instance; the remaining permissions are read-only dependencies required by OCI Bastion session creation.
+
+```text
+Allow dynamic-group aura-board-bastion-runner to use bastion in tenancy where target.bastion.name = 'aura-board-devspace-bastion'
+Allow dynamic-group aura-board-bastion-runner to manage bastion-session in tenancy where ALL {target.bastion.name = 'aura-board-devspace-bastion', target.resource.ocid = 'ocid1.instance.oc1.ap-osaka-1.anvwsljrwauhlkacvztijko427vjz6f4zcau64mjjmz7muur34ygd5t72jda'}
+Allow dynamic-group aura-board-bastion-runner to read instances in tenancy
+Allow dynamic-group aura-board-bastion-runner to read vcn in tenancy
+Allow dynamic-group aura-board-bastion-runner to read subnets in tenancy
+Allow dynamic-group aura-board-bastion-runner to read vnic-attachments in tenancy
+Allow dynamic-group aura-board-bastion-runner to read vnics in tenancy
+Allow dynamic-group aura-board-bastion-runner to inspect work-requests in tenancy
+```
+
+`.github/workflows/oci-bastion-session.yml` is gated by the repository variable `OCI_BASTION_SESSION_KEEPER_ENABLED=true`. Leave the variable unset/false until the IAM policy is applied and one manual workflow run succeeds. Once enabled, it runs only on the trusted `main` branch and only on the `aura-board-prod` self-hosted ARM64 runner, checking every 10 minutes. `infra/oracle/renew-bastion-session.sh` reads IMDSv2 for the current instance OCID/private IP, finds the active `aura-board-devspace-bastion`, reuses an existing `aura-board-devspace-auto` session while it has more than 20 minutes left, and otherwise creates a new port-forwarding session using the Bastion's configured maximum TTL. The workflow publishes only session metadata as a one-day GitHub Actions artifact; it never uploads a private SSH key.
+
+The current DevSpace SSH public key is embedded in the trusted workflow because public keys are not secrets. Its matching private key remains outside the repository. Rotate this transitional key to a dedicated DevSpace-only SSH key when the execution environment gains a supported secret/key store; do not copy a private key into source control.
+
 Configure a bucket lifecycle policy for retention and expiry after recovery requirements are approved. The upload script never lists or deletes remote objects. Keep the bucket private and disable public access.
 
 ## A1 operating model

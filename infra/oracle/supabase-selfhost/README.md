@@ -18,6 +18,8 @@ e66d8eb0947973fdd8f26921a9ee3ca08474beb6
 
 ## 안전 경계
 
+staging Storage global file limit은 managed `aura-board-uploads` bucket의 100 MB 제한과 맞춰 `104857600` bytes로 둔다. official compose 기본 50 MB를 그대로 사용하면 기존 50 MB 초과 object 복원이 실패한다.
+
 staging 기본 포트:
 
 ```text
@@ -150,7 +152,49 @@ systemctl show -p MemoryCurrent,MemoryPeak,CPUUsageNSec aura-play-engine.service
 
 managed Supabase production 데이터는 위 기반 검증 전에는 옮기지 않는다.
 
-## 8. 중지/제거
+## 8. Storage payload staging migration
+
+DB restore로 `storage.buckets`와 `storage.objects` metadata를 먼저 복원한 뒤 실제 object payload를 별도로 복사한다. `migrate-storage.py`는 production managed Storage를 service-role로 읽고 loopback self-hosted Storage에 기존 object를 `PUT`으로 갱신한다. object 이름이나 credential 값은 로그에 남기지 않는다.
+
+2026-08-19 staging 기준선은 `aura-board-uploads` 1개 bucket, 1,226 objects, metadata 기준 1,040,594,444 bytes다. 실행 전에는 반드시 dry-run count/bytes가 production 기준선과 맞는지 확인한다.
+
+```bash
+sudo python3 /srv/aura-board/migration/migrate-storage.py --dry-run
+sudo systemd-run \
+  --unit=aura-storage-migrate \
+  --collect \
+  --property=Nice=10 \
+  --property=CPUQuota=100% \
+  --property=MemoryMax=1G \
+  python3 /srv/aura-board/migration/migrate-storage.py --verify-samples 8
+sudo journalctl -u aura-storage-migrate.service -f
+```
+
+기본 source credential은 `/etc/aura-board/app.env`의 `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`, target credential은 `/srv/aura-board/supabase/.env`의 `SERVICE_ROLE_KEY`에서 읽는다. source는 읽기만 하고 target staging만 갱신한다. 성공 후 크기 구간별 sample object를 source/target에서 다시 다운로드해 SHA-256을 비교한다.
+
+### OCI Object Storage backend 전환 전제
+
+self-hosted Storage의 S3 backend는 OCI CLI Instance Principal이 아니라 S3-compatible Access Key / Secret Key가 필요하다. OCI에서는 별도 Customer Secret Key를 사용하고, Storage 전용 bucket을 backup bucket과 분리한다. credential은 source control이나 shell history에 기록하지 않는다.
+
+전환 시 Storage container에 최소 다음 값을 주고 staging에서 먼저 검증한다.
+
+```text
+STORAGE_BACKEND=s3
+GLOBAL_S3_BUCKET=<storage-only-bucket>
+GLOBAL_S3_ENDPOINT=https://<namespace>.compat.objectstorage.ap-osaka-1.oci.customer-oci.com
+GLOBAL_S3_FORCE_PATH_STYLE=true
+AWS_ACCESS_KEY_ID=<customer-secret-access-key>
+AWS_SECRET_ACCESS_KEY=<customer-secret-key>
+REGION=ap-osaka-1
+```
+
+OCI backend가 검증되기 전에는 local file backend의 payload를 삭제하지 않는다.
+
+### pg_cron / Vault cutover
+
+managed production에는 `notification-outbox-retry-sweep`, `student-morning-digest`, `student-morning-tasks-08-kst` pg_cron job과 notification worker URL/secret Vault 값이 남아 있다. staging에는 이 job/secret을 복제하지 않는다. Oracle은 이미 `notification-push`를 매분 실행하고 `attendance-reminder`를 매일 `23:00 UTC`에 실행하므로 self-host cutover에서는 Oracle cron을 단일 scheduler로 유지해 중복 callback을 피한다. DB에 복원된 Vault 참조 함수는 secret이 없으면 no-op이어야 한다.
+
+## 9. 중지/제거
 
 staging 중지:
 
@@ -161,7 +205,7 @@ sudo docker compose down
 
 `down -v`, official `reset.sh`, staging directory 삭제는 PostgreSQL/Storage 데이터를 파괴할 수 있으므로 별도 승인 없이 실행하지 않는다.
 
-## 9. production cutover 금지 사항
+## 10. production cutover 금지 사항
 
 이 staging 단계에서는 다음을 하지 않는다.
 

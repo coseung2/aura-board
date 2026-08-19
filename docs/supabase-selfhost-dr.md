@@ -1,7 +1,7 @@
 # Oracle self-hosted Supabase + DR/백업 설계
 
 기준일: 2026-08-19  
-상태: **설계 기록 / 미적용**
+상태: **Phase 1 staging 진행 중 — DB 복원·PostgREST/RLS·Realtime 검증 완료, Storage payload/OCI S3 backend 미완료**
 
 이 문서는 Aura Board의 managed Supabase 의존성을 Oracle Cloud A1의 self-hosted Supabase로 이전할 경우, 단일 Oracle 인스턴스 장애가 전체 서비스 장애로 확대되는 위험을 어떻게 줄일지 정리한다.
 
@@ -18,6 +18,50 @@
 5. Supabase Free + Vercel은 평상시 트래픽을 받는 active-active가 아니라 **재해복구용 warm standby** 후보로 유지한다.
 6. DB 백업은 Oracle 내부 백업만으로 끝내지 않고, 암호화된 사본을 로컬 PC/외장 디스크 및 필요 시 Google Drive 같은 Oracle 외부 위치에도 보관한다.
 7. 자동 failover보다 **반자동 promotion**을 우선한다. Oracle과 DR DB가 동시에 writable한 split-brain 상태를 만들지 않는다.
+
+### 1.1 2026-08-19 staging 실행 결과
+
+설계만 있던 Phase 1은 실제 Oracle staging까지 진행됐다. production managed Supabase는 아직 source of truth이며 production endpoint/DNS/app env는 변경하지 않았다.
+
+호스트/런타임 검증:
+
+- `testauram-a1-osaka`: ARM64, 4 online CPU, 약 23 GiB RAM 확인
+- 100 GB OCI Block Volume을 `aura-board` filesystem으로 초기화해 `/srv/aura-board`에 UUID 기반 영구 mount
+- Docker `29.7.2`, Compose `5.5.0`; Docker/containerd data root를 `/srv/aura-board`로 이동
+- official Supabase Docker upstream `e66d8eb0947973fdd8f26921a9ee3ca08474beb6` 기반 full stack 11개 service가 ARM64에서 모두 healthy
+- host publish는 staging 전용 `127.0.0.1:18000`, `127.0.0.1:15432`, `127.0.0.1:16543`만 사용
+- full stack 기동 후 host available memory 약 20 GiB, 기존 Next.js/play-engine health 모두 `200`
+
+managed → staging DB 복원:
+
+- Supabase CLI로 production dump를 생성하고 SHA-256 검증 완료
+- production dump 기준 DB 약 125 MB
+- managed Auth 내부 schema가 self-host Auth보다 앞선 버전이어서 full Auth data restore는 호환되지 않았음
+- Aura Board는 Supabase Auth를 사용하지 않고 production `auth.users=0`, `auth.identities=0`, public schema의 Auth FK도 없음을 확인해 Auth data는 복원 대상에서 제외
+- `public` schema/data와 실제 사용하는 Storage metadata(`storage.buckets`, `storage.objects`)를 transaction 단위로 staging에 복원
+- staging 기준 핵심 count: `Student=646`, `Board=76`, `Card=1000`, `CardAttachment=499`, `storage.objects=1226`, Prisma migration history `146`, public RLS policy `18`
+- Realtime publication은 production과 동일하게 `Card`, `CardComment`, `CardLike`, `LiveQuizPublicSession`, `LiveQuizQuestionCounterShard`, `Section` 6개 table 확인
+
+동작 검증:
+
+- PostgREST service-role read `200`
+- share RLS: `x-share-token` 없음 → 0 row, 올바른 token → 1 row
+- Realtime WebSocket join 성공, `postgres_changes` subscription 등록 후 실제 `Card` no-op `UPDATE` 이벤트 수신
+- `pg_cron 1.6.4`, `pg_net 0.20.3`, `supabase_vault 0.3.1`, logical WAL/replication slot 동작 확인
+- managed Vault secret 및 DB cron job은 staging에 복제하지 않음. Oracle cron을 단일 scheduler로 유지해 duplicate callback을 방지한다.
+
+Storage 현황/차단점:
+
+- production Storage: `aura-board-uploads` 1 bucket, 1,226 object, metadata 합계 1,040,594,444 bytes
+- DB의 bucket/object metadata는 staging에 복원됐지만 실제 object payload는 아직 이전하지 않음
+- payload migration helper와 persisted Supabase URL scanner를 준비했지만 실제 migration은 미실행
+- OCI Object Storage를 Supabase Storage S3 backend로 쓰려면 OCI IAM User의 Customer Secret Key(Access Key/Secret Key)가 필요하다. 현재 Compute Instance Principal은 기존 backup object upload는 가능하지만 IAM user 관리 및 Storage 전용 bucket 생성 권한은 없음
+- 따라서 OCI S3 credential/bucket 준비 전까지 production Storage cutover는 금지
+
+관리 경로:
+
+- public SSH는 닫고 OCI Bastion SSH port-forwarding으로 관리
+- 자동 Bastion session keeper workflow/script 초안을 추가했으나, 전용 dynamic group/policy 적용 및 실제 workflow 성공 검증 전에는 수동 Bastion session을 기준으로 한다.
 
 ## 2. 왜 self-hosted Supabase인가
 
@@ -361,19 +405,24 @@ restore rehearsal은 production write를 발생시키지 않는다.
 ### Phase 0 — 문서/검증만
 
 - [x] 방향 기록
-- [ ] 현재 managed Supabase DB/Storage 실사용량 재측정
-- [ ] Oracle PAYG A1 무료 할당량과 실제 tenancy billing 확인
+- [x] 현재 managed Supabase DB/Storage 실사용량 재측정
+- [ ] Oracle PAYG A1 무료 할당량과 실제 tenancy billing 확인 — Always Free 계산은 확인했지만 billing 화면 실측은 별도
 - [ ] Vercel DR 플랜/사용 조건 확인
 - [ ] Supabase Free DB/Realtime 한도와 현재 Aura 사용량 비교
 
 ### Phase 1 — Oracle self-hosted Supabase staging
 
-- [ ] A1 4 OCPU / 24 GB resize
-- [ ] Supabase OSS ARM64 runtime 검증
-- [ ] PostgreSQL 별도 volume 배치
-- [ ] PostgREST/RLS 검증
-- [ ] Realtime Broadcast + `postgres_changes` 검증
-- [ ] Storage API -> OCI Object Storage 검증
+- [x] A1 4 OCPU / 24 GB resize 및 live host 확인
+- [x] Supabase OSS ARM64 runtime 검증
+- [x] PostgreSQL/Docker용 100 GB 별도 Block Volume 배치
+- [x] managed Supabase `public` schema/data + Storage core metadata staging restore
+- [x] PostgREST/RLS 검증
+- [x] Realtime `postgres_changes` 실제 event 검증
+- [ ] Realtime Broadcast 실제 publish/subscribe 검증
+- [ ] Storage object payload 1,226건 staging migration + sample SHA-256 검증
+- [ ] Storage API -> OCI Object Storage S3 backend 검증
+- [ ] persisted `*.supabase.co/storage/v1/object/` URL inventory 및 endpoint/backfill 전략 확정
+- [ ] Bastion session keeper IAM policy 적용 및 workflow end-to-end 검증
 
 ### Phase 2 — Backup hardening
 
@@ -425,13 +474,16 @@ restore rehearsal은 production write를 발생시키지 않는다.
 
 ## 17. 다음 결정 사항
 
-실제 구현 전에 다음을 확정한다.
+다음 구현/cutover 전에 아래를 확정한다.
 
-1. PostgreSQL data volume 크기와 backup volume 정책
-2. WAL archive 대상 bucket/region
-3. Oracle 외부 backup 위치: 로컬 외장 디스크만 둘지, Google Drive까지 둘지
-4. 암호화 도구와 recovery key 보관 위치
-5. Supabase Free를 logical replica로 실제 사용할지
-6. Vercel DR이 현재 서비스 운영 조건에 적합한지
-7. manual failover 승인 기준과 담당자
-8. 목표 RPO/RTO를 실제 운영 요구에 맞게 유지할지 조정할지
+1. **결정됨:** primary PostgreSQL/Docker data volume은 Osaka 100 GB Block Volume(`/srv/aura-board`)을 사용
+2. OCI Storage 전용 private bucket 이름/compartment와 Customer Secret Key 발급 주체 및 최소 IAM policy
+3. Storage S3 backend 전환 전 1,226개 payload migration/검증 순서와 rollback 보존 기간
+4. persisted managed Supabase public URL을 stable Aura domain/proxy로 유지할지 DB backfill할지
+5. WAL archive 대상 bucket/region
+6. Oracle 외부 backup 위치: 로컬 외장 디스크만 둘지, Google Drive까지 둘지
+7. 암호화 도구와 recovery key 보관 위치
+8. Supabase Free를 logical replica로 실제 사용할지
+9. Vercel DR이 현재 서비스 운영 조건에 적합한지
+10. manual failover 승인 기준과 담당자
+11. 목표 RPO/RTO를 실제 운영 요구에 맞게 유지할지 조정할지

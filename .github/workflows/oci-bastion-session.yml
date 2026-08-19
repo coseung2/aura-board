@@ -1,0 +1,68 @@
+name: OCI Bastion Session Keeper
+
+on:
+  schedule:
+    - cron: "7,17,27,37,47,57 * * * *"
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/oci-bastion-session.yml
+      - infra/oracle/renew-bastion-session.sh
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oci-bastion-session-keeper
+  cancel-in-progress: false
+
+jobs:
+  renew:
+    name: Keep DevSpace Bastion session active
+    if: github.repository == 'coseung2/aura-board' && github.ref == 'refs/heads/main' && vars.OCI_BASTION_SESSION_KEEPER_ENABLED == 'true'
+    runs-on:
+      - self-hosted
+      - Linux
+      - ARM64
+      - aura-board-prod
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout exact revision
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+          clean: true
+
+      - name: Prepare DevSpace Bastion public key
+        shell: bash
+        env:
+          DEVSPACE_BASTION_PUBLIC_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINhhIxYwrea9IkJmkC2Np8a5q9L7uKTrvogdCQCuOdV7 coseung2-aura-board-vm-testauram-a1-osaka
+        run: |
+          set -euo pipefail
+          install -d -m 0700 "$RUNNER_TEMP/aura-bastion-session"
+          printf '%s\n' "$DEVSPACE_BASTION_PUBLIC_KEY" > "$RUNNER_TEMP/aura-bastion-session/devspace.pub"
+          chmod 0600 "$RUNNER_TEMP/aura-bastion-session/devspace.pub"
+
+      - name: Ensure an active OCI Bastion session
+        shell: bash
+        env:
+          BASTION_NAME: aura-board-devspace-bastion
+          SESSION_NAME: aura-board-devspace-auto
+          TARGET_PORT: "22"
+          MIN_REMAINING_SECONDS: "1200"
+          SSH_PUBLIC_KEY_FILE: ${{ runner.temp }}/aura-bastion-session/devspace.pub
+          OUTPUT_FILE: ${{ runner.temp }}/aura-bastion-session/session.json
+        run: bash infra/oracle/renew-bastion-session.sh
+
+      - name: Publish current session metadata
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: oci-bastion-session
+          path: ${{ runner.temp }}/aura-bastion-session/session.json
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0

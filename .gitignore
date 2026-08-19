@@ -7,6 +7,8 @@ build/
 coverage/
 .turbo/
 *.tsbuildinfo
+__pycache__/
+*.pyc
 
 .env
 .env.local
