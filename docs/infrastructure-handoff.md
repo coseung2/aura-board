@@ -9,7 +9,7 @@
 
 | 제공자 | 책임 | 책임이 아닌 것 | 현재 상태 |
 | --- | --- | --- | --- |
-| Oracle Cloud | Next.js 앱 호스팅, private play engine, 앱 cron, 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업 | 원본 Postgres, Auth, Realtime, 원본 Storage | `ap-osaka-1`의 `testauram-a1-osaka` A1 2 OCPU/12 GB에서 nginx와 loopback 전용 앱 서비스를 운영. 현재 public IP는 `129.225.159.251`; daily backup timer active (2026-08-14 복구 검증 완료) |
+| Oracle Cloud | Next.js 앱 호스팅, private play engine, 앱 cron, 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업 | 원본 Postgres, Auth, Realtime, 원본 Storage | `ap-osaka-1`의 `testauram-a1-osaka` A1을 2026-08-19 4 OCPU/24 GB로 resize하고 on-host에서 `aarch64`, 4 online CPUs, 23 GiB visible RAM을 재검증. nginx와 loopback 전용 앱 서비스를 운영하며 public IP는 `129.225.159.251`; daily backup timer active |
 | Cloudflare | 운영 DNS·HTTPS proxy, Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | `aura-board.com` apex A와 `www` CNAME을 Oracle origin으로 proxied 운영. Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
 | Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개를 2026-08-01 적용하고 RLS·권한·함수·트리거·cron job을 검증함 |
 | GitHub Actions | 운영 cron endpoint 수동 실행과 장애 시 대체 호출 | 앱 호스팅, 기본 스케줄러 | 8개 endpoint용 수동 workflow를 비상 운영 경로로 유지 |
@@ -40,7 +40,7 @@
 - `main` 기준 이전 8개 커밋은 `80183f55`까지 push 완료.
 - 기존 Vercel production은 rollback 참고용으로 유지하지만 신규 운영 트래픽과 cron을 처리하지 않는다.
 - Oracle schedule은 `parent-weekly-digest`, `parent-anonymize`, `expire-pending-links`, `fd-maturity`, `role-salary-payout`, `billing-renew`, `blob-cleanup`, `attendance-reminder`, `notification-push`, `play-outbox`를 실행한다.
-- 현재 운영 OCI profile은 `testauram`, 홈 리전은 `ap-osaka-1`이다. 운영 인스턴스 `testauram-a1-osaka`는 root compartment의 `VM.Standard.A1.Flex` 2 OCPU/12 GB이며 public subnet security list가 TCP 22/80/443을 허용한다.
+- 현재 운영 OCI profile은 `testauram`, 홈 리전은 `ap-osaka-1`이다. 운영 인스턴스 `testauram-a1-osaka`는 root compartment의 `VM.Standard.A1.Flex`이며 2026-08-19 on-host에서 4 online CPUs와 23 GiB visible RAM을 확인했다. 같은 날 100 GB paravirtualized Block Volume을 `/srv/aura-board`에 ext4로 마운트하고 Docker/containerd 및 self-hosted Supabase staging 데이터를 이 볼륨으로 분리했다. public SSH는 운영 점검 시 외부에서 닫힌 상태였고 관리 경로는 OCI Bastion을 사용한다.
 - 2026-08-03에 검증한 구 `aura-board-worker-a1-osaka`와 `161.33.30.33` 관련 backup/IAM 증거는 당시 기록으로만 보존한다. 2026-08-08 DNS 및 웹 origin 기준선은 `testauram-a1-osaka`의 `129.225.159.251`이다.
 - A1 성공 검증 직후 `oci-a1-1` 용량 retry automation은 삭제되어 재실행되지 않는다.
 - `notification-push`는 Oracle의 매분 poller가 담당한다. Supabase `NotificationOutbox` insert event wakeup과 5분 retry sweep 계약은 [`src/app/api/cron/notification-push/HANDOFF.md`](../src/app/api/cron/notification-push/HANDOFF.md)에 남아 있지만, 외부 callback secret이 없더라도 Oracle poller가 backlog를 처리한다.

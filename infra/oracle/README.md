@@ -2,13 +2,13 @@
 
 This directory contains the production runtime contract for Aura Board on Oracle Cloud. The Osaka A1 instance hosts the public Next.js application, the private Rust play engine, scheduled API jobs, media workers, and the daily logical backup. Supabase remains the primary Postgres/Auth/Realtime/Storage service and OCI Object Storage keeps the backup copy.
 
-The production compute target is one `VM.Standard.A1.Flex` instance with **2 OCPUs and 12 GB RAM** in Japan Central (Osaka), `ap-osaka-1`. All runtime artifacts and native dependencies must be built for Linux ARM64.
+The production compute target is one `VM.Standard.A1.Flex` instance with **4 OCPUs and 24 GB RAM** in Japan Central (Osaka), `ap-osaka-1`. The resize was verified on-host on 2026-08-19 as `aarch64`, 4 online CPUs, and 23 GiB visible RAM. All runtime artifacts and native dependencies must be built for Linux ARM64.
 
 OCI resource creation remains an operator action. The checked-in systemd and nginx files define the application runtime after the instance exists.
 
 ## Prerequisites
 
-- One OCI Ampere A1 Compute instance in the Osaka home region (`ap-osaka-1`), shape `VM.Standard.A1.Flex`, configured with 2 OCPUs and 12 GB RAM, plus dedicated `aura-app`, `aura-backup`, and `aura-media` system users and groups.
+- One OCI Ampere A1 Compute instance in the Osaka home region (`ap-osaka-1`), shape `VM.Standard.A1.Flex`, configured with 4 OCPUs and 24 GB RAM, plus dedicated `aura-app`, `aura-backup`, and `aura-media` system users and groups.
 - Node.js 22 for Linux ARM64. Install dependencies and run `prisma generate` on the A1 itself; never copy `node_modules` or generated native binaries from an AMD64 host.
 - ARM64-compatible PostgreSQL 17 client, OCI CLI, Rust toolchain, nginx, and FFmpeg binaries.
 - PostgreSQL 17 client tools (`pg_dump` and `pg_restore`). Keep the client major version compatible with or newer than the Supabase server version.
@@ -34,7 +34,7 @@ The single A1 preserves workload isolation in software:
 - Run the public app only through nginx on ports 80/443. Keep Next.js on `127.0.0.1:3000` and the Rust play engine on `127.0.0.1:8081`.
 - Use the A1 scheduler for application cron endpoints. Supabase remains responsible for its database-native notification outbox wakeup.
 - Start with one resource-intensive job at a time. Do not overlap FFmpeg with a backup write or restore rehearsal until measured CPU, memory, disk, and network headroom demonstrates that concurrency is safe.
-- Add explicit systemd CPU/memory limits per worker after the first measured runs. The 12 GB total is shared capacity, not 12 GB guaranteed to every process.
+- Add explicit systemd CPU/memory limits per worker after the first measured runs. The 24 GB total is shared capacity, not 24 GB guaranteed to every process.
 - Install only ARM64-native packages and images. Rebuild or replace every x86_64 binary, container image, native Node module, PostgreSQL client, OCI CLI, and FFmpeg dependency before cutover.
 - Treat the 50 GB boot volume as replaceable runtime storage. Upload durable backup artifacts to the private bucket and keep original application data in Supabase/Cloudflare; do not make local A1 files the only copy.
 - Treat the A1 as a single application host. Keep release directories immutable, switch `/opt/aura-board-app/current` atomically, and retain one known-good release for rollback.
@@ -189,7 +189,7 @@ sudo -u aura-media test -w /run/lock/aura-board-heavy.lock
 
 Both units take a nonblocking exclusive `flock` on this file. Verify contention before any write run by holding the lock in one shell and confirming each unit refuses to start rather than overlapping. The tmpfiles rule recreates the lock after reboot.
 
-The backup unit is capped at 150% CPU with a 1.5/2 GB memory high/max envelope. The manual video backfill unit can use up to 180% CPU and a 6/8 GB memory high/max envelope. These limits preserve headroom on the 2 OCPU/12 GB host and must be adjusted only after recording `MemoryPeak`, CPU time, temporary-disk use, and elapsed time from real runs.
+The backup unit remains capped at 150% CPU with a 1.5/2 GB memory high/max envelope. The manual video backfill unit can use up to 180% CPU and a 6/8 GB memory high/max envelope. These limits were originally set for the 2 OCPU/12 GB host and remain conservative after the 4 OCPU/24 GB resize; adjust them only after recording `MemoryPeak`, CPU time, temporary-disk use, and elapsed time from real runs.
 
 ## Manual A1 video-thumbnail backfill
 
