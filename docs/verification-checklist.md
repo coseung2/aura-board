@@ -99,6 +99,37 @@ creating overlapping testing-notes documents.
 - Exercise rollback with a disposable failing release before treating push deployment as operational. Confirm both symlinks and both services return to the same prior release.
 - Confirm completed release trees are root-owned, contain matching completion/checksum markers, and have no group/world-writable files or directories.
 
+## Supabase Free + Vercel Warm Standby DR
+
+Oracle Osaka remains the primary for this DR scope. Supabase Free and Vercel are a warm standby path, not active-active production. Until the separately approved production cutover, managed Supabase Pro remains the current production database source of truth. The operational scope and evidence handoff are in [`docs/infrastructure-handoff.md`](infrastructure-handoff.md) and the design constraints are in [`docs/supabase-selfhost-dr.md`](supabase-selfhost-dr.md).
+
+Do not mark any item below complete from a staging-only observation. Record the target project/endpoint, UTC timestamp, deployment or commit SHA, and sanitized SQL/log artifact for every result; never record secret values.
+
+### Promotion control
+
+- [ ] Confirm the runbook requires an operator-approved primary write fence or confirmed Oracle unavailability before promotion. Record the approver, incident ID, fence result, last replicated LSN/heartbeat, and promotion time.
+- [ ] Confirm Oracle and DR cannot remain writable at the same time during failover, preventing split-brain. Automatic timeout-only promotion and automatic DNS switching must be disabled or explicitly guarded by the fence.
+
+### Data and service parity
+
+- [ ] Compare primary and Supabase Free migration history plus schema-only/catalog evidence for tables, columns, indexes, sequences, extensions, functions, triggers, publications, roles/grants, and RLS policies. Run representative allowed and denied RLS requests and retain their status/row-count evidence.
+- [ ] Verify logical replication publisher/subscriber state, confirmed LSN and commit timestamp, measured lag at repeated timestamps, and a primary heartbeat row observed on DR. Record the result against the approved RPO and alert threshold.
+- [ ] Exercise DR PostgREST health and representative read/write paths. Retain HTTP status and response-shape evidence for service-role access plus anonymous/share RLS allowed and denied cases.
+- [ ] Join the DR Realtime WebSocket, register the required `postgres_changes`/Broadcast subscriptions, and receive a real event generated on the promoted DR path. Retain join, event, disconnect, and reconnect evidence.
+- [ ] Verify the Vercel DR deployment reaches a healthy/ready state for the intended commit or deployment ID, builds successfully, serves `/api/health` against Supabase Free, and has the required environment variable names without exposing values.
+
+### Traffic switch and recovery rehearsal
+
+- [ ] Perform an approved Cloudflare origin switch rehearsal and retain before/after DNS record, proxy/TTL, audit/change, external HTTPS response, and rollback-to-Oracle evidence. Confirm traffic is not split between Oracle and Vercel DR.
+- [ ] Run a failover smoke after fencing and promotion: verify login, shared-board access, representative CRUD persistence, RLS isolation, Realtime delivery/reconnect, and the documented rollback trigger. Record timestamps, canary identifiers, status codes, and observed lag.
+- [ ] Run a failback rehearsal with DR as the temporary source of truth: cleanly resync/restore to Oracle, freeze writes, apply the final delta, switch Cloudflare back, and verify schema/RLS, health, CRUD, Realtime, elapsed time, and restoration of the Supabase Free warm standby.
+
+### Object availability acceptance gate
+
+Object payload replication or a documented media degraded-mode is a separate gate from DB/API DR. Do not accept the full DR path because schema, PostgREST, Realtime, or Vercel checks pass alone.
+
+- [ ] Verify replicated object availability with object count/bytes, representative checksum and download evidence, including the user-facing image/file paths; or, if degraded mode is selected, verify the supported/unsupported media matrix, placeholder/error behavior, user impact, operator recovery steps, and explicit approval. Keep Cloudflare Stream video outside this gate unless separately scoped.
+
 ## Always-open Game Hub
 
 - Render the teacher dashboard 놀이 tab and confirm it shows 잼라이브 plus exactly Shadow Alliance, Kordle, Speed Game, Omok, and Song Guess as one consistent six-card grid. Game cards keep a fixed `14rem` width; responsive layouts change only how many cards fit per row and must not stretch cards to fill the row. Confirm the teacher opens an official game through a classroom-selection modal when multiple owned classrooms exist, skips the modal when only one classroom exists, lands in the same classroom-owned room students enter, no longer sees the dashboard classroom selector or 학급 관리/배경 설정 controls on the board hub, and no teacher-authored legacy official-game board appears in the dashboard or top navigation.

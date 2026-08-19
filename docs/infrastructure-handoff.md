@@ -12,8 +12,9 @@
 | Oracle Cloud | Next.js 앱 호스팅, private play engine, 앱 cron, 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업 | 원본 Postgres, Auth, Realtime, 원본 Storage | `ap-osaka-1`의 `testauram-a1-osaka` A1을 2026-08-19 4 OCPU/24 GB로 resize하고 on-host에서 `aarch64`, 4 online CPUs, 23 GiB visible RAM을 재검증. nginx와 loopback 전용 앱 서비스를 운영하며 public IP는 `129.225.159.251`; daily backup timer active |
 | Cloudflare | 운영 DNS·HTTPS proxy, Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | `aura-board.com` apex A와 `www` CNAME을 Oracle origin으로 proxied 운영. Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
 | Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개를 2026-08-01 적용하고 RLS·권한·함수·트리거·cron job을 검증함 |
+| Supabase Free (DR) | 논리 replica, DR용 Postgres·PostgREST·RLS·Realtime warm standby | Oracle primary write path, 자동 promotion, object payload(별도 acceptance gate) | 이번 DR 범위에 포함했지만 schema/RLS parity, replication, 서비스 health, object availability 증거는 아직 기록하지 않음 |
 | GitHub Actions | 운영 cron endpoint 수동 실행과 장애 시 대체 호출 | 앱 호스팅, 기본 스케줄러 | 8개 endpoint용 수동 workflow를 비상 운영 경로로 유지 |
-| Vercel | 전환 기간의 마지막 검증 가능한 배포본 | 신규 운영 트래픽, 기본 cron scheduler | DNS 전환과 Oracle 검증 뒤 운영 경로에서 제외 |
+| Vercel | 전환 기간의 마지막 검증 가능한 배포본, Supabase Free warm standby용 DR runtime | Oracle primary의 신규 운영 트래픽, 기본 cron scheduler | 평상시 운영 DNS와 scheduler에서는 제외. DR deployment·health는 준비/검증 대상이며 아직 증거 없음 |
 
 책임 이전 후에도 cron API의 인증 기준은 [`src/lib/cron-auth.ts`](../src/lib/cron-auth.ts)이며, GitHub Actions와 Supabase callback 모두 동일한 `CRON_SECRET`을 Bearer token으로 사용한다.
 
@@ -155,6 +156,26 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 - [ ] Operational verification: cutover 승인 후 URL별 참조/대상 object, queue 처리·실패 재시도, 사용자 다운로드/이미지 표시를 확인. dry-run도 후보 검색을 위해 지정된 DB를 읽으므로 운영 실행 전에 연결 대상을 재확인.
 - [x] Handoff: 이번 commit은 도구 준비만 수행했고 데이터 복사·참조 갱신·원본 삭제는 하지 않음. 처리 전후 object/URL/queue 수치와 원본 삭제 승인은 실제 실행 handoff에 별도로 기록.
 
+### 8. Supabase Free + Vercel warm standby DR — 범위 포함, 미완료
+
+이 DR 범위의 primary는 Oracle Osaka(`testauram-a1-osaka`)로 유지한다. 다만 production cutover가 별도 승인·검증되기 전까지는 현재 managed Supabase Pro가 production database source of truth라는 기존 사실을 유지한다. Supabase Free DB와 Vercel runtime은 평상시 사용자 트래픽을 받지 않는 warm standby이며 active-active 운영이 아니다.
+
+Promotion은 수동 또는 반자동으로만 진행한다. 운영자가 Oracle primary의 write fence 또는 완전한 불가 상태를 확인하고 마지막 replication LSN/heartbeat를 기록한 뒤에만 DR subscriber를 promote하고, 그 후에 Cloudflare origin을 전환한다. split-brain을 막기 위해 Oracle과 DR을 동시에 writable로 두거나 장애 timeout만으로 자동 promotion·DNS 전환을 수행하지 않는다.
+
+DB/API DR과 object payload 복제 또는 media degraded-mode는 별도 acceptance gate다. PostgREST·Realtime·앱 health가 통과해도 이미지·파일 payload가 Osaka 장애에서 사용 가능하다는 뜻은 아니다. payload 복제 또는 승인된 degraded-mode의 지원 범위·사용자 표시·복구 절차에 증거가 생기기 전에는 전체 DR을 accepted로 선언하지 않는다. Cloudflare Stream video는 기존 책임 경계를 유지하며 이 object gate와 별도로 취급한다.
+
+운영 기준과 상세 설계는 [`docs/supabase-selfhost-dr.md`](supabase-selfhost-dr.md)를 참조하고, 아래 항목은 이 handoff와 [`docs/verification-checklist.md`](verification-checklist.md)의 공통 acceptance evidence로 사용한다. 각 증거에는 대상(project/endpoint), UTC 시각, commit/deployment SHA 또는 SQL/log artifact를 기록하고 secret 값은 기록하지 않는다. 현재는 모든 DR acceptance 항목이 미완료다.
+
+- [ ] Schema/RLS parity: primary와 Supabase Free의 migration history, schema-only export/catalog 비교, table·column·index·sequence·extension·function·trigger·publication, role/grant, RLS policy를 대조하고 대표적인 허용/거부 RLS 요청 결과를 저장한다.
+- [ ] Logical replication lag/heartbeat: publisher/subscriber 상태, 마지막 confirmed LSN과 commit timestamp, 측정 시각별 lag, primary heartbeat row가 DR에서 관찰된 시각, 승인된 RPO와 alert 기준을 함께 기록한다.
+- [ ] PostgREST: DR endpoint에서 health와 대표 read/write를 확인하고, service-role 경로와 anonymous/share RLS 허용·거부 결과 및 HTTP status를 저장한다.
+- [ ] Realtime: DR Realtime WebSocket join과 필요한 `postgres_changes`/Broadcast subscription을 연결하고, DR에서 발생한 실제 event의 수신·재연결 결과를 저장한다.
+- [ ] Vercel deployment health: DR deployment ID/SHA, build 결과, runtime health(`/api/health` 등), Supabase Free 연결 결과, environment variable 이름의 존재 여부를 확인한다. 값과 secret은 남기지 않는다.
+- [ ] Cloudflare origin switch: 승인된 변경 기록과 before/after DNS·proxy·TTL, Vercel DR로의 외부 HTTPS 응답, Oracle origin으로의 rollback 응답을 저장하고 두 origin이 동시에 사용자 write를 받지 않음을 확인한다.
+- [ ] Failover smoke: primary write fence, promotion 시각, 마지막 LSN/heartbeat, Cloudflare 전환 시각을 기록한 뒤 로그인/공유·RLS/read-write/Realtime의 대표 사용자 흐름과 rollback 조건을 DR에서 검증한다.
+- [ ] Failback rehearsal: DR을 임시 source of truth로 선언하고 clean Oracle target에 DR 데이터를 재동기화한 뒤 write freeze와 final delta를 적용하고 Oracle로 origin을 되돌린다. parity, health, 대표 CRUD, Realtime 및 소요 시간을 기록하고 Supabase Free warm standby 재구성까지 확인한다.
+- [ ] Object availability gate: replicated payload의 object count/bytes와 표본 checksum·download를 확인하거나, degraded-mode를 선택했다면 지원/불지원 media, placeholder/error 동작, 사용자 영향, operator recovery 절차와 승인 기록을 남긴다. 이 gate가 없으면 DB/API 검증만으로 DR 완료 처리하지 않는다.
+
 ## 실제 실행 전 승인 체크
 
 - [x] OCI Osaka의 compartment, VCN, public subnet/NSG, private Object Storage bucket은 준비 완료. A1 `2 OCPU/12 GB`, ARM64 instance와 boot volume, instance OCID 단일 dynamic group/IAM policy를 확인했고 유료 리소스는 만들지 않음.
@@ -175,6 +196,7 @@ Vercel Blob distinct URL 4개와 due queue 165개를 재확인한다. Supabase S
 - **Supabase migration:** 적용 전 논리 backup과 migration별 영향 분석을 우선한다. 데이터 손실 가능성이 있는 migration을 임의 down migration으로 되돌리지 말고, forward-fix 또는 검증된 복구 절차를 선택한다.
 - **Cloudflare Stream:** 새 상태 검증/삭제 worker를 중지하고 기존 업로드 경로로 복귀한다. 삭제된 asset은 코드 rollback으로 복원되지 않으므로 삭제 전 참조와 보존 조건을 확인한다.
 - **Oracle:** 앱 이상 시 Cloudflare apex A record를 이전 Vercel origin `76.76.21.21`로 되돌리고 proxy를 유지한 뒤, nginx와 앱·play-engine 서비스를 이전 release로 되돌리거나 중지한다. `www`는 apex CNAME을 유지한다. 파생 backup 삭제는 별도 승인 대상이다.
+- **Supabase Free + Vercel DR:** promotion 전 Oracle write fence와 replication evidence를 다시 확인한다. failover 중에는 Oracle을 writable로 복귀시키지 않으며, failback은 DR을 임시 source of truth로 유지한 채 clean Oracle target 재동기화·write freeze·final delta·Cloudflare 원복 순서로 수행한다. object payload gate를 통과하지 못하면 media degraded-mode 또는 복구 보류를 명시한다.
 - **Vercel 배포:** 이번 작업에서는 배포하지 않는다. 향후 배포 실패 시 기존 production을 유지하고, 실패한 최신 SHA를 production으로 수동 승격하지 않는다.
 
 ## Residual risks
