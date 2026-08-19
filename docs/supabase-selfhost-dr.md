@@ -1,6 +1,6 @@
 # Oracle self-hosted Supabase + DR/백업 설계
 
-기준일: 2026-08-19  
+기준일: 2026-08-20  
 상태: **Phase 1 staging 진행 중 — DB 복원·PostgREST/RLS·Realtime 검증 완료, Storage payload/OCI S3 backend 미완료**
 
 이 문서는 Aura Board의 managed Supabase 의존성을 Oracle Cloud A1의 self-hosted Supabase로 이전할 경우, 단일 Oracle 인스턴스 장애가 전체 서비스 장애로 확대되는 위험을 어떻게 줄일지 정리한다.
@@ -15,7 +15,7 @@
 2. PostgreSQL, PostgREST, Realtime, Storage API는 직접 재구현하지 않고 **Supabase OSS를 self-host**한다.
 3. Aura Board 애플리케이션은 현재 `@supabase/supabase-js`, RLS, Realtime 계약을 최대한 유지한다.
 4. 일반 파일·이미지의 실제 object payload는 VM 로컬 디스크가 아니라 OCI Object Storage에 둔다.
-5. Supabase Free + Vercel은 평상시 트래픽을 받는 active-active가 아니라 **재해복구용 warm standby** 후보로 유지한다.
+5. Supabase Free + Vercel은 평상시 트래픽을 받는 active-active가 아니라 **재해복구용 warm standby 구성으로 포함**한다.
 6. DB 백업은 Oracle 내부 백업만으로 끝내지 않고, 암호화된 사본을 로컬 PC/외장 디스크 및 필요 시 Google Drive 같은 Oracle 외부 위치에도 보관한다.
 7. 자동 failover보다 **반자동 promotion**을 우선한다. Oracle과 DR DB가 동시에 writable한 split-brain 상태를 만들지 않는다.
 
@@ -104,7 +104,7 @@ Aura Board는 Supabase를 단순 PostgreSQL 호스팅으로만 사용하지 않�
                     |               +------> OCI Object Storage
                     |                        images/files/private media
                     |
-                    +---- logical replication 후보 ----+
+                    +---- logical replication / DR ----+
                                                        |
                                                        v
                                             Supabase Free DR
@@ -261,6 +261,14 @@ aura-db-20260819.dump.sha256
 Supabase Free Storage는 warm DR의 필수 구성요소로 간주하지 않는다. 현재 Aura Board의 object volume은 Free Storage 한도와 너무 근접할 수 있으므로, DR 앱이 OCI 또는 별도 replicated object store를 읽도록 설계하는 편을 우선한다.
 
 ## 7. Vercel + Supabase Free DR
+
+이 DR 구성은 이번 이관 범위에 포함한다. Oracle Osaka primary가 장시간 복구되지 않을 때
+Vercel runtime과 Supabase Free DB/PostgREST/RLS/Realtime을 승격해 서비스를 재개하는
+warm standby 경로로 운영한다. 평상시 사용자 트래픽은 받지 않는다.
+
+단, OCI Osaka Object Storage를 유일한 object payload 저장소로 유지하면 Osaka 리전
+장애 시 DR 앱이 이미지·파일을 읽지 못할 수 있다. 따라서 Phase 3에서 DB 복제와 별도로
+object payload 복제 또는 media degraded-mode 정책을 확정해야 한다.
 
 ### 역할
 
@@ -433,13 +441,14 @@ restore rehearsal은 production write를 발생시키지 않는다.
 - [ ] encrypted local/offsite backup
 - [ ] restore rehearsal 자동화
 
-### Phase 3 — Supabase Free / Vercel warm DR
+### Phase 3 — Supabase Free / Vercel warm DR (범위 포함)
 
 - [ ] DR Supabase schema/RLS 구축
 - [ ] logical replication proof-of-concept
 - [ ] DDL migration 동기화 절차
 - [ ] replication lag monitor
 - [ ] Vercel DR deployment
+- [ ] DR object payload 복제 또는 Osaka Object Storage 장애 시 media degraded-mode 정책
 - [ ] Cloudflare 수동 failover runbook
 - [ ] failback rehearsal
 
@@ -483,7 +492,8 @@ restore rehearsal은 production write를 발생시키지 않는다.
 5. WAL archive 대상 bucket/region
 6. Oracle 외부 backup 위치: 로컬 외장 디스크만 둘지, Google Drive까지 둘지
 7. 암호화 도구와 recovery key 보관 위치
-8. Supabase Free를 logical replica로 실제 사용할지
-9. Vercel DR이 현재 서비스 운영 조건에 적합한지
-10. manual failover 승인 기준과 담당자
-11. 목표 RPO/RTO를 실제 운영 요구에 맞게 유지할지 조정할지
+8. **결정됨:** Supabase Free를 logical replica로 사용
+9. **결정됨:** Vercel DR deployment를 warm standby로 포함
+10. DR object payload 복제 또는 media degraded-mode 정책
+11. manual failover 승인 기준과 담당자
+12. 목표 RPO/RTO를 실제 운영 요구에 맞게 유지할지 조정할지
