@@ -577,7 +577,7 @@ class InstallerSubprocessTests(unittest.TestCase):
         result = self.execute("--write", self.env())
         self.assertEqual(result.returncode, 0, result.stderr)
         log = self.log.read_text(encoding="utf-8")
-        self.assertLess(log.index("docker compose"), log.index("certbot"))
+        self.assertLess(log.index("docker compose"), log.index("certbot certonly"))
         for expected in ("config --quiet", "pg_isready", "pg_hba_file_rules", "nginx -t", "systemctl reload nginx", "iptables -I INPUT"):
             self.assertIn(expected, log)
         self.assertIn("-d 10.42.1.207 -p tcp --dport 5432", log)
