@@ -21,7 +21,7 @@ concurrency:
 jobs:
   renew:
     name: Keep DevSpace Bastion session active
-    if: github.repository == 'coseung2/aura-board' && github.ref == 'refs/heads/main' && vars.OCI_BASTION_SESSION_KEEPER_ENABLED == 'true'
+    if: github.repository == 'coseung2/aura-board' && github.ref == 'refs/heads/main'
     runs-on:
       - self-hosted
       - Linux

@@ -41,16 +41,18 @@ Create a root policy named `aura-board-bastion-session-policy` with the followin
 
 ```text
 Allow dynamic-group aura-board-bastion-runner to use bastion in tenancy where target.bastion.name = 'aura-board-devspace-bastion'
-Allow dynamic-group aura-board-bastion-runner to manage bastion-session in tenancy where ALL {target.bastion.name = 'aura-board-devspace-bastion', target.resource.ocid = 'ocid1.instance.oc1.ap-osaka-1.anvwsljrwauhlkacvztijko427vjz6f4zcau64mjjmz7muur34ygd5t72jda'}
+Allow dynamic-group aura-board-bastion-runner to read bastion-session in tenancy
+Allow dynamic-group aura-board-bastion-runner to manage bastion-session in tenancy where ALL {target.bastion.name = 'aura-board-devspace-bastion', target.resource.ocid = '<CURRENT_PRODUCTION_INSTANCE_OCID>'}
 Allow dynamic-group aura-board-bastion-runner to read instances in tenancy
 Allow dynamic-group aura-board-bastion-runner to read vcn in tenancy
 Allow dynamic-group aura-board-bastion-runner to read subnets in tenancy
 Allow dynamic-group aura-board-bastion-runner to read vnic-attachments in tenancy
 Allow dynamic-group aura-board-bastion-runner to read vnics in tenancy
+Allow dynamic-group aura-board-bastion-runner to read private-ips in tenancy
 Allow dynamic-group aura-board-bastion-runner to inspect work-requests in tenancy
 ```
 
-`.github/workflows/oci-bastion-session.yml` is gated by the repository variable `OCI_BASTION_SESSION_KEEPER_ENABLED=true`. Leave the variable unset/false until the IAM policy is applied and one manual workflow run succeeds. Once enabled, it runs only on the trusted `main` branch and only on the `aura-board-prod` self-hosted ARM64 runner, checking every 10 minutes. `infra/oracle/renew-bastion-session.sh` reads IMDSv2 for the current instance OCID/private IP, finds the active `aura-board-devspace-bastion`, reuses an existing `aura-board-devspace-auto` session while it has more than 20 minutes left, and otherwise creates a new port-forwarding session using the Bastion's configured maximum TTL. The workflow publishes only session metadata as a one-day GitHub Actions artifact; it never uploads a private SSH key.
+`.github/workflows/oci-bastion-session.yml` runs only on the trusted `main` branch and only on the repository-scoped `aura-board-prod` self-hosted ARM64 runner, checking every 10 minutes. The former repository-variable gate was removed only after the live instance-principal session create/reuse, local SSH port forwarding, and public TCP/22 closure all passed. `infra/oracle/renew-bastion-session.sh` reads IMDSv2 for the current instance OCID/private IP, finds the active `aura-board-devspace-bastion`, reuses an existing `aura-board-devspace-auto` session while it has more than 20 minutes left, and otherwise creates a new port-forwarding session using the Bastion's configured maximum TTL. The workflow publishes only session metadata as a one-day GitHub Actions artifact; it never uploads a private SSH key.
 
 The current DevSpace SSH public key is embedded in the trusted workflow because public keys are not secrets. Its matching private key remains outside the repository. Rotate this transitional key to a dedicated DevSpace-only SSH key when the execution environment gains a supported secret/key store; do not copy a private key into source control.
 

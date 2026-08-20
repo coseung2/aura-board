@@ -19,6 +19,36 @@ log() {
   printf '[bastion-session] %s\n' "$1"
 }
 
+normalize_oci_json() {
+  python3 -c '
+import sys
+text = sys.stdin.read()
+if not text.strip():
+    raise SystemExit("OCI command returned empty output")
+start = text.find("{")
+if start < 0:
+    raise SystemExit("OCI command returned no JSON object")
+sys.stdout.write(text[start:])
+'
+}
+
+normalize_oci_list_json() {
+  python3 -c '
+import sys
+text = sys.stdin.read()
+if not text.strip():
+    # OCI CLI 3.90.2 returns an empty stdout with exit 0 for a successful
+    # filtered session list containing zero rows. pipefail still rejects a
+    # non-zero OCI command before this normalizer can create the empty list.
+    sys.stdout.write("{\"data\":[]}")
+    raise SystemExit(0)
+start = text.find("{")
+if start < 0:
+    raise SystemExit("OCI command returned no JSON object")
+sys.stdout.write(text[start:])
+'
+}
+
 for command_name in curl oci python3; do
   command -v "$command_name" >/dev/null 2>&1 || fail "$command_name is required"
 done
@@ -71,22 +101,41 @@ bastion_json="$(
     --name "$BASTION_NAME" \
     --bastion-lifecycle-state ACTIVE \
     --all \
-    --output json
+    --output json \
+  | normalize_oci_json
 )"
 
-read -r bastion_id max_ttl < <(
+bastion_id="$(
   python3 -c '
 import json, sys
 items = json.load(sys.stdin).get("data", [])
 if len(items) != 1:
     raise SystemExit(f"expected exactly one active bastion, got {len(items)}")
-item = items[0]
-values = [item.get("id"), item.get("max-session-ttl-in-seconds")]
-if not all(values):
-    raise SystemExit("bastion id or max session TTL missing")
-print(values[0], values[1])
+value = items[0].get("id")
+if not value:
+    raise SystemExit("bastion id missing")
+print(value)
 ' <<<"$bastion_json"
-)
+)"
+
+bastion_detail_json="$(
+  oci bastion bastion get \
+    --auth instance_principal \
+    --region "$region" \
+    --bastion-id "$bastion_id" \
+    --output json \
+  | normalize_oci_json
+)"
+
+max_ttl="$(
+  python3 -c '
+import json, sys
+value = json.load(sys.stdin).get("data", {}).get("max-session-ttl-in-seconds")
+if not value:
+    raise SystemExit("bastion max session TTL missing")
+print(value)
+' <<<"$bastion_detail_json"
+)"
 
 [[ "$max_ttl" =~ ^[0-9]+$ ]] || fail "Bastion max session TTL is not numeric"
 (( max_ttl >= 1800 && max_ttl <= 10800 )) || fail "unexpected Bastion max session TTL: $max_ttl"
@@ -101,7 +150,8 @@ latest_json="$(
     --sort-by timeCreated \
     --sort-order DESC \
     --limit 1 \
-    --output json
+    --output json \
+  | normalize_oci_list_json
 )"
 
 read -r session_id time_created remaining_seconds < <(
@@ -157,7 +207,8 @@ for _ in $(seq 1 24); do
       --auth instance_principal \
       --region "$region" \
       --session-id "$session_id" \
-      --output json
+      --output json \
+    | normalize_oci_json
   )"
   lifecycle_state="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["data"]["lifecycle-state"])' <<<"$session_json")"
   case "$lifecycle_state" in
