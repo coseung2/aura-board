@@ -331,6 +331,100 @@ config/symlink로 rollback한다. `configure-public-url.py`는 기존 secret 라
 `API_EXTERNAL_URL=https://supabase.aura-board.com/auth/v1`만 mode-0600 backup 후
 원자 교체한다.
 
+## 9A. Oracle-to-Supabase DR replication endpoint
+
+이 endpoint는 Oracle Osaka A1 ARM64의 `/srv/aura-board/supabase` self-hosted
+PostgreSQL을 Supabase Free DR subscriber가 접근하기 위한 별도 경로다. TLS 1.3,
+PostgreSQL ALPN, dedicated role/HBA, 외부 5432 및 실제 logical subscription은 A1에서
+검증했다. 아래 installer는 그 interim 상태를 재현 가능한 contract로 고정한다.
+
+현재 interim hostname은 `replication.129-225-159-251.sslip.io`다. DNS 편집 권한이
+준비되면 `replication.aura-board.com` 같은 안정적인 `aura-board.com` hostname을
+우선 사용하고, installer의 `--domain`으로 명시한다. managed Supabase outbound IP는
+고정되지 않고 NAT64도 관찰되었으므로 `/32` allowlist를 주장하지 않는다.
+
+사전 조건:
+
+- 대상 host가 `aarch64`/ARM64이고 root로 실행되며, `supabase-db`가 공개 port를
+  publish하지 않는지 확인한다.
+- `aura_board_dr_replication` dedicated role을 안전한 operator 절차로 먼저
+  provision한다. installer는 password를 만들거나 읽거나 출력하지 않고, LOGIN,
+  REPLICATION, BYPASSRLS, NOSUPERUSER, NOCREATEDB, NOCREATEROLE 및 bounded
+  connection limit만 `supabase_admin`으로 검증한다.
+- host nginx ARM64 stream module이 설치되어 있어야 한다. installer는 top-level
+  stream include를 독립 module config로 설치하지만 module 자체가 없으면 exact apt
+  instruction을 출력하고 자동 설치하지 않는다.
+- DNS와 public HTTP/80이 A1으로 도달해야 HTTP-01이 성공한다.
+
+dry-run이 기본이며, write는 명시적으로 실행한다.
+
+```bash
+sudo bash infra/oracle/supabase-selfhost/install-replication-endpoint.sh \
+  --dry-run --domain replication.129-225-159-251.sslip.io --private-ip <PRIVATE_IP>
+sudo bash infra/oracle/supabase-selfhost/install-replication-endpoint.sh \
+  --write --domain replication.129-225-159-251.sslip.io --private-ip <PRIVATE_IP>
+```
+
+write는 `docker-compose.replication.yml` override로 `127.0.0.1:15433 -> db:5432`만
+publish하고, 기존 `/etc/postgresql-custom` volume에 persistent HBA와 `hba_file`
+override를 설치한다. HBA는 exact Docker gateway
+`172.18.0.1/32`에서 `postgres` database와 physical/logical `replication` protocol에
+대한 해당 role만 먼저 허용한다. dedicated role은 그 외 모든 IPv4/IPv6 source에서
+먼저 reject해 broad RFC1918 grants로 fall-through하지 않게 하고, 같은 gateway의
+다른 role도 reject한다. 그 뒤 private CIDR를 유지하고 나머지 public IPv4/IPv6는
+reject한다. nginx stream은 private NIC의
+TCP/5432에서 TLS를 종료해 loopback 15433으로 보내며, `ssl_alpn postgresql`, TLS
+1.2/1.3, exact Certbot certificate/key, bounded connect/idle/handshake timeout,
+socket keepalive를 적용한다. HTTP는 ACME challenge path만 200이고 나머지는 404이며
+Studio와 HTTP API proxy를 이 endpoint에 추가하지 않는다.
+
+앱 health probe는 redirect나 401을 성공으로 보지 않고 HTTP 2xx만 허용한다. host
+firewall allow에는 선택한 private NIC destination을 함께 넣고, `ss` 결과의 TCP/5432
+listener가 정확히 그 주소 하나인지 확인한다. 다른 주소나 wildcard listener가 있으면
+write가 실패한다.
+
+OCI NSG는 host installer가 변경하지 않는다. 승인된 operator가 artifact를 사용해
+TCP/5432의 최소 inbound rule을 추가한다. source는 managed outbound NAT가
+동적이므로 의도적으로 `0.0.0.0/0`이고, 보상 통제는 TLS hostname verification과
+dedicated random SCRAM role이다.
+
+```bash
+oci network nsg rules add --region ap-osaka-1 --nsg-id "$OCI_NSG_ID" \
+  --security-rules file://infra/oracle/nsg-replication-5432.json
+# 응답의 새 security rule id를 별도 operator 기록에 보관한다.
+oci network nsg rules remove --region ap-osaka-1 \
+  --nsg-id "$OCI_NSG_ID" --security-rule-ids "[\"$REPLICATION_RULE_ID\"]" --force
+```
+
+첫 명령의 반환 rule id가 rollback 식별자다. NSG rule을 먼저 삭제한 뒤 host에서
+다음 명시적 rollback을 실행한다. write 성공 시 installer는
+`/var/lib/aura-board/replication-endpoint` 아래 root 소유 durable snapshot에
+직전 파일 상태와 설치 후 digest를 보관한다. 같은 설치를 idempotently rerun하면
+이미 관리 중인 상태로 이 pre-install snapshot을 덮어쓰지 않는다.
+기존 managed 일반 파일은 write 전에 `root:root`와 mode `0644`를 요구하고 renewal
+hook만 `0755`를 요구한다. 따라서 rollback이 알 수 없는 기존 owner/mode를 임의로
+넓히지 않는다. 첫 endpoint 변경 전에는 mode `0600` pending journal을 원자적으로
+게시한다.
+
+```bash
+sudo bash infra/oracle/supabase-selfhost/install-replication-endpoint.sh \
+  --rollback --domain replication.129-225-159-251.sslip.io --private-ip <PRIVATE_IP>
+```
+
+rollback은 snapshot owner/path, domain/private-IP, 현재 설치 파일 digest를 검증한
+뒤 host TCP/5432 rule과 `/etc/iptables/rules.v4`, nginx include/config, compose
+override, custom HBA를 복원하고 복원된 compose 조합으로 db를 recreate한다. db와 앱
+health는 HTTP 2xx 기준으로 다시 확인한다. 자동 복구나 명시적 rollback이 중간에
+실패하면 pending/in-progress journal과 snapshot을 남기므로 원인을 해결한 뒤 같은
+`--rollback` 명령으로 idempotently 재시도한다. journal은 전체 복원과 health/nginx
+검증이 성공한 뒤에만 제거된다. Certbot renewal deploy hook은 `nginx -t` 성공 때만 reload한다.
+installer는 dedicated role credential을 생성·읽기·출력·백업하지 않는다.
+
+Certbot 표준 layout에서 `live/<cert-name>`은 일반 directory이고 그 안의
+`fullchain.pem`/`privkey.pem` 등이 `archive/`를 가리키는 symlink다. 이 layout은
+허용되는 것으로 확인했으며, installer의 일반 경로 보호(상위 directory symlink와
+target symlink 거부)는 완화하지 않는다.
+
 ## 10. 중지/제거
 
 staging 중지:

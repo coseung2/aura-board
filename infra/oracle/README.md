@@ -27,6 +27,74 @@ Allow dynamic-group <BACKUP_DYNAMIC_GROUP> to manage objects in compartment <BAC
 
 If your tenancy requires separate permissions to inspect the bucket or namespace, add only the minimum read permissions needed by the deployed OCI CLI workflow. Do not grant tenancy-wide object-management access.
 
+## Oracle-to-Supabase DR replication endpoint
+
+The Oracle Osaka A1 ARM64 host is the self-hosted PostgreSQL source for the Supabase
+Free DR subscriber. The endpoint installer is intentionally separate from application
+deployment and from the OCI NSG: it defaults to dry-run, accepts a validated
+`--domain` and `--private-ip`, and only `--write` can install files, recreate the
+database, reload nginx, or change the host firewall. The TLS/ALPN/HBA/role/firewall
+data plane was verified live on A1; the checked-in installer must still pass its own
+dry-run and write verification before replacing that interim configuration.
+
+Use `replication.129-225-159-251.sslip.io` only as the current interim hostname. Once
+DNS-edit credentials exist, prefer a stable `aura-board.com` hostname and pass it
+explicitly to the installer. Managed Supabase outbound addresses are dynamic and NAT64
+may be used, so do not document or enforce a `/32` source allowlist.
+
+```bash
+sudo bash infra/oracle/supabase-selfhost/install-replication-endpoint.sh \
+  --dry-run --domain replication.129-225-159-251.sslip.io --private-ip <PRIVATE_IP>
+sudo bash infra/oracle/supabase-selfhost/install-replication-endpoint.sh \
+  --write --domain replication.129-225-159-251.sslip.io --private-ip <PRIVATE_IP>
+```
+
+The write flow requires an existing ARM64 nginx stream module, an existing Certbot
+account, DNS/HTTP reachability for HTTP-01, and a pre-provisioned random SCRAM role.
+It verifies that the role has LOGIN, REPLICATION, BYPASSRLS, NOSUPERUSER, NOCREATEDB,
+NOCREATEROLE, and a bounded connection limit without ever creating, reading, or logging
+the password. It composes an override that publishes only
+`127.0.0.1:15433 -> db:5432`, installs the exact-gateway HBA policy into the existing
+`/etc/postgresql-custom` volume, validates
+`pg_hba_file_rules` through `supabase_admin`, installs the TLS stream proxy, checks
+listeners and requires the app health endpoint to return HTTP 2xx. The dedicated role
+is explicitly rejected for every other IPv4/IPv6 source before broad RFC1918 grants.
+The host TCP/5432 allow is restricted to the selected private NIC destination, every
+other local TCP/5432 listener is rejected, and `/etc/iptables/rules.v4` is persisted.
+
+The checked-in `infra/oracle/nsg-replication-5432.json` is one explicit OCI `INGRESS`
+TCP/5432 rule. The host script never mutates the NSG. After approval, an operator adds
+it and records the returned rule id:
+
+```bash
+oci network nsg rules add --region ap-osaka-1 --nsg-id "$OCI_NSG_ID" \
+  --security-rules file://infra/oracle/nsg-replication-5432.json
+```
+
+Rollback removes that returned rule id with `oci network nsg rules remove --nsg-id
+"$OCI_NSG_ID" --security-rule-ids "[\"$REPLICATION_RULE_ID\"]" --force`, restores the
+pre-install host firewall, nginx, compose override, and custom HBA state, recreates db
+with the restored compose set, and
+verifies app/Supabase health. Never leave the public NSG rule in place after the endpoint
+files have been removed. A successful write keeps its root-owned durable snapshot under
+`/var/lib/aura-board/replication-endpoint`; rerunning an unchanged install preserves the
+same last-known pre-install snapshot. Run the explicit host rollback only after removing
+the OCI rule:
+
+```bash
+sudo bash infra/oracle/supabase-selfhost/install-replication-endpoint.sh \
+  --rollback --domain replication.129-225-159-251.sslip.io --private-ip <PRIVATE_IP>
+```
+
+Before write, every existing managed regular file must already be `root:root` with mode
+`0644` (the renewal hook is `0755`), so rollback never widens unknown metadata. The
+installer publishes a mode-`0600` pending journal before its first endpoint mutation.
+Failed recovery retains that journal, and `--rollback` safely retries partial recovery;
+normal rollback likewise retains an in-progress marker until all file, firewall,
+compose, database, app, and nginx checks pass. Rollback validates the snapshot owner,
+paths, domain, private IP, and installed file digests before the first attempt. It never
+reads or handles the dedicated role credential.
+
 ### DevSpace Bastion session keeper
 
 Keep public SSH closed. DevSpace administration uses OCI Bastion SSH port-forwarding sessions to the instance private IP and port 22. Because Bastion sessions are intentionally short-lived, the self-hosted `aura-board-prod` GitHub runner can refresh the session through the instance principal after the dedicated IAM policy below is installed and verified. Until then, create Bastion sessions manually.

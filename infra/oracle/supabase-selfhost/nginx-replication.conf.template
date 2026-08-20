@@ -1,0 +1,17 @@
+server {
+    listen __PRIVATE_IP__:__LISTEN_PORT__ ssl so_keepalive=on;
+
+    proxy_pass 127.0.0.1:__DB_PORT__;
+    proxy_connect_timeout 5s;
+    proxy_timeout 1h;
+    proxy_socket_keepalive on;
+
+    ssl_certificate __CERT_DIR__/fullchain.pem;
+    ssl_certificate_key __CERT_DIR__/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_alpn postgresql;
+    ssl_handshake_timeout 10s;
+    ssl_session_cache shared:aura_board_replication_tls:10m;
+    ssl_session_timeout 1h;
+    ssl_session_tickets off;
+}

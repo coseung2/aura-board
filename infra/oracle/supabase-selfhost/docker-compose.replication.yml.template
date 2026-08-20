@@ -1,0 +1,5 @@
+services:
+  db:
+    # Direct database access is loopback-only; nginx owns public TCP/5432.
+    ports:
+      - "127.0.0.1:15433:5432/tcp"

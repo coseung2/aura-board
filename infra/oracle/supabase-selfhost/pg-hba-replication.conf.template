@@ -1,0 +1,27 @@
+# This file is installed in the existing /etc/postgresql-custom volume and
+# selected by a conf.d hba_file override.
+# The nginx stream endpoint terminates TLS, so the backend rules are host rules.
+
+local all supabase_admin trust
+local all all peer map=supabase_map
+
+# The Docker NAT gateway is the only source permitted to use the DR role.
+host postgres __REPLICATION_ROLE__ __REPLICATION_GATEWAY__/32 scram-sha-256
+host replication __REPLICATION_ROLE__ __REPLICATION_GATEWAY__/32 scram-sha-256
+# Do not let the dedicated role fall through to the broad private CIDR grants.
+host all __REPLICATION_ROLE__ 0.0.0.0/0 reject
+host all __REPLICATION_ROLE__ ::/0 reject
+host all all __REPLICATION_GATEWAY__/32 reject
+
+# Generic loopback access follows the dedicated-role denies.
+host all all 127.0.0.1/32 trust
+host all all ::1/128 trust
+
+# Preserve private Docker/OCI access after the exact gateway reject above.
+host all all 172.16.0.0/12 scram-sha-256
+host all all 10.0.0.0/8 scram-sha-256
+host all all 192.168.0.0/16 scram-sha-256
+
+# No other public database access is accepted.
+host all all 0.0.0.0/0 reject
+host all all ::/0 reject

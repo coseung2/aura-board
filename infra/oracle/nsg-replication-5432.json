@@ -1,0 +1,16 @@
+[
+  {
+    "description": "Aura Board DR PostgreSQL TLS endpoint",
+    "direction": "INGRESS",
+    "isStateless": false,
+    "protocol": "6",
+    "source": "0.0.0.0/0",
+    "sourceType": "CIDR_BLOCK",
+    "tcpOptions": {
+      "destinationPortRange": {
+        "min": 5432,
+        "max": 5432
+      }
+    }
+  }
+]
