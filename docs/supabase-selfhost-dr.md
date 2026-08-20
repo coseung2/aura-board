@@ -445,11 +445,13 @@ restore rehearsal은 production write를 발생시키지 않는다.
 ### Phase 2 — Backup hardening
 
 - [ ] 기존 `backup-supabase.sh`를 local PostgreSQL backup으로 전환
-- [ ] full dump retention policy
+- [x] full dump retention policy — private OCI bucket의 backup prefix에 30일 lifecycle 적용
 - [ ] WAL archive/PITR 설계 및 테스트
 - [ ] OCI cross-region 또는 외부 copy
-- [ ] encrypted local/offsite backup
-- [ ] restore rehearsal 자동화
+- [x] encrypted local/offsite backup 도구 — AES-256-GCM+scrypt, 원자적 no-overwrite publish와 변조/오암호 거부 검증
+- [x] restore rehearsal 자동화 — digest-pinned Supabase PG17 ARM64 격리 컨테이너와 실제 A1 full dump 복원 통과
+
+2026-08-20 검증에서는 `restore-rehearsal.sh`가 실제 self-hosted Supabase full dump의 checksum/archive를 재검증하고, network/port가 없는 read-only 컨테이너의 bounded tmpfs에 복원했다. Supabase PG17 이미지가 요구하는 최소 capability와 임시 pgsodium key만 제공했으며 복원 후 소유 label이 일치하는 컨테이너만 제거되고 잔존 컨테이너가 없음을 확인했다. `offsite-backup.mjs`는 실제 암복호화 round trip, wrong passphrase, tamper, malformed header/KDF, symlink, destination race 및 decrypt no-overwrite를 검증한다. 다만 암호화 도구가 Oracle 외부 위치로 파일을 전송하지는 않으므로 실제 offsite 사본 배치는 별도 미완료 항목이다.
 
 ### Phase 3 — Supabase Free / Vercel warm DR (범위 포함)
 

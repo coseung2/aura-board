@@ -24,6 +24,7 @@ export default defineConfig({
     include: [
       "src/**/*.vitest.{ts,tsx}",
       "scripts/loadtest-classroom-metrics.vitest.ts",
+      "infra/oracle/**/*.vitest.ts",
     ],
   },
 });

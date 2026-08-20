@@ -328,13 +328,52 @@ Before claiming a self-hosted RPO better than the latest validated logical dump,
 
 Until that work is separately implemented and verified, recovery coverage is limited to the latest checksum- and archive-validated logical dump. Do not describe the daily timer as WAL/PITR protection.
 
-Periodically perform a logical-dump restore rehearsal in an isolated, disposable scratch database—not production. This validates the custom-format backup path; it does not validate WAL/PITR:
+Periodically perform a logical-dump restore rehearsal in an isolated, disposable scratch database—not production. This validates the custom-format backup path; it does not validate WAL/PITR. Use the checked-in runner so the image, resource bounds, checksum binding, and cleanup contract remain reproducible:
 
 1. Download one archive and its manifest through an approved operator workflow.
-2. Run `sha256sum --check <archive>.sha256` in the directory containing the archive.
-3. Run `pg_restore --list <archive>.dump` and review the object list.
-4. Restore into an empty scratch database with a compatible PostgreSQL client, capture errors, and run application-specific integrity checks.
-5. Destroy the scratch database and securely remove downloaded backup material according to policy.
+2. Run the non-mutating verification first:
+
+   ```bash
+   ./infra/oracle/restore-rehearsal.sh --dry-run \
+     --archive /approved/path/backup.dump \
+     --manifest /approved/path/backup.dump.sha256
+   ```
+
+3. On the ARM64 operator host, run the isolated restore. The default image is the exact digest-pinned Supabase PG17 image used by the self-hosted stack. An unpinned image is rejected unless the operator explicitly supplies `--unsafe-allow-unpinned-image`; do not use that override as acceptance evidence:
+
+   ```bash
+   sudo ./infra/oracle/restore-rehearsal.sh --write \
+     --archive /approved/path/backup.dump \
+     --manifest /approved/path/backup.dump.sha256 \
+     --check-sql /approved/path/integrity-check.sql
+   ```
+
+4. Review the checksum, archive-list, readiness, restore, and optional check-SQL stages. Confirm `docker ps -a --filter label=com.aura-board.restore-rehearsal` is empty afterward.
+5. Securely remove downloaded backup material according to policy.
+
+The runner copies the archive/manifest into a private invocation directory before hashing, validates an exact one-line lowercase SHA-256 manifest, rechecks the staged bytes, mounts them read-only, and starts no network or published port. CPU, memory/swap, PIDs, tmpfs sizes, restore timeout, integrity timeout, and cleanup timeout have bounded validated environment overrides listed by `--help`. SHA-256 does not authenticate an attacker-controlled archive and manifest pair; use the encrypted offsite container or an independent signature for that threat.
+
+### Encrypted Oracle-external copy artifact
+
+`offsite-backup.mjs` creates a versioned AES-256-GCM container with scrypt key derivation, authenticated metadata, streaming I/O, mode-0600 temporary files, and atomic hard-link no-overwrite publication. It never uploads or deletes remote objects. Choose an approved Oracle-external destination, then transfer the encrypted artifact through that provider's supported client.
+
+Do not place a passphrase in argv, environment variables, shell history, or logs. Feed the script's bounded stdin JSON from an interactive prompt:
+
+```bash
+python3 -c 'import getpass,json; print(json.dumps({"passphrase":getpass.getpass()}))' | \
+  node ./infra/oracle/offsite-backup.mjs encrypt --write \
+    --input /approved/path/backup.dump \
+    --output /approved/offsite-device/backup.dump.aura
+```
+
+Verify decryption to a new path; the script refuses to overwrite any existing destination:
+
+```bash
+python3 -c 'import getpass,json; print(json.dumps({"passphrase":getpass.getpass()}))' | \
+  node ./infra/oracle/offsite-backup.mjs decrypt --write \
+    --input /approved/offsite-device/backup.dump.aura \
+    --output /approved/restore-test/backup.dump
+```
 
 ## Rollback
 
