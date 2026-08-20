@@ -3,15 +3,29 @@ import { randomBytes } from "crypto";
 import { mkdir, readFile, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { createClient } from "@supabase/supabase-js";
+import {
+  isMediaDegradedModeEnabled,
+  MEDIA_DEGRADED_MESSAGE,
+  MEDIA_DEGRADED_MODE_CODE,
+} from "./media-degraded";
+
+export type MediaStorageErrorCode =
+  | "media_storage_failed"
+  | typeof MEDIA_DEGRADED_MODE_CODE;
 
 export class MediaStorageError extends Error {
-  code = "media_storage_failed" as const;
+  code: MediaStorageErrorCode;
   cause?: unknown;
 
-  constructor(message: string, cause?: unknown) {
+  constructor(
+    message: string,
+    cause?: unknown,
+    code: MediaStorageErrorCode = "media_storage_failed",
+  ) {
     super(message);
     this.name = "MediaStorageError";
     this.cause = cause;
+    this.code = code;
   }
 }
 
@@ -113,6 +127,7 @@ export async function uploadPublicObject(
   body: Buffer,
   options: UploadPublicObjectOptions,
 ): Promise<UploadPublicObjectResult> {
+  assertMediaStorageAvailable();
   const normalizedPath = normalizeObjectPath(pathname);
   const supabase = getSupabaseStorageConfig();
   if (supabase) {
@@ -131,6 +146,7 @@ export async function uploadPublicObject(
 export async function deletePublicObjects(
   urls: (string | null | undefined)[],
 ): Promise<{ deleted: number; skipped: number }> {
+  assertMediaStorageAvailable();
   const config = getSupabaseStorageConfig();
   if (!config) {
     return { deleted: 0, skipped: urls.filter(Boolean).length };
@@ -168,6 +184,7 @@ export async function uploadPrivateObject(
   body: Buffer,
   options: PrivateMediaObjectOptions,
 ): Promise<PrivateMediaObjectResult> {
+  assertMediaStorageAvailable();
   const normalizedPath = normalizePrivateObjectPath(pathname);
   const publicConfig = getSupabaseStorageConfig();
   const privateBucket = getPrivateStorageBucket();
@@ -196,6 +213,7 @@ export async function uploadPrivateObject(
 export async function downloadPrivateObject(
   pathname: string,
 ): Promise<DownloadPrivateObjectResult> {
+  assertMediaStorageAvailable();
   const normalizedPath = normalizePrivateObjectPath(pathname);
   const publicConfig = getSupabaseStorageConfig();
   const privateBucket = getPrivateStorageBucket();
@@ -229,6 +247,7 @@ export async function downloadPrivateObject(
 }
 
 export async function deletePrivateObject(pathname: string): Promise<void> {
+  assertMediaStorageAvailable();
   const normalizedPath = normalizePrivateObjectPath(pathname);
   const publicConfig = getSupabaseStorageConfig();
   const privateBucket = getPrivateStorageBucket();
@@ -347,6 +366,16 @@ function getPrivateStorageBucket(): string | null {
     process.env.AURA_SONG_GUESS_BUCKET?.trim() ||
     null
   );
+}
+
+function assertMediaStorageAvailable(): void {
+  if (isMediaDegradedModeEnabled()) {
+    throw new MediaStorageError(
+      MEDIA_DEGRADED_MESSAGE,
+      undefined,
+      MEDIA_DEGRADED_MODE_CODE,
+    );
+  }
 }
 
 function normalizeObjectPath(pathname: string): string {

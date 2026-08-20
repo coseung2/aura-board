@@ -12,6 +12,18 @@ export type UploadedFile = {
   mimeType: string;
 };
 
+export class UploadClientError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "UploadClientError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
 const LARGE_IMAGE_REENCODE_THRESHOLD = 4 * 1024 * 1024;
 const TARGET_MULTIPART_IMAGE_BYTES = 3.5 * 1024 * 1024;
 const MAX_REENCODED_IMAGE_PIXELS = 4_000_000;
@@ -45,9 +57,15 @@ export async function uploadFile(file: File): Promise<UploadedFile> {
     method: "POST",
     body: form,
   });
-  const json = await res.json().catch(() => null) as Partial<UploadedFile> & { error?: string } | null;
+  const json = await res.json().catch(() => null) as
+    | (Partial<UploadedFile> & { error?: string; code?: string })
+    | null;
   if (!res.ok || !json?.url) {
-    throw new Error(json?.error ?? `업로드 실패 (${res.status})`);
+    throw new UploadClientError(
+      json?.error ?? `업로드 실패 (${res.status})`,
+      res.status,
+      json?.code,
+    );
   }
 
   const kind: UploadedFile["type"] = mimeType.startsWith("image/")

@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { DJPlayerProvider } from "@/components/dj/DJPlayerProvider";
 import { Footer } from "@/components/Footer";
 import { GlobalToolkitFab } from "@/components/GlobalToolkitFab";
+import { MediaDegradedNotice } from "@/components/MediaDegradedNotice";
 import { TwemojiRoot } from "@/components/TwemojiRoot";
 import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
@@ -47,6 +48,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>
+        <MediaDegradedNotice />
         <noscript>
           <iframe
             src="https://www.googletagmanager.com/ns.html?id=GTM-KKNWDX8N"

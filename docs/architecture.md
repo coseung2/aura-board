@@ -17,6 +17,7 @@
 - Required public client env: `NEXT_PUBLIC_SUPABASE_URL` plus `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` or legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 - Server-only media writes/deletes use Supabase Storage with `SUPABASE_SERVICE_ROLE_KEY` and `SUPABASE_URL` or `NEXT_PUBLIC_SUPABASE_URL`.
 - Do not expose `SUPABASE_SERVICE_ROLE_KEY` through `NEXT_PUBLIC_*`.
+- `AURA_DR_MEDIA_DEGRADED_MODE=true|1`은 Supabase Free warm DR 승격 시에만 사용한다. 명시적으로 설정되면 public/private media upload·delete와 private download를 Storage I/O 전에 `media_degraded_mode`로 차단하고, 전역 복구 안내를 표시한다. 기본값은 비활성이며 DB·텍스트·보드 저장 경로는 유지한다.
 
 ## Auth & RBAC
 

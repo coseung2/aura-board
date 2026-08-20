@@ -7,6 +7,11 @@ import { ALLOWED_IMAGE, ALLOWED_VIDEO, MAX_SIZE, UploadPolicyError } from "./upl
 import { resizeBufferToWebPPreview, uploadWebPBuffer, extractVideoThumbnail } from "@/lib/blob";
 import { logError } from "@/lib/error-log";
 import { uploadPublicObject } from "@/lib/media-storage";
+import {
+  isMediaDegradedModeEnabled,
+  MEDIA_DEGRADED_MESSAGE,
+  MEDIA_DEGRADED_MODE_CODE,
+} from "@/lib/media-degraded";
 
 // Multipart boundaries and per-part headers are part of Content-Length. Keep a
 // small envelope allowance while still rejecting obviously oversized requests
@@ -79,6 +84,13 @@ export async function POST(req: Request) {
     if (teacher) {
       userId = teacher.id;
       userEmail = teacher.email;
+    }
+
+    if (isMediaDegradedModeEnabled()) {
+      return NextResponse.json(
+        { error: MEDIA_DEGRADED_MESSAGE, code: MEDIA_DEGRADED_MODE_CODE },
+        { status: 503 },
+      );
     }
 
     const contentLength = Number(req.headers.get("content-length"));
@@ -257,6 +269,16 @@ export async function POST(req: Request) {
       mimeType: normalizedMime,
     });
   } catch (e) {
+    const errorCode =
+      e && typeof e === "object" && "code" in e
+        ? (e as { code?: unknown }).code
+        : undefined;
+    if (errorCode === MEDIA_DEGRADED_MODE_CODE) {
+      return NextResponse.json(
+        { error: MEDIA_DEGRADED_MESSAGE, code: MEDIA_DEGRADED_MODE_CODE },
+        { status: 503 },
+      );
+    }
     // 정책 거부는 사용자 입력 이슈 → 400으로 매핑해 UI가 적절히 토스트.
     if (e instanceof UploadPolicyError) {
       console.error("[POST /api/upload] policy reject:", e.message);
