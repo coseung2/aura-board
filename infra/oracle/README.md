@@ -56,6 +56,22 @@ Allow dynamic-group aura-board-bastion-runner to inspect work-requests in tenanc
 
 The current DevSpace SSH public key is embedded in the trusted workflow because public keys are not secrets. Its matching private key remains outside the repository. Rotate this transitional key to a dedicated DevSpace-only SSH key when the execution environment gains a supported secret/key store; do not copy a private key into source control.
 
+#### Operator session CLI
+
+On an operator machine with an authenticated OCI CLI profile, create or reuse the named session and write mode-0600 metadata atomically:
+
+```bash
+python3 ./infra/oracle/create-bastion-session.py \
+  --profile OPERATOR_PROFILE \
+  --instance-name testauram-a1-osaka \
+  --bastion-name aura-board-devspace-bastion \
+  --session-name aura-board-devspace-auto \
+  --ssh-public-key-file /path/to/devspace.pub \
+  --output-file /path/to/bastion-session.json
+```
+
+The CLI defaults to `ap-osaka-1` and a 20-minute reuse threshold. Set `OCI_CLI_CONFIG_FILE` when the OCI config is not at `~/.oci/config`; the matching private key is never read or passed to OCI.
+
 Configure an approved bucket lifecycle policy for retention and expiry after recovery requirements are approved. Apply the same retention treatment to each `.dump` and sibling `.dump.sha256` pair under the configured prefix. The upload script never lists or deletes remote objects. Keep the bucket private and disable public access.
 
 ## A1 operating model
