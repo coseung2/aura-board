@@ -129,6 +129,7 @@ Do not mark any item below complete from a staging-only observation. Record the 
 - [ ] Verify logical replication publisher/subscriber state, confirmed LSN and commit timestamp, measured lag at repeated timestamps, and a primary heartbeat row observed on DR. Record the result against the approved RPO and alert threshold.
 - [ ] Exercise DR PostgREST health and representative read/write paths. Retain HTTP status and response-shape evidence for service-role access plus anonymous/share RLS allowed and denied cases.
 - [ ] Join the DR Realtime WebSocket, register the required `postgres_changes`/Broadcast subscriptions, and receive a real event generated on the promoted DR path. Retain join, event, disconnect, and reconnect evidence.
+- [x] Create a dedicated `aura-board-dr` Vercel project in the approved team, apply the Next.js framework preset, and verify it has no production env or deployment before Supabase DR is connected.
 - [ ] Verify the Vercel DR deployment reaches a healthy/ready state for the intended commit or deployment ID, builds successfully, serves `/api/health` against Supabase Free, and has the required environment variable names without exposing values.
 
 ### Traffic switch and recovery rehearsal

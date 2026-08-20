@@ -31,7 +31,8 @@ prisma/dev.db*
 # uploads
 public/uploads/*
 !public/uploads/.gitkeep
-.vercel
+# Local Vercel project link metadata; the DR project is recorded in docs.
+.vercel/
 .worktrees/
 padlet-env-backup/
 

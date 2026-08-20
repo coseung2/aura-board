@@ -424,7 +424,7 @@ restore rehearsal은 production write를 발생시키지 않는다.
 - [x] 방향 기록
 - [x] 현재 managed Supabase DB/Storage 실사용량 재측정
 - [ ] Oracle PAYG A1 무료 할당량과 실제 tenancy billing 확인 — Always Free 계산은 확인했지만 billing 화면 실측은 별도
-- [ ] Vercel DR 플랜/사용 조건 확인
+- [x] Vercel DR project/plan 조건 확인 — `aura-board-dr` project 생성, Next.js preset/Seoul runtime 설정, env·deployment는 Supabase DR 연결 전까지 비워 둠
 - [ ] Supabase Free DB/Realtime 한도와 현재 Aura 사용량 비교
 
 ### Phase 1 — Oracle self-hosted Supabase staging
@@ -453,12 +453,13 @@ restore rehearsal은 production write를 발생시키지 않는다.
 
 ### Phase 3 — Supabase Free / Vercel warm DR (범위 포함)
 
-- [ ] `mallagaenge` Supabase CLI 계정으로 인증하고 Free slot이 남은 조직에 `aura-board-dr` 생성 — 현재 CLI token은 `coseung2` 사용자라 조직을 바꿔도 사용자 단위 활성 Free 프로젝트 2개 한도에 차단됨
+- [ ] 사용자 생성 `coseung-sk`의 `aura-board-dr`을 운영 CLI에 연결 — 현재 CLI token의 project list에는 보이지 않아 해당 계정으로 `supabase login --profile coseung-sk` 또는 현재 CLI 사용자 초대 필요
 - [ ] DR Supabase schema/RLS 구축
 - [ ] logical replication proof-of-concept
 - [ ] DDL migration 동기화 절차
 - [ ] replication lag monitor
-- [ ] Vercel DR deployment
+- [x] Vercel DR project 생성 및 Next.js framework preset 적용
+- [ ] Vercel DR production env 주입 및 deployment health 검증
 - [ ] DR object payload 복제 또는 Osaka Object Storage 장애 시 media degraded-mode 정책
 - [ ] Cloudflare 수동 failover runbook
 - [ ] failback rehearsal

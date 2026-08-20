@@ -14,7 +14,7 @@
 | Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개를 2026-08-01 적용하고 RLS·권한·함수·트리거·cron job을 검증함 |
 | Supabase Free (DR) | 논리 replica, DR용 Postgres·PostgREST·RLS·Realtime warm standby | Oracle primary write path, 자동 promotion, object payload(별도 acceptance gate) | 이번 DR 범위에 포함했지만 schema/RLS parity, replication, 서비스 health, object availability 증거는 아직 기록하지 않음 |
 | GitHub Actions | 운영 cron endpoint 수동 실행과 장애 시 대체 호출 | 앱 호스팅, 기본 스케줄러 | 8개 endpoint용 수동 workflow를 비상 운영 경로로 유지 |
-| Vercel | 전환 기간의 마지막 검증 가능한 배포본, Supabase Free warm standby용 DR runtime | Oracle primary의 신규 운영 트래픽, 기본 cron scheduler | 평상시 운영 DNS와 scheduler에서는 제외. DR deployment·health는 준비/검증 대상이며 아직 증거 없음 |
+| Vercel | 전환 기간의 마지막 검증 가능한 배포본, Supabase Free warm standby용 DR runtime | Oracle primary의 신규 운영 트래픽, 기본 cron scheduler | `mallagaenge-1872's projects/aura-board-dr` 별도 project와 Next.js preset 생성 완료. env/deployment는 Supabase DR 연결 전까지 비워 두며 평상시 운영 DNS와 scheduler에서는 제외 |
 
 책임 이전 후에도 cron API의 인증 기준은 [`src/lib/cron-auth.ts`](../src/lib/cron-auth.ts)이며, GitHub Actions와 Supabase callback 모두 동일한 `CRON_SECRET`을 Bearer token으로 사용한다.
 
@@ -168,7 +168,7 @@ DB/API DR과 object payload 복제 또는 media degraded-mode는 별도 acceptan
 
 운영 기준과 상세 설계는 [`docs/supabase-selfhost-dr.md`](supabase-selfhost-dr.md)를 참조하고, 아래 항목은 이 handoff와 [`docs/verification-checklist.md`](verification-checklist.md)의 공통 acceptance evidence로 사용한다. 각 증거에는 대상(project/endpoint), UTC 시각, commit/deployment SHA 또는 SQL/log artifact를 기록하고 secret 값은 기록하지 않는다. 현재는 모든 DR acceptance 항목이 미완료다.
 
-DR 프로젝트 이름은 `aura-board-dr`, 리전은 Seoul(`ap-northeast-2`)로 정했다. 조직만 `coseung2-sketc` 또는 `mallagaenge-1872`로 바꿔도 현재 CLI token의 `coseung2` 사용자 단위 활성 Free 프로젝트 2개 한도가 적용돼 생성이 거절됐다. 기존 프로젝트는 임의 pause/delete/upgrade하지 않으며, Free slot이 남은 `mallagaenge` 사용자로 CLI를 다시 인증한 뒤 생성해야 한다.
+DR 프로젝트 이름은 `aura-board-dr`, 리전은 Seoul(`ap-northeast-2`)로 정했다. 사용자가 `coseung-sk` 계정에서 Supabase DR project를 생성했지만 현재 운영 CLI token의 project list에는 아직 보이지 않는다. 해당 계정으로 `supabase login --profile coseung-sk`를 완료하거나 현재 CLI 사용자를 조직 멤버로 초대해야 schema/replication 작업을 시작할 수 있다. Vercel에는 별도 `aura-board-dr` project를 `mallagaenge-1872's projects` 팀에 생성하고 framework preset을 Next.js로 적용했다. Supabase DR 연결 전이므로 production env와 deployment는 의도적으로 0개다.
 
 - [ ] Schema/RLS parity: primary와 Supabase Free의 migration history, schema-only export/catalog 비교, table·column·index·sequence·extension·function·trigger·publication, role/grant, RLS policy를 대조하고 대표적인 허용/거부 RLS 요청 결과를 저장한다.
 - [ ] Logical replication lag/heartbeat: publisher/subscriber 상태, 마지막 confirmed LSN과 commit timestamp, 측정 시각별 lag, primary heartbeat row가 DR에서 관찰된 시각, 승인된 RPO와 alert 기준을 함께 기록한다.
@@ -220,7 +220,8 @@ DR 프로젝트 이름은 `aura-board-dr`, 리전은 Seoul(`ap-northeast-2`)로 
 - 기록된 DB/Storage/object/queue 수치는 2026-07-31 시점 스냅샷이며 cutover 직전에 다시 측정해야 한다.
 - Storage S3 Customer Secret은 현재 A1 root-owned mode `0600` `.env`에만 있다. Infisical CLI 인증 후 `/oracle/aura-board/supabase-storage`에 값 노출 없이 동기화하고 rotation/runbook을 검증해야 한다.
 - Bastion session create의 `404/Unknown resource`는 `read private-ips` 누락으로 확인해 해결했다. 최소 권한 create + tenancy session read, client CIDR `/32`, port-forwarding SSH E2E를 검증했고 public TCP/22는 닫았다. client public IP가 바뀌면 broad CIDR을 열지 말고 승인된 `/32`만 교체해야 한다.
-- Supabase Free DR은 조직 선택이 아니라 현재 CLI 사용자 기준 활성 Free 프로젝트 2개 한도에 차단됐다. `mallagaenge` 사용자로 CLI 인증을 전환하기 전에는 신규 DR project 생성이 불가능하다.
+- Supabase Free DR project는 사용자가 다른 계정에서 만들었으나 현재 운영 CLI에 아직 노출되지 않는다. project ref를 문서에 복사하지 말고 올바른 profile login 또는 조직 초대로 접근을 연결한 뒤 값 비노출 상태에서 작업한다.
+- Vercel DR project는 생성·Next.js preset까지 완료했지만 env/deployment가 비어 있다. 기존 `aura-board` production env에서 DB/Supabase 6개 값을 제외한 runtime secret을 안전하게 복제하고 DR 값으로 대체한 뒤에만 첫 production deployment를 실행한다.
 - self-hosted upstream은 고정 commit을 사용한다. 2026-08의 Envoy 기본 gateway 전환, PostgreSQL 17 및 Studio ownership 변경은 고정본을 갱신할 때 별도 migration/rehearsal 없이 따라가지 않는다.
 
 ## Update log
