@@ -285,7 +285,53 @@ Storage API가 읽는 prefix가 달라지는 것을 막기 위해 이 대조를 
 
 managed production에는 `notification-outbox-retry-sweep`, `student-morning-digest`, `student-morning-tasks-08-kst` pg_cron job과 notification worker URL/secret Vault 값이 남아 있다. staging에는 이 job/secret을 복제하지 않는다. Oracle은 이미 `notification-push`를 매분 실행하고 `attendance-reminder`를 매일 `23:00 UTC`에 실행하므로 self-host cutover에서는 Oracle cron을 단일 scheduler로 유지해 중복 callback을 피한다. DB에 복원된 Vault 참조 함수는 secret이 없으면 no-op이어야 한다.
 
-## 9. 중지/제거
+## 9. Public endpoint two-stage rollout
+
+`supabase.aura-board.com`은 Studio나 postgres-meta를 공개하지 않고 Auth, PostgREST,
+Realtime, Storage, Functions, GraphQL client API prefix만 loopback gateway로 전달한다.
+DNS·TLS·self-host public URL은 다음 순서로만 적용한다. 이 단계만으로 production 앱 env나
+database source of truth는 전환되지 않는다.
+
+1. Cloudflare DNS tool을 public origin IPv4와 `--proxied false`로 dry-run한다.
+2. DNS-only A record를 생성한다. API token은 exact stdin JSON으로만 전달한다.
+3. A1 installer dry-run 후 write를 실행해 HTTP-01 certificate와 private-NIC TLS nginx를 설치한다.
+4. self-hosted `.env`의 public URL 두 값을 원자적으로 갱신하고 Auth/Storage를 recreate한다.
+5. 외부 HTTPS, REST allowed/denied request, Realtime WebSocket, Storage download를 확인한다.
+6. 같은 DNS tool을 `--proxied true`로 다시 실행하고 Cloudflare 경유 smoke를 반복한다.
+
+```bash
+python3 infra/oracle/supabase-selfhost/configure-cloudflare-dns.py \
+  --content <ORACLE_PUBLIC_IPV4> --proxied false --dry-run
+
+# write mode stdin shape only; value는 shell argv/history에 넣지 않는다.
+# {"apiToken":"<zone-scoped DNS edit token>"}
+secure-token-producer | python3 infra/oracle/supabase-selfhost/configure-cloudflare-dns.py \
+  --content <ORACLE_PUBLIC_IPV4> --proxied false --write
+
+sudo bash infra/oracle/supabase-selfhost/install-public-endpoint.sh --dry-run
+sudo bash infra/oracle/supabase-selfhost/install-public-endpoint.sh --write
+
+sudo python3 infra/oracle/supabase-selfhost/configure-public-url.py \
+  --env-file /srv/aura-board/supabase/.env --dry-run
+sudo python3 infra/oracle/supabase-selfhost/configure-public-url.py \
+  --env-file /srv/aura-board/supabase/.env --write
+cd /srv/aura-board/supabase
+sudo docker compose config --quiet
+sudo docker compose up -d --force-recreate --wait auth storage
+
+secure-token-producer | python3 infra/oracle/supabase-selfhost/configure-cloudflare-dns.py \
+  --content <ORACLE_PUBLIC_IPV4> --proxied true --write
+```
+
+Cloudflare token은 `aura-board.com` 단일 zone의 DNS read/edit만 허용한다. Wrangler의
+기본 OAuth token은 zone read 권한만 있으므로 DNS write 증거로 간주하지 않는다.
+installer는 DNS를 변경하지 않으며, Certbot 또는 최종 `nginx -t` 실패 시 직전 nginx
+config/symlink로 rollback한다. `configure-public-url.py`는 기존 secret 라인을 출력하지
+않고 `SUPABASE_PUBLIC_URL=https://supabase.aura-board.com`과
+`API_EXTERNAL_URL=https://supabase.aura-board.com/auth/v1`만 mode-0600 backup 후
+원자 교체한다.
+
+## 10. 중지/제거
 
 staging 중지:
 
@@ -296,7 +342,7 @@ sudo docker compose down
 
 `down -v`, official `reset.sh`, staging directory 삭제는 PostgreSQL/Storage 데이터를 파괴할 수 있으므로 별도 승인 없이 실행하지 않는다.
 
-## 10. production cutover 금지 사항
+## 11. production cutover 금지 사항
 
 이 staging 단계에서는 다음을 하지 않는다.
 
