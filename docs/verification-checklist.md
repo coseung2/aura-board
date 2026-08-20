@@ -130,7 +130,7 @@ Do not mark any item below complete from a staging-only observation. Record the 
 - [x] Exercise DR PostgREST: service-role `200`/1 row; anonymous no token `200`/0; valid share token `200`/1; invalid token `200`/0.
 - [x] Join DR Realtime and verify Broadcast plus Oracle-origin `postgres_changes`; the canary update was received in 1.134 seconds.
 - [x] Create a dedicated `aura-board-dr` Vercel project in the approved team, apply the Next.js framework preset, and verify it has no production env or deployment before Supabase DR is connected.
-- [ ] Verify the Vercel DR deployment reaches a healthy/ready state for the intended commit or deployment ID, builds successfully, serves `/api/health` against Supabase Free, and has the required environment variable names without exposing values.
+- [x] Verify Vercel DR deployment `dpl_5Hu4bGn2aBDEut8YJop2qUt2R3zo` is production `READY` in `icn1` for exact SHA `f35286e1`, with 42 production env names, `/api/health` returning `200`/database reachable/replication fresh, the global media-degraded notice present, unauthenticated upload remaining auth-first `401`, and no deployment error logs.
 
 ### Traffic switch and recovery rehearsal
 

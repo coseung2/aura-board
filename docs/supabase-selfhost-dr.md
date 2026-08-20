@@ -478,7 +478,7 @@ restore rehearsal은 production write를 발생시키지 않는다.
 - [x] replication lag heartbeat 1분 갱신 및 DR health fail-closed 계약
 - [x] Vercel DR project 생성 및 Next.js framework preset 적용
 - [x] Vercel DR production env 42개를 production-only로 주입하고 DB/Supabase 값을 DR로 교체
-- [ ] Vercel DR exact-SHA deployment 및 `/api/health` 검증
+- [x] Vercel DR exact-SHA deployment 및 `/api/health` 검증 — `f35286e1`, production `READY`, `icn1`, DB reachable, replication fresh, degraded notice 확인
 - [x] Osaka Object Storage 장애 시 media degraded-mode 구현·행동 테스트
 - [ ] Cloudflare 수동 failover runbook
 - [ ] failback rehearsal
