@@ -1,7 +1,7 @@
 # Oracle self-hosted Supabase + DR/백업 설계
 
 기준일: 2026-08-20  
-상태: **Phase 1 staging 진행 중 — DB 복원·PostgREST/RLS·Realtime 검증 완료, Storage payload/OCI S3 backend 미완료**
+상태: **Phase 1 data plane·Bastion 관리 경로 검증 완료 — public Supabase endpoint와 DR 프로젝트 미완료**
 
 이 문서는 Aura Board의 managed Supabase 의존성을 Oracle Cloud A1의 self-hosted Supabase로 이전할 경우, 단일 Oracle 인스턴스 장애가 전체 서비스 장애로 확대되는 위험을 어떻게 줄일지 정리한다.
 
@@ -19,7 +19,7 @@
 6. DB 백업은 Oracle 내부 백업만으로 끝내지 않고, 암호화된 사본을 로컬 PC/외장 디스크 및 필요 시 Google Drive 같은 Oracle 외부 위치에도 보관한다.
 7. 자동 failover보다 **반자동 promotion**을 우선한다. Oracle과 DR DB가 동시에 writable한 split-brain 상태를 만들지 않는다.
 
-### 1.1 2026-08-19 staging 실행 결과
+### 1.1 2026-08-19~20 staging 실행 결과
 
 설계만 있던 Phase 1은 실제 Oracle staging까지 진행됐다. production managed Supabase는 아직 source of truth이며 production endpoint/DNS/app env는 변경하지 않았다.
 
@@ -47,21 +47,30 @@ managed → staging DB 복원:
 - PostgREST service-role read `200`
 - share RLS: `x-share-token` 없음 → 0 row, 올바른 token → 1 row
 - Realtime WebSocket join 성공, `postgres_changes` subscription 등록 후 실제 `Card` no-op `UPDATE` 이벤트 수신
+- Realtime Broadcast channel join 후 실제 publish/subscribe 성공 및 동일 payload 수신
 - `pg_cron 1.6.4`, `pg_net 0.20.3`, `supabase_vault 0.3.1`, logical WAL/replication slot 동작 확인
 - managed Vault secret 및 DB cron job은 staging에 복제하지 않음. Oracle cron을 단일 scheduler로 유지해 duplicate callback을 방지한다.
 
-Storage 현황/차단점:
+Storage 이관 및 검증:
 
 - production Storage: `aura-board-uploads` 1 bucket, 1,226 object, metadata 합계 1,040,594,444 bytes
-- DB의 bucket/object metadata는 staging에 복원됐지만 실제 object payload는 아직 이전하지 않음
-- payload migration helper와 persisted Supabase URL scanner를 준비했지만 실제 migration은 미실행
-- OCI Object Storage를 Supabase Storage S3 backend로 쓰려면 OCI IAM User의 Customer Secret Key(Access Key/Secret Key)가 필요하다. 현재 Compute Instance Principal은 기존 backup object upload는 가능하지만 IAM user 관리 및 Storage 전용 bucket 생성 권한은 없음
-- 따라서 OCI S3 credential/bucket 준비 전까지 production Storage cutover는 금지
+- private/versioning-enabled OCI bucket `aura-board-storage`, bucket-scoped IAM group/user/policy와 Customer Secret Key를 생성
+- Customer Secret Key는 A1의 root-owned mode `0600` self-hosted Supabase `.env`에만 설치하고 임시 전달 파일을 제거함. Infisical CLI가 아직 인증되지 않아 secret manager 동기화는 남아 있음
+- Storage container를 `STORAGE_BACKEND=s3`, OCI S3-compatible HTTPS endpoint, path-style로 recreate한 뒤 healthy 확인
+- OCI S3 direct put/get/delete probe 성공
+- metadata의 `version`을 포함한 `<tenant>/<bucket>/<object>/<version>` key layout으로 1,226 object, 1,040,594,444 bytes를 이관
+- OCI bucket 실제 count/bytes가 managed metadata와 정확히 일치하고 probe object는 0개임을 확인
+- direct S3 sample SHA-256 8/8, self-hosted Storage API download와 managed source SHA-256 8/8 일치
+- persisted managed Storage URL inventory는 11개 column, 1,173 row. 안정 endpoint `supabase.aura-board.com`을 두고 점진 backfill하는 전략으로 확정했지만 public nginx/DNS endpoint 자체는 아직 열지 않음
+- 위 결과는 staging 증거이며 production managed Supabase는 계속 source of truth다. public endpoint와 앱 env 전환 전까지 Storage cutover를 금지한다.
 
 관리 경로:
 
-- public SSH는 닫고 OCI Bastion SSH port-forwarding으로 관리
-- 자동 Bastion session keeper workflow/script 초안을 추가했으나, 전용 dynamic group/policy 적용 및 실제 workflow 성공 검증 전에는 수동 Bastion session을 기준으로 한다.
+- Bastion runner dynamic group과 최소 권한 session policy를 적용했다. 최초 `404/Unknown resource`는 target private IP 조회에 필요한 `read private-ips` 누락이 원인이었고 해당 read 권한을 추가해 해결했다.
+- Bastion client CIDR allowlist는 승인된 relay와 현재 Codex 관리 endpoint의 `/32`만 추가했다.
+- instance-principal session create/reuse, ACTIVE metadata 생성, local port forwarding, A1 `ubuntu` SSH 명령을 end-to-end로 검증했다.
+- A1 `authorized_keys`는 기존 private backup을 남기고 Codex 관리 공개키를 원자적으로 추가했다. private key는 이동·복사하지 않았다.
+- public `0.0.0.0/0:22` Security List rule을 제거하고 target private subnet 전용 TCP/22 rule로 교체했다. 외부 TCP/22는 닫혔고 같은 상태에서 Bastion SSH와 public HTTPS health `200`을 재검증했다.
 
 ## 2. 왜 self-hosted Supabase인가
 
@@ -426,11 +435,12 @@ restore rehearsal은 production write를 발생시키지 않는다.
 - [x] managed Supabase `public` schema/data + Storage core metadata staging restore
 - [x] PostgREST/RLS 검증
 - [x] Realtime `postgres_changes` 실제 event 검증
-- [ ] Realtime Broadcast 실제 publish/subscribe 검증
-- [ ] Storage object payload 1,226건 staging migration + sample SHA-256 검증
-- [ ] Storage API -> OCI Object Storage S3 backend 검증
-- [ ] persisted `*.supabase.co/storage/v1/object/` URL inventory 및 endpoint/backfill 전략 확정
-- [ ] Bastion session keeper IAM policy 적용 및 workflow end-to-end 검증
+- [x] Realtime Broadcast 실제 publish/subscribe 검증
+- [x] Storage object payload 1,226건 staging migration + sample SHA-256 8/8 검증
+- [x] Storage API -> OCI Object Storage S3 backend 및 API download SHA-256 8/8 검증
+- [x] persisted `*.supabase.co/storage/v1/object/` URL inventory(11 column/1,173 row) 및 endpoint/backfill 전략 확정
+- [ ] `supabase.aura-board.com` public nginx/DNS endpoint 구축 및 외부 download 검증
+- [x] Bastion session keeper IAM policy 적용, local port-forwarding SSH E2E, public TCP/22 폐쇄 검증
 
 ### Phase 2 — Backup hardening
 
@@ -443,6 +453,7 @@ restore rehearsal은 production write를 발생시키지 않는다.
 
 ### Phase 3 — Supabase Free / Vercel warm DR (범위 포함)
 
+- [ ] `mallagaenge` Supabase CLI 계정으로 인증하고 Free slot이 남은 조직에 `aura-board-dr` 생성 — 현재 CLI token은 `coseung2` 사용자라 조직을 바꿔도 사용자 단위 활성 Free 프로젝트 2개 한도에 차단됨
 - [ ] DR Supabase schema/RLS 구축
 - [ ] logical replication proof-of-concept
 - [ ] DDL migration 동기화 절차

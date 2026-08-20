@@ -1,15 +1,15 @@
 # 4-provider infrastructure handoff
 
-기준일: 2026-08-08
-기준 브랜치: `main` (2026-08-08 실행 기준)
+기준일: 2026-08-20
+기준 브랜치: `main` (2026-08-20 staging 실행 기준, production cutover 전)
 
-이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **Oracle A1에서 Aura Board 애플리케이션과 private play engine을 운영하고 있으며, 2026-08-08 Cloudflare DNS와 HTTPS origin을 실제 `testauram-a1-osaka` 인스턴스에 맞게 현행화했다. 2026-08-14 backup 인프라 복구(버킷·IAM·env·pg_dump 17·OCI CLI) 후 실제 backup write와 격리 restore rehearsal을 통과해 `aura-supabase-backup.timer`가 활성 상태로 운영 중이다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
+이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **Oracle A1에서 Aura Board 애플리케이션과 private play engine을 운영하고 있으며, 2026-08-20 self-hosted Supabase staging의 DB·PostgREST/RLS·Realtime·OCI S3 Storage data plane을 검증했다. production database와 일반 파일의 source of truth는 cutover 전까지 managed Supabase Pro다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
 
 ## 책임과 경계
 
 | 제공자 | 책임 | 책임이 아닌 것 | 현재 상태 |
 | --- | --- | --- | --- |
-| Oracle Cloud | Next.js 앱 호스팅, private play engine, 앱 cron, 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업 | 원본 Postgres, Auth, Realtime, 원본 Storage | `ap-osaka-1`의 `testauram-a1-osaka` A1을 2026-08-19 4 OCPU/24 GB로 resize하고 on-host에서 `aarch64`, 4 online CPUs, 23 GiB visible RAM을 재검증. nginx와 loopback 전용 앱 서비스를 운영하며 public IP는 `129.225.159.251`; daily backup timer active |
+| Oracle Cloud | Next.js 앱 호스팅, private play engine, 앱 cron, 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업, self-hosted Supabase staging | cutover 전 managed Supabase 원본 데이터, 자동 DR promotion | `ap-osaka-1`의 `testauram-a1-osaka` A1을 4 OCPU/24 GB로 운영. 100 GB Block Volume의 Supabase OSS 11개 service와 OCI S3 Storage backend가 healthy이며 production cutover는 아직 하지 않음 |
 | Cloudflare | 운영 DNS·HTTPS proxy, Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | `aura-board.com` apex A와 `www` CNAME을 Oracle origin으로 proxied 운영. Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
 | Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개를 2026-08-01 적용하고 RLS·권한·함수·트리거·cron job을 검증함 |
 | Supabase Free (DR) | 논리 replica, DR용 Postgres·PostgREST·RLS·Realtime warm standby | Oracle primary write path, 자동 promotion, object payload(별도 acceptance gate) | 이번 DR 범위에 포함했지만 schema/RLS parity, replication, 서비스 health, object availability 증거는 아직 기록하지 않음 |
@@ -41,13 +41,15 @@
 - `main` 기준 이전 8개 커밋은 `80183f55`까지 push 완료.
 - 기존 Vercel production은 rollback 참고용으로 유지하지만 신규 운영 트래픽과 cron을 처리하지 않는다.
 - Oracle schedule은 `parent-weekly-digest`, `parent-anonymize`, `expire-pending-links`, `fd-maturity`, `role-salary-payout`, `billing-renew`, `blob-cleanup`, `attendance-reminder`, `notification-push`, `play-outbox`를 실행한다.
-- 현재 운영 OCI profile은 `testauram`, 홈 리전은 `ap-osaka-1`이다. 운영 인스턴스 `testauram-a1-osaka`는 root compartment의 `VM.Standard.A1.Flex`이며 2026-08-19 on-host에서 4 online CPUs와 23 GiB visible RAM을 확인했다. 같은 날 100 GB paravirtualized Block Volume을 `/srv/aura-board`에 ext4로 마운트하고 Docker/containerd 및 self-hosted Supabase staging 데이터를 이 볼륨으로 분리했다. public SSH는 운영 점검 시 외부에서 닫힌 상태였고 관리 경로는 OCI Bastion을 사용한다.
+- 현재 운영 OCI profile은 `testauram`, 홈 리전은 `ap-osaka-1`이다. 운영 인스턴스 `testauram-a1-osaka`는 root compartment의 `VM.Standard.A1.Flex`이며 2026-08-19 on-host에서 4 online CPUs와 23 GiB visible RAM을 확인했다. 같은 날 100 GB paravirtualized Block Volume을 `/srv/aura-board`에 ext4로 마운트하고 Docker/containerd 및 self-hosted Supabase staging 데이터를 이 볼륨으로 분리했다. 2026-08-20 Bastion instance-principal session create/reuse와 local port-forwarding A1 SSH를 end-to-end로 검증한 뒤 public `0.0.0.0/0:22`를 제거하고 target private subnet TCP/22만 유지했다. 외부 TCP/22는 닫혔고 Bastion SSH 및 public HTTPS health `200`을 재검증했다.
 - 2026-08-03에 검증한 구 `aura-board-worker-a1-osaka`와 `161.33.30.33` 관련 backup/IAM 증거는 당시 기록으로만 보존한다. 2026-08-08 DNS 및 웹 origin 기준선은 `testauram-a1-osaka`의 `129.225.159.251`이다.
 - A1 성공 검증 직후 `oci-a1-1` 용량 retry automation은 삭제되어 재실행되지 않는다.
 - `notification-push`는 Oracle의 매분 poller가 담당한다. Supabase `NotificationOutbox` insert event wakeup과 5분 retry sweep 계약은 [`src/app/api/cron/notification-push/HANDOFF.md`](../src/app/api/cron/notification-push/HANDOFF.md)에 남아 있지만, 외부 callback secret이 없더라도 Oracle poller가 backlog를 처리한다.
 - `role-salary-payout`은 `155c7c54`에서 구현·push됐지만 production에는 아직 배포되지 않았고 scheduler도 없다. 2026-08-01 로컬 코드와 운영 DB를 연결한 별무리반 제한 검증에서 24명·16역할·26,300 지급, 동일 키 재호출 차단, 24건 보상 거래 회수와 잔액 원복을 확인했다. 이 테스트로 별무리반의 `2026-08` 자동지급 키는 소비됐으며 다음 정상 자동지급 기간은 2026-09다.
 - Cloudflare Stream 진입점은 [`src/lib/event/cfstream.ts`](../src/lib/event/cfstream.ts)와 [`src/app/api/event/video-upload-url/route.ts`](../src/app/api/event/video-upload-url/route.ts)다.
 - 일반 파일·이미지는 Supabase Storage가 기준이며 관련 구현은 [`src/lib/media-storage.ts`](../src/lib/media-storage.ts)와 [`src/app/api/upload/route.ts`](../src/app/api/upload/route.ts)다. Vercel Blob 잔여분 이전 도구는 [`scripts/migrate-vercel-blob-to-supabase.ts`](../scripts/migrate-vercel-blob-to-supabase.ts)다.
+- self-hosted staging에서는 private/versioned OCI bucket `aura-board-storage`로 payload 1,226건/1,040,594,444 bytes를 이관했다. OCI 실제 count/bytes 일치, direct S3 SHA-256 8/8, self-hosted Storage API download SHA-256 8/8, Realtime Broadcast publish/subscribe를 확인했다.
+- managed Storage URL은 11개 column의 1,173 row에 남아 있다. 안정 endpoint `supabase.aura-board.com`과 점진 backfill 전략은 확정했지만 nginx/DNS endpoint와 앱 env는 아직 전환하지 않았다.
 
 ### 운영 적용 마이그레이션
 
@@ -166,6 +168,8 @@ DB/API DR과 object payload 복제 또는 media degraded-mode는 별도 acceptan
 
 운영 기준과 상세 설계는 [`docs/supabase-selfhost-dr.md`](supabase-selfhost-dr.md)를 참조하고, 아래 항목은 이 handoff와 [`docs/verification-checklist.md`](verification-checklist.md)의 공통 acceptance evidence로 사용한다. 각 증거에는 대상(project/endpoint), UTC 시각, commit/deployment SHA 또는 SQL/log artifact를 기록하고 secret 값은 기록하지 않는다. 현재는 모든 DR acceptance 항목이 미완료다.
 
+DR 프로젝트 이름은 `aura-board-dr`, 리전은 Seoul(`ap-northeast-2`)로 정했다. 조직만 `coseung2-sketc` 또는 `mallagaenge-1872`로 바꿔도 현재 CLI token의 `coseung2` 사용자 단위 활성 Free 프로젝트 2개 한도가 적용돼 생성이 거절됐다. 기존 프로젝트는 임의 pause/delete/upgrade하지 않으며, Free slot이 남은 `mallagaenge` 사용자로 CLI를 다시 인증한 뒤 생성해야 한다.
+
 - [ ] Schema/RLS parity: primary와 Supabase Free의 migration history, schema-only export/catalog 비교, table·column·index·sequence·extension·function·trigger·publication, role/grant, RLS policy를 대조하고 대표적인 허용/거부 RLS 요청 결과를 저장한다.
 - [ ] Logical replication lag/heartbeat: publisher/subscriber 상태, 마지막 confirmed LSN과 commit timestamp, 측정 시각별 lag, primary heartbeat row가 DR에서 관찰된 시각, 승인된 RPO와 alert 기준을 함께 기록한다.
 - [ ] PostgREST: DR endpoint에서 health와 대표 read/write를 확인하고, service-role 경로와 anonymous/share RLS 허용·거부 결과 및 HTTP status를 저장한다.
@@ -214,11 +218,16 @@ DB/API DR과 object payload 복제 또는 media degraded-mode는 별도 acceptan
 - A1은 현재 `RUNNING` 상태이며 backup daily timer만 활성화되어 있다. video backfill은 수동 unit으로 유지되고 이번 검증에서는 후보 0건이었다. upload 후 DB update 실패 시 새 Supabase object를 best-effort 삭제하며, cleanup까지 실패하면 `orphan cleanup failed` 로그를 기준으로 attachment prefix의 미참조 object를 확인·수동 삭제해야 한다.
 - Vercel Blob URL 4개와 due queue 165개는 참조 무결성을 확인하기 전까지 삭제 위험이 남는다.
 - 기록된 DB/Storage/object/queue 수치는 2026-07-31 시점 스냅샷이며 cutover 직전에 다시 측정해야 한다.
+- Storage S3 Customer Secret은 현재 A1 root-owned mode `0600` `.env`에만 있다. Infisical CLI 인증 후 `/oracle/aura-board/supabase-storage`에 값 노출 없이 동기화하고 rotation/runbook을 검증해야 한다.
+- Bastion session create의 `404/Unknown resource`는 `read private-ips` 누락으로 확인해 해결했다. 최소 권한 create + tenancy session read, client CIDR `/32`, port-forwarding SSH E2E를 검증했고 public TCP/22는 닫았다. client public IP가 바뀌면 broad CIDR을 열지 말고 승인된 `/32`만 교체해야 한다.
+- Supabase Free DR은 조직 선택이 아니라 현재 CLI 사용자 기준 활성 Free 프로젝트 2개 한도에 차단됐다. `mallagaenge` 사용자로 CLI 인증을 전환하기 전에는 신규 DR project 생성이 불가능하다.
+- self-hosted upstream은 고정 commit을 사용한다. 2026-08의 Envoy 기본 gateway 전환, PostgreSQL 17 및 Studio ownership 변경은 고정본을 갱신할 때 별도 migration/rehearsal 없이 따라가지 않는다.
 
 ## Update log
 
 | 일자 | 상태 | 기록 | 다음 단계 |
 | --- | --- | --- | --- |
+| 2026-08-20 | self-hosted Supabase Storage·Realtime·Bastion staging 경로 검증 완료 | private/versioned OCI bucket `aura-board-storage`, bucket-scoped IAM group/user/policy와 S3 Customer Secret을 구성하고 Storage container를 OCI S3 HTTPS/path-style backend로 recreate해 healthy 확인. managed payload 1,226건/1,040,594,444 bytes 이관, OCI count/bytes exact match, direct S3 SHA-256 8/8 및 self-hosted Storage API download SHA-256 8/8 통과. URL inventory는 11 column/1,173 row이며 `supabase.aura-board.com` + gradual backfill로 결정. Realtime Broadcast 실제 publish/subscribe 성공. Bastion `404`는 `read private-ips` 누락으로 해결하고 최소 권한 session create/reuse, client `/32` allowlist, local port-forwarding A1 SSH를 검증한 뒤 public `0.0.0.0/0:22`를 private subnet TCP/22로 교체. 외부 TCP/22 closed, Bastion SSH와 HTTPS health `200`. production source of truth와 endpoint는 managed Supabase 유지. | Infisical 인증 후 Storage secret 동기화, public endpoint/nginx/DNS 검증. `mallagaenge` 사용자 CLI 인증 후 Free slot에 `aura-board-dr` 생성 필요 |
 | 2026-08-14 | testauram A1 backup 인프라 복구 완료 | testauram 테넌시에 private 버킷 `aura-board-postgres-backups` 생성, 인스턴스 OCID 동적 그룹 `aura-board-a1-instances`와 버킷 스코프 정책 `aura-board-backup-policy`, lifecycle 정책(30일 DELETE, prefix `aura-board/postgres`) 적용. VM `oracle-backup.env`를 testauram 네임스페이스 `ax6lnwsc3kt3`으로 교체하고 pg_dump 17.11 설치(서버 17.6 매칭), `/home/ubuntu` venv에 의존하던 OCI CLI를 시스템 전역 `/opt/oracle-cli` 3.90.2로 재설치. 실제 backup 1회 성공(7,432,486 bytes + sha256, checksum 일치). 격리 restore rehearsal 통과(1,868 entries, 오류 0, vault 제외 208 tables/2 views, live 대비 pg_net 2개 제외). `aura-supabase-backup.timer` active/enabled. video-thumbnail backfill 복구: `aura-media` 시스템 사용자, `/opt/aura-board` repo+node_modules(tsx, 382 packages), `/etc/aura-board/oracle-video-thumbnail.env`(root:aura-media 0640), 수동 unit+tmpfiles 설치, dry-run 및 write 1회(`scanned=0`, Result=success). Infisical prod `/oracle/aura-board`의 OCI_* 값도 testauram 기준으로 정리 완료. | pending kernel reboot 후 전체 서비스·cron·backup·외부 HTTPS smoke 반복. video backfill은 후보가 생기면 수동 unit으로 실행하고 자원 증거를 측정. pg_net/supabase_vault 확장 설치 시 완전 restore rehearsal로 확장하고 주기 rehearsal 유지. DNS API token은 `aura-board.com` 단일 zone 최소 권한과 짧은 TTL로 유지 |
 | 2026-08-08 | Cloudflare DNS·Oracle origin 현행화 완료 | 실제 `testauram` 테넌시의 `testauram-a1-osaka`가 `RUNNING`이고 public/private IP가 `129.225.159.251`/`10.42.1.207`임을 확인했다. apex A와 `www` CNAME을 이 origin으로 proxied 전환하고, nginx HTTPS를 Tailscale wildcard 443과 충돌하지 않도록 private NIC에 bind했다. Let's Encrypt ECDSA 인증서 발급, nginx config, origin 직접 HTTP/HTTPS, Cloudflare 경유 두 도메인 `/api/health`, `certbot renew --dry-run`, release `73cccdd0`, 앱·play engine·cron·certbot timer active를 검증했다. `aura-supabase-backup.timer`는 inactive다. | backup unit·credential·IAM을 새 A1에서 재검증해 timer를 복구하고, 유지보수 창에서 pending kernel reboot 후 전체 서비스·cron·backup·외부 HTTPS smoke를 반복. DNS API token은 `aura-board.com` 단일 zone 최소 권한과 짧은 TTL로 유지 |
 | 2026-08-03 | Oracle 앱·play engine·cron 운영 전환 완료 | A1 release `2a4d7c5-oracle1`, systemd/nginx/cron/certbot/backup timer active, 외부·origin `/api/health` DB reachable, Cloudflare proxied + Full strict, Let's Encrypt renewal dry-run 성공, Vercel Cron Jobs Disabled, Oracle 매분 cron 연속 실행 확인 | 운영 로그·백업 복구 시험을 정기 점검하고 새 release마다 health/OAuth/cron smoke를 반복 |
