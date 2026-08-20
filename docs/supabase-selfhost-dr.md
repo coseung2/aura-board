@@ -1,7 +1,7 @@
 # Oracle self-hosted Supabase + DR/백업 설계
 
 기준일: 2026-08-20  
-상태: **Phase 1 data plane·Bastion 관리 경로 검증 완료 — public Supabase endpoint와 DR 프로젝트 미완료**
+상태: **Phase 1 data plane·Bastion 및 Supabase Free DB/API warm DR 검증 완료 — public API endpoint·Vercel 배포·failover rehearsal 미완료**
 
 이 문서는 Aura Board의 managed Supabase 의존성을 Oracle Cloud A1의 self-hosted Supabase로 이전할 경우, 단일 Oracle 인스턴스 장애가 전체 서비스 장애로 확대되는 위험을 어떻게 줄일지 정리한다.
 
@@ -71,6 +71,22 @@ Storage 이관 및 검증:
 - instance-principal session create/reuse, ACTIVE metadata 생성, local port forwarding, A1 `ubuntu` SSH 명령을 end-to-end로 검증했다.
 - A1 `authorized_keys`는 기존 private backup을 남기고 Codex 관리 공개키를 원자적으로 추가했다. private key는 이동·복사하지 않았다.
 - public `0.0.0.0/0:22` Security List rule을 제거하고 target private subnet 전용 TCP/22 rule로 교체했다. 외부 TCP/22는 닫혔고 같은 상태에서 Bastion SSH와 public HTTPS health `200`을 재검증했다.
+
+### 1.2 2026-08-20 Supabase Free warm DR 실행 결과
+
+`coseung-sk` CLI profile로 Seoul(`ap-northeast-2`)의 `aura-board-dr`을 연결하고 Oracle self-hosted PostgreSQL을 publisher, Supabase Free PostgreSQL 17.6을 subscriber로 구성했다. subscriber에서 `CREATE SUBSCRIPTION` 권한 POC를 임시 slot·외부 연결 없이 먼저 수행하고 test subscription을 삭제한 뒤 실제 구성을 시작했다.
+
+- Oracle publisher는 TLS 1.3, hostname 검증, PostgreSQL 17 direct TLS ALPN `postgresql`, 전용 SCRAM replication role을 사용한다.
+- managed Supabase outbound가 고정 IPv4가 아니며 실제 연결은 NAT64 IPv6를 사용하므로 source IP `/32` allowlist를 보안 경계로 삼지 않는다. Oracle Postgres는 Docker gateway에서 전용 replication role만 허용하고 나머지 역할을 먼저 거부한다.
+- `public` catalog parity: 167 tables, 625 indexes, public/private functions 8/7, trigger 9, RLS policy 18, RLS-enabled table 167, Realtime publication 6.
+- 167/167 table이 `replicating` 상태이며 source/DR 전체 count는 148,993 rows로 exact match했다.
+- subscription apply/sync error count는 0, source slot은 `pgoutput` logical active 상태다.
+- private heartbeat row를 1분마다 갱신해 DR로 복제한다. 수동 반복 측정에서 latest-end age 약 1.15초, Oracle `Card` no-op update의 DR `postgres_changes` 도착은 1.134초였다.
+- DR PostgREST service-role read `200`; anonymous token 없음 0 row, 올바른 share token 1 row, 잘못된 token 0 row를 확인했다.
+- DR Realtime Broadcast 실제 publish/subscribe와 Oracle-origin `postgres_changes` 실제 수신을 확인했다.
+- Storage payload는 1,226 objects / 1,040,594,444 bytes이고 78,591,142-byte object 1개가 있다. Supabase Free의 1 GB 총량 및 50 MB 단일 파일 제한을 동시에 넘으므로 payload 복제 대신 명시적 media degraded mode를 선택했다. 이 모드에서는 DB·텍스트·보드는 유지하고 upload/delete/private download를 Storage I/O 전에 `503 media_degraded_mode`로 차단한다.
+
+현재 replication TLS hostname은 DNS write credential 없이 검증 가능한 임시 `sslip.io` origin이다. stable `aura-board.com` 하위 DNS로 교체한 뒤 동일 TLS/ALPN 검증을 반복하는 작업은 남아 있다.
 
 ## 2. 왜 self-hosted Supabase인가
 
@@ -455,14 +471,15 @@ restore rehearsal은 production write를 발생시키지 않는다.
 
 ### Phase 3 — Supabase Free / Vercel warm DR (범위 포함)
 
-- [ ] 사용자 생성 `coseung-sk`의 `aura-board-dr`을 운영 CLI에 연결 — 현재 CLI token의 project list에는 보이지 않아 해당 계정으로 `supabase login --profile coseung-sk` 또는 현재 CLI 사용자 초대 필요
-- [ ] DR Supabase schema/RLS 구축
-- [ ] logical replication proof-of-concept
-- [ ] DDL migration 동기화 절차
-- [ ] replication lag monitor
+- [x] `coseung-sk` CLI profile로 Seoul `aura-board-dr` 생성·연결 및 secret manager 분리 보관
+- [x] DR Supabase schema/RLS/catalog parity 구축
+- [x] Oracle → Supabase Free logical replication 실제 167-table 초기 copy·추종
+- [x] DDL migration 동기화 절차 — affected write fence, DR에 migration SQL 선적용, Oracle에 Prisma migration 적용, migration history row 복제, 신규 table publication refresh, catalog 비교 순서
+- [x] replication lag heartbeat 1분 갱신 및 DR health fail-closed 계약
 - [x] Vercel DR project 생성 및 Next.js framework preset 적용
-- [ ] Vercel DR production env 주입 및 deployment health 검증
-- [ ] DR object payload 복제 또는 Osaka Object Storage 장애 시 media degraded-mode 정책
+- [x] Vercel DR production env 42개를 production-only로 주입하고 DB/Supabase 값을 DR로 교체
+- [ ] Vercel DR exact-SHA deployment 및 `/api/health` 검증
+- [x] Osaka Object Storage 장애 시 media degraded-mode 구현·행동 테스트
 - [ ] Cloudflare 수동 failover runbook
 - [ ] failback rehearsal
 

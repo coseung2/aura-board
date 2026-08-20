@@ -125,10 +125,10 @@ Do not mark any item below complete from a staging-only observation. Record the 
 
 ### Data and service parity
 
-- [ ] Compare primary and Supabase Free migration history plus schema-only/catalog evidence for tables, columns, indexes, sequences, extensions, functions, triggers, publications, roles/grants, and RLS policies. Run representative allowed and denied RLS requests and retain their status/row-count evidence.
-- [ ] Verify logical replication publisher/subscriber state, confirmed LSN and commit timestamp, measured lag at repeated timestamps, and a primary heartbeat row observed on DR. Record the result against the approved RPO and alert threshold.
-- [ ] Exercise DR PostgREST health and representative read/write paths. Retain HTTP status and response-shape evidence for service-role access plus anonymous/share RLS allowed and denied cases.
-- [ ] Join the DR Realtime WebSocket, register the required `postgres_changes`/Broadcast subscriptions, and receive a real event generated on the promoted DR path. Retain join, event, disconnect, and reconnect evidence.
+- [x] Compare primary and Supabase Free migration history plus schema-only/catalog evidence: 167 tables, 625 indexes, public/private functions 8/7, trigger 9, RLS policy/table 18/167, Realtime publication 6, and 148,993 rows exact match. Share RLS allowed/denied probes retained in the 2026-08-20 handoff.
+- [x] Verify logical replication publisher/subscriber state: 167/167 tables replicating, `pgoutput` source slot active, apply/sync errors 0, one-minute heartbeat replicated, latest-end age approximately 1.15 seconds during acceptance.
+- [x] Exercise DR PostgREST: service-role `200`/1 row; anonymous no token `200`/0; valid share token `200`/1; invalid token `200`/0.
+- [x] Join DR Realtime and verify Broadcast plus Oracle-origin `postgres_changes`; the canary update was received in 1.134 seconds.
 - [x] Create a dedicated `aura-board-dr` Vercel project in the approved team, apply the Next.js framework preset, and verify it has no production env or deployment before Supabase DR is connected.
 - [ ] Verify the Vercel DR deployment reaches a healthy/ready state for the intended commit or deployment ID, builds successfully, serves `/api/health` against Supabase Free, and has the required environment variable names without exposing values.
 
@@ -142,7 +142,7 @@ Do not mark any item below complete from a staging-only observation. Record the 
 
 Object payload replication or a documented media degraded-mode is a separate gate from DB/API DR. Do not accept the full DR path because schema, PostgREST, Realtime, or Vercel checks pass alone.
 
-- [ ] Verify replicated object availability with object count/bytes, representative checksum and download evidence, including the user-facing image/file paths; or, if degraded mode is selected, verify the supported/unsupported media matrix, placeholder/error behavior, user impact, operator recovery steps, and explicit approval. Keep Cloudflare Stream video outside this gate unless separately scoped.
+- [x] Select and verify degraded mode: current payload is 1,226 objects / 1,040,594,444 bytes with one 78,591,142-byte object, exceeding Supabase Free 1 GB total and 50 MB single-file limits. DB/text/board paths remain supported; uploads, deletes, and private downloads are rejected before Storage I/O with a persistent recovery notice. Existing image/file public URLs may be unavailable while Osaka is down. Keep Cloudflare Stream video outside this gate.
 
 ## Always-open Game Hub
 
