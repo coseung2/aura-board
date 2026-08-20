@@ -154,35 +154,44 @@ managed Supabase production 데이터는 위 기반 검증 전에는 옮기지 �
 
 ## 8. Storage payload staging migration
 
-DB restore로 `storage.buckets`와 `storage.objects` metadata를 먼저 복원한 뒤 실제 object payload를 별도로 복사한다. `migrate-storage.py`는 production managed Storage를 service-role로 읽고 loopback self-hosted Storage에 기존 object를 `PUT`으로 갱신한다. object 이름이나 credential 값은 로그에 남기지 않는다.
+DB restore로 `storage.buckets`와 `storage.objects` metadata를 먼저 복원한 뒤 실제 object payload를 별도로 복사한다. `migrate-storage.py`는 production managed Storage를 service-role로 읽는다. 기본 `storage-api` mode는 loopback self-hosted Storage API에 기존 object를 `PUT`으로 갱신한다. 다만 metadata가 payload보다 먼저 복원된 경우 Storage API의 upsert가 거부될 수 있으므로, 이 순서의 staging migration에는 `--target-mode s3-direct`를 반드시 사용한다. direct mode는 OCI S3-compatible endpoint에 boto3 S3v4 path-style로 직접 기록하며 object 이름이나 credential 값은 로그에 남기지 않는다.
 
 2026-08-19 staging 기준선은 `aura-board-uploads` 1개 bucket, 1,226 objects, metadata 기준 1,040,594,444 bytes다. 실행 전에는 반드시 dry-run count/bytes가 production 기준선과 맞는지 확인한다.
 
 ```bash
-sudo python3 /srv/aura-board/migration/migrate-storage.py --dry-run
+sudo python3 /srv/aura-board/migration/migrate-storage.py --target-mode s3-direct --dry-run
 sudo systemd-run \
   --unit=aura-storage-migrate \
   --collect \
   --property=Nice=10 \
   --property=CPUQuota=100% \
   --property=MemoryMax=1G \
-  python3 /srv/aura-board/migration/migrate-storage.py --verify-samples 8
+  python3 /srv/aura-board/migration/migrate-storage.py \
+  --target-mode s3-direct --verify-samples 8
 sudo journalctl -u aura-storage-migrate.service -f
 ```
 
-dry-run 로그의 `manifest_sha256`는 object metadata 순서·이름·크기·MIME manifest의
-식별자다. 중단 후 재개할 때는 같은 dry-run에서 확인한 digest를 함께 지정한다.
+dry-run 로그의 `manifest_sha256`는 C 순서의 object metadata 이름·크기·MIME·`version`
+manifest 식별자다. 중단 후 재개할 때는 같은 dry-run에서 확인한 digest를 함께 지정한다.
 재개 실행은 `status=partial`과 exit code `2`를 반환하므로, 전체 bucket 완료로
 간주하지 말고 마지막에 전체 dry-run/count와 sample hash를 다시 확인한다.
 
 ```bash
 python3 /srv/aura-board/migration/migrate-storage.py \
+  --target-mode s3-direct \
   --start-index <next-index> \
   --expected-manifest-sha256 <dry-run-manifest-sha256> \
   --verify-samples 8
 ```
 
-기본 source credential은 `/etc/aura-board/app.env`의 `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY`, target credential은 `/srv/aura-board/supabase/.env`의 `SERVICE_ROLE_KEY`에서 읽는다. source는 읽기만 하고 target staging만 갱신한다. 성공 후 크기 구간별 sample object를 source/target에서 다시 다운로드해 SHA-256을 비교한다.
+`storage-api` mode의 source credential은 `/etc/aura-board/app.env`의 `SUPABASE_URL` /
+`SUPABASE_SERVICE_ROLE_KEY`, target credential은 `/srv/aura-board/supabase/.env`의
+`SERVICE_ROLE_KEY`에서 읽는다. `s3-direct` mode는 target `.env`에서
+`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `GLOBAL_S3_ENDPOINT`,
+`GLOBAL_S3_BUCKET`, `REGION`, `STORAGE_TENANT_ID`만 읽고 `boto3`를 사용한다.
+source는 읽기만 하고 target staging만 갱신한다. 성공 후 크기 구간별 sample object를
+source와 target에서 다시 다운로드해 SHA-256을 비교한다. direct mode의 target
+검증은 Storage API를 거치지 않는다.
 
 ### OCI Object Storage backend 전환 전제
 
@@ -194,13 +203,83 @@ self-hosted Storage의 S3 backend는 OCI CLI Instance Principal이 아니라 S3-
 STORAGE_BACKEND=s3
 GLOBAL_S3_BUCKET=<storage-only-bucket>
 GLOBAL_S3_ENDPOINT=https://<namespace>.compat.objectstorage.ap-osaka-1.oci.customer-oci.com
+GLOBAL_S3_PROTOCOL=https
 GLOBAL_S3_FORCE_PATH_STYLE=true
 AWS_ACCESS_KEY_ID=<customer-secret-access-key>
 AWS_SECRET_ACCESS_KEY=<customer-secret-key>
 REGION=ap-osaka-1
+STORAGE_TENANT_ID=<storage-tenant-id>
 ```
 
-OCI backend가 검증되기 전에는 local file backend의 payload를 삭제하지 않는다.
+`STORAGE_TENANT_ID`는 Storage container가 사용하는 tenant ID이며 configurator가
+관리하는 S3 설정 8개에는 포함되지 않는다. direct mode의 object key는 Storage
+upstream의 `withOptionalVersion` 계약을 따른다. 기본은 version이 있을 때
+`<tenant-id>/<metadata bucket id>/<object name>/<version>`이고 version이 null/empty면
+suffix가 없다. `TUS_USE_FILE_VERSION_SEPARATOR=true`인 배포는 `/version` 대신
+`-$v-<version>`을 사용한다.
+
+### S3 환경변수 안전 설정
+
+기존 self-hosted Docker `.env`에 위 설정을 적용할 때는 다음 CLI를 사용한다.
+`--env-file`, bucket, endpoint, region은 인자로 전달하지만 Access Key와 Secret
+Key는 **단일 JSON 객체로 stdin에서만** 전달한다. 비밀값을 인자, shell history,
+문서, 로그에 넣지 않는다.
+
+먼저 stdin을 읽지 않고 파일도 변경하지 않는 dry-run을 실행한다.
+
+```bash
+sudo python3 /srv/aura-board/migration/configure-storage-s3.py \
+  --env-file /srv/aura-board/supabase/.env \
+  --bucket <storage-only-bucket> \
+  --endpoint https://<namespace>.compat.objectstorage.ap-osaka-1.oci.customer-oci.com \
+  --region ap-osaka-1 \
+  --dry-run
+```
+
+write mode의 stdin은 secret manager 등 보호된 파이프라인에서 다음 필드만 포함한
+JSON을 공급한다. JSON 자체를 command line에 작성하지 않는다.
+
+write mode는 위 명령의 `--dry-run`을 `--write`로 바꾼 경우에만 활성화된다.
+두 flag 중 하나를 반드시 지정해야 하므로 flag 누락이 env 변경으로 이어지지 않는다.
+
+```text
+{"accessKeyId":"<customer-secret-access-key>","secretAccessKey":"<customer-secret-key>"}
+```
+
+CLI는 `STORAGE_BACKEND`, `GLOBAL_S3_BUCKET`, `GLOBAL_S3_ENDPOINT`,
+`GLOBAL_S3_PROTOCOL`, `GLOBAL_S3_FORCE_PATH_STYLE`, `AWS_ACCESS_KEY_ID`,
+`AWS_SECRET_ACCESS_KEY`, `REGION`을 정확히 한 줄씩 갱신한다. 다른 라인과 주석은 보존하고 대상 키의 중복은 하나로
+합친다. write mode는 같은 디렉터리에 원본의 mode `0600` timestamped backup을
+먼저 만들고, mode `0600`인 임시 파일을 같은 디렉터리에서 원자적으로 교체한다.
+파일과 디렉터리는 지원되는 플랫폼에서 fsync한다. HTTPS endpoint의 credential,
+query, fragment와 빈 값·제어문자·Docker Compose dotenv에서 안전하지 않은 문자,
+잘못된 stdin JSON은 거부하며 secret 값은 출력하지 않는다. OCI Access Key와
+Secret Key는 ASCII `A-Z a-z 0-9 . _ ~ + / = -` 문자만 허용한다.
+
+env 변경 후에는 compose가 실제 storage container에 새 값을 주는지 검증하고
+container를 recreate한 뒤 health를 기다린다.
+
+```bash
+cd /srv/aura-board/supabase
+sudo docker compose config --quiet
+sudo docker compose up -d --force-recreate --wait storage
+sudo docker compose ps storage
+sudo docker exec supabase-storage sh -c '
+  for key in STORAGE_BACKEND GLOBAL_S3_BUCKET GLOBAL_S3_ENDPOINT GLOBAL_S3_PROTOCOL GLOBAL_S3_FORCE_PATH_STYLE REGION TENANT_ID; do
+    printf "%s=" "$key"
+    printenv "$key"
+  done
+'
+```
+
+위 출력은 credential을 포함하지 않아야 하며 `TENANT_ID`는 `.env`의
+`STORAGE_TENANT_ID`와 정확히 같아야 한다. `s3-direct`가 쓰는 key prefix와
+Storage API가 읽는 prefix가 달라지는 것을 막기 위해 이 대조를 생략하지 않는다.
+
+그 다음에 metadata restore가 끝났고 `STORAGE_TENANT_ID`가 확인된 상태에서
+`--target-mode s3-direct` migration을 실행한다. OCI backend와 payload가
+검증되기 전에는 local file backend의 payload를 삭제하지 않는다.
+
 
 ### pg_cron / Vault cutover
 

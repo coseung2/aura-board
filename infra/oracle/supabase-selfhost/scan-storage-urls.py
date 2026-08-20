@@ -21,6 +21,7 @@ def run_psql(sql: str) -> str:
                 "exec",
                 "supabase-db",
                 "psql",
+                "-q",
                 "-U",
                 "postgres",
                 "-d",

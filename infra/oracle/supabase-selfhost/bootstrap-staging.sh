@@ -99,12 +99,28 @@ replacements = {
     '      - ${POSTGRES_PORT}:5432': f'      - 127.0.0.1:{session_port}:5432',
     '      - ${POOLER_PROXY_PORT_TRANSACTION}:6543': f'      - 127.0.0.1:{transaction_port}:6543',
     '      FILE_SIZE_LIMIT: 52428800': '      FILE_SIZE_LIMIT: 104857600',
+    '      STORAGE_BACKEND: file': '      STORAGE_BACKEND: ${STORAGE_BACKEND:-file}',
+    '      #GLOBAL_S3_ENDPOINT: https://your-s3-endpoint': '      GLOBAL_S3_ENDPOINT: ${GLOBAL_S3_ENDPOINT:-}',
+    '      #GLOBAL_S3_PROTOCOL: https': '      GLOBAL_S3_PROTOCOL: ${GLOBAL_S3_PROTOCOL:-https}',
+    '      #GLOBAL_S3_FORCE_PATH_STYLE: "true"': '      GLOBAL_S3_FORCE_PATH_STYLE: ${GLOBAL_S3_FORCE_PATH_STYLE:-true}',
+    '      #AWS_ACCESS_KEY_ID: your-access-key-id': '      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}',
+    '      #AWS_SECRET_ACCESS_KEY: your-secret-access-key': '      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}',
 }
 for old, new in replacements.items():
     count = text.count(old)
     if count != 1:
         raise SystemExit(f"expected exactly one compose staging replacement for {old!r}, got {count}")
     text = text.replace(old, new)
+
+required_storage_mappings = (
+    '      GLOBAL_S3_BUCKET: ${GLOBAL_S3_BUCKET}',
+    '      TENANT_ID: ${STORAGE_TENANT_ID}',
+    '      REGION: ${REGION}',
+)
+for mapping in required_storage_mappings:
+    count = text.count(mapping)
+    if count != 1:
+        raise SystemExit(f"expected exactly one resolved Storage mapping for {mapping!r}, got {count}")
 path.write_text(text, encoding="utf-8")
 PY
 
