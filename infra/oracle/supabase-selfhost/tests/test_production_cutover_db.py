@@ -1255,6 +1255,42 @@ class EphemeralPostgresHarness:
 
 @unittest.skipUnless(os.environ.get("AURA_CUTOVER_RUN_DOCKER_TESTS") == "1", "set AURA_CUTOVER_RUN_DOCKER_TESTS=1 to run the ephemeral PostgreSQL harness")
 class DockerIntegrationTests(unittest.TestCase):
+    def test_migration_sql_uses_python_order_for_collation_sensitive_names(self) -> None:
+        harness = EphemeralPostgresHarness()
+        try:
+            harness.start()
+            harness.psql(
+                """
+                CREATE COLLATION aura_test_migration_order (provider = icu, locale = 'en-US');
+                CREATE TABLE public._prisma_migrations (
+                    id text PRIMARY KEY,
+                    checksum text NOT NULL,
+                    finished_at timestamptz,
+                    migration_name text COLLATE aura_test_migration_order NOT NULL,
+                    logs text,
+                    rolled_back_at timestamptz,
+                    started_at timestamptz NOT NULL,
+                    applied_steps_count integer NOT NULL
+                );
+                INSERT INTO public._prisma_migrations (
+                    id,
+                    checksum,
+                    finished_at,
+                    migration_name,
+                    started_at,
+                    applied_steps_count
+                )
+                VALUES
+                    ('z-id', 'z-checksum', '2026-08-21 00:00:00+00', '202608210001_Z', '2026-08-21 00:00:00+00', 1),
+                    ('a-id', 'a-checksum', '2026-08-21 00:00:00+00', '202608210001_a', '2026-08-21 00:00:00+00', 1);
+                """
+            )
+            records = json.loads(harness.psql(cutover._lib.MIGRATION_SQL))
+            names = [record["migration_name"] for record in records]
+            self.assertEqual(names, sorted(names))
+        finally:
+            harness.stop()
+
     def test_catalog_sql_executes_and_fingerprints_dependencies(self) -> None:
         harness = EphemeralPostgresHarness()
         try:

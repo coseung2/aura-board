@@ -200,7 +200,7 @@ SELECT coalesce(
                 ELSE 'unfinished'
             END
         )
-        ORDER BY migration_name, started_at NULLS FIRST, id
+        ORDER BY migration_name COLLATE "C", started_at NULLS FIRST, id COLLATE "C"
     ),
     '[]'::json
 )::text
