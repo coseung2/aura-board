@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import io
 import json
+import multiprocessing
 from pathlib import Path
 import os
 import stat
@@ -13,6 +14,7 @@ import subprocess
 import tempfile
 import types
 import unittest
+from typing import Any
 from unittest import mock
 
 
@@ -40,6 +42,12 @@ def invoke(arguments: list[str]) -> tuple[int, str, str]:
     return code, stdout.getvalue(), stderr.getvalue()
 
 
+def hold_db_operation_lock(state_dir: str, ready: Any, release: Any) -> None:
+    with db_lib.state_lock(Path(state_dir)):
+        ready.set()
+        release.wait(10)
+
+
 @unittest.skipUnless(
     os.name == "nt" or os.geteuid() == 0,
     "production env fixtures are root-owned on POSIX",
@@ -51,6 +59,9 @@ class ProductionCutoverRuntimeTests(unittest.TestCase):
         self.state = self.root / "state"
         self.state.mkdir()
         self.state.chmod(0o700)
+        self.cron_path = self.root / "aura-board-app.cron"
+        self.cron_patch = mock.patch.object(lib, "PRODUCTION_CRON_PATH", self.cron_path)
+        self.cron_patch.start()
         self.app = self.root / "app.env"
         self.backup = self.root / "oracle-backup.env"
         self.selfhost = self.root / "selfhost.env"
@@ -59,6 +70,8 @@ class ProductionCutoverRuntimeTests(unittest.TestCase):
         self.manifest = self.root / "next-build-manifest.json"
         self.app_release = self.root / ("app-release-" + ("d" * 40))
         self.engine_release = self.root / ("engine-release-" + ("d" * 40))
+        self.active_app = self.root / "app-current"
+        self.active_engine = self.root / "engine-current"
         self.build_sha = "d" * 40
         self.app_old = (
             b"# preserve this comment\n"
@@ -93,11 +106,18 @@ class ProductionCutoverRuntimeTests(unittest.TestCase):
         marker = f"{self.build_sha}\n".encode()
         self.write_file(self.app_release / ".release-complete", marker, 0o444)
         self.write_file(self.engine_release / ".release-complete", marker, 0o444)
+        self.active_links_available = True
+        try:
+            self.active_app.symlink_to(self.app_release, target_is_directory=True)
+            self.active_engine.symlink_to(self.engine_release, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            self.active_links_available = False
         self.write_file(self.rich_db, self.rich_bytes(self.valid_rich()), 0o600)
         self.write_file(self.db, self.db_bytes(self.valid_db()), 0o600)
         self.write_file(self.manifest, self.manifest_bytes(), 0o600)
 
     def tearDown(self) -> None:
+        self.cron_patch.stop()
         self.temp.cleanup()
 
     def write_file(self, path: Path, content: bytes, mode: int) -> None:
@@ -206,23 +226,45 @@ class ProductionCutoverRuntimeTests(unittest.TestCase):
         if manifest:
             arguments.extend(("--build-manifest", str(self.manifest)))
         if action == "--seal-before-writers":
+            if not self.active_links_available:
+                self.skipTest("active release symlinks are unavailable")
             arguments.extend(
                 (
                     "--deployed-app-release",
                     str(self.app_release),
                     "--deployed-engine-release",
                     str(self.engine_release),
+                    "--active-app-release",
+                    str(self.active_app),
+                    "--active-engine-release",
+                    str(self.active_engine),
                     "--required-stopped-service",
                     "aura-board-app.service",
                     "--required-stopped-service",
                     "aura-play-engine.service",
+                    "--required-stopped-service",
+                    "aura-supabase-backup.service",
+                    "--required-stopped-service",
+                    "aura-supabase-backup.timer",
+                    "--required-stopped-service",
+                    "aura-video-thumbnail-backfill.service",
                 )
             )
+            for container in db_lib.PRODUCTION_STOPPED_CONTAINERS:
+                arguments.extend(("--required-stopped-container", container))
         arguments.append(action)
         return arguments
 
     def run_write(self) -> tuple[int, str, str]:
         return invoke(self.args("--write"))
+
+    def stopped_tool_result(self, arguments: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        if arguments[0] == "docker":
+            output = "\n".join(
+                f"/{name}\texited\tfalse" for name in db_lib.PRODUCTION_STOPPED_CONTAINERS
+            )
+            return subprocess.CompletedProcess(arguments, 0, stdout=output, stderr="")
+        return subprocess.CompletedProcess(arguments, 3, stdout="inactive\n", stderr="")
 
     def state_path(self) -> Path:
         return self.state / lib.STATE_FILENAME
@@ -413,9 +455,7 @@ class ProductionCutoverRuntimeTests(unittest.TestCase):
         with mock.patch.object(
             lib.subprocess,
             "run",
-            return_value=subprocess.CompletedProcess(
-                ["systemctl"], 3, stdout="inactive\n", stderr=""
-            ),
+            side_effect=self.stopped_tool_result,
         ):
             code, output, error = invoke(self.args("--seal-before-writers"))
         self.assertEqual(code, 0, error)
@@ -441,9 +481,7 @@ class ProductionCutoverRuntimeTests(unittest.TestCase):
         with mock.patch.object(
             lib.subprocess,
             "run",
-            return_value=subprocess.CompletedProcess(
-                ["systemctl"], 3, stdout="inactive\n", stderr=""
-            ),
+            side_effect=self.stopped_tool_result,
         ):
             code, _output, error = invoke(self.args("--seal-before-writers"))
         self.assertNotEqual(code, 0)
@@ -456,9 +494,7 @@ class ProductionCutoverRuntimeTests(unittest.TestCase):
         with mock.patch.object(
             lib.subprocess,
             "run",
-            return_value=subprocess.CompletedProcess(
-                ["systemctl"], 3, stdout="inactive\n", stderr=""
-            ),
+            side_effect=self.stopped_tool_result,
         ):
             code, _output, error = invoke(self.args("--seal-before-writers"))
         self.assertNotEqual(code, 0)
@@ -471,9 +507,7 @@ class ProductionCutoverRuntimeTests(unittest.TestCase):
         with mock.patch.object(
             lib.subprocess,
             "run",
-            return_value=subprocess.CompletedProcess(
-                ["systemctl"], 3, stdout="inactive\n", stderr=""
-            ),
+            side_effect=self.stopped_tool_result,
         ):
             code, _output, error = invoke(self.args("--seal-before-writers"))
         self.assertNotEqual(code, 0)
@@ -494,6 +528,144 @@ class ProductionCutoverRuntimeTests(unittest.TestCase):
         self.assertIn("required stopped service is active", error)
         self.assertEqual(json.loads(self.state_path().read_text())["phase"], "written")
         self.assertEqual(run.call_args.args[0][:2], ["systemctl", "is-active"])
+
+    def test_seal_rejects_omitted_required_service(self) -> None:
+        code, _output, error = self.run_write()
+        self.assertEqual(code, 0, error)
+        arguments = self.args("--seal-before-writers")
+        index = arguments.index("--required-stopped-service")
+        del arguments[index : index + 2]
+        code, _output, error = invoke(arguments)
+        self.assertNotEqual(code, 0)
+        self.assertIn("complete production systemd stopped-service set", error)
+
+    def test_seal_rejects_omitted_required_container(self) -> None:
+        code, _output, error = self.run_write()
+        self.assertEqual(code, 0, error)
+        arguments = self.args("--seal-before-writers")
+        index = arguments.index("--required-stopped-container")
+        del arguments[index : index + 2]
+        code, _output, error = invoke(arguments)
+        self.assertNotEqual(code, 0)
+        self.assertIn("complete sorted production container set", error)
+
+    def test_seal_rejects_active_required_container(self) -> None:
+        code, _output, error = self.run_write()
+        self.assertEqual(code, 0, error)
+
+        def active_container(arguments: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+            if arguments[0] == "docker":
+                output = "\n".join(
+                    f"/{name}\texited\t{'true' if name == 'supabase-auth' else 'false'}"
+                    for name in db_lib.PRODUCTION_STOPPED_CONTAINERS
+                )
+                return subprocess.CompletedProcess(arguments, 0, stdout=output, stderr="")
+            return subprocess.CompletedProcess(arguments, 3, stdout="inactive\n", stderr="")
+
+        with mock.patch.object(lib.subprocess, "run", side_effect=active_container):
+            code, _output, error = invoke(self.args("--seal-before-writers"))
+        self.assertNotEqual(code, 0)
+        self.assertIn("required target container is active: supabase-auth", error)
+        self.assertEqual(json.loads(self.state_path().read_text())["phase"], "written")
+
+    def test_seal_rejects_active_cron_path(self) -> None:
+        code, _output, error = self.run_write()
+        self.assertEqual(code, 0, error)
+        cron_path = self.root / "aura-board-app.cron"
+        self.write_file(cron_path, b"* * * * * root true\n", 0o644)
+        with (
+            mock.patch.object(lib, "PRODUCTION_CRON_PATH", cron_path),
+            mock.patch.object(lib.subprocess, "run", side_effect=self.stopped_tool_result),
+        ):
+            code, _output, error = invoke(self.args("--seal-before-writers"))
+        self.assertNotEqual(code, 0)
+        self.assertIn("production cron path must be absent", error)
+
+    def test_seal_rejects_active_release_binding_mismatch(self) -> None:
+        if not self.active_links_available:
+            self.skipTest("active release symlinks are unavailable")
+        code, _output, error = self.run_write()
+        self.assertEqual(code, 0, error)
+        self.active_app.unlink()
+        self.active_app.symlink_to(self.engine_release, target_is_directory=True)
+        with mock.patch.object(lib.subprocess, "run", side_effect=self.stopped_tool_result):
+            code, _output, error = invoke(self.args("--seal-before-writers"))
+        self.assertNotEqual(code, 0)
+        self.assertIn("deployed app release active link does not resolve", error)
+
+    def test_seal_writes_atomic_db_marker_without_mutating_rich_journal(self) -> None:
+        code, _output, error = self.run_write()
+        self.assertEqual(code, 0, error)
+        rich_before = self.rich_db.read_bytes()
+        with mock.patch.object(lib.subprocess, "run", side_effect=self.stopped_tool_result):
+            code, _output, error = invoke(self.args("--seal-before-writers"))
+        self.assertEqual(code, 0, error)
+        marker_path = db_lib.seal_marker_path(self.rich_db)
+        self.assertTrue(marker_path.is_file())
+        if os.name != "nt":
+            self.assertEqual(stat.S_IMODE(marker_path.stat().st_mode), 0o600)
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+        self.assertEqual(marker["rich_journal_sha256"], hashlib.sha256(rich_before).hexdigest())
+        self.assertEqual(
+            marker["promotion_manifest_sha256"],
+            hashlib.sha256(self.db.read_bytes()).hexdigest(),
+        )
+        self.assertEqual(self.rich_db.read_bytes(), rich_before)
+
+    def test_seal_retries_after_runtime_state_write_failure_with_idempotent_marker(self) -> None:
+        code, _output, error = self.run_write()
+        self.assertEqual(code, 0, error)
+        real_write_state = lib.write_state
+
+        def fail_sealed_state(path: Path, payload: dict[str, object]) -> None:
+            if payload["phase"] == "sealed":
+                raise OSError(errno.EIO, "injected seal state failure")
+            real_write_state(path, payload)
+
+        with (
+            mock.patch.object(lib.subprocess, "run", side_effect=self.stopped_tool_result),
+            mock.patch.object(lib, "write_state", side_effect=fail_sealed_state),
+        ):
+            code, _output, error = invoke(self.args("--seal-before-writers"))
+        self.assertNotEqual(code, 0)
+        self.assertIn("unexpected filesystem error", error)
+        marker_path = db_lib.seal_marker_path(self.rich_db)
+        marker_before_retry = marker_path.read_bytes()
+        self.assertEqual(json.loads(self.state_path().read_text())["phase"], "written")
+
+        with mock.patch.object(lib.subprocess, "run", side_effect=self.stopped_tool_result):
+            code, _output, error = invoke(self.args("--seal-before-writers"))
+        self.assertEqual(code, 0, error)
+        self.assertEqual(marker_path.read_bytes(), marker_before_retry)
+        self.assertEqual(json.loads(self.state_path().read_text())["phase"], "sealed")
+
+    def test_seal_and_db_rollback_share_the_db_operation_lock(self) -> None:
+        if os.name != "posix" or "fork" not in multiprocessing.get_all_start_methods():
+            self.skipTest("Linux fork and flock are required for the lock race probe")
+        code, _output, error = self.run_write()
+        self.assertEqual(code, 0, error)
+        context = multiprocessing.get_context("fork")
+        ready = context.Event()
+        release = context.Event()
+        holder = context.Process(
+            target=hold_db_operation_lock,
+            args=(str(self.rich_db.parent), ready, release),
+        )
+        holder.start()
+        try:
+            self.assertTrue(ready.wait(5))
+            code, _output, error = invoke(self.args("--seal-before-writers"))
+            self.assertNotEqual(code, 0)
+            self.assertIn("another cutover operation holds the lock", error)
+            self.assertFalse(db_lib.seal_marker_path(self.rich_db).exists())
+            self.assertEqual(json.loads(self.state_path().read_text())["phase"], "written")
+        finally:
+            release.set()
+            holder.join(5)
+            if holder.is_alive():
+                holder.terminate()
+                holder.join(5)
+        self.assertEqual(holder.exitcode, 0)
 
     def test_seal_rejects_systemctl_transport_error(self) -> None:
         code, _output, error = self.run_write()

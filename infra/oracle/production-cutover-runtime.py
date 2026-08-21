@@ -41,8 +41,12 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         ),
         epilog=(
             "Write and seal require --build-manifest from a fresh Next.js build; "
-            "every action requires both DB evidence files. Seal also requires "
-            "immutable deployed releases and explicit stopped-service checks. "
+            "runtime --dry-run intentionally reads and validates the supplied DB "
+            "evidence and environment files but never writes. Every action requires "
+            "both DB evidence files. Seal also requires "
+            "immutable deployed releases, active release symlinks, the complete "
+            "fixed stopped-service/container sets, and the fixed production cron "
+            "path to be absent. "
             "The command never starts services or deploys an application. "
             "Rollback is permanently unavailable after --seal-before-writers."
         ),
@@ -78,17 +82,34 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         help="immutable deployed play-engine release; mandatory for --seal-before-writers",
     )
     parser.add_argument(
+        "--active-app-release",
+        type=Path,
+        help="active app symlink; mandatory for --seal-before-writers",
+    )
+    parser.add_argument(
+        "--active-engine-release",
+        type=Path,
+        help="active play-engine symlink; mandatory for --seal-before-writers",
+    )
+    parser.add_argument(
         "--required-stopped-service",
         action="append",
         default=[],
         metavar="UNIT",
         help="systemd writer unit that must report inactive at seal; repeat for each unit",
     )
+    parser.add_argument(
+        "--required-stopped-container",
+        action="append",
+        default=[],
+        metavar="CONTAINER",
+        help="production self-host container that must report stopped at seal; repeat for each container",
+    )
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument(
         "--dry-run",
         action="store_true",
-        help="validate metadata, source names, and both exact DB evidence files without writing",
+        help="intentionally read and validate supplied metadata, source names, and exact DB evidence files; never write",
     )
     mode.add_argument(
         "--write",

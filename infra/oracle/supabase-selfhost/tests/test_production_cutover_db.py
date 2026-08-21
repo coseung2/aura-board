@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import stat
 import subprocess
 import tempfile
 import unittest
@@ -33,13 +34,37 @@ def contract() -> dict[str, object]:
         "source": source,
         "target": conn("target_db", "target_admin", "target pass\\#=\"' 한"),
         "target_admin": conn("postgres", "target_admin", "target pass\\#=\"' 한"),
+        "source_fence_mode": "role_lockdown",
         "source_export_role": "aura_export",
         "source_writer_roles": writers,
         "source_writer_credentials": {
             role: conn("source_db", role, f"{role} pass \\ # = \" ' 한") for role in writers
         },
-        "target_services_stopped": True,
+        "target_stopped_containers": list(cutover.PRODUCTION_STOPPED_CONTAINERS),
     }
+
+
+def rotation_contract() -> dict[str, object]:
+    value = contract()
+    host = cutover.SUPABASE_MANAGED_POOLER_HOST
+    value["source_fence_mode"] = "credential_rotation"
+    value["source"] = conn(
+        "source_db",
+        "postgres.abcdefghijklmnopqrst",
+        "temporary-cutover-password",
+        host=host,
+    )
+    value["source_export_role"] = "postgres"
+    value["source_writer_roles"] = ["postgres"]
+    value["source_writer_credentials"] = {
+        "postgres": conn(
+            "source_db",
+            "postgres.abcdefghijklmnopqrst",
+            "old-writer-password",
+            host=host,
+        )
+    }
+    return value
 
 
 def migration(name: str = "202608210001_init", checksum: str = "abc", **changes: object) -> dict[str, object]:
@@ -71,6 +96,11 @@ class FakeToolchain:
     def __init__(self, credentials: dict[str, object]) -> None:
         self.credentials = credentials
         self.names = cutover.db_names(credentials)
+        self.rotation = credentials["source_fence_mode"] == "credential_rotation"
+        self.active_password = "old-writer-password"
+        self.allow_temp_after_restore = False
+        self.rotation_read_only = True
+        self.rotation_cron_disabled = True
         self.databases = {self.names["target"]}
         self.fenced = False
         self.fail_restore = False
@@ -80,6 +110,9 @@ class FakeToolchain:
         self.fail_writer_termination = False
         self.writer_probe_stderr = 'FATAL: role "aura_app" is not permitted to log in'
         self.fail_target_termination = False
+        self.running_containers: set[str] = set()
+        self.restart_after_quiesce = False
+        self.database_acl_is_default = False
         self.sessions: list[dict[str, object]] = []
         self.writer_sessions: list[dict[str, object]] = []
         self.calls: list[tuple[list[str], dict[str, str], str | None]] = []
@@ -102,7 +135,7 @@ class FakeToolchain:
         self.sql_calls: list[tuple[str, str]] = []
 
     def _marker(self, service: str) -> dict[str, object]:
-        if service == "source":
+        if service in {"source", "writer_0"}:
             connection = self.credentials["source"]
         elif service == "candidate":
             connection = self.credentials["target"]
@@ -117,17 +150,53 @@ class FakeToolchain:
             connection = self.credentials["target"]
         return {
             "database": connection["dbname"],
-            "user": connection["user"],
-            "server_address": "source host" if service == "source" else "target host",
+            "user": (
+                self.credentials["source_export_role"]
+                if service in {"source", "writer_0"}
+                else connection["user"]
+            ),
+            "server_address": "source host" if service in {"source", "writer_0"} else "target host",
             "server_port": 5432,
-            "system_identifier": "source-system" if service == "source" else "target-system",
+            "system_identifier": "source-system" if service in {"source", "writer_0"} else "target-system",
         }
 
     def _fence(self) -> dict[str, object]:
+        if self.rotation:
+            return {
+                "roles": [
+                    {"rolname": "postgres", "rolcanlogin": True, "rolsuper": False}
+                ],
+                "connect_acl": [
+                    {"grantee": "PUBLIC", "grantor": "postgres", "is_grantable": False}
+                ],
+                "database_acl": "original-acl",
+                "database_acl_is_default": self.database_acl_is_default,
+                "database_acl_entries": [
+                    {
+                        "grantee": "PUBLIC",
+                        "grantor": "postgres",
+                        "privilege_type": "CONNECT",
+                        "is_grantable": False,
+                    },
+                    {
+                        "grantee": "PUBLIC",
+                        "grantor": "postgres",
+                        "privilege_type": "TEMPORARY",
+                        "is_grantable": False,
+                    },
+                ],
+                "cron_jobs": [{"jobid": 7, "active": not (self.fenced and self.rotation_cron_disabled)}],
+                "db_settings": (
+                    ["default_transaction_read_only=on"]
+                    if self.fenced and self.rotation_read_only
+                    else []
+                ),
+                "effective_read_only": "on" if self.fenced and self.rotation_read_only else "off",
+            }
         if self.fenced:
             roles = [
-                {"rolname": "aura_export", "rolcanlogin": True, "rolsuper": False},
                 {"rolname": "aura_app", "rolcanlogin": False, "rolsuper": False},
+                {"rolname": "aura_export", "rolcanlogin": True, "rolsuper": False},
                 {"rolname": "aura_jobs", "rolcanlogin": False, "rolsuper": False},
             ]
             acl = [{"grantee": "aura_export", "grantor": "target_admin", "is_grantable": False}]
@@ -143,8 +212,8 @@ class FakeToolchain:
             effective_read_only = "on"
         else:
             roles = [
-                {"rolname": "aura_export", "rolcanlogin": True, "rolsuper": False},
                 {"rolname": "aura_app", "rolcanlogin": True, "rolsuper": False},
+                {"rolname": "aura_export", "rolcanlogin": True, "rolsuper": False},
                 {"rolname": "aura_jobs", "rolcanlogin": True, "rolsuper": False},
             ]
             acl = [{"grantee": "PUBLIC", "grantor": "target_admin", "is_grantable": False}]
@@ -168,12 +237,19 @@ class FakeToolchain:
             "roles": roles,
             "connect_acl": acl,
             "database_acl": acl_raw,
-            "database_acl_is_default": False,
+            "database_acl_is_default": self.database_acl_is_default,
             "database_acl_entries": acl_entries,
             "cron_jobs": [{"jobid": 7, "active": True}],
             "db_settings": [],
             "effective_read_only": effective_read_only,
         }
+
+    def externally_rotate_and_fence(self) -> None:
+        self.active_password = "temporary-cutover-password"
+        self.fenced = True
+
+    def externally_restore_old_password(self) -> None:
+        self.active_password = "old-writer-password"
 
     @staticmethod
     def archive_listing(path: Path) -> str:
@@ -192,10 +268,26 @@ class FakeToolchain:
         executable = Path(argv[0]).name.lower()
         service = env.get("PGSERVICE", "")
         if "psql" in executable:
+            if self.rotation and service in {"source", "writer_0"}:
+                connection = (
+                    self.credentials["source"]
+                    if service == "source"
+                    else self.credentials["source_writer_credentials"]["postgres"]
+                )
+                password_is_active = connection["password"] == self.active_password
+                if service == "source" and self.allow_temp_after_restore:
+                    password_is_active = True
+                if not password_is_active:
+                    return subprocess.CompletedProcess(
+                        argv,
+                        7,
+                        "",
+                        'FATAL: password authentication failed for user "postgres"',
+                    )
             if "--command" in argv:
                 command = argv[argv.index("--command") + 1]
                 self.sql_calls.append((service, command))
-                if service.startswith("writer_") and self.fenced:
+                if service.startswith("writer_") and self.fenced and not self.rotation:
                     return subprocess.CompletedProcess(argv, 7, "", self.writer_probe_stderr)
                 return subprocess.CompletedProcess(argv, 0, "", "")
             assert sql is not None
@@ -220,13 +312,21 @@ class FakeToolchain:
             elif "aura:fence-release" in sql:
                 self.fenced = False
                 output = ""
+            elif "aura:credential-rotation-release" in sql:
+                self.fenced = False
+                output = ""
             elif "aura:fence-inspect" in sql:
                 if "aura:fence-release" in sql:
                     self.fenced = False
                 elif "aura:fence-engage" in sql:
                     self.fenced = True
                 output = json.dumps(self._fence())
-            elif "aura:writer-terminate" in sql or "aura:release-writer-terminate" in sql:
+            elif (
+                "aura:writer-terminate" in sql
+                or "aura:release-writer-terminate" in sql
+                or "aura:rotation-terminate" in sql
+                or "aura:rotation-release-terminate" in sql
+            ):
                 output = json.dumps(
                     [
                         {"pid": item["pid"], "terminated": not self.fail_writer_termination}
@@ -235,10 +335,17 @@ class FakeToolchain:
                 )
                 if not self.fail_writer_termination:
                     self.writer_sessions = []
-            elif "aura:writer-sessions" in sql or "aura:release-writer-sessions" in sql:
+            elif (
+                "aura:writer-sessions" in sql
+                or "aura:release-writer-sessions" in sql
+                or "aura:rotation-sessions" in sql
+                or "aura:rotation-release-sessions" in sql
+            ):
                 output = json.dumps(self.writer_sessions)
             elif "aura:export-path-probe" in sql:
-                output = json.dumps({"database": "source_db", "user": "aura_export"})
+                output = json.dumps(
+                    {"database": "source_db", "user": self.credentials["source_export_role"]}
+                )
             elif "aura:database-names" in sql:
                 output = json.dumps(sorted(self.databases))
             elif "aura:target-sessions" in sql:
@@ -252,6 +359,8 @@ class FakeToolchain:
                 )
                 if not self.fail_target_termination:
                     self.sessions = []
+                    if self.restart_after_quiesce:
+                        self.running_containers.add("supabase-auth")
             elif "aura:candidate-drop" in sql:
                 self.databases.discard(self.names["candidate"])
                 output = ""
@@ -273,6 +382,13 @@ class FakeToolchain:
                 output = ""
             else:
                 output = ""
+            return subprocess.CompletedProcess(argv, 0, output, "")
+        if executable == "docker":
+            names = argv[3:]
+            output = "\n".join(
+                f"/{name}\t{'running' if name in self.running_containers else 'exited'}\t{str(name in self.running_containers).lower()}"
+                for name in names
+            )
             return subprocess.CompletedProcess(argv, 0, output, "")
         if "pg_dump" in executable:
             output_arg = next(value for value in argv if value.startswith("--file="))
@@ -340,6 +456,62 @@ class CutoverTests(unittest.TestCase):
             with self.assertRaisesRegex(cutover.CutoverError, "must not be a writer"):
                 cutover.read_credentials()
 
+    def test_shared_pooler_login_aliases_are_separate_from_sql_roles(self) -> None:
+        pooler = json.loads(json.dumps(self.credentials))
+        project = "abcdefghijklmnopqrst"
+        pooler["source"]["host"] = "aws-0-ap-northeast-1.pooler.supabase.com"
+        pooler["source"]["user"] = f"aura_export.{project}"
+        for role, connection in pooler["source_writer_credentials"].items():
+            connection["host"] = pooler["source"]["host"]
+            connection["user"] = f"{role}.{project}"
+        with mock.patch.object(cutover.sys, "stdin", io.StringIO(json.dumps(pooler))):
+            parsed = cutover.read_credentials()
+        self.assertEqual(parsed["source_export_role"], "aura_export")
+        with cutover.service_file(parsed) as path:
+            service_text = path.read_text(encoding="utf-8")
+        self.assertIn(f"user=aura_export.{project}", service_text)
+        self.assertIn(f"user=aura_app.{project}", service_text)
+        fence_sql = cutover.fence_engage_sql(parsed)
+        self.assertIn('ALTER ROLE "aura_app" NOLOGIN', fence_sql)
+        self.assertIn('ALTER ROLE "aura_jobs" NOLOGIN', fence_sql)
+        self.assertNotIn(project, fence_sql)
+
+    def test_role_lockdown_rejects_null_database_acl_before_fence(self) -> None:
+        self.fake.database_acl_is_default = True
+        result, _out, err = self.call("preflight")
+        self.assertEqual(result, 1)
+        self.assertIn("datacl is NULL", err)
+        self.assertFalse(any("aura:fence-engage" in sql for _service, sql in self.fake.sql_calls))
+        self.assertFalse((self.root / cutover.JOURNAL_FILENAME).exists())
+
+    def test_pooler_aliases_reject_arbitrary_hosts_and_suffix_mismatches(self) -> None:
+        arbitrary_host = json.loads(json.dumps(self.credentials))
+        arbitrary_host["source"]["user"] = "aura_export.projectref"
+        with mock.patch.object(
+            cutover.sys, "stdin", io.StringIO(json.dumps(arbitrary_host))
+        ):
+            with self.assertRaisesRegex(cutover.CutoverError, "exact Supabase shared-pooler host"):
+                cutover.read_credentials()
+
+        mismatch = json.loads(json.dumps(self.credentials))
+        mismatch["source"]["host"] = "aws-0-ap-northeast-1.pooler.supabase.com"
+        mismatch["source"]["user"] = "aura_export.abcdefghijklmnopqrst"
+        mismatch["source_writer_credentials"]["aura_app"]["host"] = mismatch["source"]["host"]
+        mismatch["source_writer_credentials"]["aura_app"]["user"] = "aura_app.differentprojectref"
+        mismatch["source_writer_credentials"]["aura_jobs"]["host"] = mismatch["source"]["host"]
+        mismatch["source_writer_credentials"]["aura_jobs"]["user"] = "aura_jobs.abcdefghijklmnopqrst"
+        with mock.patch.object(cutover.sys, "stdin", io.StringIO(json.dumps(mismatch))):
+            with self.assertRaisesRegex(cutover.CutoverError, "same role.<project-ref>"):
+                cutover.read_credentials()
+
+        dotted_target = json.loads(json.dumps(self.credentials))
+        dotted_target["target"]["user"] = "target_admin.projectref"
+        with mock.patch.object(
+            cutover.sys, "stdin", io.StringIO(json.dumps(dotted_target))
+        ):
+            with self.assertRaisesRegex(cutover.CutoverError, "exact cutover contract"):
+                cutover.read_credentials()
+
     def test_libpq_service_values_round_trip_special_characters(self) -> None:
         with cutover.service_file(self.credentials) as path:
             text = path.read_text(encoding="utf-8")
@@ -364,6 +536,40 @@ class CutoverTests(unittest.TestCase):
                 values[key] = "".join(decoded)
         self.assertEqual(values["password"], self.credentials["source"]["password"])
         self.assertEqual(values["host"], self.credentials["source"]["host"])
+
+    def test_pg_service_cleanup_failure_is_reported_without_secret_content(self) -> None:
+        created: list[Path] = []
+
+        def fail_cleanup(path: str | os.PathLike[str]) -> None:
+            created.append(Path(path))
+            raise OSError(13, "permission denied")
+
+        with mock.patch.object(cutover._lib.shutil, "rmtree", side_effect=fail_cleanup):
+            with self.assertRaisesRegex(cutover.CutoverError, "pg_service.conf cleanup failed") as raised:
+                with cutover.service_file(self.credentials):
+                    pass
+        self.assertNotIn(self.credentials["source"]["password"], str(raised.exception))
+        if created:
+            shutil.rmtree(created[0])
+
+    def test_operation_and_pg_service_cleanup_failure_reports_cleanup(self) -> None:
+        created: list[Path] = []
+
+        def fail_cleanup(path: str | os.PathLike[str]) -> None:
+            created.append(Path(path))
+            raise OSError(13, "permission denied")
+
+        with mock.patch.object(cutover._lib.shutil, "rmtree", side_effect=fail_cleanup):
+            with self.assertRaisesRegex(
+                cutover.CutoverError,
+                "cutover operation failed and pg_service.conf cleanup failed",
+            ) as raised:
+                with cutover.service_file(self.credentials):
+                    raise cutover.CutoverError("simulated operation failure")
+        self.assertNotIn(self.credentials["source"]["password"], str(raised.exception))
+        self.assertIsInstance(raised.exception.__cause__, cutover.CutoverError)
+        if created:
+            shutil.rmtree(created[0])
 
     def test_migration_checksum_missing_unfinished_and_rolled_back_mismatch(self) -> None:
         source = {"present": True, "records": [migration()]}
@@ -402,6 +608,51 @@ class CutoverTests(unittest.TestCase):
         self.assertTrue(all(service == "candidate" for service, _argv in restores if "--list" not in _argv))
         self.assertFalse(any("DROP SCHEMA public" in sql for _service, sql in self.fake.sql_calls))
 
+    def test_rollback_works_before_seal_and_fails_after_runtime_seal_marker(self) -> None:
+        self.flow_to("candidate-verify")
+        result, _out, err = self.call("promote")
+        self.assertEqual(result, 0, err)
+        before_seal = set(self.fake.databases)
+        marker = cutover.write_seal_marker(
+            self.root / cutover.JOURNAL_FILENAME,
+            self.root / cutover.PROMOTION_MANIFEST_FILENAME,
+        )
+        self.assertEqual(
+            cutover.write_seal_marker(
+                self.root / cutover.JOURNAL_FILENAME,
+                self.root / cutover.PROMOTION_MANIFEST_FILENAME,
+            ),
+            marker,
+        )
+        manifest_bytes = (self.root / cutover.PROMOTION_MANIFEST_FILENAME).read_bytes()
+        (self.root / cutover.PROMOTION_MANIFEST_FILENAME).write_bytes(manifest_bytes + b"tampered")
+        with self.assertRaisesRegex(cutover.CutoverError, "does not match current DB evidence"):
+            cutover.write_seal_marker(
+                self.root / cutover.JOURNAL_FILENAME,
+                self.root / cutover.PROMOTION_MANIFEST_FILENAME,
+            )
+        (self.root / cutover.PROMOTION_MANIFEST_FILENAME).write_bytes(manifest_bytes)
+        marker_path = cutover.seal_marker_path(self.root / cutover.JOURNAL_FILENAME)
+        if os.name != "nt":
+            self.assertEqual(stat.S_IMODE(marker_path.stat().st_mode), 0o600)
+        result, _out, err = self.call("rollback")
+        self.assertEqual(result, 1)
+        self.assertIn("permanently blocked after the production seal", err)
+        self.assertEqual(self.fake.databases, before_seal)
+
+    def test_malformed_seal_marker_fails_closed_before_rollback_action(self) -> None:
+        self.flow_to("candidate-verify")
+        result, _out, err = self.call("promote")
+        self.assertEqual(result, 0, err)
+        marker_path = cutover.seal_marker_path(self.root / cutover.JOURNAL_FILENAME)
+        marker_path.write_text("{}\n", encoding="utf-8")
+        marker_path.chmod(0o600)
+        before = set(self.fake.databases)
+        result, _out, err = self.call("rollback")
+        self.assertEqual(result, 1)
+        self.assertIn("DB seal marker is malformed", err)
+        self.assertEqual(self.fake.databases, before)
+
     def test_fence_denies_real_writer_reconnect_write_and_preserves_export_path(self) -> None:
         result, _out, err = self.call("preflight")
         self.assertEqual(result, 0, err)
@@ -421,7 +672,7 @@ class CutoverTests(unittest.TestCase):
         self.assertIn("pg_terminate_backend", fence_sql)
         self.assertEqual(self.fake.writer_sessions, [])
 
-    def test_release_restores_recorded_acl_login_and_cron_state(self) -> None:
+    def test_release_restores_recorded_acl_login_cron_and_read_only_state_exactly(self) -> None:
         self.flow_to("engage-fence")
         result, _out, err = self.call("release-fence")
         self.assertEqual(result, 0, err)
@@ -433,6 +684,8 @@ class CutoverTests(unittest.TestCase):
         self.assertIn("UPDATE cron.job SET active=true", release_sql)
         journal = json.loads((self.root / "journal.json").read_text(encoding="utf-8"))
         self.assertEqual(journal["fence"]["before"]["database_acl"], journal["fence"]["after_release"]["database_acl"])
+        self.assertEqual(journal["fence"]["before"]["cron_jobs"], journal["fence"]["after_release"]["cron_jobs"])
+        self.assertEqual(journal["fence"]["before"]["db_settings"], journal["fence"]["after_release"]["db_settings"])
         self.assertEqual(journal["fence"]["before"]["effective_read_only"], journal["fence"]["after_release"]["effective_read_only"])
 
     def test_release_snapshot_comparison_includes_acl_and_effective_read_only(self) -> None:
@@ -454,11 +707,64 @@ class CutoverTests(unittest.TestCase):
         self.assertLess(session_write, first_restore)
         self.assertLess(default_write, first_restore)
 
-    def test_target_services_confirmation_is_required_before_candidate_creation(self) -> None:
+    def test_role_lockdown_release_replays_exact_cron_and_read_only_snapshot(self) -> None:
+        before = self.fake._fence()
+        before["cron_jobs"] = [
+            {"jobid": 7, "active": False},
+            {"jobid": 9, "active": True},
+        ]
+        before["db_settings"] = [
+            "default_transaction_read_only=on",
+            "search_path=public",
+        ]
+        before["effective_read_only"] = "on"
+        sql = cutover.release_sql(self.credentials, before)
+        self.assertIn(
+            'ALTER DATABASE "source_db" SET default_transaction_read_only=on;',
+            sql,
+        )
+        self.assertIn("UPDATE cron.job SET active=false WHERE jobid=7;", sql)
+        self.assertIn("UPDATE cron.job SET active=true WHERE jobid=9;", sql)
+
+    def test_target_container_contract_is_required_before_candidate_creation(self) -> None:
         false_contract = json.loads(json.dumps(self.credentials))
-        false_contract["target_services_stopped"] = False
-        with self.assertRaisesRegex(cutover.CutoverError, "target_services_stopped=true"):
-            cutover.require_stopped(false_contract)
+        false_contract["target_stopped_containers"] = false_contract["target_stopped_containers"][1:]
+        with (
+            mock.patch.object(cutover.sys, "stdin", io.StringIO(json.dumps(false_contract))),
+            self.assertRaisesRegex(
+                cutover.CutoverError, "complete sorted production container set"
+            ),
+        ):
+            cutover.read_credentials()
+
+    def test_active_target_container_blocks_candidate_creation_before_database_action(self) -> None:
+        self.flow_to("engage-fence")
+        self.fake.running_containers.add("supabase-auth")
+        result, _out, err = self.call("candidate-create")
+        self.assertEqual(result, 1)
+        self.assertIn("required target container is active: supabase-auth", err)
+        self.assertEqual(self.fake.databases, {cutover.db_names(self.credentials)["target"]})
+
+        legacy_contract = json.loads(json.dumps(self.credentials))
+        del legacy_contract["target_stopped_containers"]
+        legacy_contract["target_services_stopped"] = True
+        with (
+            mock.patch.object(cutover.sys, "stdin", io.StringIO(json.dumps(legacy_contract))),
+            self.assertRaisesRegex(cutover.CutoverError, "exact cutover contract"),
+        ):
+            cutover.read_credentials()
+
+    def test_candidate_drop_rechecks_containers_after_quiescence(self) -> None:
+        names = cutover.db_names(self.credentials)
+        self.fake.databases.add(names["candidate"])
+        self.fake.restart_after_quiesce = True
+        with (
+            mock.patch.object(cutover.subprocess, "run", side_effect=self.fake),
+            self.assertRaisesRegex(cutover.CutoverError, "required target container is active"),
+        ):
+            cutover._lib.drop_candidate(self.root, self.credentials)
+        self.assertIn(names["candidate"], self.fake.databases)
+        self.assertFalse(any("aura:candidate-drop" in sql for _service, sql in self.fake.sql_calls))
 
     def test_candidate_restore_failure_leaves_live_target_database_untouched_and_journals_partial_candidate(self) -> None:
         self.flow_to("candidate-create")
@@ -629,6 +935,233 @@ class CutoverTests(unittest.TestCase):
         self.assertNotIn(secret, stdout + stderr)
         self.assertTrue(all("PGSERVICEFILE" in env and "PGPASSWORD" not in env for _argv, env, _sql in self.fake.calls))
         self.assertFalse(any("postgresql://" in arg for argv, _env, _sql in self.fake.calls for arg in argv))
+
+
+class CredentialRotationTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory(prefix="cutover-rotation-test-")
+        self.root = Path(self.temporary.name)
+        self.root.chmod(0o700)
+        self.credentials = rotation_contract()
+        self.fake = FakeToolchain(self.credentials)
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def call(self, action: str) -> tuple[int, str, str]:
+        stdout, stderr = io.StringIO(), io.StringIO()
+        with (
+            mock.patch.object(cutover.subprocess, "run", side_effect=self.fake),
+            mock.patch.object(cutover, "validate_state_dir"),
+            mock.patch.object(
+                cutover.sys,
+                "stdin",
+                io.StringIO(json.dumps(self.credentials, ensure_ascii=False)),
+            ),
+            contextlib.redirect_stdout(stdout),
+            contextlib.redirect_stderr(stderr),
+        ):
+            result = cutover.main([action, "--write", "--state-dir", str(self.root)])
+        return result, stdout.getvalue(), stderr.getvalue()
+
+    def preflight_and_external_fence(self) -> None:
+        result, _out, err = self.call("preflight")
+        self.assertEqual(result, 0, err)
+        self.fake.externally_rotate_and_fence()
+
+    def adopt(self) -> None:
+        self.preflight_and_external_fence()
+        result, _out, err = self.call("adopt-fence")
+        self.assertEqual(result, 0, err)
+
+    def test_same_role_rotation_requires_exact_alias_and_different_passwords(self) -> None:
+        with mock.patch.object(
+            cutover.sys, "stdin", io.StringIO(json.dumps(self.credentials))
+        ):
+            parsed = cutover.read_credentials()
+        self.assertEqual(parsed["source_fence_mode"], "credential_rotation")
+        self.assertEqual(parsed["source_export_role"], "postgres")
+        self.assertEqual(parsed["source_writer_roles"], ["postgres"])
+
+        same_password = json.loads(json.dumps(self.credentials))
+        same_password["source_writer_credentials"]["postgres"]["password"] = same_password[
+            "source"
+        ]["password"]
+        with mock.patch.object(
+            cutover.sys, "stdin", io.StringIO(json.dumps(same_password))
+        ), self.assertRaisesRegex(cutover.CutoverError, "different passwords"):
+            cutover.read_credentials()
+
+        alias_mismatch = json.loads(json.dumps(self.credentials))
+        alias_mismatch["source_writer_credentials"]["postgres"]["user"] = (
+            "postgres.otherprojectref"
+        )
+        with mock.patch.object(
+            cutover.sys, "stdin", io.StringIO(json.dumps(alias_mismatch))
+        ), self.assertRaisesRegex(cutover.CutoverError, "same role.<project-ref>"):
+            cutover.read_credentials()
+
+        wrong_role = json.loads(json.dumps(self.credentials))
+        wrong_role["source_export_role"] = "aura_app"
+        wrong_role["source_writer_roles"] = ["aura_app"]
+        wrong_role["source"]["user"] = "aura_app.abcdefghijklmnopqrst"
+        wrong_role["source_writer_credentials"] = {
+            "aura_app": {
+                **wrong_role["source_writer_credentials"]["postgres"],
+                "user": "aura_app.abcdefghijklmnopqrst",
+            }
+        }
+        with mock.patch.object(
+            cutover.sys, "stdin", io.StringIO(json.dumps(wrong_role))
+        ), self.assertRaisesRegex(cutover.CutoverError, "actual postgres role"):
+            cutover.read_credentials()
+
+    def test_credential_rotation_allows_default_database_acl_without_acl_mutation(self) -> None:
+        self.fake.database_acl_is_default = True
+        result, _out, err = self.call("preflight")
+        self.assertEqual(result, 0, err)
+        self.fake.externally_rotate_and_fence()
+        result, _out, err = self.call("adopt-fence")
+        self.assertEqual(result, 0, err)
+        journal = json.loads((self.root / cutover.JOURNAL_FILENAME).read_text(encoding="utf-8"))
+        self.assertTrue(journal["fence"]["before"]["database_acl_is_default"])
+        self.assertTrue(journal["fence"]["after"]["database_acl_is_default"])
+
+    def test_adopt_rejects_engage_and_verifies_old_rejection_and_temp_export(self) -> None:
+        self.preflight_and_external_fence()
+        result, _out, err = self.call("engage-fence")
+        self.assertEqual(result, 1)
+        self.assertIn("adopt-fence", err)
+        result, _out, err = self.call("adopt-fence")
+        self.assertEqual(result, 0, err)
+        self.assertTrue(
+            any(
+                "old-writer-reconnect-write-probe" in " ".join(argv)
+                for argv, _env, _sql in self.fake.calls
+            )
+        )
+        self.assertTrue(any("export-path-probe" in sql for _service, sql in self.fake.sql_calls))
+        self.assertTrue(
+            any("default_transaction_read_only=on" in sql for _service, sql in self.fake.sql_calls)
+            or self.fake._fence()["effective_read_only"] == "on"
+        )
+        journal = json.loads((self.root / "journal.json").read_text(encoding="utf-8"))
+        self.assertEqual(journal["phase"], "fence-engaged")
+        self.assertEqual(journal["fence"]["after"]["effective_read_only"], "on")
+        self.assertTrue(all(not job["active"] for job in journal["fence"]["after"]["cron_jobs"]))
+
+    def test_adopt_terminates_active_old_pooled_sessions(self) -> None:
+        self.fake.writer_sessions = [{"pid": 700, "user": "postgres", "application": "pooler"}]
+        self.preflight_and_external_fence()
+        result, _out, err = self.call("adopt-fence")
+        self.assertEqual(result, 0, err)
+        self.assertEqual(self.fake.writer_sessions, [])
+        self.assertTrue(
+            any("aura:rotation-terminate" in sql for _service, sql in self.fake.sql_calls)
+        )
+
+    def test_adopt_requires_exact_read_only_and_cron_state(self) -> None:
+        self.preflight_and_external_fence()
+        self.fake.rotation_read_only = False
+        result, _out, err = self.call("adopt-fence")
+        self.assertEqual(result, 1)
+        self.assertIn("read-only", err)
+        self.assertEqual(
+            json.loads((self.root / "journal.json").read_text(encoding="utf-8"))["phase"],
+            "fence-adopt-partial-failure",
+        )
+        before = json.loads((self.root / "journal.json").read_text(encoding="utf-8"))["fence"]["before"]
+        self.fake.rotation_read_only = True
+        result, _out, err = self.call("adopt-fence")
+        self.assertEqual(result, 0, err)
+        retry_journal = json.loads((self.root / "journal.json").read_text(encoding="utf-8"))
+        self.assertEqual(retry_journal["phase"], "fence-engaged")
+        self.assertEqual(retry_journal["fence"]["before"], before)
+
+        self.temporary.cleanup()
+        self.temporary = tempfile.TemporaryDirectory(prefix="cutover-rotation-test-")
+        self.root = Path(self.temporary.name)
+        self.root.chmod(0o700)
+        self.credentials = rotation_contract()
+        self.fake = FakeToolchain(self.credentials)
+        self.preflight_and_external_fence()
+        self.fake.rotation_cron_disabled = False
+        result, _out, err = self.call("adopt-fence")
+        self.assertEqual(result, 1)
+        self.assertIn("pg_cron", err)
+
+    def test_malformed_or_ambiguous_rotation_state_fails_closed(self) -> None:
+        snapshot = self.fake._fence()
+        snapshot["roles"].append(dict(snapshot["roles"][0]))
+        with self.assertRaisesRegex(cutover.CutoverError, "role snapshot"):
+            cutover.validate_fence(snapshot, self.credentials)
+
+        snapshot = self.fake._fence()
+        snapshot["cron_jobs"].append(dict(snapshot["cron_jobs"][0]))
+        with self.assertRaisesRegex(cutover.CutoverError, "pg_cron snapshot"):
+            cutover.validate_fence(snapshot, self.credentials)
+
+        malformed = json.loads(json.dumps(self.credentials))
+        malformed["source_fence_mode"] = ["credential_rotation"]
+        with mock.patch.object(
+            cutover.sys, "stdin", io.StringIO(json.dumps(malformed))
+        ), self.assertRaisesRegex(cutover.CutoverError, "source_fence_mode"):
+            cutover.read_credentials()
+
+        self.preflight_and_external_fence()
+        journal = json.loads((self.root / "journal.json").read_text(encoding="utf-8"))
+        journal["fence"] = []
+        (self.root / "journal.json").write_text(json.dumps(journal), encoding="utf-8")
+        result, _out, err = self.call("adopt-fence")
+        self.assertEqual(result, 1)
+        self.assertIn("journal fence mode", err)
+
+    def test_release_requires_external_old_restore_and_restores_exact_state(self) -> None:
+        self.adopt()
+        result, _out, err = self.call("release-fence")
+        self.assertEqual(result, 1)
+        self.assertIn("temporary credential remains active", err)
+        self.assertNotIn(self.credentials["source"]["password"], err)
+        self.assertNotIn(
+            self.credentials["source_writer_credentials"]["postgres"]["password"], err
+        )
+        self.assertFalse(
+            any("aura:credential-rotation-release" in sql for _service, sql in self.fake.sql_calls)
+        )
+
+        self.fake.externally_restore_old_password()
+        result, _out, err = self.call("release-fence")
+        self.assertEqual(result, 0, err)
+        journal = json.loads((self.root / "journal.json").read_text(encoding="utf-8"))
+        self.assertEqual(journal["phase"], "fence-released")
+        self.assertEqual(journal["fence"]["before"], journal["fence"]["after_release"])
+        self.assertFalse(self.fake.fenced)
+
+    def test_release_never_succeeds_while_temporary_password_is_active(self) -> None:
+        self.adopt()
+        self.fake.externally_restore_old_password()
+        self.fake.allow_temp_after_restore = True
+        result, _out, err = self.call("release-fence")
+        self.assertEqual(result, 1)
+        self.assertIn("temporary credential remains active", err)
+        self.assertEqual(
+            json.loads((self.root / "journal.json").read_text(encoding="utf-8"))["phase"],
+            "fence-release-partial-failure",
+        )
+
+    def test_rotation_secrets_stay_out_of_argv_sql_journal_and_errors(self) -> None:
+        self.adopt()
+        journal = (self.root / "journal.json").read_text(encoding="utf-8")
+        rendered = json.dumps(self.fake.calls, ensure_ascii=False) + json.dumps(
+            self.fake.sql_calls, ensure_ascii=False
+        )
+        secret_values = {
+            self.credentials["source"]["password"],
+            self.credentials["source_writer_credentials"]["postgres"]["password"],
+        }
+        self.assertTrue(all(secret not in journal for secret in secret_values))
+        self.assertTrue(all(secret not in rendered for secret in secret_values))
+        self.assertTrue(all("PGPASSWORD" not in env for _argv, env, _sql in self.fake.calls))
 
 
 class EphemeralPostgresHarness:

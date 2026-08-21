@@ -1,6 +1,7 @@
 """Fail-closed runtime cutover helpers; state stores hashes and metadata, never environment values."""
 
 from __future__ import annotations
+import contextlib
 import datetime as dt
 import errno
 import hashlib
@@ -13,7 +14,7 @@ import stat
 import subprocess
 import sys
 import tempfile
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Iterator, Sequence
 from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, NoReturn
@@ -30,11 +31,15 @@ TRANSACTION_PORTS = frozenset({6543, 16543})
 STATE_FILENAME = "production-cutover-runtime.json"
 APP_BACKUP_FILENAME = "app.env.before-production-cutover"
 BACKUP_ENV_BACKUP_FILENAME = "oracle-backup.env.before-production-cutover"
-NEXT_SERVICE_ACTIONS = (
+REQUIRED_STOPPED_SYSTEMD_SERVICES = (
     "aura-board-app.service",
     "aura-play-engine.service",
     "aura-supabase-backup.service",
+    "aura-supabase-backup.timer",
+    "aura-video-thumbnail-backfill.service",
 )
+NEXT_SERVICE_ACTIONS = REQUIRED_STOPPED_SYSTEMD_SERVICES
+PRODUCTION_CRON_PATH = Path("/etc/cron.d/aura-board-app")
 TARGET_APP_KEYS = (
     "DATABASE_URL",
     "DIRECT_URL",
@@ -683,6 +688,42 @@ def require_db_gate(
         fail("stale DB promotion manifest: rich journal digest does not match")
 
 
+def verify_required_stopped_containers(containers: Sequence[str]) -> None:
+    helper = _canonical_db_helper()
+    try:
+        helper.verify_stopped_containers(containers)
+    except helper.CutoverError as exc:
+        raise CutoverError(str(exc)) from exc
+
+
+def write_db_seal_marker(rich_snapshot: FileSnapshot, manifest_snapshot: FileSnapshot) -> None:
+    helper = _canonical_db_helper()
+    try:
+        helper.write_seal_marker(rich_snapshot.path, manifest_snapshot.path)
+    except helper.CutoverError as exc:
+        raise CutoverError(str(exc)) from exc
+
+
+def require_db_seal_absent(rich_journal: Path, promotion_manifest: Path) -> None:
+    helper = _canonical_db_helper()
+    try:
+        marker = helper.read_seal_marker(rich_journal, promotion_manifest)
+    except helper.CutoverError as exc:
+        raise CutoverError(f"DB seal marker validation failed: {exc}") from exc
+    if marker is not None:
+        fail("rollback is permanently blocked after the production seal")
+
+
+@contextlib.contextmanager
+def db_operation_lock(state_dir: Path) -> Iterator[None]:
+    helper = _canonical_db_helper()
+    try:
+        with helper.state_lock(state_dir):
+            yield
+    except helper.CutoverError as exc:
+        raise CutoverError(str(exc)) from exc
+
+
 def read_db_journal(path: Path) -> tuple[dict[str, Any], FileSnapshot]:
     snapshot = read_snapshot(path, "DB promotion manifest", JOURNAL_MODE)
     return (parse_json_document(snapshot.content, "DB promotion manifest"), snapshot)
@@ -913,6 +954,29 @@ def verify_deployed_releases(
         fail("deployed play-server digest does not match build manifest")
 
 
+def verify_active_release_binding(
+    active_link: Path, release: Path, label: str
+) -> None:
+    active_link = absolute_path(active_link)
+    release = validate_release_directory(release, label)
+    reject_symlink_components(active_link.parent, f"{label} active link")
+    try:
+        info = os.lstat(active_link)
+    except FileNotFoundError:
+        fail(f"{label} active link does not exist")
+    except OSError as exc:
+        fail(f"could not inspect {label} active link (errno={exc.errno})")
+    if not stat.S_ISLNK(info.st_mode):
+        fail(f"{label} active path must be a symlink")
+    try:
+        resolved_active = active_link.resolve(strict=True)
+        resolved_release = release.resolve(strict=True)
+    except OSError as exc:
+        fail(f"could not resolve {label} active link (errno={exc.errno})")
+    if path_key(resolved_active) != path_key(resolved_release):
+        fail(f"{label} active link does not resolve to the supplied release")
+
+
 def validate_required_stopped_service_name(value: Any) -> str:
     if (
         not isinstance(value, str)
@@ -926,8 +990,11 @@ def validate_required_stopped_service_name(value: Any) -> str:
 
 
 def verify_required_stopped_services(services: Sequence[str]) -> None:
-    if not services:
-        fail("--seal-before-writers requires at least one --required-stopped-service")
+    expected = set(REQUIRED_STOPPED_SYSTEMD_SERVICES)
+    if set(services) != expected or len(services) != len(expected):
+        fail(
+            "--seal-before-writers requires the complete production systemd stopped-service set"
+        )
     for raw_service in services:
         service = validate_required_stopped_service_name(raw_service)
         try:
@@ -948,6 +1015,20 @@ def verify_required_stopped_services(services: Sequence[str]) -> None:
         if result.returncode != 0 and status == "inactive":
             continue
         fail(f"could not prove required service is inactive: {service}")
+
+
+def verify_production_cron_absent() -> None:
+    path = absolute_path(PRODUCTION_CRON_PATH)
+    reject_symlink_components(path.parent, "production cron path")
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return
+    except OSError as exc:
+        fail(f"could not inspect production cron path (errno={exc.errno})")
+    if stat.S_ISLNK(info.st_mode):
+        fail("production cron path must be absent, not a symlink")
+    fail("production cron path must be absent: /etc/cron.d/aura-board-app")
 
 
 def state_paths(state_dir: Path) -> tuple[Path, Path, Path]:
@@ -989,6 +1070,10 @@ def validate_input_paths(args: Any) -> dict[str, Path]:
         paths["deployed_app"] = absolute_path(args.deployed_app_release)
     if args.deployed_engine_release is not None:
         paths["deployed_engine"] = absolute_path(args.deployed_engine_release)
+    if args.active_app_release is not None:
+        paths["active_app"] = absolute_path(args.active_app_release)
+    if args.active_engine_release is not None:
+        paths["active_engine"] = absolute_path(args.active_engine_release)
     validate_regular_file(paths["db"], "DB promotion manifest", JOURNAL_MODE)
     validate_regular_file(paths["rich_db"], "DB rich journal", JOURNAL_MODE)
     validate_regular_file(paths["app"], "app env", APP_MODE)
@@ -1002,9 +1087,20 @@ def validate_input_paths(args: Any) -> dict[str, Path]:
         for right_key in keys[index + 1 :]:
             if path_key(paths[left_key]) == path_key(paths[right_key]):
                 fail("input paths must be distinct")
-    for key in ("db", "rich_db", "app", "backup", "selfhost", "manifest"):
+    for key in (
+        "db",
+        "rich_db",
+        "app",
+        "backup",
+        "selfhost",
+        "manifest",
+        "active_app",
+        "active_engine",
+    ):
         if key in paths and is_within(paths[key], paths["state"]):
             fail("input file path must not be inside state directory")
+    if path_key(paths["db"].parent) != path_key(paths["rich_db"].parent):
+        fail("DB promotion manifest and rich journal must share the DB state directory")
     validate_state_entries(paths["state"])
     scan_env_keys(paths["app"], "app env", APP_MODE)
     scan_env_keys(paths["backup"], "backup env", BACKUP_MODE)
@@ -1345,6 +1441,7 @@ def verify_rollback_state(
     db_snapshot: FileSnapshot,
     rich_snapshot: FileSnapshot,
 ) -> tuple[tuple[TargetChange, TargetChange], tuple[FileSnapshot, FileSnapshot]]:
+    require_db_seal_absent(rich_snapshot.path, db_snapshot.path)
     if state["sealed"] or state["rollback_blocked"] or state["phase"] == "sealed":
         fail("rollback is permanently blocked after --seal-before-writers")
     if state["phase"] != "written":
@@ -1439,7 +1536,10 @@ def seal_before_writers_action(
     manifest_snapshot: FileSnapshot,
     deployed_app_release: Path,
     deployed_engine_release: Path,
+    active_app_release: Path,
+    active_engine_release: Path,
     required_stopped_services: Sequence[str],
+    required_stopped_containers: Sequence[str],
 ) -> None:
     require_db_gate(db_document, rich_document, rich_snapshot)
     state_file, _, _ = state_paths(paths["state"])
@@ -1474,7 +1574,14 @@ def seal_before_writers_action(
             Path(state["targets"][name]["path"]), state["targets"][name]["new"], name
         )
     verify_deployed_releases(manifest, deployed_app_release, deployed_engine_release)
+    verify_active_release_binding(active_app_release, deployed_app_release, "deployed app release")
+    verify_active_release_binding(
+        active_engine_release, deployed_engine_release, "deployed engine release"
+    )
     verify_required_stopped_services(required_stopped_services)
+    verify_required_stopped_containers(required_stopped_containers)
+    verify_production_cron_absent()
+    write_db_seal_marker(rich_snapshot, db_snapshot)
     state["phase"] = "sealed"
     state["sealed"] = True
     state["rollback_blocked"] = True
@@ -1518,19 +1625,35 @@ def require_build_manifest_for(action: str, paths: dict[str, Path]) -> None:
 def require_seal_inputs(action: str, args: Any, paths: dict[str, Path]) -> None:
     if action != "seal-before-writers":
         return
-    if "deployed_app" not in paths or "deployed_engine" not in paths:
+    if (
+        "deployed_app" not in paths
+        or "deployed_engine" not in paths
+        or "active_app" not in paths
+        or "active_engine" not in paths
+    ):
         fail(
             "--seal-before-writers requires --deployed-app-release and "
-            "--deployed-engine-release"
+            "--deployed-engine-release plus active app and engine symlink paths"
         )
-    if not args.required_stopped_service:
-        fail("--seal-before-writers requires at least one --required-stopped-service")
+    if set(args.required_stopped_service) != set(REQUIRED_STOPPED_SYSTEMD_SERVICES) or len(
+        args.required_stopped_service
+    ) != len(REQUIRED_STOPPED_SYSTEMD_SERVICES):
+        fail(
+            "--seal-before-writers requires the complete production systemd stopped-service set"
+        )
+    helper = _canonical_db_helper()
+    try:
+        helper.validate_stopped_container_names(args.required_stopped_container)
+    except helper.CutoverError as exc:
+        raise CutoverError(str(exc)) from exc
     paths["deployed_app"] = validate_release_directory(
         paths["deployed_app"], "deployed app release"
     )
     paths["deployed_engine"] = validate_release_directory(
         paths["deployed_engine"], "deployed engine release"
     )
+    paths["active_app"] = absolute_path(paths["active_app"])
+    paths["active_engine"] = absolute_path(paths["active_engine"])
 
 
 def execute(args: Any) -> None:
@@ -1539,39 +1662,48 @@ def execute(args: Any) -> None:
     require_build_manifest_for(action, paths)
     require_seal_inputs(action, args, paths)
     validate_required_source_names(scan_env_keys(paths["selfhost"], "self-host env", SELFHOST_MODE))
-    db_document, db_snapshot = read_db_journal(paths["db"])
-    rich_document, rich_snapshot = read_rich_journal(paths["rich_db"])
-    require_db_gate(db_document, rich_document, rich_snapshot)
-    if action == "dry-run":
-        dry_run_action(paths, db_document)
-        return
-    if action == "rollback":
-        rollback_action(paths, db_document, rich_document, db_snapshot, rich_snapshot)
-        return
-    manifest, manifest_snapshot = read_build_manifest(paths["manifest"])
-    selfhost = read_snapshot(paths["selfhost"], "self-host env", SELFHOST_MODE)
-    app_values, _ = build_target_values(selfhost.content)
-    verify_build_manifest_matches(manifest, app_values)
-    if action == "write":
-        write_action(
-            paths,
-            db_document,
-            rich_document,
-            db_snapshot,
-            rich_snapshot,
-            manifest,
-            manifest_snapshot,
-        )
-    else:
-        seal_before_writers_action(
-            paths,
-            db_document,
-            rich_document,
-            db_snapshot,
-            rich_snapshot,
-            manifest,
-            manifest_snapshot,
-            paths["deployed_app"],
-            paths["deployed_engine"],
-            args.required_stopped_service,
-        )
+    lock = (
+        db_operation_lock(paths["rich_db"].parent)
+        if action == "seal-before-writers"
+        else contextlib.nullcontext()
+    )
+    with lock:
+        db_document, db_snapshot = read_db_journal(paths["db"])
+        rich_document, rich_snapshot = read_rich_journal(paths["rich_db"])
+        require_db_gate(db_document, rich_document, rich_snapshot)
+        if action == "dry-run":
+            dry_run_action(paths, db_document)
+            return
+        if action == "rollback":
+            rollback_action(paths, db_document, rich_document, db_snapshot, rich_snapshot)
+            return
+        manifest, manifest_snapshot = read_build_manifest(paths["manifest"])
+        selfhost = read_snapshot(paths["selfhost"], "self-host env", SELFHOST_MODE)
+        app_values, _ = build_target_values(selfhost.content)
+        verify_build_manifest_matches(manifest, app_values)
+        if action == "write":
+            write_action(
+                paths,
+                db_document,
+                rich_document,
+                db_snapshot,
+                rich_snapshot,
+                manifest,
+                manifest_snapshot,
+            )
+        else:
+            seal_before_writers_action(
+                paths,
+                db_document,
+                rich_document,
+                db_snapshot,
+                rich_snapshot,
+                manifest,
+                manifest_snapshot,
+                paths["deployed_app"],
+                paths["deployed_engine"],
+                paths["active_app"],
+                paths["active_engine"],
+                args.required_stopped_service,
+                args.required_stopped_container,
+            )

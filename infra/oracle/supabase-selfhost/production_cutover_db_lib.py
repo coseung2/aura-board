@@ -26,6 +26,7 @@ from typing import Any, NoReturn
 ACTIONS = (
     "preflight",
     "engage-fence",
+    "adopt-fence",
     "release-fence",
     "export",
     "candidate-create",
@@ -36,15 +37,17 @@ ACTIONS = (
     "rollback",
 )
 CONNECTION_KEYS = frozenset({"host", "port", "dbname", "user", "password", "sslmode"})
+FENCE_MODES = frozenset({"role_lockdown", "credential_rotation"})
 CONTRACT_KEYS = frozenset(
     {
         "source",
         "target",
         "target_admin",
+        "source_fence_mode",
         "source_export_role",
         "source_writer_roles",
         "source_writer_credentials",
-        "target_services_stopped",
+        "target_stopped_containers",
     }
 )
 ARCHIVE_NAMES = {
@@ -68,12 +71,50 @@ PROMOTION_MANIFEST_KEYS = frozenset(
     }
 )
 SAFE_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
+SUPABASE_MANAGED_POOLER_HOST = "aws-1-ap-northeast-2.pooler.supabase.com"
+SUPABASE_SHARED_POOLER_HOST = re.compile(
+    r"^aws-[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*\.pooler\.supabase\.com$"
+)
+SUPABASE_PROJECT_REF = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$")
+POOLER_LOGIN_ALIAS = re.compile(
+    r"^(?P<role>[A-Za-z_][A-Za-z0-9_$]*)\.(?P<project>[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)$"
+)
 JOURNAL_FORMAT = 2
 PROMOTION_MANIFEST_FORMAT = 1
 JOURNAL_FILENAME = "journal.json"
 PROMOTION_MANIFEST_FILENAME = "promotion-manifest.json"
+SEAL_MARKER_FILENAME = "production-cutover-seal.json"
+SEAL_MARKER_FORMAT = 1
+SEAL_MARKER_KEYS = frozenset(
+    {
+        "format",
+        "phase",
+        "rich_journal_path",
+        "rich_journal_sha256",
+        "promotion_manifest_path",
+        "promotion_manifest_sha256",
+    }
+)
 TOOL_APP_NAME = "aura-board-cutover"
 DATA_SNAPSHOT_CONTRACT = "aura-cutover-data-v2"
+PRODUCTION_STOPPED_CONTAINERS = tuple(
+    sorted(
+        {
+            "supabase-analytics",
+            "supabase-auth",
+            "supabase-edge-functions",
+            "supabase-kong",
+            "supabase-meta",
+            "supabase-pooler",
+            "supabase-realtime",
+            "supabase-rest",
+            "supabase-storage",
+            "supabase-studio",
+            "supabase-vector",
+        }
+    )
+)
+DOCKER_INSPECT_TIMEOUT_SECONDS = 10
 MIGRATION_RECORD_KEYS = frozenset(
     {
         "id",
@@ -311,6 +352,108 @@ def atomic_json(path: Path, value: Any, mode: int = 0o600) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def seal_marker_path(rich_journal: Path) -> Path:
+    return Path(os.path.abspath(rich_journal)).with_name(SEAL_MARKER_FILENAME)
+
+
+def _seal_input_bytes(path: Path, label: str) -> bytes:
+    path = Path(os.path.abspath(path))
+    try:
+        info = os.lstat(path)
+    except OSError as exc:
+        raise CutoverError(f"{label} inspection failed (errno={exc.errno})") from None
+    if stat.S_ISLNK(info.st_mode):
+        raise CutoverError(f"{label} must not be a symlink")
+    if not stat.S_ISREG(info.st_mode):
+        raise CutoverError(f"{label} must be a regular file")
+    if os.name != "nt" and stat.S_IMODE(info.st_mode) != 0o600:
+        raise CutoverError(f"{label} must have mode 0600")
+    try:
+        return path.read_bytes()
+    except OSError as exc:
+        raise CutoverError(f"{label} could not be read (errno={exc.errno})") from None
+
+
+def validate_seal_marker(
+    value: Any,
+    rich_journal: Path,
+    promotion_manifest: Path,
+    rich_sha256: str,
+    promotion_sha256: str,
+) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != SEAL_MARKER_KEYS:
+        raise CutoverError("DB seal marker is malformed")
+    rich_journal = Path(os.path.abspath(rich_journal))
+    promotion_manifest = Path(os.path.abspath(promotion_manifest))
+    if (
+        isinstance(value["format"], bool)
+        or not isinstance(value["format"], int)
+        or value["format"] != SEAL_MARKER_FORMAT
+        or value["phase"] != "sealed"
+        or value["rich_journal_path"] != os.fspath(rich_journal)
+        or value["promotion_manifest_path"] != os.fspath(promotion_manifest)
+        or not isinstance(value["rich_journal_sha256"], str)
+        or re.fullmatch(r"[0-9a-f]{64}", value["rich_journal_sha256"]) is None
+        or not isinstance(value["promotion_manifest_sha256"], str)
+        or re.fullmatch(r"[0-9a-f]{64}", value["promotion_manifest_sha256"]) is None
+        or value["rich_journal_sha256"] != rich_sha256
+        or value["promotion_manifest_sha256"] != promotion_sha256
+    ):
+        raise CutoverError("DB seal marker is malformed or does not match current DB evidence")
+    return value
+
+
+def read_seal_marker(rich_journal: Path, promotion_manifest: Path) -> dict[str, Any] | None:
+    marker_path = seal_marker_path(rich_journal)
+    if not os.path.lexists(marker_path):
+        return None
+    marker_bytes = _seal_input_bytes(marker_path, "DB seal marker")
+    rich_bytes = _seal_input_bytes(rich_journal, "DB rich journal")
+    promotion_bytes = _seal_input_bytes(promotion_manifest, "DB promotion manifest")
+    try:
+        marker = json.loads(marker_bytes.decode("utf-8"), object_pairs_hook=unique_object)
+    except (CutoverError, UnicodeDecodeError, json.JSONDecodeError, TypeError, ValueError):
+        raise CutoverError("DB seal marker is malformed") from None
+    return validate_seal_marker(
+        marker,
+        rich_journal,
+        promotion_manifest,
+        hashlib.sha256(rich_bytes).hexdigest(),
+        hashlib.sha256(promotion_bytes).hexdigest(),
+    )
+
+
+def write_seal_marker(rich_journal: Path, promotion_manifest: Path) -> dict[str, Any]:
+    marker_path = seal_marker_path(rich_journal)
+    if os.path.lexists(marker_path):
+        marker = read_seal_marker(rich_journal, promotion_manifest)
+        if marker is None:
+            raise CutoverError("DB seal marker disappeared during validation")
+        return marker
+    rich_bytes = _seal_input_bytes(rich_journal, "DB rich journal")
+    promotion_bytes = _seal_input_bytes(promotion_manifest, "DB promotion manifest")
+    value = {
+        "format": SEAL_MARKER_FORMAT,
+        "phase": "sealed",
+        "rich_journal_path": os.fspath(Path(os.path.abspath(rich_journal))),
+        "rich_journal_sha256": hashlib.sha256(rich_bytes).hexdigest(),
+        "promotion_manifest_path": os.fspath(Path(os.path.abspath(promotion_manifest))),
+        "promotion_manifest_sha256": hashlib.sha256(promotion_bytes).hexdigest(),
+    }
+    validate_seal_marker(
+        value,
+        rich_journal,
+        promotion_manifest,
+        value["rich_journal_sha256"],
+        value["promotion_manifest_sha256"],
+    )
+    atomic_json(marker_path, value, mode=0o600)
+    read_back = read_seal_marker(rich_journal, promotion_manifest)
+    if read_back != value:
+        raise CutoverError("DB seal marker failed exact verification")
+    return value
+
+
 def validate_state_dir(path: Path) -> None:
     try:
         info = os.lstat(path)
@@ -378,10 +521,32 @@ def unique_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     return result
 
 
-def validate_connection(value: Any) -> None:
+def pooler_login_alias(value: Any) -> tuple[str, str] | None:
+    if not isinstance(value, str):
+        return None
+    match = POOLER_LOGIN_ALIAS.fullmatch(value)
+    if match is None:
+        return None
+    role = match.group("role")
+    project = match.group("project")
+    if SAFE_IDENTIFIER.fullmatch(role) is None or SUPABASE_PROJECT_REF.fullmatch(project) is None:
+        return None
+    return (role, project)
+
+
+def is_supabase_shared_pooler_host(value: Any) -> bool:
+    return isinstance(value, str) and SUPABASE_SHARED_POOLER_HOST.fullmatch(value.lower()) is not None
+
+
+def validate_connection(value: Any, *, allow_pooler_alias: bool = False) -> None:
     if not isinstance(value, dict) or set(value) != CONNECTION_KEYS:
         raise CutoverError("stdin must contain the exact cutover contract")
     if any(not safe_text(value[key]) for key in CONNECTION_KEYS - {"port"}):
+        raise CutoverError("stdin must contain the exact cutover contract")
+    user = value["user"]
+    if SAFE_IDENTIFIER.fullmatch(user) is None and (
+        not allow_pooler_alias or pooler_login_alias(user) is None
+    ):
         raise CutoverError("stdin must contain the exact cutover contract")
     port = value.get("port")
     if isinstance(port, bool) or not isinstance(port, int) or not 1 <= port <= 65535:
@@ -395,8 +560,12 @@ def read_credentials() -> dict[str, Any]:
         raise CutoverError("stdin must contain the exact cutover contract") from None
     if not isinstance(value, dict) or set(value) != CONTRACT_KEYS:
         raise CutoverError("stdin must contain the exact cutover contract")
+    source_fence_mode = value["source_fence_mode"]
+    if not isinstance(source_fence_mode, str) or source_fence_mode not in FENCE_MODES:
+        raise CutoverError("source_fence_mode must be role_lockdown or credential_rotation")
 
-    for key in ("source", "target", "target_admin"):
+    validate_connection(value["source"], allow_pooler_alias=True)
+    for key in ("target", "target_admin"):
         validate_connection(value[key])
     if value["target_admin"]["dbname"] == value["target"]["dbname"]:
         raise CutoverError("target admin must be a maintenance connection on the target server")
@@ -414,12 +583,28 @@ def read_credentials() -> dict[str, Any]:
 
     export_role = value["source_export_role"]
     writer_roles = value["source_writer_roles"]
-    if (
-        not isinstance(export_role, str)
-        or SAFE_IDENTIFIER.fullmatch(export_role) is None
-        or export_role != value["source"]["user"]
-    ):
-        raise CutoverError("source export role must exactly match the source credential user")
+    if not isinstance(export_role, str) or SAFE_IDENTIFIER.fullmatch(export_role) is None:
+        raise CutoverError("source export role must be an actual safe PostgreSQL identifier")
+    source_alias = pooler_login_alias(value["source"]["user"])
+    source_is_pooler = is_supabase_shared_pooler_host(value["source"]["host"])
+    if source_alias is not None:
+        if not source_is_pooler:
+            raise CutoverError(
+                "pooler login aliases are allowed only on the exact Supabase shared-pooler host"
+            )
+        if source_alias[0] != export_role:
+            raise CutoverError("source export role does not match the pooler login alias role")
+        pooler_project = source_alias[1]
+    else:
+        if "." in value["source"]["user"]:
+            raise CutoverError("source credential user contains an invalid dotted login alias")
+        if source_is_pooler:
+            raise CutoverError(
+                "Supabase shared-pooler source credentials must use role.<project-ref> login aliases"
+            )
+        if value["source"]["user"] != export_role:
+            raise CutoverError("source export role must exactly match the source credential user")
+        pooler_project = None
     if not isinstance(writer_roles, list) or not writer_roles:
         raise CutoverError("source writer roles must be explicit identifiers")
     if any(
@@ -427,8 +612,20 @@ def read_credentials() -> dict[str, Any]:
         for role in writer_roles
     ):
         raise CutoverError("source writer roles must be explicit identifiers")
-    if export_role in writer_roles:
+    if source_fence_mode == "role_lockdown" and export_role in writer_roles:
         raise CutoverError("source export role must not be a writer")
+    if source_fence_mode == "credential_rotation" and (
+        len(writer_roles) != 1 or export_role != writer_roles[0]
+    ):
+        raise CutoverError(
+            "credential_rotation requires the export role to be the sole writer role"
+        )
+    if source_fence_mode == "credential_rotation" and (
+        export_role != "postgres" or writer_roles != ["postgres"]
+    ):
+        raise CutoverError(
+            "credential_rotation requires the actual postgres role and postgres.<project-ref> aliases"
+        )
     if writer_roles != sorted(set(writer_roles)):
         raise CutoverError("source writer roles must be unique and sorted")
 
@@ -436,10 +633,23 @@ def read_credentials() -> dict[str, Any]:
     if not isinstance(probes, dict) or set(probes) != set(writer_roles):
         raise CutoverError("source writer credentials must exactly name every writer role")
     for role in writer_roles:
-        validate_connection(probes[role])
+        validate_connection(probes[role], allow_pooler_alias=True)
         connection = probes[role]
+        writer_alias = pooler_login_alias(connection["user"])
+        if pooler_project is None:
+            if writer_alias is not None or "." in connection["user"]:
+                raise CutoverError(
+                    "dotted writer login aliases are allowed only for Supabase shared-pooler credentials"
+                )
+            expected_user = role
+        else:
+            if writer_alias is None or writer_alias != (role, pooler_project):
+                raise CutoverError(
+                    "every source writer credential must use the same role.<project-ref> login suffix"
+                )
+            expected_user = connection["user"]
         if (
-            connection["user"] != role
+            connection["user"] != expected_user
             or connection["dbname"] != value["source"]["dbname"]
             or (connection["host"], connection["port"])
             != (value["source"]["host"], value["source"]["port"])
@@ -447,8 +657,18 @@ def read_credentials() -> dict[str, Any]:
             raise CutoverError(
                 "writer probe credentials must address the source as their named role"
             )
-    if not isinstance(value["target_services_stopped"], bool):
-        raise CutoverError("target_services_stopped must be an explicit boolean")
+        if source_fence_mode == "credential_rotation" and (
+            value["source"]["host"] != SUPABASE_MANAGED_POOLER_HOST
+            or connection["host"] != SUPABASE_MANAGED_POOLER_HOST
+            or source_alias is None
+            or writer_alias != source_alias
+            or connection["user"] != value["source"]["user"]
+            or connection["password"] == value["source"]["password"]
+        ):
+            raise CutoverError(
+                "credential_rotation requires identical managed-pooler aliases and different passwords"
+            )
+    validate_stopped_container_names(value["target_stopped_containers"])
     return value
 
 
@@ -501,13 +721,22 @@ def db_names(credentials: dict[str, Any]) -> dict[str, str]:
 def metadata(credentials: dict[str, Any]) -> dict[str, Any]:
     names = db_names(credentials)
     return {
+        "source_fence_mode": credentials["source_fence_mode"],
         "target_database": names["target"],
         "candidate_database": names["candidate"],
         "rollback_database": names["rollback"],
         "source_export_role": credentials["source_export_role"],
         "source_writer_roles": credentials["source_writer_roles"],
-        "target_services_stopped_required": True,
+        "target_stopped_containers": credentials["target_stopped_containers"],
     }
+
+
+def source_control_service(credentials: dict[str, Any]) -> str:
+    """Return the non-secret service used for source control-plane reads."""
+
+    if credentials["source_fence_mode"] == "credential_rotation":
+        return "writer_0"
+    return "source"
 
 
 @contextlib.contextmanager
@@ -529,6 +758,7 @@ def service_file(credentials: dict[str, Any]) -> Iterator[Path]:
             for index, role in enumerate(credentials["source_writer_roles"])
         }
     )
+    operation_error: BaseException | None = None
     try:
         with path.open("x", encoding="utf-8") as handle:
             for service, connection in connections.items():
@@ -539,8 +769,26 @@ def service_file(credentials: dict[str, Any]) -> Iterator[Path]:
             os.fsync(handle.fileno())
         os.chmod(path, 0o600)
         yield path
+    except BaseException as exc:
+        operation_error = exc
+        raise
     finally:
-        shutil.rmtree(directory, ignore_errors=True)
+        try:
+            if os.path.lexists(directory):
+                shutil.rmtree(directory)
+            if os.path.lexists(directory):
+                raise OSError("temporary pg_service.conf directory still exists")
+        except Exception as exc:
+            cleanup_error = CutoverError(
+                f"pg_service.conf cleanup failed (errno={getattr(exc, 'errno', None)})"
+            )
+            if operation_error is not None:
+                raise CutoverError(
+                    "cutover operation failed and pg_service.conf cleanup failed "
+                    f"(errno={getattr(exc, 'errno', None)})"
+                ) from operation_error
+            else:
+                raise cleanup_error from None
 
 
 def environment(path: Path, service: str) -> dict[str, str]:
@@ -698,13 +946,81 @@ def require_phase(journal: dict[str, Any], *phases: str) -> None:
 
 def require_preflight(journal: dict[str, Any], credentials: dict[str, Any]) -> None:
     require_contract(journal, credentials)
-    if journal.get("preflight", {}).get("passed") is not True:
+    preflight_record = journal.get("preflight")
+    if not isinstance(preflight_record, dict) or preflight_record.get("passed") is not True:
         raise CutoverError("successful preflight journal is required")
+    fence = journal.get("fence")
+    if not isinstance(fence, dict) or fence.get("mode") != credentials["source_fence_mode"]:
+        raise CutoverError("journal fence mode does not match the exact cutover contract")
+
+
+def validate_stopped_container_names(value: Any) -> list[str]:
+    if (
+        not isinstance(value, list)
+        or any(
+            not isinstance(name, str)
+            or not name
+            or name.startswith("-")
+            or any(ord(character) < 0x20 or ord(character) == 0x7F for character in name)
+            for name in value
+        )
+        or value != sorted(set(value))
+        or value != list(PRODUCTION_STOPPED_CONTAINERS)
+    ):
+        raise CutoverError(
+            "target_stopped_containers must be the complete sorted production container set"
+        )
+    return value
+
+
+def verify_stopped_containers(containers: Sequence[str]) -> None:
+    expected = validate_stopped_container_names(list(containers))
+    try:
+        result = subprocess.run(
+            [
+                os.environ.get("DOCKER_BIN", "docker"),
+                "inspect",
+                "--format={{.Name}}\t{{.State.Status}}\t{{.State.Running}}",
+                *expected,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=DOCKER_INSPECT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise CutoverError("docker inspect failed while proving target containers are stopped") from exc
+    stdout = result.stdout if isinstance(result.stdout, str) else ""
+    if result.returncode != 0:
+        raise CutoverError("docker inspect failed while proving target containers are stopped")
+    records: dict[str, tuple[str, str]] = {}
+    for line in stdout.splitlines():
+        fields = line.split("\t")
+        if len(fields) != 3:
+            raise CutoverError("docker inspect returned malformed container state")
+        name, status, running = fields
+        if name.startswith("/"):
+            name = name[1:]
+        if name not in expected or name in records:
+            raise CutoverError("docker inspect returned an unexpected container")
+        if status not in {"created", "dead", "exited"} or running != "false":
+            raise CutoverError(f"required target container is active: {name}")
+        records[name] = (status, running)
+    if set(records) != set(expected):
+        raise CutoverError("docker inspect did not report every required target container")
 
 
 def require_stopped(credentials: dict[str, Any]) -> None:
-    if credentials["target_services_stopped"] is not True:
-        raise CutoverError("exact target_services_stopped=true confirmation is required")
+    verify_stopped_containers(credentials["target_stopped_containers"])
+
+
+def require_rollback_not_sealed(state: Path) -> None:
+    marker = read_seal_marker(
+        state / JOURNAL_FILENAME,
+        state / PROMOTION_MANIFEST_FILENAME,
+    )
+    if marker is not None:
+        raise CutoverError("rollback is permanently blocked after the production seal")
 
 
 def validate_marker(value: Any, label: str) -> dict[str, Any]:
@@ -941,24 +1257,46 @@ def preflight(state: Path, path: Path, credentials: dict[str, Any]) -> None:
     if os.path.lexists(state / PROMOTION_MANIFEST_FILENAME):
         raise CutoverError("a promotion manifest already exists")
 
+    source_service = source_control_service(credentials)
     versions = {
-        service: psql(VERSION_SQL, path, service, json_output=True)
-        for service in ("source", "target")
+        "source": psql(VERSION_SQL, path, source_service, json_output=True),
+        "target": psql(VERSION_SQL, path, "target", json_output=True),
     }
     if versions["source"].get("major") != versions["target"].get("major"):
         raise CutoverError("source and target PostgreSQL major versions differ")
     extensions = {
-        service: psql(EXTENSIONS_SQL, path, service, json_output=True)
-        for service in ("source", "target")
+        "source": psql(EXTENSIONS_SQL, path, source_service, json_output=True),
+        "target": psql(EXTENSIONS_SQL, path, "target", json_output=True),
     }
     if extensions["source"] != extensions["target"]:
         raise CutoverError("source and target extension catalogs are not exact")
 
-    source_catalog = catalog(path, "source")
+    source_catalog = catalog(path, source_service)
     target_catalog = catalog(path, "target")
     compare_catalogs(source_catalog, target_catalog)
-    source_marker = validate_marker(psql(MARKER_SQL, path, "source", json_output=True), "source")
+    source_marker = validate_marker(
+        psql(MARKER_SQL, path, source_service, json_output=True), "source"
+    )
     target_marker = validate_marker(psql(MARKER_SQL, path, "target", json_output=True), "target")
+    fence: dict[str, Any] = {
+        "mode": credentials["source_fence_mode"],
+        "engaged": False,
+        "release_required": False,
+    }
+    if credentials["source_fence_mode"] == "credential_rotation":
+        fence["before"] = validate_rotation_prior_fence(
+            psql(fence_inspect_sql(credentials), path, source_service, json_output=True),
+            credentials,
+        )
+    else:
+        preflight_fence = validate_fence(
+            psql(fence_inspect_sql(credentials), path, source_service, json_output=True),
+            credentials,
+        )
+        if preflight_fence["database_acl_is_default"]:
+            raise CutoverError(
+                "role_lockdown requires an explicit database ACL; datacl is NULL and cannot be restored exactly"
+            )
     write_journal(
         state,
         {
@@ -972,11 +1310,11 @@ def preflight(state: Path, path: Path, credentials: dict[str, Any]) -> None:
                 "extensions_digest": digest(extensions["source"]),
                 "source_catalog_digest": digest(source_catalog),
                 "target_catalog_digest": digest(target_catalog),
-                "source_data_digest": digest(data_snapshot(path, "source")),
+                "source_data_digest": digest(data_snapshot(path, source_service)),
                 "target_data_digest": digest(data_snapshot(path, "target")),
                 "source_migrations_digest": digest(source_catalog["migrations"]),
             },
-            "fence": {"engaged": False, "release_required": False},
+            "fence": fence,
             "rollback_available": False,
             "first_write_sealed": False,
         },
@@ -984,10 +1322,11 @@ def preflight(state: Path, path: Path, credentials: dict[str, Any]) -> None:
 
 
 def role_names(credentials: dict[str, Any]) -> list[str]:
-    return [
-        credentials["source_export_role"],
-        *credentials["source_writer_roles"],
-    ]
+    result: list[str] = []
+    for role in [credentials["source_export_role"], *credentials["source_writer_roles"]]:
+        if role not in result:
+            result.append(role)
+    return result
 
 
 def fence_inspect_sql(credentials: dict[str, Any]) -> str:
@@ -1111,13 +1450,44 @@ def validate_fence(value: Any, credentials: dict[str, Any]) -> dict[str, Any]:
         or value["effective_read_only"] not in {"on", "off"}
     ):
         raise CutoverError("fence catalog snapshot is malformed")
-    roles = {item.get("rolname"): item for item in value["roles"] if isinstance(item, dict)}
-    if set(roles) != set(role_names(credentials)) or any(
-        not isinstance(roles[role].get("rolcanlogin"), bool)
-        or not isinstance(roles[role].get("rolsuper"), bool)
-        for role in roles
+    role_rows = value["roles"]
+    if any(
+        not isinstance(item, dict)
+        or set(item) != {"rolname", "rolcanlogin", "rolsuper"}
+        or SAFE_IDENTIFIER.fullmatch(item["rolname"]) is None
+        or not isinstance(item["rolcanlogin"], bool)
+        or not isinstance(item["rolsuper"], bool)
+        for item in role_rows
+    ):
+        raise CutoverError("fence role snapshot is malformed")
+    role_names_in_snapshot = [item["rolname"] for item in role_rows]
+    if (
+        role_names_in_snapshot != sorted(set(role_names_in_snapshot))
+        or set(role_names_in_snapshot) != set(role_names(credentials))
     ):
         raise CutoverError("fence role snapshot is not exact")
+    roles = {item["rolname"]: item for item in role_rows}
+    for grant in value["connect_acl"]:
+        if (
+            not isinstance(grant, dict)
+            or set(grant) != {"grantee", "grantor", "is_grantable"}
+            or not isinstance(grant["is_grantable"], bool)
+            or not safe_text(grant["grantee"])
+            or not safe_text(grant["grantor"])
+            or grant["grantor"] == "PUBLIC"
+            or (
+                grant["grantee"] != "PUBLIC"
+                and SAFE_IDENTIFIER.fullmatch(grant["grantee"]) is None
+            )
+            or SAFE_IDENTIFIER.fullmatch(grant["grantor"]) is None
+        ):
+            raise CutoverError("fence CONNECT ACL snapshot is malformed")
+    connect_keys = [
+        (item["grantee"], item["grantor"], item["is_grantable"])
+        for item in value["connect_acl"]
+    ]
+    if len(connect_keys) != len(set(connect_keys)):
+        raise CutoverError("fence CONNECT ACL snapshot is ambiguous")
     for grant in value["database_acl_entries"]:
         if (
             not isinstance(grant, dict)
@@ -1134,6 +1504,29 @@ def validate_fence(value: Any, credentials: dict[str, Any]) -> dict[str, Any]:
             or SAFE_IDENTIFIER.fullmatch(grant["grantor"]) is None
         ):
             raise CutoverError("fence database ACL snapshot is malformed")
+    database_acl_keys = [
+        (item["grantee"], item["grantor"], item["privilege_type"], item["is_grantable"])
+        for item in value["database_acl_entries"]
+    ]
+    if len(database_acl_keys) != len(set(database_acl_keys)):
+        raise CutoverError("fence database ACL snapshot is ambiguous")
+    jobs = value["cron_jobs"]
+    if any(
+        not isinstance(item, dict)
+        or set(item) != {"jobid", "active"}
+        or isinstance(item["jobid"], bool)
+        or not isinstance(item["jobid"], int)
+        or item["jobid"] < 1
+        or not isinstance(item["active"], bool)
+        for item in jobs
+    ):
+        raise CutoverError("fence pg_cron snapshot is malformed")
+    jobids = [item["jobid"] for item in jobs]
+    if jobids != sorted(set(jobids)):
+        raise CutoverError("fence pg_cron snapshot is ambiguous")
+    settings = value["db_settings"]
+    if any(not safe_text(item) for item in settings) or settings != sorted(set(settings)):
+        raise CutoverError("fence database settings snapshot is malformed")
     return value
 
 
@@ -1145,7 +1538,74 @@ def has_connect(snapshot: dict[str, Any], role: str) -> bool:
     )
 
 
+def default_transaction_read_only(snapshot: dict[str, Any]) -> str:
+    settings = [
+        item.split("=", 1)[1]
+        for item in snapshot["db_settings"]
+        if item.startswith("default_transaction_read_only=")
+    ]
+    if len(settings) > 1 or settings and settings[0] not in {"on", "off"}:
+        raise CutoverError("fence default transaction setting is ambiguous")
+    return settings[0] if settings else "off"
+
+
+def rotation_settings_after_fence(before: dict[str, Any]) -> list[str]:
+    return sorted(
+        [
+            item
+            for item in before["db_settings"]
+            if not item.startswith("default_transaction_read_only=")
+        ]
+        + ["default_transaction_read_only=on"]
+    )
+
+
+def validate_rotation_prior_fence(
+    snapshot: dict[str, Any], credentials: dict[str, Any]
+) -> dict[str, Any]:
+    snapshot = validate_fence(snapshot, credentials)
+    roles = {item["rolname"]: item for item in snapshot["roles"]}
+    if (
+        snapshot["effective_read_only"] != "off"
+        or default_transaction_read_only(snapshot) != "off"
+        or any(not roles[role]["rolcanlogin"] for role in role_names(credentials))
+        or any(not has_connect(snapshot, role) for role in role_names(credentials))
+    ):
+        raise CutoverError("credential rotation prior fence state is already engaged or ambiguous")
+    return snapshot
+
+
+def validate_rotation_engaged_fence(
+    snapshot: dict[str, Any],
+    before: dict[str, Any],
+    credentials: dict[str, Any],
+) -> dict[str, Any]:
+    snapshot = validate_fence(snapshot, credentials)
+    before = validate_rotation_prior_fence(before, credentials)
+    stable_keys = (
+        "roles",
+        "connect_acl",
+        "database_acl",
+        "database_acl_is_default",
+        "database_acl_entries",
+    )
+    if any(snapshot[key] != before[key] for key in stable_keys):
+        raise CutoverError("credential rotation changed role or database ACL state")
+    if (
+        snapshot["effective_read_only"] != "on"
+        or default_transaction_read_only(snapshot) != "on"
+        or snapshot["db_settings"] != rotation_settings_after_fence(before)
+        or any(item["active"] for item in snapshot["cron_jobs"])
+        or [item["jobid"] for item in snapshot["cron_jobs"]]
+        != [item["jobid"] for item in before["cron_jobs"]]
+    ):
+        raise CutoverError("credential rotation read-only or pg_cron fence is not exact")
+    return snapshot
+
+
 def fence_engage_sql(credentials: dict[str, Any]) -> str:
+    if credentials["source_fence_mode"] != "role_lockdown":
+        raise CutoverError("credential_rotation requires adopt-fence after external password rotation")
     database = qid(credentials["source"]["dbname"])
     statements = ["/* aura:fence-engage */", "BEGIN;"]
     statements.extend(
@@ -1166,6 +1626,10 @@ def fence_engage_sql(credentials: dict[str, Any]) -> str:
 
 def release_sql(credentials: dict[str, Any], before: dict[str, Any]) -> str:
     before = validate_fence(before, credentials)
+    if before["database_acl_is_default"]:
+        raise CutoverError(
+            "role_lockdown requires an explicit database ACL; datacl is NULL and cannot be restored exactly"
+        )
     database = qid(credentials["source"]["dbname"])
     statements = [
         "/* aura:fence-release */",
@@ -1228,6 +1692,34 @@ def release_sql(credentials: dict[str, Any], before: dict[str, Any]) -> str:
         f"UPDATE cron.job SET active={'true' if item['active'] else 'false'} "
         f"WHERE jobid={item['jobid']};"
         for item in jobs
+    )
+    return "\n".join(statements)
+
+
+def credential_rotation_release_sql(
+    credentials: dict[str, Any], before: dict[str, Any]
+) -> str:
+    """Restore only the DB settings changed by the externally managed fence."""
+
+    before = validate_rotation_prior_fence(before, credentials)
+    database = qid(credentials["source"]["dbname"])
+    statements = [
+        "/* aura:credential-rotation-release */",
+        "SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE;",
+        "SET default_transaction_read_only=off;",
+        f"ALTER DATABASE {database} RESET default_transaction_read_only;",
+    ]
+    if default_transaction_read_only(before) == "on":
+        statements.append(f"ALTER DATABASE {database} SET default_transaction_read_only=on;")
+    elif default_transaction_read_only(before) == "off" and any(
+        item.startswith("default_transaction_read_only=") for item in before["db_settings"]
+    ):
+        statements.append(f"ALTER DATABASE {database} SET default_transaction_read_only=off;")
+    statements.append("UPDATE cron.job SET active=false;")
+    statements.extend(
+        f"UPDATE cron.job SET active={'true' if item['active'] else 'false'} "
+        f"WHERE jobid={item['jobid']};"
+        for item in before["cron_jobs"]
     )
     return "\n".join(statements)
 
@@ -1347,6 +1839,14 @@ _EXPECTED_WRITER_DENIAL_RE = re.compile(
     r"(?:database|schema|table|relation|sequence|function|view|materialized view|type)\b"
     r"|(?:28000:\s*)?role\s+\"[^\"]+\"\s+is not permitted to log in\s*$)"
 )
+_CREDENTIAL_REJECTION_RE = re.compile(
+    r"(?i)password authentication failed(?:\s+for\s+user\b)?"
+)
+_CREDENTIAL_TRANSPORT_RE = re.compile(
+    r"(?i)(?:could not connect|connection (?:refused|timed out|reset)|"
+    r"could not translate host name|server closed the connection unexpectedly|"
+    r"ssl error|timeout expired|connection to server .* failed)"
+)
 
 
 def expected_writer_denial(stderr: str) -> bool:
@@ -1374,7 +1874,45 @@ def writer_probe(path: Path, service: str) -> None:
     raise CutoverError("source writer role still reconnects and can reach a write probe")
 
 
+def expected_old_credential_rejection(stderr: str) -> bool:
+    """Return true only for password authentication rejection, not transport failure."""
+
+    return bool(
+        stderr
+        and _CREDENTIAL_REJECTION_RE.search(stderr)
+        and not _CREDENTIAL_TRANSPORT_RE.search(stderr)
+    )
+
+
+def credential_acceptance_probe(path: Path, service: str, label: str) -> None:
+    try:
+        psql_command(
+            "/* aura:credential-acceptance-probe */ SELECT 1;",
+            path,
+            service,
+        )
+    except ToolFailure:
+        raise CutoverError(f"{label} credential was not accepted") from None
+
+
+def credential_rejection_probe(path: Path, service: str, label: str) -> None:
+    try:
+        psql_command(
+            "/* aura:old-writer-reconnect-write-probe */ BEGIN; "
+            "CREATE TABLE public.aura_cutover_old_writer_probe(id integer); ROLLBACK;",
+            path,
+            service,
+        )
+    except ToolFailure as exc:
+        if expected_old_credential_rejection(exc.stderr):
+            return
+        raise CutoverError(f"{label} credential did not fail password authentication") from None
+    raise CutoverError(f"{label} credential remains active")
+
+
 def engage_fence(state: Path, path: Path, credentials: dict[str, Any]) -> None:
+    if credentials["source_fence_mode"] != "role_lockdown":
+        raise CutoverError("credential_rotation requires adopt-fence after external password rotation")
     journal = read_journal(state)
     require_preflight(journal, credentials)
     require_phase(journal, "preflight-complete", "fence-engaging", "fence-engage-partial-failure")
@@ -1398,7 +1936,12 @@ def engage_fence(state: Path, path: Path, credentials: dict[str, Any]) -> None:
         raise CutoverError("writer or export role did not have enforceable source CONNECT state")
     journal.update(
         phase="fence-engaging",
-        fence={"engaged": False, "release_required": True, "before": before},
+        fence={
+            "mode": "role_lockdown",
+            "engaged": False,
+            "release_required": True,
+            "before": before,
+        },
     )
     write_journal(state, journal)
     try:
@@ -1438,6 +1981,100 @@ def engage_fence(state: Path, path: Path, credentials: dict[str, Any]) -> None:
     write_journal(state, journal)
 
 
+def adopt_fence(state: Path, path: Path, credentials: dict[str, Any]) -> None:
+    if credentials["source_fence_mode"] != "credential_rotation":
+        raise CutoverError("adopt-fence is only valid for credential_rotation")
+    journal = read_journal(state)
+    require_preflight(journal, credentials)
+    require_phase(journal, "preflight-complete", "fence-adopting", "fence-adopt-partial-failure")
+    fence = journal.get("fence")
+    if (
+        not isinstance(fence, dict)
+        or fence.get("mode") != "credential_rotation"
+        or fence.get("engaged") is not False
+        or not isinstance(fence.get("before"), dict)
+    ):
+        raise CutoverError("credential rotation requires an unengaged preflight fence snapshot")
+    if journal["phase"] == "preflight-complete":
+        if fence.get("release_required") is True:
+            raise CutoverError("credential rotation fence journal is ambiguous")
+        fence["release_required"] = True
+    elif fence.get("release_required") is not True:
+        raise CutoverError("partial credential rotation fence journal is not retryable")
+    before = validate_rotation_prior_fence(fence["before"], credentials)
+    journal["phase"] = "fence-adopting"
+    write_journal(state, journal)
+    try:
+        require_marker(journal, path, "source", "source_marker")
+        credential_rejection_probe(path, "writer_0", "old source writer")
+        credential_acceptance_probe(path, "source", "temporary export")
+        terminate_and_verify_sessions(
+            path,
+            "source",
+            [credentials["source"]["dbname"]],
+            roles=credentials["source_writer_roles"],
+            label="rotation",
+        )
+        after = validate_rotation_engaged_fence(
+            psql(fence_inspect_sql(credentials), path, "source", json_output=True),
+            before,
+            credentials,
+        )
+        export_probe(path, credentials)
+    except CutoverError:
+        journal["phase"] = "fence-adopt-partial-failure"
+        write_journal(state, journal)
+        raise
+    journal["phase"] = "fence-engaged"
+    journal["fence"].update(engaged=True, after=after)
+    write_journal(state, journal)
+
+
+def release_credential_rotation_fence(
+    state: Path,
+    path: Path,
+    credentials: dict[str, Any],
+    journal: dict[str, Any],
+) -> None:
+    fence = journal.get("fence")
+    if (
+        not isinstance(fence, dict)
+        or fence.get("mode") != "credential_rotation"
+        or fence.get("engaged") is not True
+        or fence.get("release_required") is not True
+        or not isinstance(fence.get("before"), dict)
+    ):
+        raise CutoverError("completed credential rotation adoption is required before release")
+    before = validate_rotation_prior_fence(fence["before"], credentials)
+    try:
+        credential_rejection_probe(path, "source", "temporary")
+        credential_acceptance_probe(path, "writer_0", "restored old source writer")
+        require_marker(journal, path, "writer_0", "source_marker")
+        terminate_and_verify_sessions(
+            path,
+            "writer_0",
+            [credentials["source"]["dbname"]],
+            roles=credentials["source_writer_roles"],
+            label="rotation-release",
+        )
+        psql(credential_rotation_release_sql(credentials, before), path, "writer_0")
+        after = validate_fence(
+            psql(fence_inspect_sql(credentials), path, "writer_0", json_output=True),
+            credentials,
+        )
+        if not fence_equal(before, after):
+            raise CutoverError("complete source fence snapshot was not restored exactly")
+        credential_acceptance_probe(path, "writer_0", "restored old source writer")
+        credential_rejection_probe(path, "source", "temporary")
+    except CutoverError:
+        journal["phase"] = "fence-release-partial-failure"
+        write_journal(state, journal)
+        raise
+    journal["phase"] = "fence-released"
+    journal["fence"].update(engaged=False, release_required=False, after_release=after)
+    write_journal(state, journal)
+
+
 def release_fence(state: Path, path: Path, credentials: dict[str, Any]) -> None:
     journal = read_journal(state)
     require_preflight(journal, credentials)
@@ -1446,6 +2083,8 @@ def release_fence(state: Path, path: Path, credentials: dict[str, Any]) -> None:
         "fence-engaged",
         "fence-engaging",
         "fence-engage-partial-failure",
+        "fence-adopt-partial-failure",
+        "fence-release-partial-failure",
         "candidate-verify-complete",
         "promotion-started",
         "promotion-recovered",
@@ -1455,8 +2094,15 @@ def release_fence(state: Path, path: Path, credentials: dict[str, Any]) -> None:
         "rolled-back",
     )
     fence = journal.get("fence", {})
-    if fence.get("release_required") is not True or not isinstance(fence.get("before"), dict):
+    if (
+        not isinstance(fence, dict)
+        or fence.get("release_required") is not True
+        or not isinstance(fence.get("before"), dict)
+    ):
         raise CutoverError("engaged or partially engaged fence journal is required")
+    if credentials["source_fence_mode"] == "credential_rotation":
+        release_credential_rotation_fence(state, path, credentials, journal)
+        return
     require_marker(journal, path, "source", "source_marker")
     try:
         terminate_and_verify_sessions(
@@ -1790,6 +2436,7 @@ def drop_candidate(path: Path, credentials: dict[str, Any]) -> None:
     if names["candidate"] not in databases(path, credentials):
         return
     quiesce(path, credentials, database_keys=("candidate",))
+    require_stopped(credentials)
     psql(
         f"/* aura:candidate-drop */ DROP DATABASE IF EXISTS {qid(names['candidate'])};",
         path,
@@ -1804,6 +2451,7 @@ def create_candidate_database(path: Path, credentials: dict[str, Any]) -> dict[s
     if databases(path, credentials) & {names["candidate"], names["rollback"]}:
         raise CutoverError("deterministic candidate or rollback database already exists")
     quiesce(path, credentials, include_candidate=False, include_rollback=False)
+    require_stopped(credentials)
     psql(
         f"/* aura:candidate-create */ CREATE DATABASE {qid(names['candidate'])} "
         f"WITH TEMPLATE {qid(names['target'])};",
@@ -1891,6 +2539,7 @@ def candidate_restore(state: Path, path: Path, credentials: dict[str, Any]) -> N
     journal["phase"] = "candidate-restore-started"
     write_journal(state, journal)
     try:
+        require_stopped(credentials)
         restore_scopes(state / "artifacts", path)
     except (CutoverError, OSError):
         journal["phase"] = "candidate-restore-partial-failure"
@@ -1957,7 +2606,9 @@ def rename_after_quiesce(
     old: str,
     new: str,
 ) -> None:
+    require_stopped(credentials)
     quiesce(path, credentials, include_candidate=True, include_rollback=True)
+    require_stopped(credentials)
     rename_database(path, old, new)
 
 
@@ -2235,6 +2886,7 @@ def recover_rollback(path: Path, credentials: dict[str, Any], journal: dict[str,
 def rollback(state: Path, path: Path, credentials: dict[str, Any]) -> None:
     journal = read_journal(state)
     require_preflight(journal, credentials)
+    require_rollback_not_sealed(state)
     if journal.get("phase") == "rollback-started":
         require_stopped(credentials)
         try:
@@ -2306,6 +2958,7 @@ def dispatch(action: str, state: Path, path: Path, credentials: dict[str, Any]) 
     actions = {
         "preflight": preflight,
         "engage-fence": engage_fence,
+        "adopt-fence": adopt_fence,
         "release-fence": release_fence,
         "export": export_archives,
         "candidate-create": create_candidate,
