@@ -133,15 +133,17 @@ therefore still allowed with a default database ACL.
    `public._prisma_migrations`와 rotation 전의 비밀 없는 source fence snapshot을
    기록한다. Application catalog는 public의 모든 semantic object와
    `storage.buckets`/`storage.objects`의 core object/dependency를 비교한다.
-   `realtime`, `_realtime`, `supabase_migrations`, `private`는 named service-internal
-   schema로 비교하지 않으며, Storage에서는 다음 forward-only column/constraint만
+   `realtime`, `_realtime`, `supabase_migrations`, `private`, `extensions`, `net`,
+   `pgbouncer`, `supabase_functions`는 named service-internal schema로 비교하지
+   않으며, 그 밖의 schema는 비교한다. Storage에서는 다음 forward-only column/constraint만
    제외한다: `buckets.versioning_status`, `buckets_versioning_dark_check`,
    `buckets_versioning_standard_only_check`, `buckets_versioning_status_check`,
    `objects.archived_at`, `objects.is_delete_marker`, `objects.is_versioned`.
-   Relation ACL은 `aclexplode`의 grantee/privilege/grantable row로 canonicalize하고
-   grantor 및 문자열 순서는 무시한다. 단, `aura_board_dr_replication`의
-   `SELECT`/non-grantable tuple만 허용 목록으로 제외하며 다른 grant는 모두 gate에
-   남는다. `credential_rotation`에서는 preflight source reads가 `writer_0`
+   Relation, schema, routine, type ACL은 `aclexplode`의 exact
+   grantee/privilege/grantable row로 canonicalize하고 grantor 및 문자열 순서는
+   무시한다. Application DR에서는 relation의 `SELECT`/non-grantable tuple과
+   public schema의 `USAGE`/non-grantable tuple만 허용 목록으로 제외하며 다른
+   grant는 모두 gate에 남는다. Owner는 exact 비교한다. `credential_rotation`에서는 preflight source reads가 `writer_0`
    (old credential)을 사용하므로 아직 temporary credential을 활성화할 필요가 없다.
 4. `source_fence_mode=role_lockdown`이면 `engage-fence`로 명시된 managed writer
    role의 LOGIN/CONNECT와 pg_cron을 차단하고 실제 writer credential 재접속·write
@@ -153,14 +155,19 @@ therefore still allowed with a default database ACL.
    credential의 password authentication rejection, temporary export 성공, 기존
    postgres pooled session의 종료, read-only/cron exactness를 검증하고 engaged
    state를 기록한다. `engage-fence`는 이 모드에서 거부된다.
-6. fenced source에서 `public` schema, `auth` data (target auth schema는 retained),
-   `storage.buckets/objects` archive를 만든다.
-7. 정지된 Oracle target을 template로 candidate DB를 만들고 candidate에만 restore한다.
+6. fenced source에서 `public` table-data, `auth` data (target auth schema는 retained),
+   `storage.buckets/objects` data-only archive를 만든다.
+7. 정지된 Oracle target을 template로 candidate DB를 만들고 candidate에만 data-only
+   restore한다. Target DB owner/ACL은 preflight에 canonical snapshot으로 기록하고,
+   candidate 생성·restore 전후·promotion 후 exact 검증한다. Public
+   schema/ACL/owner/publication은 target clone에 남겨 둔다.
 8. candidate의 exact Auth catalog, Prisma migration history, application catalog와
    data snapshot이 fenced source와 일치해야 한다. public/auth row는 전체 JSON row를
    digest하고 row count를 exact 비교하며, Storage row는 위에 열거한 forward-only
    JSON key만 제거한다. 이름 없는 추가 column/constraint/JSON key나 public/auth
    drift는 허용하지 않는다.
+   Dependency subobject fingerprint는 physical number가 아니라 local/referenced
+   column name을 사용하며, relation-level dependency는 NULL이다.
 9. target→rollback, candidate→target 순서로 rename하고 `promotion-manifest.json`을
    원자적으로 기록한다. partial rename은 자동 recovery 후 중단한다.
 10. Runtime tool이 promotion manifest와 fresh build manifest를 검증한 뒤 app/backup env를
@@ -194,6 +201,40 @@ therefore still allowed with a default database ACL.
 password 복구, temporary rejection, old acceptance, 모든 pooled session 종료, 전체
 non-secret snapshot exact 비교 중 하나라도 실패하면 journal은 partial-failure로
 남고 성공을 보고하지 않는다.
+
+### Restore and catalog contract
+
+`public.dump` is a data-only `pg_dump --schema=public` archive. Its validated
+TOC contains only public `TABLE DATA` (and data-only `SEQUENCE SET`) entries;
+schema, other DDL, malformed/unknown lines, duplicate entries, and out-of-scope
+names fail closed. Quoted mixed-case or space-containing identifiers are parsed
+without weakening scope checks. Candidate creation clones the target with the
+exact recorded database owner and then restores and verifies the recorded DB
+ACL. Target schema objects, exact owners, ACLs, and Realtime publication
+membership therefore remain in place. The restore user and maintenance user
+must both prove `rolsuper=true` in preflight, and the candidate restore user is
+rechecked immediately before mutation because `--disable-triggers` requires a
+superuser. The candidate-only restore first rejects any foreign key from an
+out-of-scope table into the archived public table set, truncates all listed
+public tables together with `RESTART IDENTITY` and no `CASCADE`, then runs
+`pg_restore --data-only --single-transaction --disable-triggers`. Auth and
+Storage remain data-only table restores with their existing scoped truncation.
+
+The operator must align target owners before preflight. Owner comparison remains
+exact for schemas, relations, indexes, routines, and types; library-style
+restore ownership is not normalized. Catalog comparison also canonicalizes
+schema, relation, routine, and type ACLs as exact
+`{grantee, privilege, grantable}` lists. The only application DR exceptions are
+the non-grantable `SELECT` tuple for relation ACLs and the non-grantable
+`USAGE` tuple on the `public` schema. There is no routine or Auth exception;
+unknown grants fail the gate.
+
+The named service-internal schemas excluded from application comparison are
+`realtime`, `_realtime`, `supabase_migrations`, `private`, `extensions`, `net`,
+`pgbouncer`, and `supabase_functions`. Any other schema remains compared. Catalog
+dependency subobject fingerprints use local and referenced column names, with
+NULL for relation-level dependencies, so physical OID and column-order shifts
+do not pass as semantic drift.
 
 ## Promotion manifest 계약
 

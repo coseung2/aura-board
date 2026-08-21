@@ -98,7 +98,16 @@ SEAL_MARKER_KEYS = frozenset(
 TOOL_APP_NAME = "aura-board-cutover"
 DATA_SNAPSHOT_CONTRACT = "aura-cutover-data-v2"
 SERVICE_INTERNAL_SCHEMAS = frozenset(
-    {"realtime", "_realtime", "supabase_migrations", "private"}
+    {
+        "realtime",
+        "_realtime",
+        "supabase_migrations",
+        "private",
+        "extensions",
+        "net",
+        "pgbouncer",
+        "supabase_functions",
+    }
 )
 RELATION_ACL_KINDS = frozenset({"relation", "index", "sequence", "view"})
 DR_REPLICATION_ROLE = "aura_board_dr_replication"
@@ -172,10 +181,78 @@ SELECT json_build_object(
     'system_identifier', (pg_control_system()).system_identifier::text
 )::text;
 """
+SUPERUSER_SQL = """
+/* aura:superuser-check */
+SELECT json_build_object(
+    'user', current_user,
+    'superuser', r.rolsuper
+)::text
+FROM pg_roles r
+WHERE r.rolname = current_user;
+"""
+DATABASE_CONTRACT_SQL = """
+/* aura:database-contract */
+SELECT json_build_object(
+    'database', d.datname,
+    'owner', owner_role.rolname,
+    'acl', coalesce(
+        json_agg(
+            json_build_object(
+                'grantee', CASE
+                    WHEN x.grantee = 0::oid THEN 'PUBLIC'
+                    ELSE coalesce(grantee_role.rolname, 'OID:' || x.grantee::text)
+                END,
+                'grantor', coalesce(grantor_role.rolname, 'OID:' || x.grantor::text),
+                'privilege', x.privilege_type,
+                'grantable', x.is_grantable
+            ) ORDER BY
+                (CASE
+                    WHEN x.grantee = 0::oid THEN 'PUBLIC'
+                    ELSE coalesce(grantee_role.rolname, 'OID:' || x.grantee::text)
+                END) COLLATE "C",
+                coalesce(grantor_role.rolname, 'OID:' || x.grantor::text) COLLATE "C",
+                x.privilege_type COLLATE "C",
+                x.is_grantable
+        ) FILTER (WHERE x.grantee IS NOT NULL),
+        '[]'::json
+    )
+)::text
+FROM pg_database d
+JOIN pg_roles owner_role ON owner_role.oid = d.datdba
+LEFT JOIN LATERAL aclexplode(
+    coalesce(d.datacl, acldefault('d'::"char", d.datdba))
+) x ON true
+LEFT JOIN pg_roles grantee_role ON grantee_role.oid = x.grantee
+LEFT JOIN pg_roles grantor_role ON grantor_role.oid = x.grantor
+WHERE d.datname = current_database()
+GROUP BY d.datname, owner_role.rolname;
+"""
 CATALOG_SQL = r"""/* aura:catalog-fingerprint */
-WITH relation_acl AS (
+WITH acl_source(object_kind, oid, raw_acl, default_acl) AS (
     SELECT
+        'relation',
         c.oid,
+        c.relacl,
+        acldefault(
+            CASE WHEN c.relkind = 'S' THEN 'S'::"char" ELSE 'r'::"char" END,
+            c.relowner
+        )
+    FROM pg_class c
+    UNION ALL
+    SELECT 'schema', n.oid, n.nspacl, acldefault('n'::"char", n.nspowner)
+    FROM pg_namespace n
+    UNION ALL
+    SELECT 'routine', p.oid, p.proacl, acldefault('f'::"char", p.proowner)
+    FROM pg_proc p
+    WHERE p.prokind IN ('f', 'p')
+    UNION ALL
+    SELECT 'type', t.oid, t.typacl, acldefault('T'::"char", t.typowner)
+    FROM pg_type t
+),
+object_acl AS (
+    SELECT
+        s.object_kind,
+        s.oid,
         coalesce(
             jsonb_agg(
                 jsonb_build_object(
@@ -199,26 +276,23 @@ WITH relation_acl AS (
             ),
             '[]'::jsonb
         ) AS acl
-    FROM pg_class c
-    CROSS JOIN LATERAL aclexplode(
-        coalesce(
-            c.relacl,
-            acldefault(
-                CASE WHEN c.relkind = 'S' THEN 'S'::"char" ELSE 'r'::"char" END,
-                c.relowner
-            )
-        )
-    ) x
+    FROM acl_source s
+    CROSS JOIN LATERAL aclexplode(coalesce(s.raw_acl, s.default_acl)) x
     LEFT JOIN pg_roles r ON r.oid = x.grantee
-    GROUP BY c.oid
+    GROUP BY s.object_kind, s.oid
 ),
 o(kind, schema_name, object_name, detail) AS (
     SELECT
         'schema',
         n.nspname,
         n.nspname,
-        jsonb_build_object('owner', pg_get_userbyid(n.nspowner), 'acl', n.nspacl::text)
+        jsonb_build_object(
+            'owner', pg_get_userbyid(n.nspowner),
+            'acl', coalesce(sa.acl, '[]'::jsonb)
+        )
     FROM pg_namespace n
+    LEFT JOIN object_acl sa
+        ON sa.object_kind = 'schema' AND sa.oid = n.oid
     WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
     UNION ALL
     SELECT
@@ -238,7 +312,8 @@ o(kind, schema_name, object_name, detail) AS (
         )
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    LEFT JOIN relation_acl ra ON ra.oid = c.oid
+    LEFT JOIN object_acl ra
+        ON ra.object_kind = 'relation' AND ra.oid = c.oid
     WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
       AND c.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
     UNION ALL
@@ -289,6 +364,7 @@ o(kind, schema_name, object_name, detail) AS (
         n.nspname,
         c.relname || '.' || i.relname,
         jsonb_build_object(
+            'owner', pg_get_userbyid(i.relowner),
             'definition', pg_get_indexdef(i.oid),
             'primary', x.indisprimary,
             'unique', x.indisunique,
@@ -304,7 +380,8 @@ o(kind, schema_name, object_name, detail) AS (
     JOIN pg_class c ON c.oid = x.indrelid
     JOIN pg_class i ON i.oid = x.indexrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    LEFT JOIN relation_acl ia ON ia.oid = i.oid
+    LEFT JOIN object_acl ia
+        ON ia.object_kind = 'relation' AND ia.oid = i.oid
     WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
     UNION ALL
     SELECT
@@ -347,6 +424,7 @@ o(kind, schema_name, object_name, detail) AS (
         n.nspname,
         p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
         jsonb_build_object(
+            'owner', pg_get_userbyid(p.proowner),
             'kind', p.prokind,
             'result', pg_get_function_result(p.oid),
             'language', l.lanname,
@@ -354,12 +432,14 @@ o(kind, schema_name, object_name, detail) AS (
             'strict', p.proisstrict,
             'security_definer', p.prosecdef,
             'config', p.proconfig::text,
-            'acl', p.proacl::text,
+            'acl', coalesce(pa.acl, '[]'::jsonb),
             'definition', pg_get_functiondef(p.oid)
         )
     FROM pg_proc p
     JOIN pg_namespace n ON n.oid = p.pronamespace
     JOIN pg_language l ON l.oid = p.prolang
+    LEFT JOIN object_acl pa
+        ON pa.object_kind = 'routine' AND pa.oid = p.oid
     WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
       AND p.prokind IN ('f', 'p')
     UNION ALL
@@ -380,7 +460,8 @@ o(kind, schema_name, object_name, detail) AS (
     FROM pg_sequence s
     JOIN pg_class c ON c.oid = s.seqrelid
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    LEFT JOIN relation_acl sa ON sa.oid = c.oid
+    LEFT JOIN object_acl sa
+        ON sa.object_kind = 'relation' AND sa.oid = c.oid
     WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
     UNION ALL
     SELECT
@@ -388,6 +469,7 @@ o(kind, schema_name, object_name, detail) AS (
         n.nspname,
         t.typname,
         jsonb_build_object(
+            'owner', pg_get_userbyid(t.typowner),
             'kind', t.typtype,
             'base_type', CASE
                 WHEN t.typbasetype = 0 THEN NULL
@@ -395,7 +477,7 @@ o(kind, schema_name, object_name, detail) AS (
             END,
             'not_null', t.typnotnull,
             'default', t.typdefault,
-            'acl', t.typacl::text,
+            'acl', coalesce(ta.acl, '[]'::jsonb),
             'enum_values', array(
                 SELECT e.enumlabel
                 FROM pg_enum e
@@ -455,6 +537,8 @@ o(kind, schema_name, object_name, detail) AS (
     LEFT JOIN pg_proc rsubdiff
         ON rsubdiff.oid = NULLIF(r.rngsubdiff::oid, 0::oid)
     LEFT JOIN pg_namespace rsubdiffn ON rsubdiffn.oid = rsubdiff.pronamespace
+    LEFT JOIN object_acl ta
+        ON ta.object_kind = 'type' AND ta.oid = t.oid
     WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
       AND t.typrelid = 0 AND t.typtype IN ('d', 'e', 'r')
     UNION ALL
@@ -470,7 +554,8 @@ o(kind, schema_name, object_name, detail) AS (
         )
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    LEFT JOIN relation_acl va ON va.oid = c.oid
+    LEFT JOIN object_acl va
+        ON va.object_kind = 'relation' AND va.oid = c.oid
     WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
       AND c.relkind IN ('v', 'm')
     UNION ALL
@@ -480,14 +565,30 @@ o(kind, schema_name, object_name, detail) AS (
         c.relname || '->' || rn.nspname || '.' || rc.relname,
         jsonb_build_object(
             'dependency_type', d.deptype,
-            'objsubid', d.objsubid,
-            'refobjsubid', d.refobjsubid
+            'objsubid', CASE
+                WHEN d.objsubid = 0 THEN NULL
+                ELSE objatt.attname
+            END,
+            'refobjsubid', CASE
+                WHEN d.refobjsubid = 0 THEN NULL
+                ELSE refatt.attname
+            END
         )
     FROM pg_depend d
     JOIN pg_class c ON d.classid = 'pg_class'::regclass AND c.oid = d.objid
     JOIN pg_namespace n ON n.oid = c.relnamespace
     JOIN pg_class rc ON d.refclassid = 'pg_class'::regclass AND rc.oid = d.refobjid
     JOIN pg_namespace rn ON rn.oid = rc.relnamespace
+    LEFT JOIN pg_attribute objatt
+        ON d.objsubid <> 0
+       AND objatt.attrelid = d.objid
+       AND objatt.attnum = d.objsubid
+       AND NOT objatt.attisdropped
+    LEFT JOIN pg_attribute refatt
+        ON d.refobjsubid <> 0
+       AND refatt.attrelid = d.refobjid
+       AND refatt.attnum = d.refobjsubid
+       AND NOT refatt.attisdropped
     WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
       AND rn.nspname !~ '^pg_' AND rn.nspname <> 'information_schema'
 )
@@ -1053,6 +1154,12 @@ def qid(value: str) -> str:
     return f'"{value}"'
 
 
+def qobject(value: str) -> str:
+    if not safe_text(value):
+        raise CutoverError("unsafe PostgreSQL object identifier")
+    return '"' + value.replace('"', '""') + '"'
+
+
 def qlit(value: str) -> str:
     if not safe_text(value):
         raise CutoverError("unsafe SQL literal")
@@ -1402,6 +1509,51 @@ def validate_marker(value: Any, label: str) -> dict[str, Any]:
     return value
 
 
+def validate_database_contract(value: Any, label: str) -> dict[str, Any]:
+    if not isinstance(value, dict) or set(value) != {"database", "owner", "acl"}:
+        raise CutoverError(f"{label} database owner/ACL contract is malformed")
+    if (
+        not isinstance(value["database"], str)
+        or SAFE_IDENTIFIER.fullmatch(value["database"]) is None
+        or not safe_text(value["owner"])
+        or str(value["owner"]).startswith("OID:")
+        or not isinstance(value["acl"], list)
+    ):
+        raise CutoverError(f"{label} database owner/ACL contract is malformed")
+    canonical: list[tuple[str, str, str, bool]] = []
+    for grant in value["acl"]:
+        if (
+            not isinstance(grant, dict)
+            or set(grant) != {"grantee", "grantor", "privilege", "grantable"}
+            or not safe_text(grant.get("grantee"))
+            or not safe_text(grant.get("grantor"))
+            or str(grant["grantee"]).startswith("OID:")
+            or str(grant["grantor"]).startswith("OID:")
+            or grant["grantor"] == "PUBLIC"
+            or grant["privilege"] not in {"CONNECT", "CREATE", "TEMPORARY"}
+            or not isinstance(grant["grantable"], bool)
+        ):
+            raise CutoverError(f"{label} database owner/ACL contract is malformed")
+        canonical.append(
+            (
+                grant["grantee"],
+                grant["grantor"],
+                grant["privilege"],
+                grant["grantable"],
+            )
+        )
+    if canonical != sorted(canonical) or len(canonical) != len(set(canonical)):
+        raise CutoverError(f"{label} database owner/ACL contract is malformed")
+    return value
+
+
+def renamed_database_contract(value: Any, database: str, label: str) -> dict[str, Any]:
+    contract = validate_database_contract(value, label)
+    if SAFE_IDENTIFIER.fullmatch(database) is None:
+        raise CutoverError(f"{label} database owner/ACL contract is malformed")
+    return {"database": database, "owner": contract["owner"], "acl": contract["acl"]}
+
+
 def identity_from_marker(value: Any, label: str) -> dict[str, Any]:
     marker = validate_marker(value, label)
     return {key: marker[key] for key in IDENTITY_KEYS}
@@ -1609,25 +1761,27 @@ def _catalog_objects(value: Any, label: str) -> list[dict[str, Any]]:
     return result
 
 
-def _canonical_relation_acl(
+def _canonical_acl(
     value: Any,
     *,
     allow_dr_replication_select: bool,
+    allow_dr_public_schema_usage: bool = False,
+    label: str,
 ) -> list[dict[str, Any]]:
     if not isinstance(value, list):
-        raise CutoverError("catalog relation ACL is malformed")
+        raise CutoverError(f"catalog {label} ACL is malformed")
     canonical: list[tuple[str, str, bool]] = []
     for grant in value:
         if not isinstance(grant, dict):
-            raise CutoverError("catalog relation ACL is malformed")
+            raise CutoverError(f"catalog {label} ACL is malformed")
         if set(grant) != {"grantee", "privilege", "grantable"}:
-            raise CutoverError("catalog relation ACL is malformed")
+            raise CutoverError(f"catalog {label} ACL is malformed")
         if (
             not isinstance(grant["grantee"], str)
             or not isinstance(grant["privilege"], str)
             or not isinstance(grant["grantable"], bool)
         ):
-            raise CutoverError("catalog relation ACL is malformed")
+            raise CutoverError(f"catalog {label} ACL is malformed")
         grantee = grant["grantee"]
         privilege = grant["privilege"]
         grantable = grant["grantable"]
@@ -1635,6 +1789,13 @@ def _canonical_relation_acl(
             allow_dr_replication_select
             and grantee == DR_REPLICATION_ROLE
             and privilege == "SELECT"
+            and grantable is False
+        ):
+            continue
+        if (
+            allow_dr_public_schema_usage
+            and grantee == DR_REPLICATION_ROLE
+            and privilege == "USAGE"
             and grantable is False
         ):
             continue
@@ -1654,9 +1815,29 @@ def _normalize_catalog_object(
     if item["kind"] in RELATION_ACL_KINDS:
         if "acl" not in detail:
             raise CutoverError("catalog relation ACL is malformed")
-        detail["acl"] = _canonical_relation_acl(
+        detail["acl"] = _canonical_acl(
             detail["acl"],
             allow_dr_replication_select=allow_dr_replication_select,
+            label="relation",
+        )
+    elif item["kind"] == "schema":
+        if "acl" not in detail:
+            raise CutoverError("catalog schema ACL is malformed")
+        detail["acl"] = _canonical_acl(
+            detail["acl"],
+            allow_dr_replication_select=False,
+            allow_dr_public_schema_usage=(
+                allow_dr_replication_select and item["schema_name"] == "public"
+            ),
+            label="schema",
+        )
+    elif item["kind"] in {"routine", "type"}:
+        if "acl" not in detail:
+            raise CutoverError(f"catalog {item['kind']} ACL is malformed")
+        detail["acl"] = _canonical_acl(
+            detail["acl"],
+            allow_dr_replication_select=False,
+            label=item["kind"],
         )
     normalized["detail"] = detail
     return normalized
@@ -1785,6 +1966,11 @@ def preflight(state: Path, path: Path, credentials: dict[str, Any]) -> None:
     }
     if versions["source"].get("major") != versions["target"].get("major"):
         raise CutoverError("source and target PostgreSQL major versions differ")
+    require_superuser(path, "target", "target restore user")
+    require_superuser(path, "target_admin", "target admin")
+    target_database_contract = database_contract(path, "target", "target")
+    if target_database_contract["database"] != db_names(credentials)["target"]:
+        raise CutoverError("target database owner/ACL contract is not deterministic")
     extensions = {
         "source": psql(EXTENSIONS_SQL, path, source_service, json_output=True),
         "target": psql(EXTENSIONS_SQL, path, "target", json_output=True),
@@ -1831,6 +2017,7 @@ def preflight(state: Path, path: Path, credentials: dict[str, Any]) -> None:
                 "extensions_digest": digest(extensions["source"]),
                 "source_catalog_digest": digest(source_catalog),
                 "target_catalog_digest": digest(target_catalog),
+                "target_database_contract": target_database_contract,
                 "source_data_digest": digest(data_snapshot(path, source_service)),
                 "target_data_digest": digest(data_snapshot(path, "target")),
                 "source_migrations_digest": digest(source_catalog["migrations"]),
@@ -2660,7 +2847,7 @@ def archive_args(scope: str, output: Path) -> list[str]:
         f"--file={output}",
     ]
     if scope == "public":
-        return base + ["--schema=public"]
+        return base + ["--data-only", "--schema=public"]
     if scope == "auth":
         return base + ["--data-only", "--schema=auth"]
     if scope == "storage":
@@ -2672,33 +2859,142 @@ def archive_args(scope: str, output: Path) -> list[str]:
     raise CutoverError("unsupported archive scope")
 
 
-def entries(listing: str) -> list[tuple[str, str]]:
-    pattern = re.compile(
-        r"\b(TABLE DATA|TABLE|SEQUENCE SET|SEQUENCE|VIEW|MATERIALIZED VIEW|"
-        r"FUNCTION|INDEX|TRIGGER|CONSTRAINT|SCHEMA|TYPE|DEFAULT) "
-        r"(?:- )?([^ .]+)(?: ([^ ]+))?"
-    )
-    result: list[tuple[str, str]] = []
-    for line in listing.splitlines():
-        if not line or line.startswith(";"):
+TOC_ENTRY_TYPES = (
+    "MATERIALIZED VIEW DATA",
+    "MATERIALIZED VIEW",
+    "SEQUENCE OWNED BY",
+    "SEQUENCE SET",
+    "TABLE ATTACH",
+    "TABLE DATA",
+    "SECURITY LABEL",
+    "FK CONSTRAINT",
+    "CHECK CONSTRAINT",
+    "DEFAULT ACL",
+    "PUBLICATION TABLE",
+    "ROW SECURITY",
+    "TABLE",
+    "SEQUENCE",
+    "VIEW",
+    "FUNCTION",
+    "PROCEDURE",
+    "INDEX",
+    "TRIGGER",
+    "CONSTRAINT",
+    "SCHEMA",
+    "TYPE",
+    "DOMAIN",
+    "DEFAULT",
+    "COMMENT",
+    "ACL",
+    "POLICY",
+    "RULE",
+)
+
+
+def _toc_fields(value: str) -> list[str]:
+    fields: list[str] = []
+    index = 0
+    while index < len(value):
+        while index < len(value) and value[index].isspace():
+            index += 1
+        if index == len(value):
+            break
+        if value[index] != '"':
+            end = index
+            while end < len(value) and not value[end].isspace():
+                end += 1
+            fields.append(value[index:end])
+            index = end
             continue
-        match = pattern.search(line)
-        if match:
-            result.append(
-                (match.group(2), "" if match.group(1) == "SCHEMA" else match.group(3) or "")
+        index += 1
+        token: list[str] = []
+        while index < len(value):
+            character = value[index]
+            if character == '"':
+                if index + 1 < len(value) and value[index + 1] == '"':
+                    token.append('"')
+                    index += 2
+                    continue
+                index += 1
+                if index < len(value) and not value[index].isspace():
+                    raise CutoverError("archive listing contains a malformed quoted identifier")
+                break
+            token.append(character)
+            index += 1
+        else:
+            raise CutoverError("archive listing contains an unterminated quoted identifier")
+        fields.append("".join(token))
+    return fields
+
+
+def archive_entries(listing: str) -> list[tuple[str, str, str]]:
+    prefix = re.compile(r"^\s*[0-9]+;\s+[0-9]+\s+[0-9]+\s+(.+?)\s*$")
+    result: list[tuple[str, str, str]] = []
+    for line in listing.splitlines():
+        if not line.strip() or line.lstrip().startswith(";"):
+            continue
+        match = prefix.fullmatch(line)
+        if not match:
+            raise CutoverError("archive listing contains an unrecognized entry")
+        body = match.group(1)
+        entry_type = next(
+            (
+                candidate
+                for candidate in TOC_ENTRY_TYPES
+                if body == candidate or body.startswith(candidate + " ")
+            ),
+            None,
+        )
+        if entry_type is None:
+            raise CutoverError("archive listing contains an unrecognized entry")
+        fields = _toc_fields(body[len(entry_type) :])
+        if len(fields) != 3 or any(not safe_text(field) for field in fields):
+            raise CutoverError("archive listing contains a malformed entry")
+        namespace, object_name, _owner = fields
+        schema = object_name if entry_type == "SCHEMA" and namespace == "-" else namespace
+        result.append(
+            (
+                entry_type,
+                schema,
+                "" if entry_type == "SCHEMA" else object_name,
             )
+        )
     return result
 
 
+def entries(listing: str) -> list[tuple[str, str]]:
+    return [
+        (schema, object_name)
+        for _entry_type, schema, object_name in archive_entries(listing)
+    ]
+
+
 def validate_archive(scope: str, listing: str) -> None:
-    found = entries(listing)
-    if not found or {item[0] for item in found} != {scope}:
+    found = archive_entries(listing)
+    if not found or {item[1] for item in found} != {scope}:
         raise CutoverError(f"{scope} archive contains an out-of-scope or empty listing")
-    tables = {item[1] for item in found if item[1]}
+    if any(item[0] not in {"TABLE DATA", "SEQUENCE SET"} for item in found):
+        raise CutoverError(f"{scope} archive contains schema or DDL entries")
+    table_data = [
+        (schema, table)
+        for entry_type, schema, table in found
+        if entry_type == "TABLE DATA" and table
+    ]
+    sequence_sets = [
+        (schema, sequence)
+        for entry_type, schema, sequence in found
+        if entry_type == "SEQUENCE SET" and sequence
+    ]
+    if not table_data and not sequence_sets:
+        raise CutoverError(f"{scope} archive has no restorable data entries")
+    restorable = table_data + sequence_sets
+    if any(not safe_text(schema) or not safe_text(name) for schema, name in restorable):
+        raise CutoverError(f"{scope} archive contains an unsafe data identifier")
+    if len(restorable) != len(set(restorable)):
+        raise CutoverError(f"{scope} archive contains duplicate data entries")
+    tables = {table for _schema, table in table_data}
     if scope == "storage" and tables != {"buckets", "objects"}:
         raise CutoverError("storage archive scope is not exact")
-    if scope == "auth" and not tables:
-        raise CutoverError("auth archive has no table data")
 
 
 def dump_archive(scope: str, output: Path, path: Path, service: str) -> None:
@@ -2858,18 +3154,120 @@ def verify_manifest(
     return document
 
 
+def require_superuser(path: Path, service: str, label: str) -> None:
+    value = psql(SUPERUSER_SQL, path, service, json_output=True)
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"user", "superuser"}
+        or not safe_text(value.get("user"))
+        or not isinstance(value.get("superuser"), bool)
+    ):
+        raise CutoverError(f"{label} superuser probe is malformed")
+    if value["superuser"] is not True:
+        raise CutoverError(f"{label} must be a PostgreSQL superuser")
+
+
+def database_contract(path: Path, service: str, label: str | None = None) -> dict[str, Any]:
+    return validate_database_contract(
+        psql(DATABASE_CONTRACT_SQL, path, service, json_output=True),
+        label or service,
+    )
+
+
+def external_public_fk_sql(public_tables: Sequence[str]) -> str:
+    if not public_tables or any(not safe_text(table) for table in public_tables):
+        raise CutoverError("public archive table scope is invalid")
+    values = ",".join(f"({qlit(table)})" for table in sorted(set(public_tables)))
+    return f"""/* aura:public-inbound-fks */
+WITH archived(table_name) AS (VALUES {values})
+SELECT coalesce(
+    json_agg(
+        json_build_object(
+            'constraint', con.conname,
+            'referencing_schema', child_ns.nspname,
+            'referencing_table', child.relname,
+            'referenced_table', parent.relname
+        ) ORDER BY child_ns.nspname, child.relname, con.conname
+    ),
+    '[]'::json
+)::text
+FROM pg_constraint con
+JOIN pg_class child ON child.oid = con.conrelid
+JOIN pg_namespace child_ns ON child_ns.oid = child.relnamespace
+JOIN pg_class parent ON parent.oid = con.confrelid
+JOIN pg_namespace parent_ns ON parent_ns.oid = parent.relnamespace
+WHERE con.contype = 'f'
+  AND parent_ns.nspname = 'public'
+  AND parent.relname IN (SELECT table_name FROM archived)
+  AND NOT (
+      child_ns.nspname = 'public'
+      AND child.relname IN (SELECT table_name FROM archived)
+  );"""
+
+
+def require_no_external_public_fks(
+    path: Path, service: str, public_tables: Sequence[str]
+) -> None:
+    if not public_tables:
+        return
+    value = psql(
+        external_public_fk_sql(public_tables), path, service, json_output=True
+    )
+    if not isinstance(value, list) or any(
+        not isinstance(item, dict)
+        or set(item)
+        != {
+            "constraint",
+            "referencing_schema",
+            "referencing_table",
+            "referenced_table",
+        }
+        or any(not safe_text(field) for field in item.values())
+        for item in value
+    ):
+        raise CutoverError("public inbound foreign-key probe is malformed")
+    if value:
+        raise CutoverError(
+            "out-of-scope table has a foreign key into the archived public table set"
+        )
+
+
 def restore_scopes(directory: Path, path: Path, service: str = "candidate") -> None:
     if service != "candidate":
         raise CutoverError("restore is permitted only against the isolated candidate database")
     public_archive = directory / ARCHIVE_NAMES["public"]
+    public_listing = run_tool(
+        [os.environ.get("PG_RESTORE_BIN", "pg_restore"), "--list", str(public_archive)],
+        path,
+        service,
+        capture=True,
+    )
+    validate_archive("public", public_listing)
+    public_tables = sorted(
+        {
+            table
+            for entry_type, schema, table in archive_entries(public_listing)
+            if entry_type == "TABLE DATA" and schema == "public" and table
+        }
+    )
+    require_superuser(path, service, "candidate restore user")
+    require_no_external_public_fks(path, service, public_tables)
+    if public_tables:
+        public_qualified = ", ".join(
+            f"{qobject('public')}.{qobject(table)}" for table in public_tables
+        )
+        psql(
+            f"/* aura:truncate-public */ BEGIN; TRUNCATE TABLE {public_qualified} "
+            "RESTART IDENTITY; COMMIT;",
+            path,
+            service,
+        )
     run_tool(
         [
             os.environ.get("PG_RESTORE_BIN", "pg_restore"),
-            "--clean",
-            "--if-exists",
+            "--data-only",
+            "--disable-triggers",
             "--exit-on-error",
-            "--no-owner",
-            "--no-acl",
             "--single-transaction",
             str(public_archive),
         ],
@@ -2884,17 +3282,24 @@ def restore_scopes(directory: Path, path: Path, service: str = "candidate") -> N
             service,
             capture=True,
         )
-        tables = sorted({table for kind, table in entries(listing) if kind == scope and table})
-        validate_archive(scope, listing)
-        if any(SAFE_IDENTIFIER.fullmatch(table) is None for table in tables):
-            raise CutoverError("archive contains an unsafe table identifier")
-        qualified = ", ".join(f"{qid(scope)}.{qid(table)}" for table in tables)
-        psql(
-            f"/* aura:truncate-{scope} */ BEGIN; TRUNCATE TABLE {qualified} "
-            "RESTART IDENTITY; COMMIT;",
-            path,
-            service,
+        tables = sorted(
+            {
+                table
+                for entry_type, entry_scope, table in archive_entries(listing)
+                if entry_type == "TABLE DATA" and entry_scope == scope and table
+            }
         )
+        validate_archive(scope, listing)
+        if tables:
+            qualified = ", ".join(
+                f"{qobject(scope)}.{qobject(table)}" for table in tables
+            )
+            psql(
+                f"/* aura:truncate-{scope} */ BEGIN; TRUNCATE TABLE {qualified} "
+                "RESTART IDENTITY; COMMIT;",
+                path,
+                service,
+            )
         run_tool(
             [
                 os.environ.get("PG_RESTORE_BIN", "pg_restore"),
@@ -2923,6 +3328,57 @@ def databases(path: Path, credentials: dict[str, Any]) -> set[str]:
     if not isinstance(listed, list) or any(not isinstance(item, str) for item in listed):
         raise CutoverError("database existence probe is malformed")
     return set(listed)
+
+
+def restore_database_contract(
+    path: Path,
+    service: str,
+    expected: Any,
+) -> dict[str, Any]:
+    expected = validate_database_contract(expected, "expected candidate")
+    current = database_contract(path, service, "candidate before owner/ACL restore")
+    if current["database"] != expected["database"]:
+        raise CutoverError("candidate database owner/ACL restore addressed the wrong database")
+    require_superuser(path, "target_admin", "target admin")
+    database = qid(expected["database"])
+    statements = [
+        "/* aura:candidate-database-contract */",
+        f"ALTER DATABASE {database} OWNER TO {qobject(expected['owner'])};",
+    ]
+    revoke_pairs = sorted(
+        {
+            (grant["grantor"], grant["grantee"])
+            for contract in (current, expected)
+            for grant in contract["acl"]
+        }
+    )
+    for grantor, grantee in revoke_pairs:
+        grantee_sql = "PUBLIC" if grantee == "PUBLIC" else qobject(grantee)
+        statements.extend(
+            [
+                f"SET ROLE {qobject(grantor)};",
+                f"REVOKE ALL PRIVILEGES ON DATABASE {database} FROM {grantee_sql};",
+                "RESET ROLE;",
+            ]
+        )
+    for grant in expected["acl"]:
+        grantee_sql = (
+            "PUBLIC" if grant["grantee"] == "PUBLIC" else qobject(grant["grantee"])
+        )
+        grant_option = " WITH GRANT OPTION" if grant["grantable"] else ""
+        statements.extend(
+            [
+                f"SET ROLE {qobject(grant['grantor'])};",
+                f"GRANT {grant['privilege']} ON DATABASE {database} "
+                f"TO {grantee_sql}{grant_option};",
+                "RESET ROLE;",
+            ]
+        )
+    psql("\n".join(statements), path, "target_admin")
+    restored = database_contract(path, service, "candidate after owner/ACL restore")
+    if restored != expected:
+        raise CutoverError("candidate database owner/ACL was not restored exactly")
+    return restored
 
 
 def quiesce(
@@ -2967,17 +3423,38 @@ def drop_candidate(path: Path, credentials: dict[str, Any]) -> None:
         raise CutoverError("partial candidate database was not removed")
 
 
-def create_candidate_database(path: Path, credentials: dict[str, Any]) -> dict[str, Any]:
+def create_candidate_database(
+    path: Path,
+    credentials: dict[str, Any],
+    target_database_contract: Any | None = None,
+) -> dict[str, Any]:
     names = db_names(credentials)
     if databases(path, credentials) & {names["candidate"], names["rollback"]}:
         raise CutoverError("deterministic candidate or rollback database already exists")
     quiesce(path, credentials, include_candidate=False, include_rollback=False)
     require_stopped(credentials)
+    require_superuser(path, "target_admin", "target admin")
+    if target_database_contract is None:
+        target_database_contract = database_contract(path, "target", "target")
+    target_database_contract = validate_database_contract(
+        target_database_contract, "preflight target"
+    )
+    if target_database_contract["database"] != names["target"]:
+        raise CutoverError("preflight target database owner/ACL contract is not deterministic")
+    if database_contract(path, "target", "current target") != target_database_contract:
+        raise CutoverError("target database owner/ACL changed before candidate creation")
     psql(
         f"/* aura:candidate-create */ CREATE DATABASE {qid(names['candidate'])} "
-        f"WITH TEMPLATE {qid(names['target'])};",
+        f"WITH OWNER {qobject(target_database_contract['owner'])} "
+        f"TEMPLATE {qid(names['target'])};",
         path,
         "target_admin",
+    )
+    expected_candidate_contract = renamed_database_contract(
+        target_database_contract, names["candidate"], "candidate"
+    )
+    restored_contract = restore_database_contract(
+        path, "candidate", expected_candidate_contract
     )
     marker = validate_marker(psql(MARKER_SQL, path, "candidate", json_output=True), "candidate")
     if (
@@ -2985,7 +3462,7 @@ def create_candidate_database(path: Path, credentials: dict[str, Any]) -> dict[s
         or marker["database"] != names["candidate"]
     ):
         raise CutoverError("candidate database was not created")
-    return marker
+    return {"marker": marker, "database_contract": restored_contract}
 
 
 def create_candidate(state: Path, path: Path, credentials: dict[str, Any]) -> None:
@@ -3009,14 +3486,18 @@ def create_candidate(state: Path, path: Path, credentials: dict[str, Any]) -> No
     journal["phase"] = "candidate-create-started"
     write_journal(state, journal)
     try:
-        marker = create_candidate_database(path, credentials)
+        created = create_candidate_database(
+            path,
+            credentials,
+            journal["preflight"]["target_database_contract"],
+        )
     except (CutoverError, OSError):
         journal["phase"] = "candidate-create-partial-failure"
         write_journal(state, journal)
         raise
     journal.update(
         phase="candidate-created",
-        candidate={"database": names["candidate"]},
+        candidate={"database": names["candidate"], **created},
     )
     write_journal(state, journal)
 
@@ -3037,10 +3518,14 @@ def candidate_restore(state: Path, path: Path, credentials: dict[str, Any]) -> N
         # auth/storage restore is intentionally non-transactional; discard the isolated
         # candidate and reclone the target before any retry.
         drop_candidate(path, credentials)
-        marker = create_candidate_database(path, credentials)
+        created = create_candidate_database(
+            path,
+            credentials,
+            journal["preflight"]["target_database_contract"],
+        )
         journal.update(
             phase="candidate-created",
-            candidate={"database": db_names(credentials)["candidate"], "marker": marker},
+            candidate={"database": db_names(credentials)["candidate"], **created},
         )
         write_journal(state, journal)
     artifact_manifest = verify_manifest(
@@ -3048,20 +3533,33 @@ def candidate_restore(state: Path, path: Path, credentials: dict[str, Any]) -> N
     )
     before_catalog = catalog(path, "candidate")
     before_data = data_snapshot(path, "candidate")
+    before_database_contract = database_contract(path, "candidate", "candidate before restore")
+    expected_candidate_contract = renamed_database_contract(
+        journal["preflight"]["target_database_contract"],
+        db_names(credentials)["candidate"],
+        "candidate before restore",
+    )
     if (
         digest(before_catalog) != journal["preflight"]["target_catalog_digest"]
         or digest(before_data) != journal["preflight"]["target_data_digest"]
+        or before_database_contract != expected_candidate_contract
     ):
         raise CutoverError("candidate clone does not exactly match the current target")
     journal["candidate_before_restore"] = {
         "catalog_digest": digest(before_catalog),
         "data_digest": digest(before_data),
+        "database_contract": before_database_contract,
     }
     journal["phase"] = "candidate-restore-started"
     write_journal(state, journal)
     try:
         require_stopped(credentials)
         restore_scopes(state / "artifacts", path)
+        after_database_contract = database_contract(
+            path, "candidate", "candidate after restore"
+        )
+        if after_database_contract != expected_candidate_contract:
+            raise CutoverError("candidate database owner/ACL changed during restore")
     except (CutoverError, OSError):
         journal["phase"] = "candidate-restore-partial-failure"
         write_journal(state, journal)
@@ -3076,6 +3574,10 @@ def candidate_restore(state: Path, path: Path, credentials: dict[str, Any]) -> N
                 "source_catalog_digest",
                 "source_data_digest",
             )
+        },
+        candidate={
+            **journal["candidate"],
+            "database_contract": after_database_contract,
         },
     )
     write_journal(state, journal)
@@ -3094,6 +3596,16 @@ def candidate_verify(state: Path, path: Path, credentials: dict[str, Any]) -> No
     source_data = data_snapshot(path, "source")
     candidate_data = data_snapshot(path, "candidate")
     compare_data_snapshots(source_data, candidate_data)
+    candidate_database_contract = database_contract(
+        path, "candidate", "verified candidate"
+    )
+    expected_candidate_contract = renamed_database_contract(
+        journal["preflight"]["target_database_contract"],
+        db_names(credentials)["candidate"],
+        "verified candidate",
+    )
+    if candidate_database_contract != expected_candidate_contract:
+        raise CutoverError("verified candidate database owner/ACL is not exact")
     if (
         digest(source_catalog) != journal["manifest"]["source_catalog_digest"]
         or digest(source_data) != journal["manifest"]["source_data_digest"]
@@ -3106,6 +3618,7 @@ def candidate_verify(state: Path, path: Path, credentials: dict[str, Any]) -> No
             "data_digest": digest(candidate_data),
             "migration_digest": digest(candidate_catalog["migrations"]),
             "auth_catalog_digest": digest(auth_scope(candidate_catalog)),
+            "database_contract": candidate_database_contract,
         },
     )
     write_journal(state, journal)
@@ -3141,15 +3654,23 @@ def promotion_inputs(state: Path, path: Path, credentials: dict[str, Any]) -> di
         raise CutoverError("verified candidate and engaged source fence are required")
     require_stopped(credentials)
     require_marker(journal, path, "target", "target_marker")
+    current_target_database_contract = database_contract(
+        path, "target", "target before promotion"
+    )
     if (
         digest(catalog(path, "target")) != journal["preflight"]["target_catalog_digest"]
         or digest(data_snapshot(path, "target")) != journal["preflight"]["target_data_digest"]
+        or current_target_database_contract
+        != journal["preflight"]["target_database_contract"]
     ):
         raise CutoverError("current target changed before promotion")
-    if digest(catalog(path, "candidate")) != journal.get("verification", {}).get(
-        "catalog_digest"
-    ) or digest(data_snapshot(path, "candidate")) != journal.get("verification", {}).get(
-        "data_digest"
+    if (
+        digest(catalog(path, "candidate"))
+        != journal.get("verification", {}).get("catalog_digest")
+        or digest(data_snapshot(path, "candidate"))
+        != journal.get("verification", {}).get("data_digest")
+        or database_contract(path, "candidate", "candidate before promotion")
+        != journal.get("verification", {}).get("database_contract")
     ):
         raise CutoverError("verified candidate changed before promotion")
     candidate_marker = validate_marker(
@@ -3184,6 +3705,12 @@ def promoted_target_matches_verification(
     if (
         digest(catalog(path, "target")) != journal["verification"]["catalog_digest"]
         or digest(data_snapshot(path, "target")) != journal["verification"]["data_digest"]
+        or database_contract(path, "target", "promoted target")
+        != renamed_database_contract(
+            journal["verification"]["database_contract"],
+            names["target"],
+            "promoted target",
+        )
     ):
         raise CutoverError("renamed target does not match the verified candidate")
     return marker
@@ -3378,6 +3905,8 @@ def rolled_back_target_matches_original(
     if (
         digest(catalog(path, "target")) != journal["preflight"]["target_catalog_digest"]
         or digest(data_snapshot(path, "target")) != journal["preflight"]["target_data_digest"]
+        or database_contract(path, "target", "rolled-back target")
+        != journal["preflight"]["target_database_contract"]
     ):
         raise CutoverError("rolled-back target does not match the original target")
 

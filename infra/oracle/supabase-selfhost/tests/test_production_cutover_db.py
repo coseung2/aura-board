@@ -123,6 +123,43 @@ class FakeToolchain:
         self.rotation_read_only = True
         self.rotation_cron_disabled = True
         self.databases = {self.names["target"]}
+        self.restore_user_superuser = True
+        self.target_admin_superuser = True
+        self.external_public_fks: list[dict[str, str]] = []
+        self.database_contracts: dict[str, dict[str, object]] = {
+            self.names["target"]: {
+                "database": self.names["target"],
+                "owner": "target_admin",
+                "acl": [
+                    {
+                        "grantee": "PUBLIC",
+                        "grantor": "target_admin",
+                        "privilege": "CONNECT",
+                        "grantable": False,
+                    },
+                    {
+                        "grantee": "target_admin",
+                        "grantor": "target_admin",
+                        "privilege": "CONNECT",
+                        "grantable": False,
+                    },
+                    {
+                        "grantee": "target_admin",
+                        "grantor": "target_admin",
+                        "privilege": "CREATE",
+                        "grantable": False,
+                    },
+                    {
+                        "grantee": "target_admin",
+                        "grantor": "target_admin",
+                        "privilege": "TEMPORARY",
+                        "grantable": False,
+                    },
+                ],
+            }
+        }
+        self.target_schema_objects = {"public.target_only_schema_object"}
+        self.candidate_schema_objects: set[str] = set()
         self.fenced = False
         self.fail_restore = False
         self.fail_dump_scope: str | None = None
@@ -206,6 +243,14 @@ class FakeToolchain:
             "server_port": 5432,
             "system_identifier": "source-system" if service in {"source", "writer_0"} else "target-system",
         }
+
+    def _database_contract(self, service: str) -> dict[str, object]:
+        database = (
+            self.names["candidate"]
+            if service == "candidate"
+            else self.names["target"]
+        )
+        return json.loads(json.dumps(self.database_contracts[database]))
 
     def _fence(self) -> dict[str, object]:
         if self.rotation:
@@ -301,7 +346,10 @@ class FakeToolchain:
     @staticmethod
     def archive_listing(path: Path) -> str:
         if "public" in path.name:
-            return "1; 0 0 SCHEMA - public postgres\n2; 0 0 TABLE public lessons postgres\n3; 0 0 TABLE DATA public lessons postgres\n"
+            return (
+                "1; 0 0 TABLE DATA public lessons postgres\n"
+                "2; 0 0 TABLE DATA public boards postgres\n"
+            )
         if "storage" in path.name:
             return "1; 0 0 TABLE DATA storage buckets postgres\n2; 0 0 TABLE DATA storage objects postgres\n"
         return "1; 0 0 TABLE DATA auth users postgres\n"
@@ -353,6 +401,21 @@ class FakeToolchain:
                 output = json.dumps(self.data)
             elif "aura:database-marker" in sql:
                 output = json.dumps(self._marker(service))
+            elif "aura:superuser-check" in sql:
+                output = json.dumps(
+                    {
+                        "user": "target_admin",
+                        "superuser": (
+                            self.target_admin_superuser
+                            if service == "target_admin"
+                            else self.restore_user_superuser
+                        ),
+                    }
+                )
+            elif "aura:database-contract" in sql:
+                output = json.dumps(self._database_contract(service))
+            elif "aura:public-inbound-fks" in sql:
+                output = json.dumps(self.external_public_fks)
             elif "aura:fence-engage" in sql:
                 self.fenced = True
                 output = ""
@@ -410,12 +473,27 @@ class FakeToolchain:
                         self.running_containers.add("supabase-auth")
             elif "aura:candidate-drop" in sql:
                 self.databases.discard(self.names["candidate"])
+                self.database_contracts.pop(self.names["candidate"], None)
+                self.candidate_schema_objects.clear()
                 output = ""
             elif "aura:candidate-create" in sql:
                 self.databases.add(self.names["candidate"])
+                self.database_contracts[self.names["candidate"]] = {
+                    "database": self.names["candidate"],
+                    "owner": "target_admin",
+                    "acl": [],
+                }
+                self.candidate_schema_objects = set(self.target_schema_objects)
                 if self.fail_candidate_create_once:
                     self.fail_candidate_create_once = False
                     return subprocess.CompletedProcess(argv, 7, "", "candidate create failed")
+                output = ""
+            elif "aura:candidate-database-contract" in sql:
+                expected = json.loads(
+                    json.dumps(self.database_contracts[self.names["target"]])
+                )
+                expected["database"] = self.names["candidate"]
+                self.database_contracts[self.names["candidate"]] = expected
                 output = ""
             elif "aura:database-rename" in sql:
                 match = re.search(r'ALTER DATABASE "([^"]+)" RENAME TO "([^"]+)"', sql)
@@ -426,6 +504,9 @@ class FakeToolchain:
                     return subprocess.CompletedProcess(argv, 9, "", "rename failed")
                 self.databases.remove(old)
                 self.databases.add(new)
+                database_contract = self.database_contracts.pop(old)
+                database_contract["database"] = new
+                self.database_contracts[new] = database_contract
                 output = ""
             else:
                 output = ""
@@ -788,7 +869,7 @@ class CutoverTests(unittest.TestCase):
                     "kind": "schema",
                     "schema_name": "custom_extension",
                     "object_name": "custom_extension",
-                    "detail": {"owner": "owner_a"},
+                    "detail": {"owner": "owner_a", "acl": []},
                 }
             ]
         )
@@ -908,6 +989,30 @@ class CutoverTests(unittest.TestCase):
                     "object_name": "internal_state",
                     "detail": {"definition": "source"},
                 },
+                {
+                    "kind": "relation",
+                    "schema_name": "extensions",
+                    "object_name": "internal_state",
+                    "detail": {"definition": "source"},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "net",
+                    "object_name": "internal_state",
+                    "detail": {"definition": "source"},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "pgbouncer",
+                    "object_name": "internal_state",
+                    "detail": {"definition": "source"},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "supabase_functions",
+                    "object_name": "internal_state",
+                    "detail": {"definition": "source"},
+                },
             ]
         )
         candidate = json.loads(json.dumps(source))
@@ -932,7 +1037,7 @@ class CutoverTests(unittest.TestCase):
                 "grantable": False,
             },
         ]
-        for schema_name in ("realtime", "_realtime", "supabase_migrations", "private"):
+        for schema_name in cutover._lib.SERVICE_INTERNAL_SCHEMAS:
             candidate_by_key[("relation", schema_name, "internal_state")]["detail"]["definition"] = "target"
         for key in EXPECTED_STORAGE_FORWARD_CATALOG_OBJECTS:
             candidate_by_key[key]["detail"] = {"definition": "target-forward-only"}
@@ -1115,6 +1220,266 @@ class CutoverTests(unittest.TestCase):
                 with self.assertRaisesRegex(cutover.CutoverError, "relation ACL is malformed"):
                     cutover.compare_catalogs(source, candidate)
 
+    def test_schema_and_routine_acls_are_canonical_with_exact_dr_exceptions(self) -> None:
+        source = catalog_document(
+            [
+                {
+                    "kind": "schema",
+                    "schema_name": "public",
+                    "object_name": "public",
+                    "detail": {
+                        "owner": "postgres",
+                        "acl": [
+                            {
+                                "grantee": "PUBLIC",
+                                "privilege": "CREATE",
+                                "grantable": False,
+                            },
+                            {
+                                "grantee": "PUBLIC",
+                                "privilege": "USAGE",
+                                "grantable": False,
+                            },
+                        ],
+                    },
+                },
+                {
+                    "kind": "routine",
+                    "schema_name": "public",
+                    "object_name": "aura_probe()",
+                    "detail": {
+                        "acl": [
+                            {
+                                "grantee": "PUBLIC",
+                                "privilege": "EXECUTE",
+                                "grantable": False,
+                            }
+                        ],
+                        "definition": "CREATE FUNCTION aura_probe() RETURNS void",
+                    },
+                },
+            ]
+        )
+        candidate = json.loads(json.dumps(source))
+        candidate["objects"][0]["detail"]["acl"] = [
+            {
+                "grantee": "aura_board_dr_replication",
+                "privilege": "USAGE",
+                "grantable": False,
+            },
+            {
+                "grantee": "PUBLIC",
+                "privilege": "USAGE",
+                "grantable": False,
+            },
+            {
+                "grantee": "PUBLIC",
+                "privilege": "CREATE",
+                "grantable": False,
+            },
+        ]
+        cutover.compare_catalogs(source, candidate)
+
+        candidate["objects"][1]["detail"]["acl"].append(
+            {
+                "grantee": "aura_board_dr_replication",
+                "privilege": "EXECUTE",
+                "grantable": False,
+            }
+        )
+        with self.assertRaisesRegex(cutover.CutoverError, "application catalog"):
+            cutover.compare_catalogs(source, candidate)
+
+        auth = catalog_document(
+            [
+                {
+                    "kind": "schema",
+                    "schema_name": "auth",
+                    "object_name": "auth",
+                    "detail": {"owner": "postgres", "acl": []},
+                }
+            ]
+        )
+        auth_candidate = json.loads(json.dumps(auth))
+        auth_candidate["objects"][0]["detail"]["acl"].append(
+            {
+                "grantee": "aura_board_dr_replication",
+                "privilege": "USAGE",
+                "grantable": False,
+            }
+        )
+        with self.assertRaisesRegex(cutover.CutoverError, "auth schema"):
+            cutover.compare_catalogs(auth, auth_candidate)
+
+    def test_owner_drift_is_not_normalized_for_library_style_restore(self) -> None:
+        source = catalog_document(
+            [
+                {
+                    "kind": "schema",
+                    "schema_name": "public",
+                    "object_name": "public",
+                    "detail": {"owner": "source_owner", "acl": []},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "public",
+                    "object_name": "lessons",
+                    "detail": {"owner": "source_owner", "acl": []},
+                },
+            ]
+        )
+        candidate = json.loads(json.dumps(source))
+        candidate["objects"][0]["detail"]["owner"] = "target_owner"
+        with self.assertRaisesRegex(cutover.CutoverError, "application catalog"):
+            cutover.compare_catalogs(source, candidate)
+
+        candidate = json.loads(json.dumps(source))
+        candidate["objects"][1]["detail"]["owner"] = "target_owner"
+        with self.assertRaisesRegex(cutover.CutoverError, "application catalog"):
+            cutover.compare_catalogs(source, candidate)
+
+    def test_routine_type_and_index_owner_drift_fails_closed(self) -> None:
+        source = catalog_document(
+            [
+                {
+                    "kind": kind,
+                    "schema_name": "public",
+                    "object_name": name,
+                    "detail": {"owner": "source_owner", "acl": []},
+                }
+                for kind, name in (
+                    ("routine", "library_lookup()"),
+                    ("type", "library_kind"),
+                    ("index", "library.library_pkey"),
+                )
+            ]
+        )
+        for index, kind in enumerate(("routine", "type", "index")):
+            with self.subTest(kind=kind):
+                candidate = json.loads(json.dumps(source))
+                candidate["objects"][index]["detail"]["owner"] = "target_owner"
+                with self.assertRaisesRegex(cutover.CutoverError, "application catalog"):
+                    cutover.compare_catalogs(source, candidate)
+
+    def test_public_archive_is_data_only_and_rejects_schema_or_ddl_entries(self) -> None:
+        public_args = cutover._lib.archive_args("public", self.root / "public.dump")
+        self.assertIn("--data-only", public_args)
+        self.assertIn("--schema=public", public_args)
+        self.assertNotIn("--clean", public_args)
+        cutover._lib.validate_archive(
+            "public",
+            "1; 0 0 TABLE DATA public lessons postgres\n"
+            "2; 0 0 SEQUENCE SET public lessons_id_seq postgres\n",
+        )
+        for entry in (
+            "1; 0 0 SCHEMA - public postgres\n",
+            "1; 0 0 TABLE public lessons postgres\n",
+            "1; 0 0 INDEX public lessons_pkey postgres\n",
+        ):
+            with self.subTest(entry=entry):
+                with self.assertRaisesRegex(cutover.CutoverError, "schema or DDL"):
+                    cutover._lib.validate_archive("public", entry)
+
+    def test_archive_toc_parser_is_anchored_and_supports_quoted_identifiers(self) -> None:
+        listing = (
+            "; Archive created at 2026-08-21\n"
+            '1; 0 0 TABLE DATA public "Mixed Case Table" postgres\n'
+            '2; 0 0 SEQUENCE SET public "Sequence ""With Quote""" postgres\n'
+        )
+        self.assertEqual(
+            cutover._lib.archive_entries(listing),
+            [
+                ("TABLE DATA", "public", "Mixed Case Table"),
+                ("SEQUENCE SET", "public", 'Sequence "With Quote"'),
+            ],
+        )
+        cutover._lib.validate_archive("public", listing)
+        with self.assertRaisesRegex(cutover.CutoverError, "unrecognized"):
+            cutover._lib.archive_entries(
+                "prefix 1; 0 0 TABLE DATA public lessons postgres\n"
+            )
+        with self.assertRaisesRegex(cutover.CutoverError, "malformed"):
+            cutover._lib.archive_entries(
+                "1; 0 0 TABLE DATA public lessons postgres trailing\n"
+            )
+
+    def test_sequence_only_archive_is_valid_and_duplicate_data_entries_fail(self) -> None:
+        cutover._lib.validate_archive(
+            "public", "1; 0 0 SEQUENCE SET public only_sequence postgres\n"
+        )
+        with self.assertRaisesRegex(cutover.CutoverError, "duplicate"):
+            cutover._lib.validate_archive(
+                "public",
+                "1; 0 0 SEQUENCE SET public only_sequence postgres\n"
+                "2; 0 0 SEQUENCE SET public only_sequence postgres\n",
+            )
+
+    def test_preflight_requires_restore_and_admin_superusers(self) -> None:
+        for field in ("restore_user_superuser", "target_admin_superuser"):
+            with self.subTest(field=field):
+                setattr(self.fake, field, False)
+                result, _out, err = self.call("preflight")
+                self.assertEqual(result, 1)
+                self.assertIn("must be a PostgreSQL superuser", err)
+                self.assertFalse(
+                    any(
+                        "aura:candidate-create" in sql
+                        or "aura:truncate-" in sql
+                        for _service, sql in self.fake.sql_calls
+                    )
+                )
+                setattr(self.fake, field, True)
+
+    def test_candidate_restore_rechecks_superuser_before_mutation(self) -> None:
+        self.flow_to("candidate-create")
+        self.fake.restore_user_superuser = False
+        result, _out, err = self.call("candidate-restore")
+        self.assertEqual(result, 1)
+        self.assertIn("candidate restore user must be a PostgreSQL superuser", err)
+        self.assertFalse(
+            any("aura:truncate-" in sql for _service, sql in self.fake.sql_calls)
+        )
+        self.assertFalse(
+            any(
+                "pg_restore" in Path(argv[0]).name and "--list" not in argv
+                for argv, _env, _sql in self.fake.calls
+            )
+        )
+
+    def test_external_public_fk_blocks_truncate_without_cascade(self) -> None:
+        self.flow_to("candidate-create")
+        self.fake.external_public_fks = [
+            {
+                "constraint": "audit_lesson_fk",
+                "referencing_schema": "audit",
+                "referencing_table": "lesson_events",
+                "referenced_table": "lessons",
+            }
+        ]
+        result, _out, err = self.call("candidate-restore")
+        self.assertEqual(result, 1)
+        self.assertIn("out-of-scope table has a foreign key", err)
+        self.assertFalse(
+            any("aura:truncate-" in sql for _service, sql in self.fake.sql_calls)
+        )
+
+    def test_candidate_database_owner_and_acl_are_restored_and_recorded(self) -> None:
+        self.flow_to("candidate-create")
+        names = cutover.db_names(self.credentials)
+        create_sql = next(
+            sql
+            for service, sql in self.fake.sql_calls
+            if service == "target_admin" and "aura:candidate-create" in sql
+        )
+        self.assertIn('WITH OWNER "target_admin"', create_sql)
+        expected = json.loads(
+            json.dumps(self.fake.database_contracts[names["target"]])
+        )
+        expected["database"] = names["candidate"]
+        self.assertEqual(self.fake.database_contracts[names["candidate"]], expected)
+        journal = json.loads((self.root / "journal.json").read_text(encoding="utf-8"))
+        self.assertEqual(journal["candidate"]["database_contract"], expected)
+
     def test_candidate_flow_uses_only_candidate_restore_and_deterministic_rename_rollback(self) -> None:
         self.flow_to("candidate-verify")
         result, _out, err = self.call("promote")
@@ -1130,6 +1495,33 @@ class CutoverTests(unittest.TestCase):
         restores = [(service, argv) for argv, env, _sql in self.fake.calls if (service := env.get("PGSERVICE", "")) and "pg_restore" in Path(argv[0]).name]
         self.assertTrue(restores)
         self.assertTrue(all(service == "candidate" for service, _argv in restores if "--list" not in _argv))
+        public_restore = [
+            argv
+            for service, argv in restores
+            if service == "candidate"
+            and "--list" not in argv
+            and argv[-1].endswith("public.dump")
+        ]
+        self.assertEqual(len(public_restore), 1)
+        self.assertIn("--data-only", public_restore[0])
+        self.assertIn("--disable-triggers", public_restore[0])
+        self.assertIn("--single-transaction", public_restore[0])
+        self.assertNotIn("--clean", public_restore[0])
+        self.assertNotIn("--if-exists", public_restore[0])
+        public_truncates = [
+            (service, sql)
+            for service, sql in self.fake.sql_calls
+            if "aura:truncate-public" in sql
+        ]
+        self.assertEqual(len(public_truncates), 1)
+        self.assertEqual(public_truncates[0][0], "candidate")
+        self.assertIn(
+            'TRUNCATE TABLE "public"."boards", "public"."lessons" '
+            'RESTART IDENTITY',
+            public_truncates[0][1],
+        )
+        self.assertNotIn("CASCADE", public_truncates[0][1])
+        self.assertEqual(self.fake.candidate_schema_objects, self.fake.target_schema_objects)
         self.assertFalse(any("DROP SCHEMA public" in sql for _service, sql in self.fake.sql_calls))
 
     def test_rollback_works_before_seal_and_fails_after_runtime_seal_marker(self) -> None:
@@ -1428,6 +1820,9 @@ class CutoverTests(unittest.TestCase):
         journal.update(phase="promotion-started", promotion={"step": 1})
         (self.root / "journal.json").write_text(json.dumps(journal), encoding="utf-8")
         self.fake.databases = {names["candidate"], names["rollback"]}
+        rollback_contract = self.fake.database_contracts.pop(names["target"])
+        rollback_contract["database"] = names["rollback"]
+        self.fake.database_contracts[names["rollback"]] = rollback_contract
         result, _out, _err = self.call("candidate-rename")
         self.assertEqual(result, 1)
         self.assertEqual(self.fake.databases, {names["target"], names["candidate"]})
@@ -1440,6 +1835,9 @@ class CutoverTests(unittest.TestCase):
         journal.update(phase="rollback-started", rollback={"step": 1})
         (self.root / "journal.json").write_text(json.dumps(journal), encoding="utf-8")
         self.fake.databases = {names["candidate"], names["rollback"]}
+        candidate_contract = self.fake.database_contracts.pop(names["target"])
+        candidate_contract["database"] = names["candidate"]
+        self.fake.database_contracts[names["candidate"]] = candidate_contract
         result, _out, _err = self.call("rollback")
         self.assertEqual(result, 1)
         self.assertEqual(self.fake.databases, {names["target"], names["rollback"]})
@@ -1831,6 +2229,13 @@ class DockerIntegrationTests(unittest.TestCase):
                     payload text DEFAULT 'payload'
                 );
                 GRANT SELECT ON TABLE public.acl_items TO aura_acl_grantee;
+                GRANT USAGE ON SCHEMA public TO aura_acl_grantee;
+                CREATE INDEX acl_items_payload_idx ON public.acl_items(payload);
+                CREATE FUNCTION public.acl_probe() RETURNS integer
+                    LANGUAGE sql AS $$ SELECT 1 $$;
+                GRANT EXECUTE ON FUNCTION public.acl_probe() TO aura_acl_grantee;
+                CREATE TYPE public.acl_kind AS ENUM ('one', 'two');
+                GRANT USAGE ON TYPE public.acl_kind TO aura_acl_grantee;
                 CREATE TABLE public.policy_items (id integer);
                 CREATE POLICY policy_roles
                     ON public.policy_items
@@ -1849,6 +2254,13 @@ class DockerIntegrationTests(unittest.TestCase):
                 ALTER TABLE public.acl_items DROP COLUMN noise;
                 GRANT SELECT ON TABLE public.acl_items TO aura_acl_grantee;
                 GRANT SELECT ON TABLE public.acl_items TO aura_board_dr_replication;
+                GRANT USAGE ON SCHEMA public TO aura_acl_grantee;
+                CREATE INDEX acl_items_payload_idx ON public.acl_items(payload);
+                CREATE FUNCTION public.acl_probe() RETURNS integer
+                    LANGUAGE sql AS $$ SELECT 1 $$;
+                GRANT EXECUTE ON FUNCTION public.acl_probe() TO aura_acl_grantee;
+                CREATE TYPE public.acl_kind AS ENUM ('one', 'two');
+                GRANT USAGE ON TYPE public.acl_kind TO aura_acl_grantee;
                 """,
                 harness.catalog_target,
             )
@@ -1913,6 +2325,30 @@ class DockerIntegrationTests(unittest.TestCase):
                 source_policy["detail"]["roles"],
                 ["aura_policy_oid_a", "aura_policy_oid_z"],
             )
+            for kind, object_name in (
+                ("schema", "public"),
+                ("routine", "acl_probe()"),
+                ("type", "acl_kind"),
+                ("index", "acl_items.acl_items_payload_idx"),
+            ):
+                source_item = next(
+                    item
+                    for item in source_objects
+                    if item["kind"] == kind
+                    and item["schema_name"] == "public"
+                    and item["object_name"] == object_name
+                )
+                target_item = next(
+                    item
+                    for item in target_objects
+                    if item["kind"] == kind
+                    and item["schema_name"] == "public"
+                    and item["object_name"] == object_name
+                )
+                self.assertEqual(source_item["detail"]["owner"], "postgres")
+                self.assertEqual(source_item["detail"], target_item["detail"])
+                if kind in {"schema", "routine", "type", "index"}:
+                    self.assertIsInstance(source_item["detail"]["acl"], list)
         finally:
             harness.stop()
 
@@ -2164,6 +2600,18 @@ class DockerIntegrationTests(unittest.TestCase):
                 );
                 CREATE INDEX child_parent_idx ON app.child(parent_id);
             """
+            target_topology = """
+                CREATE SCHEMA app;
+                CREATE TABLE app.parent (noise text, id integer PRIMARY KEY);
+                CREATE TABLE app.child (
+                    noise text,
+                    id integer PRIMARY KEY,
+                    parent_id integer NOT NULL,
+                    CONSTRAINT child_parent_fk
+                        FOREIGN KEY (parent_id) REFERENCES app.parent(id)
+                );
+                CREATE INDEX child_parent_idx ON app.child(parent_id);
+            """
             harness.psql(
                 """
                 CREATE SCHEMA oid_shift;
@@ -2174,7 +2622,7 @@ class DockerIntegrationTests(unittest.TestCase):
                 harness.catalog_target,
             )
             harness.psql(topology, harness.catalog_source)
-            harness.psql(topology, harness.catalog_target)
+            harness.psql(target_topology, harness.catalog_target)
 
             relation_oid_sql = """
                 SELECT c.oid
@@ -2228,18 +2676,203 @@ class DockerIntegrationTests(unittest.TestCase):
                     for object_name, _detail in source_dependencies
                 )
             )
+            source_index_dependencies = [
+                json.loads(detail)
+                for object_name, detail in source_dependencies
+                if object_name == "child_parent_idx->app.child"
+            ]
+            target_index_dependencies = [
+                json.loads(detail)
+                for object_name, detail in target_dependencies
+                if object_name == "child_parent_idx->app.child"
+            ]
+            self.assertIn(
+                "parent_id",
+                [item["refobjsubid"] for item in source_index_dependencies],
+            )
+            self.assertIn(
+                "parent_id",
+                [item["refobjsubid"] for item in target_index_dependencies],
+            )
 
             harness.psql(
-                "CREATE INDEX child_parent_extra_idx ON app.child(parent_id, id);",
+                "DROP INDEX app.child_parent_idx; "
+                "CREATE INDEX child_parent_idx ON app.child(id);",
                 harness.catalog_target,
             )
             changed_dependencies = dependencies(harness.catalog_target)
             self.assertNotEqual(source_dependencies, changed_dependencies)
             self.assertTrue(
                 any(
-                    object_name == "child_parent_extra_idx->app.child"
-                    for object_name, _detail in changed_dependencies
+                    object_name == "child_parent_idx->app.child"
+                    and "\"refobjsubid\": \"id\"" in detail
+                    for object_name, detail in changed_dependencies
                 )
+            )
+        finally:
+            harness.stop()
+
+    def test_candidate_database_owner_and_acl_contract_restores_exactly(self) -> None:
+        harness = EphemeralPostgresHarness()
+        try:
+            harness.start()
+            harness.psql(
+                """
+                CREATE ROLE aura_db_owner NOLOGIN;
+                CREATE ROLE aura_db_reader NOLOGIN;
+                CREATE DATABASE aura_contract_source OWNER aura_db_owner;
+                SET ROLE aura_db_owner;
+                GRANT CONNECT, TEMPORARY ON DATABASE aura_contract_source
+                    TO aura_db_reader;
+                RESET ROLE;
+                CREATE DATABASE aura_contract_candidate
+                    WITH OWNER aura_db_owner TEMPLATE aura_contract_source;
+                """
+            )
+            source_contract = json.loads(
+                harness.psql(cutover._lib.DATABASE_CONTRACT_SQL, "aura_contract_source")
+            )
+            expected = cutover._lib.renamed_database_contract(
+                source_contract, "aura_contract_candidate", "candidate"
+            )
+
+            def routed_psql(
+                sql: str,
+                _path: Path,
+                service: str,
+                *,
+                json_output: bool = False,
+            ) -> object:
+                database = (
+                    "aura_contract_candidate"
+                    if service == "candidate"
+                    else "postgres"
+                )
+                output = harness.psql(sql, database)
+                return json.loads(output) if json_output else output
+
+            with mock.patch.object(cutover._lib, "psql", side_effect=routed_psql):
+                restored = cutover._lib.restore_database_contract(
+                    Path("unused"), "candidate", expected
+                )
+            self.assertEqual(restored, expected)
+            self.assertEqual(
+                json.loads(
+                    harness.psql(
+                        cutover._lib.DATABASE_CONTRACT_SQL,
+                        "aura_contract_candidate",
+                    )
+                ),
+                expected,
+            )
+        finally:
+            harness.stop()
+
+    def test_public_data_only_restore_preserves_schema_and_publication(self) -> None:
+        harness = EphemeralPostgresHarness()
+        try:
+            harness.start()
+            harness.psql(
+                """
+                CREATE DATABASE aura_restore_source;
+                CREATE DATABASE aura_restore_target;
+                """
+            )
+            harness.psql(
+                """
+                CREATE TABLE public.library_items (
+                    id integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                    title text NOT NULL
+                );
+                INSERT INTO public.library_items(title) VALUES ('source row');
+                """,
+                "aura_restore_source",
+            )
+            harness.psql(
+                """
+                CREATE TABLE public.library_items (
+                    id integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                    title text NOT NULL
+                );
+                INSERT INTO public.library_items(title) VALUES ('stale row');
+                CREATE SCHEMA target_only;
+                CREATE TABLE target_only.keep_me(id integer PRIMARY KEY);
+                CREATE PUBLICATION aura_keep_publication
+                    FOR TABLE public.library_items;
+                """,
+                "aura_restore_target",
+            )
+            archive = "/tmp/aura-public-data.dump"
+            subprocess.run(
+                [
+                    harness.docker,
+                    "exec",
+                    harness.name,
+                    "pg_dump",
+                    "-U",
+                    "postgres",
+                    "-d",
+                    "aura_restore_source",
+                    "--format=custom",
+                    "--data-only",
+                    "--schema=public",
+                    f"--file={archive}",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            listing = subprocess.run(
+                [harness.docker, "exec", harness.name, "pg_restore", "--list", archive],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            cutover._lib.validate_archive("public", listing)
+            harness.psql(
+                "TRUNCATE TABLE public.library_items RESTART IDENTITY;",
+                "aura_restore_target",
+            )
+            subprocess.run(
+                [
+                    harness.docker,
+                    "exec",
+                    harness.name,
+                    "pg_restore",
+                    "-U",
+                    "postgres",
+                    "-d",
+                    "aura_restore_target",
+                    "--data-only",
+                    "--disable-triggers",
+                    "--exit-on-error",
+                    "--single-transaction",
+                    archive,
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(
+                harness.psql(
+                    "SELECT title FROM public.library_items;", "aura_restore_target"
+                ),
+                "source row",
+            )
+            self.assertEqual(
+                harness.psql(
+                    "SELECT to_regclass('target_only.keep_me') IS NOT NULL;",
+                    "aura_restore_target",
+                ),
+                "t",
+            )
+            self.assertEqual(
+                harness.psql(
+                    "SELECT count(*) FROM pg_publication "
+                    "WHERE pubname = 'aura_keep_publication';",
+                    "aura_restore_target",
+                ),
+                "1",
             )
         finally:
             harness.stop()
