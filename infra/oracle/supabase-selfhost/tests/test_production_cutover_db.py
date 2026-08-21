@@ -601,6 +601,36 @@ class CutoverTests(unittest.TestCase):
         with self.assertRaisesRegex(cutover.CutoverError, "missing.*public._prisma_migrations"):
             cutover.compare_migrations(source, {"present": False, "records": []})
 
+    def test_duplicate_migration_names_compare_by_name_and_id(self) -> None:
+        name = "202608210001_duplicate_name"
+        source_records = [
+            migration(name, id=f"{name}-1", started_at="2026-08-21T00:00:00+00:00"),
+            migration(name, id=f"{name}-2", started_at="2026-08-21T00:01:00+00:00"),
+        ]
+        source = {"present": True, "records": source_records}
+        candidate = json.loads(json.dumps(source))
+
+        cutover.compare_migrations(source, candidate)
+
+        candidate["records"][1]["checksum"] = "different"
+        with self.assertRaisesRegex(cutover.CutoverError, "checksum"):
+            cutover.compare_migrations(source, candidate)
+
+        candidate["records"].pop()
+        with self.assertRaisesRegex(cutover.CutoverError, "missing"):
+            cutover.compare_migrations(source, candidate)
+
+    def test_migration_record_duplicate_id_is_rejected(self) -> None:
+        records = [
+            migration("202608210001_first", id="duplicate-id"),
+            migration("202608210002_second", id="duplicate-id"),
+        ]
+        with self.assertRaisesRegex(cutover.CutoverError, "duplicate ids"):
+            cutover.compare_migrations(
+                {"present": True, "records": records},
+                {"present": True, "records": records},
+            )
+
     def test_full_auth_catalog_gate_is_exact(self) -> None:
         source = {"objects": [{"kind": "policy", "schema_name": "auth", "object_name": "users.read", "detail": {"using": "true"}}], "migrations": {"present": True, "records": [migration()]}}
         candidate = json.loads(json.dumps(source))

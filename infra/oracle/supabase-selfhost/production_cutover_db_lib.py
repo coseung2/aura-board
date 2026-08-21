@@ -1120,8 +1120,21 @@ def migration_records(value: Any, label: str) -> list[dict[str, Any]]:
             raise CutoverError(f"{label} migration logs state is inconsistent")
         if item["state"] != migration_state(item):
             raise CutoverError(f"{label} migration state is inconsistent")
-    names = [item["migration_name"] for item in rows]
-    if names != sorted(names) or len(set(names)) != len(names):
+    identities = [(item["migration_name"], item["id"]) for item in rows]
+    if len(set(identities)) != len(identities):
+        raise CutoverError(f"{label} migration records contain duplicate identities")
+    ids = [item["id"] for item in rows]
+    if len(set(ids)) != len(ids):
+        raise CutoverError(f"{label} migration records contain duplicate ids")
+    order = [
+        (
+            item["migration_name"].encode("utf-8"),
+            item["started_at"],
+            item["id"].encode("utf-8"),
+        )
+        for item in rows
+    ]
+    if order != sorted(order):
         raise CutoverError(f"{label} migration records are not exact ordered records")
     return rows
 
@@ -1129,18 +1142,28 @@ def migration_records(value: Any, label: str) -> list[dict[str, Any]]:
 def compare_migrations(source: Any, candidate: Any) -> None:
     source_rows = migration_records(source, "source")
     candidate_rows = migration_records(candidate, "candidate")
-    source_map = {item["migration_name"]: item for item in source_rows}
-    candidate_map = {item["migration_name"]: item for item in candidate_rows}
-    missing = sorted(set(source_map) - set(candidate_map))
-    extra = sorted(set(candidate_map) - set(source_map))
+    source_map = {
+        (item["migration_name"], item["id"]): item for item in source_rows
+    }
+    candidate_map = {
+        (item["migration_name"], item["id"]): item for item in candidate_rows
+    }
+    source_order = [(item["migration_name"], item["id"]) for item in source_rows]
+    candidate_order = [(item["migration_name"], item["id"]) for item in candidate_rows]
+    source_identities = set(source_order)
+    candidate_identities = set(candidate_order)
+    missing = [identity for identity in source_order if identity not in candidate_identities]
+    extra = [identity for identity in candidate_order if identity not in source_identities]
     if missing or extra:
-        detail = "missing " + ",".join(missing) if missing else ""
+        detail = "missing " + ",".join(name for name, _ in missing) if missing else ""
         if extra:
-            detail = (detail + "; " if detail else "") + "extra " + ",".join(extra)
+            detail = (detail + "; " if detail else "") + "extra " + ",".join(
+                name for name, _ in extra
+            )
         raise CutoverError("migration history mismatch: " + detail)
-    for name in sorted(source_map):
-        source_item = source_map[name]
-        candidate_item = candidate_map[name]
+    for name, migration_id in source_order:
+        source_item = source_map[(name, migration_id)]
+        candidate_item = candidate_map[(name, migration_id)]
         if source_item["checksum"] != candidate_item["checksum"]:
             raise CutoverError(f"migration checksum mismatch: {name}")
         if source_item["id"] != candidate_item["id"]:
