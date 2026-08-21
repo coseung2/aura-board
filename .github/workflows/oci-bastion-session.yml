@@ -40,12 +40,49 @@ jobs:
       - name: Prepare DevSpace Bastion public key
         shell: bash
         env:
-          DEVSPACE_BASTION_PUBLIC_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINhhIxYwrea9IkJmkC2Np8a5q9L7uKTrvogdCQCuOdV7 coseung2-aura-board-vm-testauram-a1-osaka
+          DEVSPACE_BASTION_PUBLIC_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINu4u9bcaAugHGyhhmX5mTCgYqKsrJtOccLLurH99AoV aura-devspace-bastion
         run: |
           set -euo pipefail
           install -d -m 0700 "$RUNNER_TEMP/aura-bastion-session"
           printf '%s\n' "$DEVSPACE_BASTION_PUBLIC_KEY" > "$RUNNER_TEMP/aura-bastion-session/devspace.pub"
           chmod 0600 "$RUNNER_TEMP/aura-bastion-session/devspace.pub"
+
+      - name: Keep Bastion endpoint SSH path open
+        shell: bash
+        env:
+          BASTION_NAME: aura-board-devspace-bastion
+        run: |
+          set -euo pipefail
+          instance_json=$(curl --fail --silent --show-error \
+            --header 'Authorization: Bearer Oracle' \
+            http://169.254.169.254/opc/v2/instance/)
+          read -r compartment_id region < <(python3 -c '
+          import json, sys
+          value = json.load(sys.stdin)
+          print(value["compartmentId"], value.get("canonicalRegionName") or value["region"])
+          ' <<<"$instance_json")
+          bastion_json=$(oci bastion bastion list \
+            --auth instance_principal \
+            --region "$region" \
+            --compartment-id "$compartment_id" \
+            --name "$BASTION_NAME" \
+            --bastion-lifecycle-state ACTIVE \
+            --output json)
+          endpoint_ip=$(python3 -c '
+          import ipaddress, json, sys
+          items = json.load(sys.stdin).get("data", [])
+          if len(items) != 1:
+              raise SystemExit("expected exactly one active Bastion")
+          value = ipaddress.ip_address(items[0]["private-endpoint-ip-address"])
+          if not value.is_private:
+              raise SystemExit("Bastion endpoint must be private")
+          print(value)
+          ' <<<"$bastion_json")
+          sudo -n systemctl restart ssh.service
+          if ! sudo -n iptables -C INPUT -p tcp -s "${endpoint_ip}/32" --dport 22 -j ACCEPT 2>/dev/null; then
+            sudo -n iptables -I INPUT 1 -p tcp -s "${endpoint_ip}/32" --dport 22 -j ACCEPT
+          fi
+          sudo -n sh -c 'iptables-save > /etc/iptables/rules.v4'
 
       - name: Ensure an active OCI Bastion session
         shell: bash
