@@ -662,7 +662,8 @@ def parse_rich_journal(content: bytes) -> dict[str, Any]:
         fail("DB rich journal must be format 2")
     if document.get("phase") != "promotion-complete":
         fail("DB rich journal must be promotion-complete")
-    if document.get("fence") != {"engaged": True}:
+    fence = document.get("fence")
+    if not isinstance(fence, dict) or fence.get("engaged") is not True:
         fail("DB rich journal fence must be engaged")
     return document
 

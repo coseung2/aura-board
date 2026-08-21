@@ -1704,6 +1704,37 @@ class CutoverTests(unittest.TestCase):
         )
         self.assertTrue(any("aura:candidate-drop" in sql for _service, sql in self.fake.sql_calls))
 
+    def test_candidate_restore_passes_explicit_candidate_service_to_pg_restore(self) -> None:
+        self.flow_to("candidate-verify")
+        restores = [
+            argv
+            for argv, _env, _sql in self.fake.calls
+            if "pg_restore" in Path(argv[0]).name and "--list" not in argv
+        ]
+        self.assertTrue(restores)
+        self.assertTrue(
+            all("--dbname=service=candidate" in argv for argv in restores)
+        )
+        storage_guard = [
+            sql for _service, sql in self.fake.sql_calls
+            if "aura:storage-ephemeral-empty" in sql
+        ]
+        storage_truncate = [
+            sql for _service, sql in self.fake.sql_calls
+            if "aura:truncate-storage" in sql
+        ]
+        self.assertTrue(storage_guard)
+        self.assertTrue(storage_truncate)
+        self.assertIn('"storage"."s3_multipart_uploads"', storage_truncate[-1])
+        self.assertIn('"storage"."s3_multipart_uploads_parts"', storage_truncate[-1])
+        storage_compat = [
+            sql for _service, sql in self.fake.sql_calls
+            if "aura:storage-forward-compat" in sql
+        ]
+        self.assertTrue(storage_compat)
+        self.assertIn("ADD COLUMN versioning_status", storage_compat[-1])
+        self.assertIn("ADD COLUMN archived_at", storage_compat[-1])
+
     def test_export_partial_failure_is_safely_recreated_on_retry(self) -> None:
         self.flow_to("engage-fence")
         self.fake.fail_dump_scope = "auth"
@@ -1756,6 +1787,18 @@ class CutoverTests(unittest.TestCase):
         self.assertTrue(cutover.expected_writer_denial("ERROR: 42501: permission denied for schema public"))
         self.assertFalse(cutover.expected_writer_denial("ERROR: 99999: permission denied for schema public"))
         self.assertFalse(cutover.expected_writer_denial("FATAL: password authentication failed for user \"aura_app\""))
+        self.assertTrue(
+            cutover.expected_old_credential_rejection(
+                "psql: error: connection to server at \"pooler\" (127.0.0.1), port 5432 failed: "
+                'FATAL: password authentication failed for user "postgres.project"'
+            )
+        )
+        self.assertFalse(
+            cutover.expected_old_credential_rejection(
+                "psql: error: connection to server at \"pooler\" (127.0.0.1), port 5432 failed: "
+                "Connection refused"
+            )
+        )
         self.call("preflight")
         self.fake.writer_probe_stderr = "could not connect to server: Connection refused"
         result, _out, err = self.call("engage-fence")
@@ -1766,6 +1809,17 @@ class CutoverTests(unittest.TestCase):
             json.loads((self.root / "journal.json").read_text(encoding="utf-8"))["phase"],
             "fence-engage-partial-failure",
         )
+
+    def test_data_snapshot_enables_only_its_session_for_temp_state(self) -> None:
+        session_write = cutover._lib.DATA_SQL.index(
+            "SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE;"
+        )
+        default_write = cutover._lib.DATA_SQL.index(
+            "SET default_transaction_read_only = off;"
+        )
+        temporary_table = cutover._lib.DATA_SQL.index("CREATE TEMP TABLE aura_cutover_data")
+        self.assertLess(session_write, default_write)
+        self.assertLess(default_write, temporary_table)
 
     def test_failed_writer_termination_fails_before_probe_and_records_partial_fence(self) -> None:
         self.call("preflight")

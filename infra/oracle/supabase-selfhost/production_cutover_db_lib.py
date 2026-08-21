@@ -645,6 +645,8 @@ FROM public._prisma_migrations;
 """
 DATA_SQL = r"""
 /* aura:data-snapshot:v2 */
+SET SESSION CHARACTERISTICS AS TRANSACTION READ WRITE;
+SET default_transaction_read_only = off;
 CREATE TEMP TABLE aura_cutover_data(
     scope text,
     table_name text,
@@ -732,6 +734,25 @@ SELECT coalesce(
     json_build_object('contract', 'aura-cutover-data-v2', 'tables', '{}'::json)
 )::text
 FROM aura_cutover_data;
+"""
+STORAGE_FORWARD_COMPAT_SQL = r"""
+/* aura:storage-forward-compat */
+BEGIN;
+ALTER TABLE storage.buckets
+    ADD COLUMN versioning_status text NOT NULL DEFAULT 'DISABLED'::text,
+    ADD CONSTRAINT buckets_versioning_dark_check
+        CHECK (versioning_status = 'DISABLED'::text),
+    ADD CONSTRAINT buckets_versioning_standard_only_check
+        CHECK (type = 'STANDARD'::storage.buckettype OR versioning_status = 'DISABLED'::text),
+    ADD CONSTRAINT buckets_versioning_status_check
+        CHECK (versioning_status = ANY (
+            ARRAY['DISABLED'::text, 'ENABLED'::text, 'SUSPENDED'::text]
+        ));
+ALTER TABLE storage.objects
+    ADD COLUMN archived_at timestamptz,
+    ADD COLUMN is_delete_marker boolean NOT NULL DEFAULT false,
+    ADD COLUMN is_versioned boolean NOT NULL DEFAULT false;
+COMMIT;
 """
 
 
@@ -2554,7 +2575,7 @@ _CREDENTIAL_REJECTION_RE = re.compile(
 _CREDENTIAL_TRANSPORT_RE = re.compile(
     r"(?i)(?:could not connect|connection (?:refused|timed out|reset)|"
     r"could not translate host name|server closed the connection unexpectedly|"
-    r"ssl error|timeout expired|connection to server .* failed)"
+    r"ssl error|timeout expired)"
 )
 
 
@@ -3266,6 +3287,7 @@ def restore_scopes(directory: Path, path: Path, service: str = "candidate") -> N
     run_tool(
         [
             os.environ.get("PG_RESTORE_BIN", "pg_restore"),
+            f"--dbname=service={service}",
             "--data-only",
             "--disable-triggers",
             "--exit-on-error",
@@ -3291,6 +3313,20 @@ def restore_scopes(directory: Path, path: Path, service: str = "candidate") -> N
             }
         )
         validate_archive(scope, listing)
+        if scope == "storage":
+            psql(
+                "/* aura:storage-ephemeral-empty */ DO $aura$ BEGIN "
+                "IF EXISTS (SELECT 1 FROM storage.s3_multipart_uploads) "
+                "OR EXISTS (SELECT 1 FROM storage.s3_multipart_uploads_parts) THEN "
+                "RAISE EXCEPTION 'storage multipart state is not empty'; "
+                "END IF; END $aura$;",
+                path,
+                service,
+            )
+            tables = sorted(
+                set(tables)
+                | {"s3_multipart_uploads", "s3_multipart_uploads_parts"}
+            )
         if tables:
             qualified = ", ".join(
                 f"{qobject(scope)}.{qobject(table)}" for table in tables
@@ -3304,6 +3340,7 @@ def restore_scopes(directory: Path, path: Path, service: str = "candidate") -> N
         run_tool(
             [
                 os.environ.get("PG_RESTORE_BIN", "pg_restore"),
+                f"--dbname=service={service}",
                 "--exit-on-error",
                 "--no-owner",
                 "--no-acl",
@@ -3555,6 +3592,7 @@ def candidate_restore(state: Path, path: Path, credentials: dict[str, Any]) -> N
     write_journal(state, journal)
     try:
         require_stopped(credentials)
+        psql(STORAGE_FORWARD_COMPAT_SQL, path, "candidate")
         restore_scopes(state / "artifacts", path)
         after_database_contract = database_contract(
             path, "candidate", "candidate after restore"

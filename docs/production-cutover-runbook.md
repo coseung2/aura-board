@@ -1,12 +1,37 @@
 # Managed Supabase → Oracle production cutover
 
-상태: **live DB preflight 완료, production source 전환 전**
+상태: **production Oracle self-hosted cutover 완료**
 
-현재 production source of truth는 managed Supabase다. `supabase.aura-board.com`,
-Oracle nginx/TLS, self-hosted Auth/Storage, OCI S3 backend는 준비됐지만 아래 gate를
-모두 통과하기 전에는 앱 환경을 self-hosted로 바꾸지 않는다.
+현재 production source of truth는 Oracle self-hosted Supabase다. 앱과 play-engine의
+active release는 `1049cf64175e803b7b443f0002fded3be1a8ad36`이며 외부
+`/api/health`는 `200`/DB reachable이다. managed Supabase는 cutover 당시 read-only와
+pg_cron disabled 상태로 남겨 두었으며 자동 rollback은 seal로 영구 종료됐다.
 
-## 2026-08-21 재개 체크포인트
+## 2026-08-21 완료 체크포인트
+
+- production DB password rotation, read-only/pg_cron fence, export, candidate
+  create/restore/verify, promotion, runtime env write, release switch 및
+  `--seal-before-writers`를 완료했다.
+- Library migration `20260819090000_add_teacher_content_library`와 Prisma history
+  147개를 promoted DB에 유지했다. 로그인된 production `/teacher/library`가 오류 없이
+  렌더링되고 빈 자료/컬렉션 상태를 표시하는 것을 확인했다.
+- self-host Auth/Storage/REST/Envoy/Realtime와 app/play-engine/backup timer가 모두
+  healthy/active다. app cron도 복원했다.
+- Infisical `prod /oracle/aura-board/cutover/selfhost`에 누락됐던
+  `POSTGRES_USER=postgres`, `DIRECT_POSTGRES_PORT=15434`를 추가했다. secret 값은
+  문서나 source control에 복사하지 않는다.
+- GitHub `Deploy Oracle Production` workflow를 재활성화하고 run `32483473309`로
+  exact main SHA `1049cf64...` ARM64 build와 production deploy를 완료했다.
+- 실행 중 발견한 cutover 도구 결함은 local source에서 수정했다: hosted psql auth
+  diagnostic parser, read-only data snapshot TEMP 세션, pg_restore candidate DSN,
+  Storage multipart FK closure/forward columns, rich-journal fence parsing. 이 변경은
+  아직 별도 commit/push 전이다.
+- 별도 managed DR project의 이전 password reset consumer 정리는 남아 있다. 현재
+  로컬 Supabase CLI credential에서는 해당 project가 보이지 않으므로 그 project를
+  소유한 account/profile로 인증한 뒤 Infisical `/dr/aura-board`의 DB credential과
+  replication consumer를 함께 갱신해야 한다.
+
+## 2026-08-21 재개 체크포인트 (완료 전 기록)
 
 이 절이 다음 작업 세션의 시작점이다. production은 계속 managed Supabase를 사용하며
 write fence, production password rotation, database promotion, app/backup env 교체,

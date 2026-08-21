@@ -142,7 +142,11 @@ class ProductionCutoverRuntimeTests(unittest.TestCase):
         return {
             "format": 2,
             "phase": "promotion-complete",
-            "fence": {"engaged": True},
+            "fence": {
+                "mode": "credential_rotation",
+                "engaged": True,
+                "release_required": True,
+            },
         }
 
     def valid_db(self) -> dict[str, object]:
