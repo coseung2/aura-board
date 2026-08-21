@@ -91,6 +91,26 @@ def migration(name: str = "202608210001_init", checksum: str = "abc", **changes:
     return value
 
 
+def catalog_document(objects: list[dict[str, object]]) -> dict[str, object]:
+    return {
+        "objects": objects,
+        "migrations": {"present": True, "records": [migration()]},
+    }
+
+
+EXPECTED_STORAGE_FORWARD_CATALOG_OBJECTS = frozenset(
+    {
+        ("column", "storage", "buckets.versioning_status"),
+        ("constraint", "storage", "buckets.buckets_versioning_dark_check"),
+        ("constraint", "storage", "buckets.buckets_versioning_standard_only_check"),
+        ("constraint", "storage", "buckets.buckets_versioning_status_check"),
+        ("column", "storage", "objects.archived_at"),
+        ("column", "storage", "objects.is_delete_marker"),
+        ("column", "storage", "objects.is_versioned"),
+    }
+)
+
+
 class FakeToolchain:
     """Command-level PostgreSQL shim; no socket, Docker, or external process is used."""
 
@@ -118,8 +138,34 @@ class FakeToolchain:
         self.writer_sessions: list[dict[str, object]] = []
         self.calls: list[tuple[list[str], dict[str, str], str | None]] = []
         self.catalog_objects = [
-            {"kind": "relation", "schema_name": "public", "object_name": "lessons", "detail": {"acl": "public-acl"}},
-            {"kind": "relation", "schema_name": "auth", "object_name": "users", "detail": {"acl": "auth-acl"}},
+            {
+                "kind": "relation",
+                "schema_name": "public",
+                "object_name": "lessons",
+                "detail": {
+                    "acl": [
+                        {
+                            "grantee": "PUBLIC",
+                            "privilege": "SELECT",
+                            "grantable": False,
+                        }
+                    ]
+                },
+            },
+            {
+                "kind": "relation",
+                "schema_name": "auth",
+                "object_name": "users",
+                "detail": {
+                    "acl": [
+                        {
+                            "grantee": "PUBLIC",
+                            "privilege": "SELECT",
+                            "grantable": False,
+                        }
+                    ]
+                },
+            },
             {"kind": "policy", "schema_name": "auth", "object_name": "users.read", "detail": {"using": "true"}},
             {"kind": "trigger", "schema_name": "storage", "object_name": "objects.touch", "detail": {"enabled": "O"}},
         ]
@@ -704,6 +750,370 @@ class CutoverTests(unittest.TestCase):
         candidate["objects"][0]["detail"]["using"] = "false"
         with self.assertRaisesRegex(cutover.CutoverError, "auth schema"):
             cutover.compare_catalogs(source, candidate)
+
+    def test_auth_scope_does_not_ignore_dr_replication_select(self) -> None:
+        source = catalog_document(
+            [
+                {
+                    "kind": "relation",
+                    "schema_name": "auth",
+                    "object_name": "users",
+                    "detail": {
+                        "acl": [
+                            {
+                                "grantee": "PUBLIC",
+                                "privilege": "SELECT",
+                                "grantable": False,
+                            }
+                        ]
+                    },
+                }
+            ]
+        )
+        candidate = json.loads(json.dumps(source))
+        candidate["objects"][0]["detail"]["acl"].append(
+            {
+                "grantee": "aura_board_dr_replication",
+                "privilege": "SELECT",
+                "grantable": False,
+            }
+        )
+        with self.assertRaisesRegex(cutover.CutoverError, "auth schema"):
+            cutover.compare_catalogs(source, candidate)
+
+    def test_application_scope_detects_unknown_custom_schema_drift(self) -> None:
+        source = catalog_document(
+            [
+                {
+                    "kind": "schema",
+                    "schema_name": "custom_extension",
+                    "object_name": "custom_extension",
+                    "detail": {"owner": "owner_a"},
+                }
+            ]
+        )
+        candidate = json.loads(json.dumps(source))
+        candidate["objects"][0]["detail"]["owner"] = "owner_b"
+        with self.assertRaisesRegex(cutover.CutoverError, "application catalog"):
+            cutover.compare_catalogs(source, candidate)
+
+    def test_application_scope_ignores_only_named_internal_forward_fields_and_exact_dr_select(self) -> None:
+        public_acl = [
+            {
+                "grantee": "PUBLIC",
+                "privilege": "UPDATE",
+                "grantable": False,
+            },
+            {
+                "grantee": "PUBLIC",
+                "privilege": "SELECT",
+                "grantable": False,
+            },
+        ]
+        source = catalog_document(
+            [
+                {
+                    "kind": "relation",
+                    "schema_name": "public",
+                    "object_name": "lessons",
+                    "detail": {"row_security": False, "acl": public_acl},
+                },
+                {
+                    "kind": "column",
+                    "schema_name": "public",
+                    "object_name": "lessons.title",
+                    "detail": {"type": "text", "default": None},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "auth",
+                    "object_name": "users",
+                    "detail": {"acl": []},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "storage",
+                    "object_name": "buckets",
+                    "detail": {"acl": []},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "storage",
+                    "object_name": "objects",
+                    "detail": {"acl": []},
+                },
+                {
+                    "kind": "column",
+                    "schema_name": "storage",
+                    "object_name": "buckets.versioning_status",
+                    "detail": {"type": "text"},
+                },
+                {
+                    "kind": "constraint",
+                    "schema_name": "storage",
+                    "object_name": "buckets.buckets_versioning_dark_check",
+                    "detail": {"definition": "forward-only"},
+                },
+                {
+                    "kind": "constraint",
+                    "schema_name": "storage",
+                    "object_name": "buckets.buckets_versioning_standard_only_check",
+                    "detail": {"definition": "forward-only"},
+                },
+                {
+                    "kind": "constraint",
+                    "schema_name": "storage",
+                    "object_name": "buckets.buckets_versioning_status_check",
+                    "detail": {"definition": "forward-only"},
+                },
+                {
+                    "kind": "column",
+                    "schema_name": "storage",
+                    "object_name": "objects.archived_at",
+                    "detail": {"type": "timestamptz"},
+                },
+                {
+                    "kind": "column",
+                    "schema_name": "storage",
+                    "object_name": "objects.is_delete_marker",
+                    "detail": {"type": "boolean"},
+                },
+                {
+                    "kind": "column",
+                    "schema_name": "storage",
+                    "object_name": "objects.is_versioned",
+                    "detail": {"type": "boolean"},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "realtime",
+                    "object_name": "internal_state",
+                    "detail": {"definition": "source"},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "_realtime",
+                    "object_name": "internal_state",
+                    "detail": {"definition": "source"},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "supabase_migrations",
+                    "object_name": "internal_state",
+                    "detail": {"definition": "source"},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "private",
+                    "object_name": "internal_state",
+                    "detail": {"definition": "source"},
+                },
+            ]
+        )
+        candidate = json.loads(json.dumps(source))
+        candidate_by_key = {
+            (item["kind"], item["schema_name"], item["object_name"]): item
+            for item in candidate["objects"]
+        }
+        candidate_by_key[("relation", "public", "lessons")]["detail"]["acl"] = [
+            {
+                "grantee": "aura_board_dr_replication",
+                "privilege": "SELECT",
+                "grantable": False,
+            },
+            {
+                "grantee": "PUBLIC",
+                "privilege": "SELECT",
+                "grantable": False,
+            },
+            {
+                "grantee": "PUBLIC",
+                "privilege": "UPDATE",
+                "grantable": False,
+            },
+        ]
+        for schema_name in ("realtime", "_realtime", "supabase_migrations", "private"):
+            candidate_by_key[("relation", schema_name, "internal_state")]["detail"]["definition"] = "target"
+        for key in EXPECTED_STORAGE_FORWARD_CATALOG_OBJECTS:
+            candidate_by_key[key]["detail"] = {"definition": "target-forward-only"}
+
+        cutover.compare_catalogs(source, candidate)
+
+    def test_candidate_only_named_storage_forward_objects_are_ignored_but_unknown_additions_fail(self) -> None:
+        source = catalog_document(
+            [
+                {
+                    "kind": "relation",
+                    "schema_name": "storage",
+                    "object_name": "buckets",
+                    "detail": {"acl": []},
+                },
+                {
+                    "kind": "relation",
+                    "schema_name": "storage",
+                    "object_name": "objects",
+                    "detail": {"acl": []},
+                },
+            ]
+        )
+        for key in EXPECTED_STORAGE_FORWARD_CATALOG_OBJECTS:
+            with self.subTest(key=key):
+                candidate = json.loads(json.dumps(source))
+                kind, schema_name, object_name = key
+                candidate["objects"].append(
+                    {
+                        "kind": kind,
+                        "schema_name": schema_name,
+                        "object_name": object_name,
+                        "detail": {"definition": "candidate-only-forward"},
+                    }
+                )
+                cutover.compare_catalogs(source, candidate)
+
+        candidate = json.loads(json.dumps(source))
+        candidate["objects"].append(
+            {
+                "kind": "column",
+                "schema_name": "storage",
+                "object_name": "objects.unlisted_candidate_field",
+                "detail": {"type": "text"},
+            }
+        )
+        with self.assertRaisesRegex(cutover.CutoverError, "application catalog"):
+            cutover.compare_catalogs(source, candidate)
+
+    def test_application_scope_detects_public_type_default_and_rls_drift(self) -> None:
+        source = catalog_document(
+            [
+                {
+                    "kind": "relation",
+                    "schema_name": "public",
+                    "object_name": "lessons",
+                    "detail": {"row_security": False, "acl": []},
+                },
+                {
+                    "kind": "column",
+                    "schema_name": "public",
+                    "object_name": "lessons.title",
+                    "detail": {"type": "text", "default": "'untitled'::text"},
+                },
+                {
+                    "kind": "policy",
+                    "schema_name": "public",
+                    "object_name": "lessons.read",
+                    "detail": {"using": "(true)"},
+                },
+            ]
+        )
+        changes = (
+            ("type", "varchar", ("column", "public", "lessons.title")),
+            ("default", "'changed'::text", ("column", "public", "lessons.title")),
+            ("row_security", True, ("relation", "public", "lessons")),
+            ("using", "(false)", ("policy", "public", "lessons.read")),
+        )
+        for field, changed, key in changes:
+            with self.subTest(field=field):
+                candidate = json.loads(json.dumps(source))
+                item = next(
+                    item
+                    for item in candidate["objects"]
+                    if (item["kind"], item["schema_name"], item["object_name"]) == key
+                )
+                item["detail"][field] = changed
+                with self.assertRaisesRegex(cutover.CutoverError, "application catalog"):
+                    cutover.compare_catalogs(source, candidate)
+
+    def test_application_scope_detects_unknown_storage_field(self) -> None:
+        source = catalog_document(
+            [
+                {
+                    "kind": "relation",
+                    "schema_name": "storage",
+                    "object_name": "objects",
+                    "detail": {"acl": []},
+                },
+                {
+                    "kind": "column",
+                    "schema_name": "storage",
+                    "object_name": "objects.unlisted_forward_field",
+                    "detail": {"type": "text"},
+                },
+            ]
+        )
+        candidate = json.loads(json.dumps(source))
+        candidate["objects"][1]["detail"]["type"] = "integer"
+        with self.assertRaisesRegex(cutover.CutoverError, "application catalog"):
+            cutover.compare_catalogs(source, candidate)
+
+    def test_relation_acl_detects_unknown_grants_and_non_allowlisted_dr_grants(self) -> None:
+        source = catalog_document(
+            [
+                {
+                    "kind": "relation",
+                    "schema_name": "public",
+                    "object_name": "lessons",
+                    "detail": {
+                        "acl": [
+                            {
+                                "grantee": "PUBLIC",
+                                "privilege": "SELECT",
+                                "grantable": False,
+                            }
+                        ]
+                    },
+                }
+            ]
+        )
+        grants = (
+            {"grantee": "unknown_grantee", "privilege": "SELECT", "grantable": False},
+            {"grantee": "aura_board_dr_replication", "privilege": "DELETE", "grantable": False},
+            {"grantee": "aura_board_dr_replication", "privilege": "SELECT", "grantable": True},
+        )
+        for grant in grants:
+            with self.subTest(grant=grant):
+                candidate = json.loads(json.dumps(source))
+                candidate["objects"][0]["detail"]["acl"].append(grant)
+                with self.assertRaisesRegex(cutover.CutoverError, "application catalog"):
+                    cutover.compare_catalogs(source, candidate)
+
+    def test_relation_acl_rejects_non_sql_emitted_row_shapes(self) -> None:
+        source = catalog_document(
+            [
+                {
+                    "kind": "relation",
+                    "schema_name": "public",
+                    "object_name": "lessons",
+                    "detail": {
+                        "acl": [
+                            {
+                                "grantee": "PUBLIC",
+                                "privilege": "SELECT",
+                                "grantable": False,
+                            }
+                        ]
+                    },
+                }
+            ]
+        )
+        alternate_shapes = (
+            {
+                "grantee": "PUBLIC",
+                "privilege_type": "SELECT",
+                "is_grantable": False,
+            },
+            {
+                "grantee": "PUBLIC",
+                "privilege": "SELECT",
+                "grantable": False,
+                "grantor": "postgres",
+            },
+        )
+        for alternate in alternate_shapes:
+            with self.subTest(alternate=alternate):
+                candidate = json.loads(json.dumps(source))
+                candidate["objects"][0]["detail"]["acl"] = [alternate]
+                with self.assertRaisesRegex(cutover.CutoverError, "relation ACL is malformed"):
+                    cutover.compare_catalogs(source, candidate)
 
     def test_candidate_flow_uses_only_candidate_restore_and_deterministic_rename_rollback(self) -> None:
         self.flow_to("candidate-verify")
@@ -1387,6 +1797,349 @@ class DockerIntegrationTests(unittest.TestCase):
             records = json.loads(harness.psql(cutover._lib.MIGRATION_SQL))
             names = [record["migration_name"] for record in records]
             self.assertEqual(names, sorted(names))
+        finally:
+            harness.stop()
+
+    def test_catalog_sql_canonicalizes_acl_policy_roles_with_shifted_oids_and_semantic_columns(self) -> None:
+        harness = EphemeralPostgresHarness()
+        try:
+            harness.start()
+            harness.psql(
+                """
+                CREATE ROLE aura_acl_grantee NOLOGIN;
+                CREATE ROLE aura_board_dr_replication NOLOGIN;
+                CREATE ROLE aura_policy_oid_z NOLOGIN;
+                CREATE ROLE aura_policy_oid_a NOLOGIN;
+                CREATE DATABASE aura_cutover_catalog_source;
+                CREATE DATABASE aura_cutover_catalog_target;
+                """
+            )
+            self.assertEqual(
+                harness.psql(
+                    """
+                    SELECT string_agg(rolname, ',' ORDER BY oid)
+                    FROM pg_roles
+                    WHERE rolname IN ('aura_policy_oid_z', 'aura_policy_oid_a');
+                    """
+                ),
+                "aura_policy_oid_z,aura_policy_oid_a",
+            )
+            harness.psql(
+                """
+                CREATE TABLE public.acl_items (
+                    id integer,
+                    payload text DEFAULT 'payload'
+                );
+                GRANT SELECT ON TABLE public.acl_items TO aura_acl_grantee;
+                CREATE TABLE public.policy_items (id integer);
+                CREATE POLICY policy_roles
+                    ON public.policy_items
+                    TO aura_policy_oid_z, aura_policy_oid_a
+                    USING (true);
+                """,
+                harness.catalog_source,
+            )
+            harness.psql(
+                """
+                CREATE TABLE public.acl_items (
+                    id integer,
+                    noise text,
+                    payload text DEFAULT 'payload'
+                );
+                ALTER TABLE public.acl_items DROP COLUMN noise;
+                GRANT SELECT ON TABLE public.acl_items TO aura_acl_grantee;
+                GRANT SELECT ON TABLE public.acl_items TO aura_board_dr_replication;
+                """,
+                harness.catalog_target,
+            )
+
+            def objects(database: str) -> list[dict[str, object]]:
+                value = json.loads(harness.psql(cutover._lib.CATALOG_SQL, database))
+                self.assertIsInstance(value, list)
+                return value
+
+            source_objects = objects(harness.catalog_source)
+            target_objects = objects(harness.catalog_target)
+            source_columns = [
+                item
+                for item in source_objects
+                if item["kind"] == "column"
+                and item["schema_name"] == "public"
+                and item["object_name"].startswith("acl_items.")
+            ]
+            target_columns = [
+                item
+                for item in target_objects
+                if item["kind"] == "column"
+                and item["schema_name"] == "public"
+                and item["object_name"].startswith("acl_items.")
+            ]
+            self.assertEqual(source_columns, target_columns)
+            self.assertEqual(
+                {"type", "collation", "not_null", "identity", "generated", "storage", "compression", "default"},
+                set(source_columns[0]["detail"]),
+            )
+            self.assertTrue(all("number" not in item["detail"] for item in source_columns))
+
+            source_relation = next(
+                item
+                for item in source_objects
+                if item["kind"] == "relation"
+                and item["schema_name"] == "public"
+                and item["object_name"] == "acl_items"
+            )
+            target_relation = next(
+                item
+                for item in target_objects
+                if item["kind"] == "relation"
+                and item["schema_name"] == "public"
+                and item["object_name"] == "acl_items"
+            )
+            self.assertNotEqual(
+                source_relation["detail"]["acl"], target_relation["detail"]["acl"]
+            )
+            self.assertEqual(
+                cutover._lib.application_scope({"objects": [source_relation]}),
+                cutover._lib.application_scope({"objects": [target_relation]}),
+            )
+            source_policy = next(
+                item
+                for item in source_objects
+                if item["kind"] == "policy"
+                and item["schema_name"] == "public"
+                and item["object_name"] == "policy_items.policy_roles"
+            )
+            self.assertEqual(
+                source_policy["detail"]["roles"],
+                ["aura_policy_oid_a", "aura_policy_oid_z"],
+            )
+        finally:
+            harness.stop()
+
+    def test_catalog_sql_fingerprints_enum_domain_and_range_base_types(self) -> None:
+        harness = EphemeralPostgresHarness()
+        try:
+            harness.start()
+            harness.psql(
+                """
+                CREATE DATABASE aura_cutover_catalog_source;
+                """
+            )
+            harness.psql(
+                """
+                CREATE TYPE public.aura_mood AS ENUM ('sad', 'ok', 'happy');
+                CREATE TYPE public.aura_amount_range AS RANGE (subtype = numeric);
+                CREATE DOMAIN public.aura_short_text AS varchar(42)
+                    CHECK (VALUE <> '');
+                """,
+                harness.catalog_source,
+            )
+            objects = json.loads(harness.psql(cutover._lib.CATALOG_SQL, harness.catalog_source))
+            types = {
+                item["object_name"]: item["detail"]
+                for item in objects
+                if item["kind"] == "type" and item["schema_name"] == "public"
+            }
+            self.assertEqual(types["aura_mood"]["kind"], "e")
+            self.assertIsNone(types["aura_mood"]["base_type"])
+            self.assertEqual(types["aura_amount_range"]["kind"], "r")
+            self.assertIsNone(types["aura_amount_range"]["base_type"])
+            self.assertEqual(types["aura_short_text"]["kind"], "d")
+            self.assertEqual(types["aura_short_text"]["base_type"], "character varying(42)")
+        finally:
+            harness.stop()
+
+    def test_catalog_sql_fingerprints_range_semantics_without_oids(self) -> None:
+        harness = EphemeralPostgresHarness()
+        try:
+            harness.start()
+            harness.psql(
+                """
+                CREATE DATABASE aura_cutover_catalog_source;
+                CREATE DATABASE aura_cutover_catalog_target;
+                """
+            )
+            harness.psql(
+                """
+                CREATE TYPE public.aura_same_range AS RANGE (
+                    subtype = text,
+                    subtype_opclass = text_ops
+                );
+                CREATE TYPE public.aura_subtype_range AS RANGE (subtype = text);
+                CREATE TYPE public.aura_opclass_range AS RANGE (
+                    subtype = text,
+                    subtype_opclass = text_ops
+                );
+                """,
+                harness.catalog_source,
+            )
+            harness.psql(
+                """
+                CREATE SCHEMA oid_shift;
+                CREATE TABLE oid_shift.noise (id integer PRIMARY KEY);
+                CREATE INDEX noise_idx ON oid_shift.noise(id);
+                CREATE TYPE public.aura_same_range AS RANGE (
+                    subtype = text,
+                    subtype_opclass = text_ops
+                );
+                CREATE TYPE public.aura_subtype_range AS RANGE (subtype = varchar);
+                CREATE TYPE public.aura_opclass_range AS RANGE (
+                    subtype = text,
+                    subtype_opclass = text_pattern_ops
+                );
+                """,
+                harness.catalog_target,
+            )
+
+            def type_details(database: str) -> dict[str, dict[str, object]]:
+                objects = json.loads(harness.psql(cutover._lib.CATALOG_SQL, database))
+                return {
+                    item["object_name"]: item["detail"]
+                    for item in objects
+                    if item["kind"] == "type"
+                    and item["schema_name"] == "public"
+                    and item["object_name"]
+                    in {"aura_same_range", "aura_subtype_range", "aura_opclass_range"}
+                }
+
+            source = type_details(harness.catalog_source)
+            target = type_details(harness.catalog_target)
+            self.assertEqual(source["aura_same_range"], target["aura_same_range"])
+            self.assertEqual(source["aura_same_range"]["range"]["subtype"], "text")
+            self.assertEqual(
+                source["aura_same_range"]["range"]["subtype_opclass"],
+                {"schema": "pg_catalog", "name": "text_ops"},
+            )
+            self.assertNotEqual(
+                source["aura_subtype_range"], target["aura_subtype_range"]
+            )
+            self.assertNotEqual(
+                source["aura_opclass_range"], target["aura_opclass_range"]
+            )
+
+            identical = catalog_document(
+                [
+                    {
+                        "kind": "type",
+                        "schema_name": "public",
+                        "object_name": "aura_same_range",
+                        "detail": source["aura_same_range"],
+                    }
+                ]
+            )
+            cutover.compare_catalogs(
+                identical,
+                catalog_document(
+                    [
+                        {
+                            "kind": "type",
+                            "schema_name": "public",
+                            "object_name": "aura_same_range",
+                            "detail": target["aura_same_range"],
+                        }
+                    ]
+                ),
+            )
+
+            for name in ("aura_subtype_range", "aura_opclass_range"):
+                with self.subTest(name=name):
+                    with self.assertRaisesRegex(cutover.CutoverError, "application catalog"):
+                        cutover.compare_catalogs(
+                            catalog_document(
+                                [
+                                    {
+                                        "kind": "type",
+                                        "schema_name": "public",
+                                        "object_name": name,
+                                        "detail": source[name],
+                                    }
+                                ]
+                            ),
+                            catalog_document(
+                                [
+                                    {
+                                        "kind": "type",
+                                        "schema_name": "public",
+                                        "object_name": name,
+                                        "detail": target[name],
+                                    }
+                                ]
+                            ),
+                        )
+        finally:
+            harness.stop()
+
+    def test_data_sql_ignores_only_named_storage_forward_fields(self) -> None:
+        harness = EphemeralPostgresHarness()
+        try:
+            harness.start()
+            harness.psql(
+                """
+                CREATE DATABASE aura_cutover_catalog_source;
+                CREATE DATABASE aura_cutover_catalog_target;
+                """
+            )
+            common = """
+                CREATE SCHEMA auth;
+                CREATE SCHEMA storage;
+                CREATE TABLE public.app_rows (id integer PRIMARY KEY, value text);
+                INSERT INTO public.app_rows VALUES (1, 'same');
+                CREATE TABLE auth.users (id integer PRIMARY KEY, email text);
+                INSERT INTO auth.users VALUES (1, 'same@example.test');
+            """
+            harness.psql(
+                common
+                + """
+                CREATE TABLE storage.buckets (id integer PRIMARY KEY, name text);
+                INSERT INTO storage.buckets VALUES (1, 'uploads');
+                CREATE TABLE storage.objects (
+                    id integer PRIMARY KEY,
+                    name text,
+                    custom_marker text
+                );
+                INSERT INTO storage.objects VALUES (1, 'a.txt', 'same');
+                """,
+                harness.catalog_source,
+            )
+            harness.psql(
+                common
+                + """
+                CREATE TABLE storage.buckets (
+                    id integer PRIMARY KEY,
+                    name text,
+                    versioning_status text
+                );
+                INSERT INTO storage.buckets VALUES (1, 'uploads', 'enabled');
+                CREATE TABLE storage.objects (
+                    id integer PRIMARY KEY,
+                    name text,
+                    custom_marker text,
+                    archived_at timestamptz,
+                    is_delete_marker boolean,
+                    is_versioned boolean
+                );
+                INSERT INTO storage.objects VALUES (
+                    1,
+                    'a.txt',
+                    'same',
+                    '2026-08-21 00:00:00+00',
+                    true,
+                    true
+                );
+                """,
+                harness.catalog_target,
+            )
+            source = json.loads(harness.psql(cutover._lib.DATA_SQL, harness.catalog_source))
+            candidate = json.loads(harness.psql(cutover._lib.DATA_SQL, harness.catalog_target))
+            cutover.compare_data_snapshots(source, candidate)
+
+            harness.psql(
+                "UPDATE storage.objects SET custom_marker = 'changed';",
+                harness.catalog_target,
+            )
+            changed = json.loads(harness.psql(cutover._lib.DATA_SQL, harness.catalog_target))
+            with self.assertRaisesRegex(cutover.CutoverError, "data snapshot"):
+                cutover.compare_data_snapshots(source, changed)
         finally:
             harness.stop()
 

@@ -97,6 +97,23 @@ SEAL_MARKER_KEYS = frozenset(
 )
 TOOL_APP_NAME = "aura-board-cutover"
 DATA_SNAPSHOT_CONTRACT = "aura-cutover-data-v2"
+SERVICE_INTERNAL_SCHEMAS = frozenset(
+    {"realtime", "_realtime", "supabase_migrations", "private"}
+)
+RELATION_ACL_KINDS = frozenset({"relation", "index", "sequence", "view"})
+DR_REPLICATION_ROLE = "aura_board_dr_replication"
+STORAGE_CORE_RELATIONS = frozenset({"buckets", "objects"})
+STORAGE_FORWARD_CATALOG_OBJECTS = frozenset(
+    {
+        ("column", "storage", "buckets.versioning_status"),
+        ("constraint", "storage", "buckets.buckets_versioning_dark_check"),
+        ("constraint", "storage", "buckets.buckets_versioning_standard_only_check"),
+        ("constraint", "storage", "buckets.buckets_versioning_status_check"),
+        ("column", "storage", "objects.archived_at"),
+        ("column", "storage", "objects.is_delete_marker"),
+        ("column", "storage", "objects.is_versioned"),
+    }
+)
 PRODUCTION_STOPPED_CONTAINERS = tuple(
     sorted(
         {
@@ -155,19 +172,337 @@ SELECT json_build_object(
     'system_identifier', (pg_control_system()).system_identifier::text
 )::text;
 """
-CATALOG_SQL = r"""/* aura:catalog-fingerprint */ WITH o(kind,schema_name,object_name,detail) AS (
-SELECT 'schema',n.nspname,n.nspname,jsonb_build_object('owner',pg_get_userbyid(n.nspowner),'acl',n.nspacl::text) FROM pg_namespace n WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
-UNION ALL SELECT 'relation',n.nspname,c.relname,jsonb_build_object('kind',c.relkind,'owner',pg_get_userbyid(c.relowner),'persistence',c.relpersistence,'row_security',c.relrowsecurity,'force_row_security',c.relforcerowsecurity,'replica_identity',c.relreplident,'options',c.reloptions::text,'partition_bound',pg_get_expr(c.relpartbound,c.oid),'acl',c.relacl::text) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND c.relkind IN ('r','p','v','m','S','f')
-UNION ALL SELECT 'column',n.nspname,c.relname||'.'||a.attname,jsonb_build_object('number',a.attnum,'type',format_type(a.atttypid,a.atttypmod),'collation',CASE WHEN a.attcollation=0 THEN NULL ELSE a.attcollation::regcollation::text END,'not_null',a.attnotnull,'identity',a.attidentity,'generated',a.attgenerated,'storage',a.attstorage,'compression',a.attcompression,'default',pg_get_expr(d.adbin,d.adrelid)) FROM pg_attribute a JOIN pg_class c ON c.oid=a.attrelid JOIN pg_namespace n ON n.oid=c.relnamespace LEFT JOIN pg_attrdef d ON d.adrelid=a.attrelid AND d.adnum=a.attnum WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND c.relkind IN ('r','p','v','m','f') AND a.attnum>0 AND NOT a.attisdropped
-UNION ALL SELECT 'constraint',n.nspname,coalesce(r.relname,t.typname)||'.'||con.conname,jsonb_build_object('type',con.contype,'validated',con.convalidated,'deferrable',con.condeferrable,'deferred',con.condeferred,'definition',pg_get_constraintdef(con.oid,true)) FROM pg_constraint con LEFT JOIN pg_class r ON r.oid=con.conrelid LEFT JOIN pg_type t ON t.oid=con.contypid JOIN pg_namespace n ON n.oid=coalesce(r.relnamespace,t.typnamespace) WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
-UNION ALL SELECT 'index',n.nspname,c.relname||'.'||i.relname,jsonb_build_object('definition',pg_get_indexdef(i.oid),'primary',x.indisprimary,'unique',x.indisunique,'exclusion',x.indisexclusion,'valid',x.indisvalid,'ready',x.indisready,'predicate',pg_get_expr(x.indpred,x.indrelid),'expressions',pg_get_expr(x.indexprs,x.indrelid),'options',i.reloptions::text,'acl',i.relacl::text) FROM pg_index x JOIN pg_class c ON c.oid=x.indrelid JOIN pg_class i ON i.oid=x.indexrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
-UNION ALL SELECT 'trigger',n.nspname,c.relname||'.'||t.tgname,jsonb_build_object('enabled',t.tgenabled,'definition',pg_get_triggerdef(t.oid,true)) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND NOT t.tgisinternal
-UNION ALL SELECT 'policy',n.nspname,c.relname||'.'||p.polname,jsonb_build_object('permissive',p.polpermissive,'command',p.polcmd,'using',pg_get_expr(p.polqual,p.polrelid),'check',pg_get_expr(p.polwithcheck,p.polrelid),'roles',array(SELECT coalesce(r.rolname,'PUBLIC') FROM unnest(p.polroles) x(oid) LEFT JOIN pg_roles r ON r.oid=x.oid ORDER BY x.oid)) FROM pg_policy p JOIN pg_class c ON c.oid=p.polrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
-UNION ALL SELECT 'routine',n.nspname,p.proname||'('||pg_get_function_identity_arguments(p.oid)||')',jsonb_build_object('kind',p.prokind,'result',pg_get_function_result(p.oid),'language',l.lanname,'volatile',p.provolatile,'strict',p.proisstrict,'security_definer',p.prosecdef,'config',p.proconfig::text,'acl',p.proacl::text,'definition',pg_get_functiondef(p.oid)) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace JOIN pg_language l ON l.oid=p.prolang WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND p.prokind IN ('f','p')
-UNION ALL SELECT 'sequence',n.nspname,c.relname,jsonb_build_object('type',s.seqtypid::regtype::text,'start',s.seqstart,'increment',s.seqincrement,'min',s.seqmin,'max',s.seqmax,'cache',s.seqcache,'cycle',s.seqcycle,'acl',c.relacl::text) FROM pg_sequence s JOIN pg_class c ON c.oid=s.seqrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
-UNION ALL SELECT 'type',n.nspname,t.typname,jsonb_build_object('kind',t.typtype,'base_type',format_type(t.typtypmod,t.typtypmod),'not_null',t.typnotnull,'default',t.typdefault,'acl',t.typacl::text,'enum_values',array(SELECT e.enumlabel FROM pg_enum e WHERE e.enumtypid=t.oid ORDER BY e.enumsortorder)) FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND t.typrelid=0 AND t.typtype IN ('d','e','r')
-UNION ALL SELECT 'view',n.nspname,c.relname,jsonb_build_object('kind',c.relkind,'definition',pg_get_viewdef(c.oid,true),'options',c.reloptions::text,'acl',c.relacl::text) FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND c.relkind IN ('v','m')
-UNION ALL SELECT 'dependency',n.nspname,c.relname||'->'||rn.nspname||'.'||rc.relname,jsonb_build_object('dependency_type',d.deptype,'objsubid',d.objsubid,'refobjsubid',d.refobjsubid) FROM pg_depend d JOIN pg_class c ON d.classid='pg_class'::regclass AND c.oid=d.objid JOIN pg_namespace n ON n.oid=c.relnamespace JOIN pg_class rc ON d.refclassid='pg_class'::regclass AND rc.oid=d.refobjid JOIN pg_namespace rn ON rn.oid=rc.relnamespace WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema' AND rn.nspname !~ '^pg_' AND rn.nspname <> 'information_schema') SELECT coalesce(json_agg(json_build_object('kind',kind,'schema_name',schema_name,'object_name',object_name,'detail',detail) ORDER BY kind,schema_name,object_name,detail),'[]'::json)::text FROM o;"""
+CATALOG_SQL = r"""/* aura:catalog-fingerprint */
+WITH relation_acl AS (
+    SELECT
+        c.oid,
+        coalesce(
+            jsonb_agg(
+                jsonb_build_object(
+                    'grantee',
+                    CASE
+                        WHEN x.grantee = 0::oid THEN 'PUBLIC'
+                        ELSE coalesce(r.rolname, 'OID:' || x.grantee::text)
+                    END,
+                    'privilege', x.privilege_type,
+                    'grantable', x.is_grantable
+                )
+                ORDER BY
+                    (
+                        CASE
+                            WHEN x.grantee = 0::oid THEN 'PUBLIC'
+                            ELSE coalesce(r.rolname, 'OID:' || x.grantee::text)
+                        END
+                    ) COLLATE "C",
+                    x.privilege_type COLLATE "C",
+                    x.is_grantable
+            ),
+            '[]'::jsonb
+        ) AS acl
+    FROM pg_class c
+    CROSS JOIN LATERAL aclexplode(
+        coalesce(
+            c.relacl,
+            acldefault(
+                CASE WHEN c.relkind = 'S' THEN 'S'::"char" ELSE 'r'::"char" END,
+                c.relowner
+            )
+        )
+    ) x
+    LEFT JOIN pg_roles r ON r.oid = x.grantee
+    GROUP BY c.oid
+),
+o(kind, schema_name, object_name, detail) AS (
+    SELECT
+        'schema',
+        n.nspname,
+        n.nspname,
+        jsonb_build_object('owner', pg_get_userbyid(n.nspowner), 'acl', n.nspacl::text)
+    FROM pg_namespace n
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+    UNION ALL
+    SELECT
+        'relation',
+        n.nspname,
+        c.relname,
+        jsonb_build_object(
+            'kind', c.relkind,
+            'owner', pg_get_userbyid(c.relowner),
+            'persistence', c.relpersistence,
+            'row_security', c.relrowsecurity,
+            'force_row_security', c.relforcerowsecurity,
+            'replica_identity', c.relreplident,
+            'options', c.reloptions::text,
+            'partition_bound', pg_get_expr(c.relpartbound, c.oid),
+            'acl', coalesce(ra.acl, '[]'::jsonb)
+        )
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN relation_acl ra ON ra.oid = c.oid
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+      AND c.relkind IN ('r', 'p', 'v', 'm', 'S', 'f')
+    UNION ALL
+    SELECT
+        'column',
+        n.nspname,
+        c.relname || '.' || a.attname,
+        jsonb_build_object(
+            'type', format_type(a.atttypid, a.atttypmod),
+            'collation', CASE
+                WHEN a.attcollation = 0 THEN NULL
+                ELSE a.attcollation::regcollation::text
+            END,
+            'not_null', a.attnotnull,
+            'identity', a.attidentity,
+            'generated', a.attgenerated,
+            'storage', a.attstorage,
+            'compression', a.attcompression,
+            'default', pg_get_expr(d.adbin, d.adrelid)
+        )
+    FROM pg_attribute a
+    JOIN pg_class c ON c.oid = a.attrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+      AND c.relkind IN ('r', 'p', 'v', 'm', 'f')
+      AND a.attnum > 0 AND NOT a.attisdropped
+    UNION ALL
+    SELECT
+        'constraint',
+        n.nspname,
+        coalesce(r.relname, t.typname) || '.' || con.conname,
+        jsonb_build_object(
+            'type', con.contype,
+            'validated', con.convalidated,
+            'deferrable', con.condeferrable,
+            'deferred', con.condeferred,
+            'definition', pg_get_constraintdef(con.oid, true)
+        )
+    FROM pg_constraint con
+    LEFT JOIN pg_class r ON r.oid = con.conrelid
+    LEFT JOIN pg_type t ON t.oid = con.contypid
+    JOIN pg_namespace n ON n.oid = coalesce(r.relnamespace, t.typnamespace)
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+    UNION ALL
+    SELECT
+        'index',
+        n.nspname,
+        c.relname || '.' || i.relname,
+        jsonb_build_object(
+            'definition', pg_get_indexdef(i.oid),
+            'primary', x.indisprimary,
+            'unique', x.indisunique,
+            'exclusion', x.indisexclusion,
+            'valid', x.indisvalid,
+            'ready', x.indisready,
+            'predicate', pg_get_expr(x.indpred, x.indrelid),
+            'expressions', pg_get_expr(x.indexprs, x.indrelid),
+            'options', i.reloptions::text,
+            'acl', coalesce(ia.acl, '[]'::jsonb)
+        )
+    FROM pg_index x
+    JOIN pg_class c ON c.oid = x.indrelid
+    JOIN pg_class i ON i.oid = x.indexrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN relation_acl ia ON ia.oid = i.oid
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+    UNION ALL
+    SELECT
+        'trigger',
+        n.nspname,
+        c.relname || '.' || t.tgname,
+        jsonb_build_object(
+            'enabled', t.tgenabled,
+            'definition', pg_get_triggerdef(t.oid, true)
+        )
+    FROM pg_trigger t
+    JOIN pg_class c ON c.oid = t.tgrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+      AND NOT t.tgisinternal
+    UNION ALL
+    SELECT
+        'policy',
+        n.nspname,
+        c.relname || '.' || p.polname,
+        jsonb_build_object(
+            'permissive', p.polpermissive,
+            'command', p.polcmd,
+            'using', pg_get_expr(p.polqual, p.polrelid),
+            'check', pg_get_expr(p.polwithcheck, p.polrelid),
+            'roles', array(
+                SELECT coalesce(r.rolname, 'PUBLIC')
+                FROM unnest(p.polroles) x(oid)
+                LEFT JOIN pg_roles r ON r.oid = x.oid
+                ORDER BY coalesce(r.rolname, 'PUBLIC') COLLATE "C"
+            )
+        )
+    FROM pg_policy p
+    JOIN pg_class c ON c.oid = p.polrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+    UNION ALL
+    SELECT
+        'routine',
+        n.nspname,
+        p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')',
+        jsonb_build_object(
+            'kind', p.prokind,
+            'result', pg_get_function_result(p.oid),
+            'language', l.lanname,
+            'volatile', p.provolatile,
+            'strict', p.proisstrict,
+            'security_definer', p.prosecdef,
+            'config', p.proconfig::text,
+            'acl', p.proacl::text,
+            'definition', pg_get_functiondef(p.oid)
+        )
+    FROM pg_proc p
+    JOIN pg_namespace n ON n.oid = p.pronamespace
+    JOIN pg_language l ON l.oid = p.prolang
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+      AND p.prokind IN ('f', 'p')
+    UNION ALL
+    SELECT
+        'sequence',
+        n.nspname,
+        c.relname,
+        jsonb_build_object(
+            'type', s.seqtypid::regtype::text,
+            'start', s.seqstart,
+            'increment', s.seqincrement,
+            'min', s.seqmin,
+            'max', s.seqmax,
+            'cache', s.seqcache,
+            'cycle', s.seqcycle,
+            'acl', coalesce(sa.acl, '[]'::jsonb)
+        )
+    FROM pg_sequence s
+    JOIN pg_class c ON c.oid = s.seqrelid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN relation_acl sa ON sa.oid = c.oid
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+    UNION ALL
+    SELECT
+        'type',
+        n.nspname,
+        t.typname,
+        jsonb_build_object(
+            'kind', t.typtype,
+            'base_type', CASE
+                WHEN t.typbasetype = 0 THEN NULL
+                ELSE format_type(t.typbasetype, t.typtypmod)
+            END,
+            'not_null', t.typnotnull,
+            'default', t.typdefault,
+            'acl', t.typacl::text,
+            'enum_values', array(
+                SELECT e.enumlabel
+                FROM pg_enum e
+                WHERE e.enumtypid = t.oid
+                ORDER BY e.enumsortorder
+            ),
+            'range', CASE
+                WHEN r.rngtypid IS NULL THEN NULL
+                ELSE jsonb_build_object(
+                    'subtype', format_type(r.rngsubtype, -1),
+                    'multirange_type', CASE
+                        WHEN r.rngmultitypid = 0 THEN NULL
+                        ELSE format_type(r.rngmultitypid, -1)
+                    END,
+                    'collation', CASE
+                        WHEN r.rngcollation = 0 OR rc.oid IS NULL THEN NULL
+                        ELSE format('%I.%I', rcn.nspname, rc.collname)
+                    END,
+                    'subtype_opclass', CASE
+                        WHEN ro.oid IS NULL THEN NULL
+                        ELSE jsonb_build_object(
+                            'schema', ron.nspname,
+                            'name', ro.opcname
+                        )
+                    END,
+                    'canonical', CASE
+                        WHEN rcanonical.oid IS NULL THEN NULL
+                        ELSE format(
+                            '%I.%I(%s)',
+                            rcanonicaln.nspname,
+                            rcanonical.proname,
+                            pg_get_function_identity_arguments(rcanonical.oid)
+                        )
+                    END,
+                    'subdiff', CASE
+                        WHEN rsubdiff.oid IS NULL THEN NULL
+                        ELSE format(
+                            '%I.%I(%s)',
+                            rsubdiffn.nspname,
+                            rsubdiff.proname,
+                            pg_get_function_identity_arguments(rsubdiff.oid)
+                        )
+                    END
+                )
+            END
+        )
+    FROM pg_type t
+    JOIN pg_namespace n ON n.oid = t.typnamespace
+    LEFT JOIN pg_range r ON r.rngtypid = t.oid
+    LEFT JOIN pg_collation rc ON rc.oid = NULLIF(r.rngcollation, 0::oid)
+    LEFT JOIN pg_namespace rcn ON rcn.oid = rc.collnamespace
+    LEFT JOIN pg_opclass ro ON ro.oid = NULLIF(r.rngsubopc, 0::oid)
+    LEFT JOIN pg_namespace ron ON ron.oid = ro.opcnamespace
+    LEFT JOIN pg_proc rcanonical
+        ON rcanonical.oid = NULLIF(r.rngcanonical::oid, 0::oid)
+    LEFT JOIN pg_namespace rcanonicaln ON rcanonicaln.oid = rcanonical.pronamespace
+    LEFT JOIN pg_proc rsubdiff
+        ON rsubdiff.oid = NULLIF(r.rngsubdiff::oid, 0::oid)
+    LEFT JOIN pg_namespace rsubdiffn ON rsubdiffn.oid = rsubdiff.pronamespace
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+      AND t.typrelid = 0 AND t.typtype IN ('d', 'e', 'r')
+    UNION ALL
+    SELECT
+        'view',
+        n.nspname,
+        c.relname,
+        jsonb_build_object(
+            'kind', c.relkind,
+            'definition', pg_get_viewdef(c.oid, true),
+            'options', c.reloptions::text,
+            'acl', coalesce(va.acl, '[]'::jsonb)
+        )
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    LEFT JOIN relation_acl va ON va.oid = c.oid
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+      AND c.relkind IN ('v', 'm')
+    UNION ALL
+    SELECT
+        'dependency',
+        n.nspname,
+        c.relname || '->' || rn.nspname || '.' || rc.relname,
+        jsonb_build_object(
+            'dependency_type', d.deptype,
+            'objsubid', d.objsubid,
+            'refobjsubid', d.refobjsubid
+        )
+    FROM pg_depend d
+    JOIN pg_class c ON d.classid = 'pg_class'::regclass AND c.oid = d.objid
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_class rc ON d.refclassid = 'pg_class'::regclass AND rc.oid = d.refobjid
+    JOIN pg_namespace rn ON rn.oid = rc.relnamespace
+    WHERE n.nspname !~ '^pg_' AND n.nspname <> 'information_schema'
+      AND rn.nspname !~ '^pg_' AND rn.nspname <> 'information_schema'
+)
+SELECT coalesce(
+    json_agg(
+        json_build_object(
+            'kind', kind,
+            'schema_name', schema_name,
+            'object_name', object_name,
+            'detail', detail
+        ) ORDER BY kind, schema_name, object_name, detail
+    ),
+    '[]'::json
+)::text
+FROM o;"""
 MIGRATION_PRESENT_SQL = """
 /* aura:prisma-migrations-present */
 SELECT (to_regclass('public._prisma_migrations') IS NOT NULL)::text;
@@ -223,8 +558,32 @@ SELECT format(
                 convert_to(
                     coalesce(
                         string_agg(
-                            to_jsonb(t)::text,
-                            E'\n' ORDER BY (to_jsonb(t)::text) COLLATE "C"
+                            (
+                                CASE
+                                    WHEN %L = 'storage' AND %L = 'buckets'
+                                        THEN to_jsonb(t) - 'versioning_status'
+                                    WHEN %L = 'storage' AND %L = 'objects'
+                                        THEN to_jsonb(t) - ARRAY[
+                                            'archived_at',
+                                            'is_delete_marker',
+                                            'is_versioned'
+                                        ]::text[]
+                                    ELSE to_jsonb(t)
+                                END
+                            )::text,
+                            E'\n' ORDER BY (
+                                CASE
+                                    WHEN %L = 'storage' AND %L = 'buckets'
+                                        THEN to_jsonb(t) - 'versioning_status'
+                                    WHEN %L = 'storage' AND %L = 'objects'
+                                        THEN to_jsonb(t) - ARRAY[
+                                            'archived_at',
+                                            'is_delete_marker',
+                                            'is_versioned'
+                                        ]::text[]
+                                    ELSE to_jsonb(t)
+                                END
+                            )::text COLLATE "C"
                         ),
                         ''
                     ),
@@ -236,6 +595,14 @@ SELECT format(
         )
     FROM %I.%I AS t;
     $command$,
+    schemaname,
+    tablename,
+    schemaname,
+    tablename,
+    schemaname,
+    tablename,
+    schemaname,
+    tablename,
     schemaname,
     tablename,
     schemaname,
@@ -1224,6 +1591,111 @@ def catalog(path: Path, service: str) -> dict[str, Any]:
     }
 
 
+def _catalog_objects(value: Any, label: str) -> list[dict[str, Any]]:
+    if not isinstance(value, dict) or not isinstance(value.get("objects"), list):
+        raise CutoverError(f"{label} catalog fingerprint is malformed")
+    result: list[dict[str, Any]] = []
+    for item in value["objects"]:
+        if (
+            not isinstance(item, dict)
+            or set(item) != {"kind", "schema_name", "object_name", "detail"}
+            or not isinstance(item["kind"], str)
+            or not isinstance(item["schema_name"], str)
+            or not isinstance(item["object_name"], str)
+            or not isinstance(item["detail"], dict)
+        ):
+            raise CutoverError(f"{label} catalog fingerprint is malformed")
+        result.append(item)
+    return result
+
+
+def _canonical_relation_acl(
+    value: Any,
+    *,
+    allow_dr_replication_select: bool,
+) -> list[dict[str, Any]]:
+    if not isinstance(value, list):
+        raise CutoverError("catalog relation ACL is malformed")
+    canonical: list[tuple[str, str, bool]] = []
+    for grant in value:
+        if not isinstance(grant, dict):
+            raise CutoverError("catalog relation ACL is malformed")
+        if set(grant) != {"grantee", "privilege", "grantable"}:
+            raise CutoverError("catalog relation ACL is malformed")
+        if (
+            not isinstance(grant["grantee"], str)
+            or not isinstance(grant["privilege"], str)
+            or not isinstance(grant["grantable"], bool)
+        ):
+            raise CutoverError("catalog relation ACL is malformed")
+        grantee = grant["grantee"]
+        privilege = grant["privilege"]
+        grantable = grant["grantable"]
+        if (
+            allow_dr_replication_select
+            and grantee == DR_REPLICATION_ROLE
+            and privilege == "SELECT"
+            and grantable is False
+        ):
+            continue
+        canonical.append((grantee, privilege, grantable))
+    canonical.sort(key=lambda item: (item[0], item[1], item[2]))
+    return [
+        {"grantee": grantee, "privilege": privilege, "grantable": grantable}
+        for grantee, privilege, grantable in canonical
+    ]
+
+
+def _normalize_catalog_object(
+    item: dict[str, Any], *, allow_dr_replication_select: bool
+) -> dict[str, Any]:
+    normalized = dict(item)
+    detail = dict(item["detail"])
+    if item["kind"] in RELATION_ACL_KINDS:
+        if "acl" not in detail:
+            raise CutoverError("catalog relation ACL is malformed")
+        detail["acl"] = _canonical_relation_acl(
+            detail["acl"],
+            allow_dr_replication_select=allow_dr_replication_select,
+        )
+    normalized["detail"] = detail
+    return normalized
+
+
+def _sort_catalog_scope(objects: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return sorted(
+        objects,
+        key=lambda item: (
+            item["kind"],
+            item["schema_name"],
+            item["object_name"],
+            json.dumps(item["detail"], sort_keys=True, separators=(",", ":")),
+        ),
+    )
+
+
+def _is_storage_core_name(value: str) -> bool:
+    if value.startswith("storage."):
+        value = value[len("storage.") :]
+    return value in STORAGE_CORE_RELATIONS or any(
+        value.startswith(f"{relation}.") for relation in STORAGE_CORE_RELATIONS
+    )
+
+
+def _is_application_catalog_object(item: dict[str, Any]) -> bool:
+    schema_name = item["schema_name"]
+    if schema_name in SERVICE_INTERNAL_SCHEMAS:
+        return False
+    if schema_name == "auth":
+        return False
+    if schema_name != "storage":
+        return True
+    object_name = item["object_name"]
+    if item["kind"] == "dependency":
+        object_name = object_name.split("->", 1)[0]
+    return _is_storage_core_name(object_name)
+
+
 def validate_data_snapshot(value: Any, label: str) -> dict[str, Any]:
     if (
         not isinstance(value, dict)
@@ -1267,23 +1739,37 @@ def compare_data_snapshots(source: Any, candidate: Any) -> None:
 
 
 def auth_scope(value: dict[str, Any]) -> list[Any]:
-    return [
-        item
-        for item in value.get("objects", [])
-        if isinstance(item, dict)
-        and (
-            item.get("schema_name") == "auth"
-            or str(item.get("object_name", "")).startswith("auth.")
-        )
-    ]
+    objects = _catalog_objects(value, "catalog")
+    return _sort_catalog_scope(
+        [
+            _normalize_catalog_object(item, allow_dr_replication_select=False)
+            for item in objects
+            if item["schema_name"] == "auth"
+        ]
+    )
+
+
+def application_scope(value: dict[str, Any]) -> list[Any]:
+    objects = _catalog_objects(value, "catalog")
+    return _sort_catalog_scope(
+        [
+            _normalize_catalog_object(item, allow_dr_replication_select=True)
+            for item in objects
+            if (
+                (item["kind"], item["schema_name"], item["object_name"])
+                not in STORAGE_FORWARD_CATALOG_OBJECTS
+                and _is_application_catalog_object(item)
+            )
+        ]
+    )
 
 
 def compare_catalogs(source: dict[str, Any], candidate: dict[str, Any]) -> None:
     compare_migrations(source.get("migrations"), candidate.get("migrations"))
     if digest(auth_scope(source)) != digest(auth_scope(candidate)):
         raise CutoverError("auth schema catalog fingerprint is not exact")
-    if source != candidate:
-        raise CutoverError("full cross-schema catalog fingerprint mismatch")
+    if digest(application_scope(source)) != digest(application_scope(candidate)):
+        raise CutoverError("application catalog fingerprint is not exact")
 
 
 def preflight(state: Path, path: Path, credentials: dict[str, Any]) -> None:

@@ -76,7 +76,7 @@ write fence, password rotation, database promotion, app/backup env 교체,
 
 - managed source에서 별도 export role과 모든 writer role의 `LOGIN`/`CONNECT`를
   정확히 제어할 수 없음
-- source와 target의 전체 Auth catalog 또는 Prisma migration history가 다름
+- source와 target의 exact Auth/application catalog 또는 Prisma migration history가 다름
 - Oracle target 서비스를 모두 정지할 수 없음
 - self-host 공개 URL/key로 빌드된 exact-SHA Next.js artifact manifest가 없음
 - candidate DB 검증, promotion recovery 또는 rollback DB 보존이 불완전함
@@ -129,9 +129,19 @@ therefore still allowed with a default database ACL.
 2. self-host 공개 URL/key를 build process에 주입해 fresh Next.js artifact를 빌드하고
    `create-cutover-build-manifest.py`로 server artifact digest와 공개 env value hash를
    기록한다. Runtime `--write`와 `--seal-before-writers`는 이 manifest가 없으면 실패한다.
-3. DB `preflight`로 PostgreSQL/extension, 전체 Auth catalog, cross-schema catalog,
+3. DB `preflight`로 PostgreSQL/extension, exact Auth catalog, application catalog,
    `public._prisma_migrations`와 rotation 전의 비밀 없는 source fence snapshot을
-   기록한다. `credential_rotation`에서는 preflight source reads가 `writer_0`
+   기록한다. Application catalog는 public의 모든 semantic object와
+   `storage.buckets`/`storage.objects`의 core object/dependency를 비교한다.
+   `realtime`, `_realtime`, `supabase_migrations`, `private`는 named service-internal
+   schema로 비교하지 않으며, Storage에서는 다음 forward-only column/constraint만
+   제외한다: `buckets.versioning_status`, `buckets_versioning_dark_check`,
+   `buckets_versioning_standard_only_check`, `buckets_versioning_status_check`,
+   `objects.archived_at`, `objects.is_delete_marker`, `objects.is_versioned`.
+   Relation ACL은 `aclexplode`의 grantee/privilege/grantable row로 canonicalize하고
+   grantor 및 문자열 순서는 무시한다. 단, `aura_board_dr_replication`의
+   `SELECT`/non-grantable tuple만 허용 목록으로 제외하며 다른 grant는 모두 gate에
+   남는다. `credential_rotation`에서는 preflight source reads가 `writer_0`
    (old credential)을 사용하므로 아직 temporary credential을 활성화할 필요가 없다.
 4. `source_fence_mode=role_lockdown`이면 `engage-fence`로 명시된 managed writer
    role의 LOGIN/CONNECT와 pg_cron을 차단하고 실제 writer credential 재접속·write
@@ -143,9 +153,14 @@ therefore still allowed with a default database ACL.
    credential의 password authentication rejection, temporary export 성공, 기존
    postgres pooled session의 종료, read-only/cron exactness를 검증하고 engaged
    state를 기록한다. `engage-fence`는 이 모드에서 거부된다.
-6. fenced source에서 `public`, `auth` data, `storage.buckets/objects` archive를 만든다.
+6. fenced source에서 `public` schema, `auth` data (target auth schema는 retained),
+   `storage.buckets/objects` archive를 만든다.
 7. 정지된 Oracle target을 template로 candidate DB를 만들고 candidate에만 restore한다.
-8. candidate catalog/data/migration digest가 fenced source와 정확히 일치해야 한다.
+8. candidate의 exact Auth catalog, Prisma migration history, application catalog와
+   data snapshot이 fenced source와 일치해야 한다. public/auth row는 전체 JSON row를
+   digest하고 row count를 exact 비교하며, Storage row는 위에 열거한 forward-only
+   JSON key만 제거한다. 이름 없는 추가 column/constraint/JSON key나 public/auth
+   drift는 허용하지 않는다.
 9. target→rollback, candidate→target 순서로 rename하고 `promotion-manifest.json`을
    원자적으로 기록한다. partial rename은 자동 recovery 후 중단한다.
 10. Runtime tool이 promotion manifest와 fresh build manifest를 검증한 뒤 app/backup env를
