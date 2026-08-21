@@ -1,6 +1,6 @@
 # Managed Supabase → Oracle production cutover
 
-상태: **도구 구현 완료, production source 전환 전**
+상태: **live DB preflight 완료, production source 전환 전**
 
 현재 production source of truth는 managed Supabase다. `supabase.aura-board.com`,
 Oracle nginx/TLS, self-hosted Auth/Storage, OCI S3 backend는 준비됐지만 아래 gate를
@@ -9,7 +9,7 @@ Oracle nginx/TLS, self-hosted Auth/Storage, OCI S3 backend는 준비됐지만 �
 ## 2026-08-21 재개 체크포인트
 
 이 절이 다음 작업 세션의 시작점이다. production은 계속 managed Supabase를 사용하며
-write fence, password rotation, database promotion, app/backup env 교체,
+write fence, production password rotation, database promotion, app/backup env 교체,
 `--seal-before-writers`는 **모두 미실행**이다. 마지막 외부 `/api/health`는 `200`이었다.
 
 완료된 준비 상태:
@@ -25,7 +25,7 @@ write fence, password rotation, database promotion, app/backup env 교체,
   생성했다. app release의 `cutover-build-manifest.json`은 root-owned mode `0600`이고,
   active `current` symlink는 아직 이전 managed-target release를 가리킨다.
 - exact-SHA 도구 사본은
-  `/opt/aura-board-cutover/releases/4e8389ecfe6e090b37eb8c1d8fca3ba7f69dfe83`에 있다.
+  `/opt/aura-board-cutover/releases/19cd0cd6785bed6d1777ea334586e4e602ef94dc`에 있다.
   DB/runtime state directory는 각각
   `/var/lib/aura-board/production-cutover-db`와
   `/var/lib/aura-board/production-cutover-runtime`이며 root-owned mode `0700`이다.
@@ -45,30 +45,38 @@ write fence, password rotation, database promotion, app/backup env 교체,
 
 현재 중단 지점:
 
-- secret-free connection probe에서 managed old writer credential(`writer_0`)은 성공했고,
-  temporary credential(`source`)은 아직 password rotation 전이므로 예상대로 거부됐다.
-- Oracle `target`/`target_admin`은 Docker internal DB IP로 host에서 직접 연결할 수 없어
-  transport 단계에서 실패했다. 따라서 DB `preflight`는 완료되지 않았고 journal,
-  fence, export, candidate, promotion 단계로 진행하지 않았다.
+- loopback-only `127.0.0.1:15434 -> supabase-db:5432` proxy와 target superuser
+  credential을 사용해 exact Auth/application catalog, 147개 Prisma history, data snapshot,
+  target DB owner/ACL을 포함한 live DB `preflight`를 완료했다. DB journal phase는
+  `preflight-complete`다.
+- target application owner/ACL 37개 객체를 managed source와 exact 정렬했다. Linux
+  Docker 실제 PostgreSQL 포함 102 tests가 통과했다.
+- maintenance window를 한 번 열어 writer/service/container를 정지했지만, 현재 로그인된
+  Supabase browser/CLI account가 contract의 production project ref를 소유하지 않아
+  production password reset 전에 중단했다. cron/service/container를 모두 복원했고
+  외부 `/api/health`는 다시 `200`이다. Production old writer credential은 계속 유효하고
+  temporary credential은 계속 거부되므로 production source fence는 미실행 상태다.
+- 브라우저에서 이름이 `aura-board-dr`인 별도 project의 DB password를 실수로 reset했다.
+  이 project는 production contract ref와 다르다. 새 password 값은 문서에 기록하지
+  않았으며, 해당 project의 credential consumer/Infisical 경로를 확인해 동기화하거나
+  다시 reset해야 한다.
 
 다음 세션의 실행 순서:
 
-1. Infisical의 provisioning key로 OCI CLI를 재구성하고, 승인된 현재 client `/32`로
-   managed Bastion SSH를 연결한다. public target TCP/22를 다시 열지 않는다.
-2. A1에서 기존 image/tool을 우선 재사용해 self-host DB와 같은 Docker network에
-   loopback-only admin proxy를 만든다. 목표 경로는 host
-   `127.0.0.1:15434 -> supabase-db:5432`이며 public/wildcard bind는 금지한다.
-3. root-only `contract.json`의 `target`과 `target_admin` host/port만 위 loopback 경로로
-   원자 교체한다. source/rotation password와 container set은 바꾸지 않는다.
-4. secret-free probe에서 `writer_0`, `target`, `target_admin` 성공과 `source`의
-   password-auth 거부를 확인한 뒤 DB `preflight`를 다시 실행한다. source/target Auth
-   catalog와 147개 migration history가 exact match하지 않으면 중단한다.
-5. preflight가 완료된 뒤에만 maintenance window를 시작한다. app/play-engine,
+1. Whale/Chrome Supabase에서 contract의 production project를 소유한 account로 로그인한다.
+   현재 보이는 `aura-board-dr`와 `eoseowa` project는 둘 다 contract ref가 아니다.
+2. Infisical `prod /oracle/aura-board/cutover`의 temporary password를 production project의
+   **Reset database password**에 입력하고 operator가 최종 reset을 직접 확정한다.
+   `MANAGED_DB_PROJECT_REF` metadata가 contract pooler suffix와 다른 상태도 함께 정정한다.
+3. exact-SHA 도구와 root-only contract로 `writer_0` 성공, `source` 거부,
+   `preflight-complete` journal 및 target 상태가 그대로인지 확인한다. preflight를 새로
+   생성하지 않는다.
+4. maintenance window를 다시 시작해 app/play-engine,
    backup timer/service, video backfill, app cron과 target API/writer containers를
    정지하고 external password rotation/read-only/cron fence → `adopt-fence` → export →
    candidate restore/verify → promote → runtime write → active symlink switch → seal 순서로
    진행한다.
-6. 최초 self-host production write와 health가 확인될 때까지 managed password/fence와
+5. 최초 self-host production write와 health가 확인될 때까지 managed password/fence와
    rollback DB를 보존한다. seal 전 실패는 도구 rollback, seal 후 실패는 forward
    failback만 사용한다.
 
