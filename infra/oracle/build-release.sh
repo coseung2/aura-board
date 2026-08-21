@@ -40,7 +40,7 @@ runuser -u aura-app -- env HOME=/var/lib/aura-app bash -c '
   npm run typecheck
   npx prisma validate
   npm run build
-' bash "${source_dir}"
+' bash "${source_dir}" "${release_id}"
 
 if [[ ! -x /var/lib/aura-app/.cargo/bin/rustc ]]; then
   runuser -u aura-app -- env HOME=/var/lib/aura-app bash -c '
@@ -55,10 +55,24 @@ runuser -u aura-app -- env \
   PATH=/var/lib/aura-app/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
   bash -c '
     set -euo pipefail
+    set -a
+    . /etc/aura-board/build.env
+    set +a
     cd "$1"
     cargo test --locked --manifest-path services/play-engine/Cargo.toml --workspace
     cargo build --locked --release --manifest-path services/play-engine/Cargo.toml -p play-server
-  ' bash "${source_dir}"
+    if [[ ${AURA_BUILD_CUTOVER_MANIFEST:-0} == 1 ]]; then
+      test -f .next/standalone/server.js
+      test -f services/play-engine/target/release/play-server
+      python3 infra/oracle/create-cutover-build-manifest.py \
+        --build-sha "$2" \
+        --app-artifact .next/standalone/server.js \
+        --engine-artifact services/play-engine/target/release/play-server \
+        --output .next/standalone/cutover-build-manifest.json \
+        --write
+      test -s .next/standalone/cutover-build-manifest.json
+    fi
+  ' bash "${source_dir}" "${release_id}"
 
 install -d -o root -g root -m 0755 "${app_staging}" "${engine_staging}"
 cp -a "${source_dir}/.next/standalone/." "${app_staging}/"

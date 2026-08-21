@@ -108,8 +108,8 @@ These checks are staging evidence only. They do not authorize production endpoin
 - [x] Configure the private/versioned OCI S3-compatible bucket and recreate the Storage container with HTTPS/path-style S3 settings. Verify container health and a direct put/get/delete probe without logging credentials.
 - [x] Migrate exactly 1,226 payload objects totaling 1,040,594,444 bytes. Confirm OCI object count/bytes match, no probe objects remain, direct S3 SHA-256 samples pass 8/8, and self-hosted Storage API downloads match managed source SHA-256 8/8.
 - [x] Inventory persisted managed Storage URLs across 11 columns and 1,173 rows. Record `supabase.aura-board.com` plus gradual backfill as the selected stable endpoint strategy.
-- [ ] Expose `supabase.aura-board.com` through the intended nginx/Cloudflare path and verify representative public/private downloads, signed URL behavior, CORS, and persisted URL compatibility before any app env switch.
-- [ ] Sync the S3 credential from the root-owned mode `0600` A1 env into Infisical without printing values; verify rotation and recovery procedures.
+- [x] Expose `supabase.aura-board.com` through Oracle nginx/TLS and a proxied Cloudflare A record. Auth/REST reject unauthenticated requests with `401`, Storage status returns `200`, and Auth/Storage containers are healthy. Representative private/signed download and persisted-URL checks remain part of the final app-env cutover smoke.
+- [x] Sync the existing S3 backend configuration and Customer Secret values from the root-owned mode `0600` A1 env into Infisical `prod` `/oracle/aura-board/supabase-storage` without printing values; all eight expected keys were compared exactly and temporary transfer files were removed.
 - [x] Create/reuse a Bastion session through the runner identity, write ACTIVE metadata, complete local SSH port forwarding to the A1 `ubuntu` account, replace public `0.0.0.0/0:22` with target-subnet TCP/22, and verify external TCP/22 is closed while Bastion SSH and public HTTPS health remain successful.
 
 ## Supabase Free + Vercel Warm Standby DR

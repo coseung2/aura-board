@@ -1,7 +1,7 @@
 # Oracle self-hosted Supabase + DR/백업 설계
 
-기준일: 2026-08-20  
-상태: **Phase 1 data plane·Bastion 및 Supabase Free DB/API warm DR 검증 완료 — public API endpoint·Vercel 배포·failover rehearsal 미완료**
+기준일: 2026-08-21
+상태: **Phase 1 data plane·Bastion 및 Supabase Free DB/API warm DR 검증 완료 — Vercel production 배포와 DR `/api/health` 검증 완료, self-hosted Supabase public endpoint·production cutover·failover/failback rehearsal 미완료**
 
 이 문서는 Aura Board의 managed Supabase 의존성을 Oracle Cloud A1의 self-hosted Supabase로 이전할 경우, 단일 Oracle 인스턴스 장애가 전체 서비스 장애로 확대되는 위험을 어떻게 줄일지 정리한다.
 
@@ -440,7 +440,7 @@ restore rehearsal은 production write를 발생시키지 않는다.
 - [x] 방향 기록
 - [x] 현재 managed Supabase DB/Storage 실사용량 재측정
 - [ ] Oracle PAYG A1 무료 할당량과 실제 tenancy billing 확인 — Always Free 계산은 확인했지만 billing 화면 실측은 별도
-- [x] Vercel DR project/plan 조건 확인 — `aura-board-dr` project 생성, Next.js preset/Seoul runtime 설정, env·deployment는 Supabase DR 연결 전까지 비워 둠
+- [x] Vercel DR project/plan 조건 확인 — `aura-board-dr` project 생성과 Next.js preset/Seoul runtime 설정을 확인했고, Supabase DR 연결 후 exact-SHA production deployment는 Phase 3에서 별도 검증 완료
 - [ ] Supabase Free DB/Realtime 한도와 현재 Aura 사용량 비교
 
 ### Phase 1 — Oracle self-hosted Supabase staging
@@ -455,7 +455,7 @@ restore rehearsal은 production write를 발생시키지 않는다.
 - [x] Storage object payload 1,226건 staging migration + sample SHA-256 8/8 검증
 - [x] Storage API -> OCI Object Storage S3 backend 및 API download SHA-256 8/8 검증
 - [x] persisted `*.supabase.co/storage/v1/object/` URL inventory(11 column/1,173 row) 및 endpoint/backfill 전략 확정
-- [ ] `supabase.aura-board.com` public nginx/DNS endpoint 구축 및 외부 download 검증
+- [x] `supabase.aura-board.com` public nginx/TLS 및 Cloudflare proxied DNS endpoint 구축. Auth/REST unauthenticated `401`, Storage status `200`, Auth/Storage healthy 확인. private/signed download와 persisted URL 최종 smoke는 app-env cutover gate로 유지
 - [x] Bastion session keeper IAM policy 적용, local port-forwarding SSH E2E, public TCP/22 폐쇄 검증
 
 ### Phase 2 — Backup hardening

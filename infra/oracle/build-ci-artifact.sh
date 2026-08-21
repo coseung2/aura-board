@@ -25,6 +25,18 @@ npm run build
 cargo test --locked --manifest-path services/play-engine/Cargo.toml --workspace
 cargo build --locked --release --manifest-path services/play-engine/Cargo.toml -p play-server
 
+if [[ ${AURA_BUILD_CUTOVER_MANIFEST:-0} == 1 ]]; then
+  test -f .next/standalone/server.js
+  test -f services/play-engine/target/release/play-server
+  python3 infra/oracle/create-cutover-build-manifest.py \
+    --build-sha "${release_id}" \
+    --app-artifact .next/standalone/server.js \
+    --engine-artifact services/play-engine/target/release/play-server \
+    --output .next/standalone/cutover-build-manifest.json \
+    --write
+  test -s .next/standalone/cutover-build-manifest.json
+fi
+
 bundle_dir=$(mktemp -d)
 cleanup() {
   rm -rf -- "${bundle_dir}"
@@ -53,4 +65,3 @@ tar \
 )
 
 echo "artifact_ready=${archive}"
-

@@ -56,6 +56,18 @@ jobs:
         shell: bash
         run: sudo -E python3 infra/oracle/supabase-selfhost/tests/test_replication_endpoint_tools.py -v
 
+      - name: Verify production cutover tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -E python3 -m unittest \
+            infra.oracle.supabase-selfhost.tests.test_production_cutover_db \
+            infra.oracle.tests.test_production_cutover_runtime \
+            infra.oracle.tests.test_create_cutover_build_manifest \
+            -v
+          bash -n infra/oracle/build-ci-artifact.sh
+          bash -n infra/oracle/build-release.sh
+
       - name: Build verified release artifact
         shell: bash
         run: bash infra/oracle/build-ci-artifact.sh "$GITHUB_SHA" "$RUNNER_TEMP/oracle-release"
