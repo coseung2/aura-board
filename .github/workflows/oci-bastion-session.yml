@@ -67,17 +67,28 @@ jobs:
             --compartment-id "$compartment_id" \
             --name "$BASTION_NAME" \
             --bastion-lifecycle-state ACTIVE \
+            --all \
             --output json)
-          endpoint_ip=$(python3 -c '
-          import ipaddress, json, sys
+          bastion_id=$(python3 -c '
+          import json, sys
           items = json.load(sys.stdin).get("data", [])
           if len(items) != 1:
               raise SystemExit("expected exactly one active Bastion")
-          value = ipaddress.ip_address(items[0]["private-endpoint-ip-address"])
+          print(items[0]["id"])
+          ' <<<"$bastion_json")
+          bastion_detail=$(oci bastion bastion get \
+            --auth instance_principal \
+            --region "$region" \
+            --bastion-id "$bastion_id" \
+            --output json)
+          endpoint_ip=$(python3 -c '
+          import ipaddress, json, sys
+          item = json.load(sys.stdin)["data"]
+          value = ipaddress.ip_address(item["private-endpoint-ip-address"])
           if not value.is_private:
               raise SystemExit("Bastion endpoint must be private")
           print(value)
-          ' <<<"$bastion_json")
+          ' <<<"$bastion_detail")
           sudo -n systemctl restart ssh.service
           if ! sudo -n iptables -C INPUT -p tcp -s "${endpoint_ip}/32" --dport 22 -j ACCEPT 2>/dev/null; then
             sudo -n iptables -I INPUT 1 -p tcp -s "${endpoint_ip}/32" --dport 22 -j ACCEPT
