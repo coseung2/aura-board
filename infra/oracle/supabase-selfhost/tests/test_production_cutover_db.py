@@ -12,6 +12,7 @@ import shutil
 import stat
 import subprocess
 import tempfile
+import time
 import unittest
 from unittest import mock
 
@@ -1190,7 +1191,62 @@ class EphemeralPostgresHarness:
     def start(self) -> None:
         if not self.docker:
             raise unittest.SkipTest("Docker unavailable")
-        subprocess.run([self.docker, "run", "--rm", "-d", "--name", self.name, "-e", "POSTGRES_PASSWORD=test-only", "postgres:16-alpine"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(
+            [
+                self.docker,
+                "run",
+                "--rm",
+                "-d",
+                "--name",
+                self.name,
+                "-e",
+                "POSTGRES_PASSWORD=test-only",
+                "postgres:16-alpine",
+            ],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            result = subprocess.run(
+                [self.docker, "exec", self.name, "pg_isready", "-U", "postgres"],
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            if result.returncode == 0:
+                return
+            time.sleep(0.25)
+        raise AssertionError("ephemeral PostgreSQL container did not become ready")
+
+    def psql(self, sql: str) -> str:
+        if not self.docker:
+            raise AssertionError("Docker unavailable")
+        result = subprocess.run(
+            [
+                self.docker,
+                "exec",
+                "-i",
+                self.name,
+                "psql",
+                "-U",
+                "postgres",
+                "-d",
+                "postgres",
+                "--no-psqlrc",
+                "--quiet",
+                "--set=ON_ERROR_STOP=1",
+                "--tuples-only",
+                "--no-align",
+                "--file=-",
+            ],
+            input=sql,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        return result.stdout.strip()
 
     def stop(self) -> None:
         if self.docker:
@@ -1199,11 +1255,41 @@ class EphemeralPostgresHarness:
 
 @unittest.skipUnless(os.environ.get("AURA_CUTOVER_RUN_DOCKER_TESTS") == "1", "set AURA_CUTOVER_RUN_DOCKER_TESTS=1 to run the ephemeral PostgreSQL harness")
 class DockerIntegrationTests(unittest.TestCase):
-    def test_ephemeral_postgres_harness_path(self) -> None:
+    def test_catalog_sql_executes_and_fingerprints_dependencies(self) -> None:
         harness = EphemeralPostgresHarness()
         try:
             harness.start()
-            self.assertIsNotNone(harness.docker)
+            harness.psql(
+                """
+                CREATE SCHEMA app;
+                CREATE TABLE app.parent (id integer PRIMARY KEY);
+                CREATE TABLE app.child (parent_id integer REFERENCES app.parent(id));
+                CREATE INDEX child_parent_idx ON app.child(parent_id);
+                """
+            )
+            objects = json.loads(harness.psql(cutover._lib.CATALOG_SQL))
+            self.assertIsInstance(objects, list)
+            self.assertTrue(objects)
+            self.assertTrue(
+                all(
+                    isinstance(item, dict)
+                    and set(item) == {"kind", "schema_name", "object_name", "detail"}
+                    for item in objects
+                )
+            )
+            dependencies = [
+                item
+                for item in objects
+                if item["kind"] == "dependency" and item["schema_name"] == "app"
+            ]
+            self.assertTrue(dependencies)
+            self.assertTrue(
+                any(
+                    item["object_name"] == "child_parent_idx->app.child"
+                    and set(item["detail"]) == {"dependency_type", "subobject", "subobject_id"}
+                    for item in dependencies
+                )
+            )
         finally:
             harness.stop()
 
