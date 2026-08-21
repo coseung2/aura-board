@@ -228,6 +228,7 @@ WHERE d.datname = current_database()
 GROUP BY d.datname, owner_role.rolname;
 """
 CATALOG_SQL = r"""/* aura:catalog-fingerprint */
+SET search_path = pg_catalog;
 WITH acl_source(object_kind, oid, raw_acl, default_acl) AS (
     SELECT
         'relation',

@@ -234,7 +234,9 @@ The named service-internal schemas excluded from application comparison are
 `pgbouncer`, and `supabase_functions`. Any other schema remains compared. Catalog
 dependency subobject fingerprints use local and referenced column names, with
 NULL for relation-level dependencies, so physical OID and column-order shifts
-do not pass as semantic drift.
+do not pass as semantic drift. Catalog extraction fixes `search_path` to
+`pg_catalog`, so `format_type`, default expressions, constraint definitions,
+and predicates remain schema-qualified independent of the connection role.
 
 ## Promotion manifest 계약
 

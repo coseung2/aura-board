@@ -2201,6 +2201,7 @@ class DockerIntegrationTests(unittest.TestCase):
             harness.stop()
 
     def test_catalog_sql_canonicalizes_acl_policy_roles_with_shifted_oids_and_semantic_columns(self) -> None:
+        self.assertIn("SET search_path = pg_catalog;", cutover._lib.CATALOG_SQL)
         harness = EphemeralPostgresHarness()
         try:
             harness.start()
