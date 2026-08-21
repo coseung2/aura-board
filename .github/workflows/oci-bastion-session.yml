@@ -89,11 +89,26 @@ jobs:
               raise SystemExit("Bastion endpoint must be private")
           print(value)
           ' <<<"$bastion_detail")
-          sudo -n systemctl restart ssh.service
-          if ! sudo -n iptables -C INPUT -p tcp -s "${endpoint_ip}/32" --dport 22 -j ACCEPT 2>/dev/null; then
-            sudo -n iptables -I INPUT 1 -p tcp -s "${endpoint_ip}/32" --dport 22 -j ACCEPT
+          if sudo -n true 2>/dev/null; then
+            sudo -n systemctl restart ssh.service
+            if ! sudo -n iptables -C INPUT -p tcp -s "${endpoint_ip}/32" --dport 22 -j ACCEPT 2>/dev/null; then
+              sudo -n iptables -I INPUT 1 -p tcp -s "${endpoint_ip}/32" --dport 22 -j ACCEPT
+            fi
+            sudo -n sh -c 'iptables-save > /etc/iptables/rules.v4'
+          else
+            docker info >/dev/null
+            docker run --rm --privileged --network host --pid host \
+              --env ENDPOINT_IP="$endpoint_ip" \
+              --volume /etc/iptables:/host-iptables \
+              alpine:3.20 sh -eu -c '
+                apk add --no-cache iptables util-linux >/dev/null
+                nsenter --target 1 --mount --uts --ipc --net --pid systemctl restart ssh.service
+                if ! iptables -C INPUT -p tcp -s "${ENDPOINT_IP}/32" --dport 22 -j ACCEPT 2>/dev/null; then
+                  iptables -I INPUT 1 -p tcp -s "${ENDPOINT_IP}/32" --dport 22 -j ACCEPT
+                fi
+                iptables-save > /host-iptables/rules.v4
+              '
           fi
-          sudo -n sh -c 'iptables-save > /etc/iptables/rules.v4'
 
       - name: Ensure an active OCI Bastion session
         shell: bash
