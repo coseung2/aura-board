@@ -2123,6 +2123,8 @@ class EphemeralPostgresHarness:
                 stderr=subprocess.DEVNULL,
             )
             if result.returncode == 0:
+                self.psql("CREATE EXTENSION IF NOT EXISTS pgcrypto;", "postgres")
+                self.psql("CREATE EXTENSION IF NOT EXISTS pgcrypto;", "template1")
                 return
             time.sleep(0.25)
         raise AssertionError("ephemeral PostgreSQL container did not become ready")
@@ -2345,7 +2347,10 @@ class DockerIntegrationTests(unittest.TestCase):
                     and item["schema_name"] == "public"
                     and item["object_name"] == object_name
                 )
-                self.assertEqual(source_item["detail"]["owner"], "postgres")
+                self.assertEqual(
+                    source_item["detail"]["owner"],
+                    "pg_database_owner" if kind == "schema" else "postgres",
+                )
                 self.assertEqual(source_item["detail"], target_item["detail"])
                 if kind in {"schema", "routine", "type", "index"}:
                     self.assertIsInstance(source_item["detail"]["acl"], list)
