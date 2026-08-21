@@ -1284,6 +1284,8 @@ class EphemeralPostgresHarness:
     def __init__(self) -> None:
         self.docker = shutil.which("docker")
         self.name = "aura-cutover-test-postgres"
+        self.catalog_source = "aura_cutover_catalog_source"
+        self.catalog_target = "aura_cutover_catalog_target"
 
     def start(self) -> None:
         if not self.docker:
@@ -1317,7 +1319,7 @@ class EphemeralPostgresHarness:
             time.sleep(0.25)
         raise AssertionError("ephemeral PostgreSQL container did not become ready")
 
-    def psql(self, sql: str) -> str:
+    def psql(self, sql: str, database: str = "postgres") -> str:
         if not self.docker:
             raise AssertionError("Docker unavailable")
         result = subprocess.run(
@@ -1330,7 +1332,7 @@ class EphemeralPostgresHarness:
                 "-U",
                 "postgres",
                 "-d",
-                "postgres",
+                database,
                 "--no-psqlrc",
                 "--quiet",
                 "--set=ON_ERROR_STOP=1",
@@ -1394,33 +1396,96 @@ class DockerIntegrationTests(unittest.TestCase):
             harness.start()
             harness.psql(
                 """
-                CREATE SCHEMA app;
-                CREATE TABLE app.parent (id integer PRIMARY KEY);
-                CREATE TABLE app.child (parent_id integer REFERENCES app.parent(id));
-                CREATE INDEX child_parent_idx ON app.child(parent_id);
+                CREATE DATABASE aura_cutover_catalog_source;
+                CREATE DATABASE aura_cutover_catalog_target;
                 """
             )
-            objects = json.loads(harness.psql(cutover._lib.CATALOG_SQL))
-            self.assertIsInstance(objects, list)
-            self.assertTrue(objects)
-            self.assertTrue(
-                all(
-                    isinstance(item, dict)
-                    and set(item) == {"kind", "schema_name", "object_name", "detail"}
-                    for item in objects
-                )
+            topology = """
+                CREATE SCHEMA app;
+                CREATE TABLE app.parent (id integer PRIMARY KEY);
+                CREATE TABLE app.child (
+                    id integer PRIMARY KEY,
+                    parent_id integer NOT NULL,
+                    CONSTRAINT child_parent_fk
+                        FOREIGN KEY (parent_id) REFERENCES app.parent(id)
+                );
+                CREATE INDEX child_parent_idx ON app.child(parent_id);
+            """
+            harness.psql(
+                """
+                CREATE SCHEMA oid_shift;
+                CREATE TABLE oid_shift.noise (id integer PRIMARY KEY);
+                CREATE INDEX noise_idx ON oid_shift.noise(id);
+                CREATE SEQUENCE oid_shift.noise_sequence;
+                """,
+                harness.catalog_target,
             )
-            dependencies = [
-                item
-                for item in objects
-                if item["kind"] == "dependency" and item["schema_name"] == "app"
-            ]
-            self.assertTrue(dependencies)
+            harness.psql(topology, harness.catalog_source)
+            harness.psql(topology, harness.catalog_target)
+
+            relation_oid_sql = """
+                SELECT c.oid
+                FROM pg_class c
+                JOIN pg_namespace n ON n.oid = c.relnamespace
+                WHERE n.nspname = 'app' AND c.relname = 'child';
+            """
+            self.assertNotEqual(
+                harness.psql(relation_oid_sql, harness.catalog_source),
+                harness.psql(relation_oid_sql, harness.catalog_target),
+                "the harness must allocate different relation OIDs",
+            )
+
+            def dependencies(database: str) -> list[tuple[str, str]]:
+                objects = json.loads(harness.psql(cutover._lib.CATALOG_SQL, database))
+                self.assertIsInstance(objects, list)
+                self.assertTrue(objects)
+                self.assertTrue(
+                    all(
+                        isinstance(item, dict)
+                        and set(item) == {"kind", "schema_name", "object_name", "detail"}
+                        for item in objects
+                    )
+                )
+                rows = [
+                    item
+                    for item in objects
+                    if item["kind"] == "dependency" and item["schema_name"] == "app"
+                ]
+                self.assertTrue(rows)
+                self.assertTrue(
+                    all(
+                        set(item["detail"]) == {"dependency_type", "objsubid", "refobjsubid"}
+                        for item in rows
+                    )
+                )
+                return sorted(
+                    (
+                        item["object_name"],
+                        json.dumps(item["detail"], sort_keys=True),
+                    )
+                    for item in rows
+                )
+
+            source_dependencies = dependencies(harness.catalog_source)
+            target_dependencies = dependencies(harness.catalog_target)
+            self.assertEqual(source_dependencies, target_dependencies)
             self.assertTrue(
                 any(
-                    item["object_name"] == "child_parent_idx->app.child"
-                    and set(item["detail"]) == {"dependency_type", "subobject", "subobject_id"}
-                    for item in dependencies
+                    object_name == "child_parent_idx->app.child"
+                    for object_name, _detail in source_dependencies
+                )
+            )
+
+            harness.psql(
+                "CREATE INDEX child_parent_extra_idx ON app.child(parent_id, id);",
+                harness.catalog_target,
+            )
+            changed_dependencies = dependencies(harness.catalog_target)
+            self.assertNotEqual(source_dependencies, changed_dependencies)
+            self.assertTrue(
+                any(
+                    object_name == "child_parent_extra_idx->app.child"
+                    for object_name, _detail in changed_dependencies
                 )
             )
         finally:
