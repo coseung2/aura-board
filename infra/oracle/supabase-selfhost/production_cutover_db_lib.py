@@ -1142,6 +1142,22 @@ def migration_records(value: Any, label: str) -> list[dict[str, Any]]:
 def compare_migrations(source: Any, candidate: Any) -> None:
     source_rows = migration_records(source, "source")
     candidate_rows = migration_records(candidate, "candidate")
+    for rows, label in ((source_rows, "source"), (candidate_rows, "candidate")):
+        finished_names = {
+            item["migration_name"]
+            for item in rows
+            if migration_state(item) == "finished"
+        }
+        for item in rows:
+            if (
+                migration_state(item) == "rolled-back"
+                and item["migration_name"] not in finished_names
+            ):
+                raise CutoverError(
+                    f"{label} rolled-back migration history has no finished replacement: "
+                    f"{item['migration_name']}"
+                )
+
     source_map = {
         (item["migration_name"], item["id"]): item for item in source_rows
     }
@@ -1190,8 +1206,6 @@ def compare_migrations(source: Any, candidate: Any) -> None:
             raise CutoverError(f"migration logs mismatch: {name}")
         if source_state == "unfinished":
             raise CutoverError(f"unfinished migration history: {name}")
-        if source_state == "rolled-back":
-            raise CutoverError(f"rolled-back migration history: {name}")
     if source_rows != candidate_rows:
         raise CutoverError("migration history records are not exactly ordered and equal")
 

@@ -601,6 +601,73 @@ class CutoverTests(unittest.TestCase):
         with self.assertRaisesRegex(cutover.CutoverError, "missing.*public._prisma_migrations"):
             cutover.compare_migrations(source, {"present": False, "records": []})
 
+    def test_exact_rolled_back_and_finished_duplicate_is_accepted(self) -> None:
+        name = "202608210001_replayed_migration"
+        source = {
+            "present": True,
+            "records": [
+                migration(
+                    name,
+                    id=f"{name}-rollback",
+                    started_at="2026-08-21T00:00:00+00:00",
+                    finished_at=None,
+                    rolled_back_at="2026-08-21T00:01:00+00:00",
+                ),
+                migration(
+                    name,
+                    id=f"{name}-finished",
+                    started_at="2026-08-21T00:02:00+00:00",
+                ),
+            ],
+        }
+
+        cutover.compare_migrations(source, json.loads(json.dumps(source)))
+
+    def test_orphan_rolled_back_migration_is_rejected(self) -> None:
+        name = "202608210001_orphaned_rollback"
+        source = {
+            "present": True,
+            "records": [
+                migration(
+                    name,
+                    finished_at=None,
+                    rolled_back_at="2026-08-21T00:01:00+00:00",
+                )
+            ],
+        }
+
+        with self.assertRaisesRegex(cutover.CutoverError, "no finished replacement"):
+            cutover.compare_migrations(source, json.loads(json.dumps(source)))
+
+    def test_rolled_back_replacement_mismatch_or_missing_is_rejected(self) -> None:
+        name = "202608210001_replacement_gate"
+        source = {
+            "present": True,
+            "records": [
+                migration(
+                    name,
+                    id=f"{name}-rollback",
+                    started_at="2026-08-21T00:00:00+00:00",
+                    finished_at=None,
+                    rolled_back_at="2026-08-21T00:01:00+00:00",
+                ),
+                migration(
+                    name,
+                    id=f"{name}-finished",
+                    started_at="2026-08-21T00:02:00+00:00",
+                ),
+            ],
+        }
+        candidate = json.loads(json.dumps(source))
+        candidate["records"][1]["checksum"] = "different"
+        with self.assertRaisesRegex(cutover.CutoverError, "checksum"):
+            cutover.compare_migrations(source, candidate)
+
+        candidate = json.loads(json.dumps(source))
+        candidate["records"].pop()
+        with self.assertRaisesRegex(cutover.CutoverError, "no finished replacement"):
+            cutover.compare_migrations(source, candidate)
+
     def test_duplicate_migration_names_compare_by_name_and_id(self) -> None:
         name = "202608210001_duplicate_name"
         source_records = [
