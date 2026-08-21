@@ -491,6 +491,17 @@ restore rehearsal은 production write를 발생시키지 않는다.
 - [ ] DR replica 정상 추종 확인
 - [ ] backup/restore 재검증
 
+2026-08-21 체크포인트: Library migration과 147개 Prisma history를 Oracle target까지
+맞췄고, SHA `4e8389ecfe6e090b37eb8c1d8fca3ba7f69dfe83`의 self-host-targeted fresh
+release/manifest와 hardened cutover 도구를 A1에 staging했다. Infisical cutover scope와
+root-only stdin contract도 준비됐다. 다만 host에서 Docker internal PostgreSQL로 향하는
+target/target_admin transport가 막혀 DB preflight는 미완료다. production은 managed
+Supabase를 계속 사용하고 write fence/env switch/promotion/seal은 하나도 실행하지 않았다.
+다음 작업은 loopback-only Docker admin proxy를 통해 target preflight를 통과시키는
+것부터 시작하며, 상세 상태와 재개 순서는 `production-cutover-runbook.md`의
+`2026-08-21 재개 체크포인트`를 단일 기준으로 사용한다. GitHub Oracle production deploy
+workflow는 cutover 중 일반 artifact가 staged SHA를 선점하지 않도록 수동 비활성화 상태다.
+
 ## 15. 하지 않을 것
 
 초기 범위에서 다음은 하지 않는다.

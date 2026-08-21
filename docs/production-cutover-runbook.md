@@ -6,6 +6,72 @@
 Oracle nginx/TLS, self-hosted Auth/Storage, OCI S3 backend는 준비됐지만 아래 gate를
 모두 통과하기 전에는 앱 환경을 self-hosted로 바꾸지 않는다.
 
+## 2026-08-21 재개 체크포인트
+
+이 절이 다음 작업 세션의 시작점이다. production은 계속 managed Supabase를 사용하며
+write fence, password rotation, database promotion, app/backup env 교체,
+`--seal-before-writers`는 **모두 미실행**이다. 마지막 외부 `/api/health`는 `200`이었다.
+
+완료된 준비 상태:
+
+- Library migration `20260819090000_add_teacher_content_library`를 managed source와
+  Oracle target에 모두 적용했다. Prisma migration history는 양쪽 147개이며 Library
+  두 테이블의 현재 row count는 모두 0이다.
+- cutover 안전 보완과 Linux ARM64 gate를 통과한 뒤 live compose container 이름을
+  반영한 SHA `4e8389ecfe6e090b37eb8c1d8fca3ba7f69dfe83`을 `main`에 push했다.
+- self-host 공개 URL/key를 주입한 fresh immutable release를
+  `/opt/aura-board-app/releases/4e8389ecfe6e090b37eb8c1d8fca3ba7f69dfe83`와
+  `/opt/aura-board-play-engine/releases/4e8389ecfe6e090b37eb8c1d8fca3ba7f69dfe83`에
+  생성했다. app release의 `cutover-build-manifest.json`은 root-owned mode `0600`이고,
+  active `current` symlink는 아직 이전 managed-target release를 가리킨다.
+- exact-SHA 도구 사본은
+  `/opt/aura-board-cutover/releases/4e8389ecfe6e090b37eb8c1d8fca3ba7f69dfe83`에 있다.
+  DB/runtime state directory는 각각
+  `/var/lib/aura-board/production-cutover-db`와
+  `/var/lib/aura-board/production-cutover-runtime`이며 root-owned mode `0700`이다.
+- secret stdin contract는 DB state directory의 `contract.json`에 root-owned mode
+  `0600`으로 보관했다. 값을 출력하거나 source control로 복사하지 않는다.
+- self-host env 75개는 Infisical `prod`
+  `/oracle/aura-board/cutover/selfhost`, rotation metadata/password는
+  `/oracle/aura-board/cutover`에 저장했다. Cloudflare/S3 기존 scope는 변경하지 않았다.
+- OCI managed Bastion SSH를 복구했다. target ingress는 private subnet
+  `10.42.1.0/24 -> TCP/22`만 남겼고, 임시 공인 target SSH `/32`와 Bastion endpoint
+  단일 `/32` NSG/security-list rule은 제거했다. 작업 중 사용한 Bastion client
+  allowlist의 operator `/32`도 제거했으므로 다음 세션은 승인된 현재 IP `/32`를 다시
+  추가한 뒤 연결하고 종료 시 다시 제거한다.
+- cutover SHA release path를 managed-target artifact가 선점하지 않도록 GitHub
+  `Deploy Oracle Production` workflow는 `disabled_manually` 상태다. cutover 완료 후
+  health와 active SHA를 확인한 다음 다시 enable한다. 중간에 일반 push/deploy를 하지 않는다.
+
+현재 중단 지점:
+
+- secret-free connection probe에서 managed old writer credential(`writer_0`)은 성공했고,
+  temporary credential(`source`)은 아직 password rotation 전이므로 예상대로 거부됐다.
+- Oracle `target`/`target_admin`은 Docker internal DB IP로 host에서 직접 연결할 수 없어
+  transport 단계에서 실패했다. 따라서 DB `preflight`는 완료되지 않았고 journal,
+  fence, export, candidate, promotion 단계로 진행하지 않았다.
+
+다음 세션의 실행 순서:
+
+1. Infisical의 provisioning key로 OCI CLI를 재구성하고, 승인된 현재 client `/32`로
+   managed Bastion SSH를 연결한다. public target TCP/22를 다시 열지 않는다.
+2. A1에서 기존 image/tool을 우선 재사용해 self-host DB와 같은 Docker network에
+   loopback-only admin proxy를 만든다. 목표 경로는 host
+   `127.0.0.1:15434 -> supabase-db:5432`이며 public/wildcard bind는 금지한다.
+3. root-only `contract.json`의 `target`과 `target_admin` host/port만 위 loopback 경로로
+   원자 교체한다. source/rotation password와 container set은 바꾸지 않는다.
+4. secret-free probe에서 `writer_0`, `target`, `target_admin` 성공과 `source`의
+   password-auth 거부를 확인한 뒤 DB `preflight`를 다시 실행한다. source/target Auth
+   catalog와 147개 migration history가 exact match하지 않으면 중단한다.
+5. preflight가 완료된 뒤에만 maintenance window를 시작한다. app/play-engine,
+   backup timer/service, video backfill, app cron과 target API/writer containers를
+   정지하고 external password rotation/read-only/cron fence → `adopt-fence` → export →
+   candidate restore/verify → promote → runtime write → active symlink switch → seal 순서로
+   진행한다.
+6. 최초 self-host production write와 health가 확인될 때까지 managed password/fence와
+   rollback DB를 보존한다. seal 전 실패는 도구 rollback, seal 후 실패는 forward
+   failback만 사용한다.
+
 ## 중단 조건
 
 - managed source에서 별도 export role과 모든 writer role의 `LOGIN`/`CONNECT`를
