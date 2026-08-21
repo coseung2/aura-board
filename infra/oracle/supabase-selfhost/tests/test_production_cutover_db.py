@@ -436,6 +436,22 @@ class CutoverTests(unittest.TestCase):
             result, _out, err = self.call(step)
             self.assertEqual(result, 0, f"{step}: {err}")
 
+    def test_production_stopped_container_contract_matches_live_a1_writer_api_set(self) -> None:
+        self.assertEqual(
+            cutover.PRODUCTION_STOPPED_CONTAINERS,
+            (
+                "realtime-dev.supabase-realtime",
+                "supabase-auth",
+                "supabase-edge-functions",
+                "supabase-envoy",
+                "supabase-meta",
+                "supabase-pooler",
+                "supabase-rest",
+                "supabase-storage",
+                "supabase-studio",
+            ),
+        )
+
     def test_dry_run_has_no_stdin_files_or_tool_io(self) -> None:
         with (
             mock.patch.object(cutover.sys, "stdin", mock.Mock(read=mock.Mock(side_effect=AssertionError("stdin read")))),

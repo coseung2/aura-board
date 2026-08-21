@@ -100,17 +100,15 @@ DATA_SNAPSHOT_CONTRACT = "aura-cutover-data-v2"
 PRODUCTION_STOPPED_CONTAINERS = tuple(
     sorted(
         {
-            "supabase-analytics",
+            "realtime-dev.supabase-realtime",
             "supabase-auth",
             "supabase-edge-functions",
-            "supabase-kong",
+            "supabase-envoy",
             "supabase-meta",
             "supabase-pooler",
-            "supabase-realtime",
             "supabase-rest",
             "supabase-storage",
             "supabase-studio",
-            "supabase-vector",
         }
     )
 )

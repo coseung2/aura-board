@@ -91,10 +91,10 @@ therefore still allowed with a default database ACL.
     `aura-video-thumbnail-backfill.service`, supplied by repeated
     `--required-stopped-service` arguments. It also requires repeated
     `--required-stopped-container` arguments for the complete production
-    self-host set: `supabase-analytics`, `supabase-auth`,
-    `supabase-edge-functions`, `supabase-kong`, `supabase-meta`,
-    `supabase-pooler`, `supabase-realtime`, `supabase-rest`,
-    `supabase-storage`, `supabase-studio`, and `supabase-vector`.
+    self-host set: `realtime-dev.supabase-realtime`, `supabase-auth`,
+    `supabase-edge-functions`, `supabase-envoy`, `supabase-meta`,
+    `supabase-pooler`, `supabase-rest`, `supabase-storage`, and
+    `supabase-studio`.
     PostgreSQL (`supabase-db`) is excluded because DB actions quiesce it through
     PostgreSQL session termination; read-only `supabase-imgproxy` is excluded
     because it cannot write the target database. The fixed
