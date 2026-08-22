@@ -301,8 +301,7 @@ export function StudentReadingScreenView({
                                 ) : entry.aiFeedbackStatus === "failed" ? (
                                   <View style={styles.feedbackStatusBox}>
                                     <Text style={styles.feedbackStatusText}>
-                                      {entry.aiFeedbackError ||
-                                        "AI 피드백을 만들지 못했어요."}
+                                      "피드백을 준비하지 못했어요. 잠시 후 다시 시도해 주세요."
                                     </Text>
                                     <ControlPressable
                                       style={styles.feedbackRetry}
@@ -310,7 +309,7 @@ export function StudentReadingScreenView({
                                         void requestFeedback(entry.id)
                                       }
                                       accessibilityRole="button"
-                                      accessibilityLabel={`${entry.title} AI 피드백 다시 시도`}
+                                      accessibilityLabel={`${entry.title} 피드백 다시 시도`}
                                     >
                                       <Text style={styles.feedbackRetryText}>
                                         다시 시도
@@ -324,7 +323,7 @@ export function StudentReadingScreenView({
                                       color={colors.accent}
                                     />
                                     <Text style={styles.feedbackStatusText}>
-                                      AI 피드백을 만들고 있어요.
+                                      피드백을 기다리는 중...
                                     </Text>
                                   </View>
                                 )}

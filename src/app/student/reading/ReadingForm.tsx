@@ -1,12 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  fetchReadingFeedback,
   fetchReadingEntries,
   generateReadingFeedback,
   saveReadingEntry,
+  ReadingFeedbackError,
   type BookType,
   type ReadingEntry,
+  type ReadingEvaluationFields,
 } from "@/lib/reading-client";
 
 const BOOK_OPTIONS: Array<{ value: BookType; label: string }> = [
@@ -28,6 +31,12 @@ const EMPTY_FORM: FormState = {
   reflection: "",
 };
 
+const FEEDBACK_POLL_INTERVAL_MS = 4_000;
+const FEEDBACK_POLL_TIMEOUT_MS = 2 * 60_000;
+const FEEDBACK_RETRY_COUNT = 1;
+
+type FeedbackPollResult = "generated" | "failed" | "timed_out";
+
 export function ReadingForm() {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [entries, setEntries] = useState<ReadingEntry[]>([]);
@@ -35,13 +44,28 @@ export function ReadingForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const activeFeedbackIds = useRef(new Set<string>());
+  const mounted = useRef(true);
 
   useEffect(() => {
     let alive = true;
+    mounted.current = true;
     setError(null);
     fetchReadingEntries()
       .then((data) => {
-        if (alive) setEntries(data.entries);
+        if (alive) {
+          setEntries(data.entries);
+          const recentCutoff = Date.now() - 10 * 60_000;
+          const entryToResume = data.entries.find((entry) => {
+            const isRecentPending =
+              entry.aiFeedbackStatus === "pending" &&
+              new Date(entry.updatedAt).getTime() >= recentCutoff;
+            return entry.aiFeedbackStatus === "processing" || isRecentPending;
+          });
+          if (entryToResume) {
+            void requestFeedback(entryToResume.id);
+          }
+        }
       })
       .catch((e: unknown) => {
         if (alive) {
@@ -53,6 +77,7 @@ export function ReadingForm() {
       });
     return () => {
       alive = false;
+      mounted.current = false;
     };
   }, []);
 
@@ -61,7 +86,17 @@ export function ReadingForm() {
     setNotice(null);
   }
 
-  async function requestFeedback(readingLogId: string) {
+  function updateEvaluation(readingLogId: string, evaluation: ReadingEvaluationFields) {
+    if (!mounted.current) return;
+    setEntries((prev) =>
+      prev.map((entry) =>
+        entry.id === readingLogId ? { ...entry, ...evaluation } : entry,
+      ),
+    );
+  }
+
+  function setFeedbackProcessing(readingLogId: string) {
+    if (!mounted.current) return;
     setEntries((prev) =>
       prev.map((entry) =>
         entry.id === readingLogId
@@ -69,22 +104,81 @@ export function ReadingForm() {
           : entry,
       ),
     );
+  }
+
+  async function pollFeedback(readingLogId: string): Promise<FeedbackPollResult> {
+    const deadline = Date.now() + FEEDBACK_POLL_TIMEOUT_MS;
+    while (Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, FEEDBACK_POLL_INTERVAL_MS));
+      try {
+        const { evaluation } = await fetchReadingFeedback(readingLogId);
+        updateEvaluation(readingLogId, evaluation);
+        if (evaluation.aiFeedbackStatus === "generated") return "generated";
+        if (evaluation.aiFeedbackStatus === "failed") return "failed";
+      } catch {
+        // A status check is best-effort. The next interval or the retrying POST
+        // will recover from a transient network/API failure.
+      }
+    }
+    return "timed_out";
+  }
+
+  function canRetryFeedback(error: unknown): boolean {
+    if (!(error instanceof ReadingFeedbackError)) return true;
+    if (error.code === "reading_ai_key_missing") return false;
+    return error.status === 409 || error.status === 429 || error.status >= 500;
+  }
+
+  async function requestFeedback(readingLogId: string) {
+    if (activeFeedbackIds.current.has(readingLogId)) return;
+    activeFeedbackIds.current.add(readingLogId);
+    setFeedbackProcessing(readingLogId);
     try {
-      const { evaluation } = await generateReadingFeedback(readingLogId);
-      setEntries((prev) =>
-        prev.map((entry) =>
-          entry.id === readingLogId ? { ...entry, ...evaluation } : entry,
-        ),
-      );
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "AI 피드백을 만들지 못했어요.";
-      setEntries((prev) =>
-        prev.map((entry) =>
-          entry.id === readingLogId
-            ? { ...entry, aiFeedbackStatus: "failed", aiFeedbackError: message }
-            : entry,
-        ),
-      );
+      for (let attempt = 0; attempt <= FEEDBACK_RETRY_COUNT; attempt += 1) {
+        try {
+          const { evaluation } = await generateReadingFeedback(readingLogId);
+          updateEvaluation(readingLogId, evaluation);
+          if (mounted.current && evaluation.aiFeedbackStatus === "generated") {
+            setNotice("피드백이 준비됐어요.");
+          }
+          return;
+        } catch (err) {
+          if (!canRetryFeedback(err)) {
+            updateEvaluation(readingLogId, {
+              aiScore: null,
+              aiFeedback: null,
+              aiFeedbackStatus: "failed",
+              aiFeedbackModel: null,
+              aiFeedbackError: "피드백을 준비하지 못했어요. 잠시 후 다시 시도해 주세요.",
+              evaluatedAt: null,
+            });
+            return;
+          }
+
+          if (mounted.current) {
+            setNotice("피드백을 기다리는 중이에요. 완료되면 자동으로 표시돼요.");
+          }
+          const pollResult = await pollFeedback(readingLogId);
+          if (pollResult === "generated") {
+            if (mounted.current) setNotice("피드백이 준비됐어요.");
+            return;
+          }
+          if (attempt === FEEDBACK_RETRY_COUNT) {
+            updateEvaluation(readingLogId, {
+              aiScore: null,
+              aiFeedback: null,
+              aiFeedbackStatus: "failed",
+              aiFeedbackModel: null,
+              aiFeedbackError: "피드백을 준비하는 데 시간이 걸리고 있어요. 잠시 후 다시 시도해 주세요.",
+              evaluatedAt: null,
+            });
+            return;
+          }
+          setFeedbackProcessing(readingLogId);
+        }
+      }
+    } finally {
+      activeFeedbackIds.current.delete(readingLogId);
     }
   }
 
@@ -118,7 +212,7 @@ export function ReadingForm() {
       });
       setEntries((prev) => [entry, ...prev]);
       setForm(EMPTY_FORM);
-      setNotice("저장했어요. AI 피드백을 만들고 있어요.");
+      setNotice("저장했어요. 피드백을 기다리는 중이에요.");
       void requestFeedback(entry.id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장에 실패했어요.");
@@ -259,7 +353,7 @@ export function ReadingForm() {
                 ) : entry.aiFeedbackStatus === "failed" ? (
                   <div className="reading-entry-evaluation reading-entry-evaluation-status">
                     <span className="reading-entry-feedback">
-                      {entry.aiFeedbackError || "AI 피드백을 만들지 못했어요."}
+                      피드백을 준비하지 못했어요. 잠시 후 다시 시도해 주세요.
                     </span>
                     <button
                       type="button"
@@ -271,7 +365,7 @@ export function ReadingForm() {
                   </div>
                 ) : (
                   <div className="reading-entry-evaluation reading-entry-evaluation-status">
-                    <span className="reading-entry-feedback">AI 피드백을 만들고 있어요.</span>
+                    <span className="reading-entry-feedback">피드백을 기다리는 중...</span>
                   </div>
                 )}
               </li>

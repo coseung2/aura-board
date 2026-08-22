@@ -39,6 +39,17 @@ export type ReadingEntryInput = {
   reflection: string;
 };
 
+export class ReadingFeedbackError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly code: string | null,
+  ) {
+    super(message);
+    this.name = "ReadingFeedbackError";
+  }
+}
+
 // GET /api/student/reading -> { entries: ReadingEntry[], count: number }
 export async function fetchReadingEntries(): Promise<{
   entries: ReadingEntry[];
@@ -68,8 +79,28 @@ export async function generateReadingFeedback(
   const res = await fetch(`/api/student/reading/${encodeURIComponent(readingLogId)}/feedback`, {
     method: "POST",
   });
-  if (!res.ok) throw new Error(await errorMessage(res));
+  if (!res.ok) throw await feedbackError(res);
   return (await res.json()) as { evaluation: ReadingEvaluationFields };
+}
+
+export async function fetchReadingFeedback(
+  readingLogId: string,
+): Promise<{ evaluation: ReadingEvaluationFields }> {
+  const res = await fetch(`/api/student/reading/${encodeURIComponent(readingLogId)}/feedback`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw await feedbackError(res);
+  return (await res.json()) as { evaluation: ReadingEvaluationFields };
+}
+
+async function feedbackError(res: Response): Promise<ReadingFeedbackError> {
+  const body = await res.json().catch(() => ({}));
+  const message = body.message ?? body.error;
+  return new ReadingFeedbackError(
+    typeof message === "string" ? message : `요청 실패 (${res.status})`,
+    res.status,
+    typeof body.error === "string" ? body.error : null,
+  );
 }
 
 async function errorMessage(res: Response): Promise<string> {

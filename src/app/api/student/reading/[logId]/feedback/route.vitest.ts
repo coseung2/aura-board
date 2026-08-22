@@ -46,10 +46,11 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 import { ReadingLlmError } from "@/lib/reading-llm";
 
 const now = new Date("2026-08-06T09:00:00.000Z");
+const STALE_PROCESSING_MS = 2 * 60 * 1_000;
 
 function pendingLog() {
   return {
@@ -79,6 +80,12 @@ function request() {
 
 function context() {
   return { params: Promise.resolve({ logId: "log-1" }) };
+}
+
+function getRequest() {
+  return new Request("http://localhost/api/student/reading/log-1/feedback", {
+    method: "GET",
+  });
 }
 
 describe("POST /api/student/reading/[logId]/feedback", () => {
@@ -232,5 +239,119 @@ describe("POST /api/student/reading/[logId]/feedback", () => {
     expect(body.alreadyGenerated).toBe(true);
     expect(body.evaluation.aiScore).toBe(9);
     expect(mocks.evaluate).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/student/reading/[logId]/feedback", () => {
+  beforeEach(() => {
+    mocks.log = pendingLog();
+    mocks.findFirst.mockReset().mockImplementation(async () => mocks.log);
+    mocks.findUnique.mockReset().mockImplementation(async () => mocks.log);
+    mocks.updateMany.mockReset();
+    mocks.update.mockReset();
+    mocks.getTeacherKey.mockReset();
+    mocks.limit.mockReset();
+    mocks.evaluate.mockReset();
+  });
+
+  it("returns the current evaluation for the authenticated owner", async () => {
+    mocks.log = {
+      ...pendingLog(),
+      aiScore: 9,
+      aiFeedback: "완성된 피드백",
+      aiFeedbackStatus: "generated",
+      aiFeedbackModel: "gemini-2.5-pro",
+      evaluatedAt: now,
+    };
+
+    const response = await GET(getRequest(), context());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body).toEqual({
+      evaluation: {
+        aiScore: 9,
+        aiFeedback: "완성된 피드백",
+        aiFeedbackStatus: "generated",
+        aiFeedbackModel: "gemini-2.5-pro",
+        aiFeedbackError: null,
+        evaluatedAt: now.toISOString(),
+      },
+    });
+    expect(mocks.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: "log-1",
+          studentId: "student-1",
+          classroomId: "classroom-1",
+        },
+      }),
+    );
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("keeps a recently started generation in processing", async () => {
+    mocks.log = {
+      ...pendingLog(),
+      aiFeedbackStatus: "processing",
+      updatedAt: new Date(Date.now() - STALE_PROCESSING_MS + 30_000),
+    };
+
+    const response = await GET(getRequest(), context());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.evaluation.aiFeedbackStatus).toBe("processing");
+    expect(body.evaluation.aiFeedbackError).toBeNull();
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("does not confirm an overdue processing row as failed because the worker may still succeed", async () => {
+    mocks.log = {
+      ...pendingLog(),
+      aiFeedbackStatus: "processing",
+      updatedAt: new Date(Date.now() - STALE_PROCESSING_MS - 1_000),
+    };
+
+    const response = await GET(getRequest(), context());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.evaluation.aiFeedbackStatus).toBe("processing");
+    expect(body.evaluation.aiFeedbackError).toBeNull();
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(mocks.evaluate).not.toHaveBeenCalled();
+  });
+
+  it("returns a failed result without changing it during status polling", async () => {
+    mocks.log = {
+      ...pendingLog(),
+      aiFeedbackStatus: "failed",
+      aiFeedbackError: "AI 피드백을 생성하지 못했어요.",
+    };
+
+    const response = await GET(getRequest(), context());
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.evaluation).toMatchObject({
+      aiFeedbackStatus: "failed",
+      aiFeedbackError: "AI 피드백을 생성하지 못했어요.",
+    });
+    expect(mocks.updateMany).not.toHaveBeenCalled();
+    expect(mocks.update).not.toHaveBeenCalled();
+  });
+
+  it("returns not found when the reading log belongs to another student or classroom", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+
+    const response = await GET(getRequest(), context());
+    const body = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(body.error).toBe("reading_log_not_found");
   });
 });

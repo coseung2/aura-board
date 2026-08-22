@@ -84,6 +84,39 @@ function evaluationResponse(row: {
   };
 }
 
+export async function GET(_req: Request, { params }: RouteContext) {
+  const student = await getCurrentStudent();
+  if (!student) {
+    return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  }
+
+  const { logId } = await params;
+  const log = await db.readingLog.findFirst({
+    where: {
+      id: logId,
+      studentId: student.id,
+      classroomId: student.classroomId,
+    },
+    select: {
+      aiScore: true,
+      aiFeedback: true,
+      aiFeedbackStatus: true,
+      aiFeedbackModel: true,
+      aiFeedbackError: true,
+      evaluatedAt: true,
+    },
+  });
+
+  if (!log) {
+    return NextResponse.json(
+      { error: "reading_log_not_found" },
+      { status: 404 },
+    );
+  }
+
+  return NextResponse.json({ evaluation: evaluationResponse(log) });
+}
+
 export async function POST(_req: Request, { params }: RouteContext) {
   const student = await getCurrentStudent();
   if (!student) {

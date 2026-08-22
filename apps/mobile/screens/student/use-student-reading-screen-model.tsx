@@ -110,6 +110,13 @@ type ReadingEntry = ReadingEvaluationFields & {
   reflection: string;
   createdAt: string;
 };
+type ReadingFeedbackResponse = { evaluation: ReadingEvaluationFields };
+
+const FEEDBACK_POLL_INTERVAL_MS = 3_000;
+const FEEDBACK_STATUS_TIMEOUT_MS = 10_000;
+const FEEDBACK_POLL_WINDOW_MS = 2 * 60_000;
+const FEEDBACK_RESUME_WINDOW_MS = 10 * 60_000;
+const RETRYABLE_FEEDBACK_STATUSES = new Set([408, 409, 429]);
 
 export function useStudentReadingScreenModel() {
   const router = useRouter();
@@ -169,6 +176,10 @@ export function useStudentReadingScreenModel() {
   const [missionError, setMissionError] = useState<string | null>(null);
   const [attendanceBusy, setAttendanceBusy] = useState(false);
   const [claimingTitleKey, setClaimingTitleKey] = useState<string | null>(null);
+  const feedbackRequestsRef = useRef(new Set<string>());
+  const feedbackPollersRef = useRef(new Set<string>());
+  const feedbackResumeAttemptedRef = useRef(new Set<string>());
+  const isMountedRef = useRef(true);
   const readingCounts = useMemo(
     () => ({
       story: entries.filter((entry) => entry.bookType === "story").length,
@@ -220,7 +231,13 @@ export function useStudentReadingScreenModel() {
           cacheTtlMs: 5 * 60_000,
           forceRefresh: force,
         });
-        setEntries(payload.entries);
+        setEntries(
+          payload.entries.map((entry) =>
+            entry.aiFeedbackError
+              ? { ...entry, aiFeedbackError: "피드백을 만들지 못했어요." }
+              : entry,
+          ),
+        );
         setSummary(payload.summary ?? null);
         setClassroomTopFive(payload.classroomTopFive ?? []);
         setClassroomRankRewards(payload.classroomRankRewards ?? []);
@@ -381,6 +398,17 @@ export function useStudentReadingScreenModel() {
   }, [load]);
 
   useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      feedbackRequestsRef.current.clear();
+      feedbackPollersRef.current.clear();
+      feedbackResumeAttemptedRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
     if (
       activeTab === "missions" &&
       attendanceReward === null &&
@@ -392,6 +420,14 @@ export function useStudentReadingScreenModel() {
 
   const requestFeedback = useCallback(
     async (readingLogId: string) => {
+      if (
+        feedbackRequestsRef.current.has(readingLogId) ||
+        feedbackPollersRef.current.has(readingLogId)
+      ) {
+        return;
+      }
+      feedbackRequestsRef.current.add(readingLogId);
+
       setEntries((current) =>
         current.map((entry) =>
           entry.id === readingLogId
@@ -403,6 +439,80 @@ export function useStudentReadingScreenModel() {
             : entry,
         ),
       );
+
+      const updateEvaluation = (evaluation: ReadingEvaluationFields) => {
+        if (!isMountedRef.current) return;
+        const safeEvaluation =
+          evaluation.aiFeedbackStatus === "failed"
+            ? {
+                ...evaluation,
+                aiFeedbackError: "피드백을 만들지 못했어요.",
+              }
+            : evaluation;
+        setEntries((current) =>
+          current.map((entry) =>
+            entry.id === readingLogId
+              ? { ...entry, ...safeEvaluation }
+              : entry,
+          ),
+        );
+      };
+
+      const pollFeedback = async () => {
+        feedbackPollersRef.current.add(readingLogId);
+        const deadline = Date.now() + FEEDBACK_POLL_WINDOW_MS;
+        try {
+          while (
+            isMountedRef.current &&
+            Date.now() < deadline
+          ) {
+            await new Promise((resolve) =>
+              setTimeout(resolve, FEEDBACK_POLL_INTERVAL_MS),
+            );
+            if (!isMountedRef.current) return;
+
+            try {
+              const nextPayload = await apiFetch<ReadingFeedbackResponse>(
+                `/api/student/reading/${encodeURIComponent(readingLogId)}/feedback`,
+                { timeoutMs: FEEDBACK_STATUS_TIMEOUT_MS },
+              );
+              const evaluation = nextPayload.evaluation;
+              if (
+                evaluation.aiFeedbackStatus === "generated" ||
+                evaluation.aiFeedbackStatus === "failed"
+              ) {
+                updateEvaluation(evaluation);
+                if (evaluation.aiFeedbackStatus === "generated") {
+                  setNotice("피드백이 완성되었어요.");
+                  void load(true);
+                }
+                return;
+              }
+            } catch (pollError) {
+              if (await handleError(pollError)) return;
+              const retryable =
+                pollError instanceof ApiError &&
+                (pollError.status === 0 ||
+                  RETRYABLE_FEEDBACK_STATUSES.has(pollError.status) ||
+                  pollError.status >= 500);
+              if (!retryable) {
+                updateEvaluation({
+                  aiScore: null,
+                  aiFeedback: null,
+                  aiFeedbackStatus: "failed",
+                  aiFeedbackModel: null,
+                  aiFeedbackError: "피드백을 만들지 못했어요.",
+                  evaluatedAt: null,
+                });
+                return;
+              }
+            }
+          }
+        } finally {
+          feedbackPollersRef.current.delete(readingLogId);
+        }
+      };
+
       try {
         const payload = await apiFetch<{ evaluation: ReadingEvaluationFields }>(
           `/api/student/reading/${encodeURIComponent(readingLogId)}/feedback`,
@@ -413,36 +523,58 @@ export function useStudentReadingScreenModel() {
             timeoutMs: 65_000,
           },
         );
-        setEntries((current) =>
-          current.map((entry) =>
-            entry.id === readingLogId
-              ? { ...entry, ...payload.evaluation }
-              : entry,
-          ),
-        );
-        setNotice("AI 피드백이 완성되었어요.");
-        void load(true);
+        updateEvaluation(payload.evaluation);
+        if (payload.evaluation.aiFeedbackStatus === "generated") {
+          setNotice("피드백이 완성되었어요.");
+          void load(true);
+        } else if (payload.evaluation.aiFeedbackStatus !== "failed") {
+          await pollFeedback();
+        }
       } catch (nextError) {
         if (await handleError(nextError)) return;
-        const message =
-          nextError instanceof ApiError && typeof nextError.message === "string"
-            ? nextError.message
-            : "AI 피드백을 만들지 못했어요.";
-        setEntries((current) =>
-          current.map((entry) =>
-            entry.id === readingLogId
-              ? {
-                  ...entry,
-                  aiFeedbackStatus: "failed",
-                  aiFeedbackError: message,
-                }
-              : entry,
-          ),
-        );
+        const retryable =
+          nextError instanceof ApiError &&
+          (nextError.status === 0 ||
+            RETRYABLE_FEEDBACK_STATUSES.has(nextError.status) ||
+            nextError.status >= 500);
+        if (!retryable) {
+          setEntries((current) =>
+            current.map((entry) =>
+              entry.id === readingLogId
+                ? {
+                    ...entry,
+                    aiFeedbackStatus: "failed",
+                    aiFeedbackError: "피드백을 만들지 못했어요.",
+                  }
+                : entry,
+            ),
+          );
+        } else {
+          await pollFeedback();
+        }
+      } finally {
+        feedbackRequestsRef.current.delete(readingLogId);
       }
     },
     [handleError, load],
   );
+
+  useEffect(() => {
+    if (loading) return;
+    const cutoff = Date.now() - FEEDBACK_RESUME_WINDOW_MS;
+    for (const entry of entries) {
+      const recentPending =
+        entry.aiFeedbackStatus === "pending" &&
+        new Date(entry.createdAt).getTime() >= cutoff;
+      if (
+        (entry.aiFeedbackStatus === "processing" || recentPending) &&
+        !feedbackResumeAttemptedRef.current.has(entry.id)
+      ) {
+        feedbackResumeAttemptedRef.current.add(entry.id);
+        void requestFeedback(entry.id);
+      }
+    }
+  }, [entries, loading, requestFeedback]);
 
   async function save() {
     if (!title.trim() || !author.trim() || !reflection.trim()) {
@@ -471,8 +603,9 @@ export function useStudentReadingScreenModel() {
       setAuthor(EMPTY_READING_COMPOSER_DRAFT.author);
       setReflection(EMPTY_READING_COMPOSER_DRAFT.reflection);
       setComposerInstanceId((current) => nextReadingComposerInstanceId(current));
-      setNotice("저장했어요. AI 피드백을 만들고 있어요.");
+      setNotice("저장했어요. 피드백을 기다리는 중...");
       setComposerVisible(false);
+      feedbackResumeAttemptedRef.current.add(payload.entry.id);
       void requestFeedback(payload.entry.id);
     } catch (nextError) {
       if (!(await handleError(nextError)))
