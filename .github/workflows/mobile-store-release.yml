@@ -16,6 +16,7 @@ on:
           - android-promote
           - ios-build
           - ios
+          - ios-submit
       expected_version:
         description: App version that must be present in app.config.ts
         required: true
@@ -379,4 +380,43 @@ jobs:
             else
               echo "- Destination: App Store Connect"
             fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  ios-submit-review:
+    name: iOS submit for review
+    environment: production
+    if: ${{ inputs.platform == 'ios-submit' }}
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v5
+
+      - name: Load release secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: oidc
+          identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
+          oidc-audience: https://github.com/coseung2
+          project-slug: mobile-release-d-w6g
+          env-slug: prod
+          secret-path: /aura-board
+
+      - name: Setup Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Submit newest ${{ inputs.expected_version }} build for App Store review
+        run: node .github/scripts/submit-ios-for-review.mjs --version "${{ inputs.expected_version }}"
+
+      - name: Write iOS submission summary
+        if: always()
+        run: |
+          {
+            echo "## iOS review submission"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Version: ${{ inputs.expected_version }}"
+            echo "- Source: App Store Connect API (infisical mobile-release-d-w6g secrets)"
           } >> "$GITHUB_STEP_SUMMARY"
