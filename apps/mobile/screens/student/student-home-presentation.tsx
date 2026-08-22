@@ -205,6 +205,7 @@ export function DailyGamePanel({
                 vehicleOffsetX={renderedVehicle?.vehicleOffsetX}
                 displayScale={homePetScene.displayScale}
                 expandSceneSurfaces
+                hostBackground={Boolean(equippedBackgroundPath)}
                 backgroundSpritePath={equippedBackgroundPath ?? undefined}
                 accessibilityLabel="내 대표 펫"
               />

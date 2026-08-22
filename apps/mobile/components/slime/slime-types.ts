@@ -94,6 +94,11 @@ export type SlimeSpriteProps = {
   /** Remote/API-relative scene background rendered behind floor and slime layers. */
   backgroundSpritePath?: string;
   /**
+   * Fill the host card slot with the scene background, matching web
+   * `hostBackground`. Character, floor, and vehicle stay in the logical scene.
+   */
+  hostBackground?: boolean;
+  /**
    * Force the wider scene viewport even when no scene asset is present yet.
    * Backgrounds, floors, trampolines, and vehicles expand automatically.
    */

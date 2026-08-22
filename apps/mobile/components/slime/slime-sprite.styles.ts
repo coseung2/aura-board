@@ -17,4 +17,9 @@ export const styles = StyleSheet.create({
   itemLayer: { zIndex: layers.spriteItem },
   propLayer: { zIndex: layers.spriteProp },
   frameViewport: { overflow: "hidden" },
+  hostScene: {
+    position: "absolute",
+    bottom: 0,
+    alignSelf: "center",
+  },
 });

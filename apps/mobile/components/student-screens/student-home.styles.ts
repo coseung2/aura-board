@@ -78,8 +78,8 @@ export const styles = StyleSheet.create({
     width: "100%",
     height: slimeUi.homePetSceneHeight,
     maxWidth: "100%",
-    alignItems: "center",
-    justifyContent: "center",
+    alignItems: "stretch",
+    justifyContent: "flex-end",
     overflow: "hidden",
   },
   petEmptyState: {

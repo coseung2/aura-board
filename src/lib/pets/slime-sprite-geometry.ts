@@ -125,7 +125,6 @@ export function resolveSlimeSpriteGeometry(input: {
   const floorWidth = base.width * floorScale;
   const floorHeight = base.height * floorScale;
   const floorInsetX = (sceneWidth - floorWidth) / 2;
-  const floorImageScale = Math.max(1, Math.trunc(input.staticFloor?.imageScale ?? 1));
   const floorRise = input.staticFloor
     ? (input.staticFloor.slimeFootY - input.staticFloor.surfaceY) * rendererScale
     : Math.max(0, Math.trunc(input.floorRiseSourcePixels ?? 0)) * rendererScale;
@@ -143,13 +142,13 @@ export function resolveSlimeSpriteGeometry(input: {
   const expandedFloorTop = input.staticFloor
     ? sceneInsetY
       + input.staticFloor.slimeFootY * rendererScale
-      - input.staticFloor.surfaceY * floorImageScale * rendererScale * floorScale
+      - input.staticFloor.surfaceY * rendererScale * floorScale
     : 0;
   const totalRise = floorRise + vehicleRise;
   const viewportHeight = Math.max(
     sceneHeight,
     sceneInsetY + base.height + totalRise,
-    input.staticFloor ? expandedFloorTop + floorHeight * floorImageScale : 0,
+    input.staticFloor ? expandedFloorTop + floorHeight : 0,
   );
 
   return {

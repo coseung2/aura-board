@@ -84,6 +84,22 @@ describe("slime-sprite-geometry", () => {
     expect(geometry.vehicleFrameWidth).toBe(128);
   });
 
+  it("keeps an expanded static floor smaller than the scene and hovering above the background edge", () => {
+    const { geometry, viewportHeight } = resolveSlimeSpriteGeometry({
+      sourceWidth: 64,
+      sourceHeight: 64,
+      rendererScale: 1,
+      expandedScene: true,
+      staticFloor: { slimeFootY: 56, surfaceY: 44, imageScale: 4 },
+    });
+
+    expect(geometry.floorWidth).toBe(72);
+    expect(geometry.floorHeight).toBe(72);
+    expect(geometry.floorInsetX).toBe(12);
+    expect(geometry.expandedFloorTop).toBe(16 + 56 - 44 * SLIME_FLOOR_SCALE);
+    expect(viewportHeight).toBe(96);
+  });
+
   it("preserves texture-packer frame offsets", () => {
     expect(
       slimeFrameOffset(

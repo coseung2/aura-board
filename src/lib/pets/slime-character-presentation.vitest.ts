@@ -51,6 +51,18 @@ describe("resolveSlimeCharacterPresentation", () => {
     expect(result.repeat).toBe(true);
   });
 
+  it("does not keep a persisted floor once that floor item is hidden", () => {
+    const floor = catalogItem("stone-floor");
+    const result = resolveSlimeCharacterPresentation({
+      slime,
+      items: [],
+      equippedFloor: floor.floor ?? "stone-floor",
+    });
+
+    expect(result.floor).toBe("none");
+    expect(result.hasScene).toBe(false);
+  });
+
   it("defaults scene backgrounds to the host full-bleed layer", () => {
     const background = SLIME_SHOP_CATALOG.find(
       (candidate) =>

@@ -134,6 +134,7 @@ export function StudentSlimeClassroomSection({
                   }
                   displayScale={petCardScene.displayScale}
                   expandSceneSurfaces
+                  hostBackground={Boolean(classBackground)}
                   backgroundSpritePath={
                     classBackground
                       ? selectSceneBackgroundSpritePath(classBackground)

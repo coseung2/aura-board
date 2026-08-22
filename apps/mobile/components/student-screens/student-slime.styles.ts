@@ -89,7 +89,7 @@ export const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     justifyContent: "center",
-    overflow: "visible",
+    overflow: "hidden",
   },
   // Occupies the empty third cell of the second row, so it matches a pet card's
   // width and sits inside the same grid rather than below it.
@@ -365,6 +365,8 @@ export const styles = StyleSheet.create({
     position: "relative",
     height: slimeUi.vehicleSceneSlotHeight,
     overflow: "hidden",
+    alignItems: "stretch",
+    justifyContent: "flex-end",
   },
   // Price bands stack down the page, so each band spans the full width and lays
   // its own items out in the same wrapping grid the ungrouped list used. Without

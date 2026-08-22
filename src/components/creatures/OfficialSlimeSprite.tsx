@@ -541,8 +541,8 @@ export function OfficialSlimeSprite({
           aria-hidden="true"
           className={`${styles.floor} ${styles.floorUnder}`}
           style={{
-            width: floorWidth * staticFloor.imageScale,
-            height: floorHeight * staticFloor.imageScale,
+            width: floorWidth,
+            height: floorHeight,
             left: floorInsetX,
             top: expandedFloorTop,
           }}

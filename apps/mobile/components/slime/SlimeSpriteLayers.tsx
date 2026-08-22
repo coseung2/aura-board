@@ -51,6 +51,7 @@ export function SlimeSpriteLayers({ model }: { model: SlimeSpriteViewModel }) {
     vehicleCanvas,
     itemLayer,
     backgroundSpritePath,
+    hostBackground,
     accessibilityLabel,
     slimeColor,
     equippedFloor,
@@ -59,13 +60,23 @@ export function SlimeSpriteLayers({ model }: { model: SlimeSpriteViewModel }) {
   const renderBackgroundLayer = (sizeStyle: {
     width: number;
     height: number;
-  }) =>
-    backgroundSpritePath ? (
+  }) => {
+    if (!backgroundSpritePath) return null;
+    if (hostBackground) {
+      return (
+        <FeatheredSceneBackground
+          spritePath={backgroundSpritePath}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+        />
+      );
+    }
+    return (
       <FeatheredSceneBackground
         spritePath={backgroundSpritePath}
         style={sizeStyle}
       />
-    ) : null;
+    );
+  };
 
   const vehicleSheetStyle = (sheetFrames: number, activeFrame: number) => ({
     width:
@@ -158,7 +169,10 @@ export function SlimeSpriteLayers({ model }: { model: SlimeSpriteViewModel }) {
     } = itemLayer;
     return (
       <View
-        style={[styles.viewport, itemViewportStyle]}
+        style={[
+          styles.viewport,
+          hostBackground ? { width: "100%", height: "100%", alignSelf: "stretch" } : itemViewportStyle,
+        ]}
         accessible
         accessibilityRole="image"
         accessibilityLabel={
@@ -167,6 +181,10 @@ export function SlimeSpriteLayers({ model }: { model: SlimeSpriteViewModel }) {
         testID="slime-sprite"
       >
         {renderBackgroundLayer({ width: sceneWidth, height: sceneHeight })}
+        <View
+          pointerEvents="box-none"
+          style={hostBackground ? [styles.hostScene, itemViewportStyle] : undefined}
+        >
         {puddleAsset && puddleFrame && puddlePackedSheetSize && puddleOffset ? (
           <View
             style={[
@@ -247,12 +265,16 @@ export function SlimeSpriteLayers({ model }: { model: SlimeSpriteViewModel }) {
           transition={0}
           accessible={false}
         />
+        </View>
       </View>
     );
   }
   return (
     <View
-      style={[styles.viewport, viewport]}
+      style={[
+        styles.viewport,
+        hostBackground ? { width: "100%", height: "100%", alignSelf: "stretch" } : viewport,
+      ]}
       accessible
       accessibilityRole="image"
       accessibilityLabel={
@@ -261,6 +283,10 @@ export function SlimeSpriteLayers({ model }: { model: SlimeSpriteViewModel }) {
       testID="slime-sprite"
     >
       {renderBackgroundLayer({ width: sceneWidth, height: sceneHeight })}
+      <View
+        pointerEvents="box-none"
+        style={hostBackground ? [styles.hostScene, viewport] : undefined}
+      >
       {puddleAsset && puddleFrame && puddlePackedSheetSize && puddleOffset ? (
         <View
           style={[
@@ -489,6 +515,7 @@ export function SlimeSpriteLayers({ model }: { model: SlimeSpriteViewModel }) {
         </View>
       ) : null}
       {renderWearableLayers(propWearables, true)}
+      </View>
     </View>
   );
 }

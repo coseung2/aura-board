@@ -62,11 +62,12 @@ export function resolveSlimeCharacterPresentation({
   slime,
   items,
   action,
-  equippedFloor,
+  equippedFloor: _unusedEquippedFloor,
   hostBackground,
   repeat = false,
 }: ResolveSlimeCharacterPresentationInput): SlimeCharacterPresentation {
-  const assignedFloor = equippedFloor ?? floorFromItems(items);
+  void _unusedEquippedFloor;
+  const assignedFloor = floorFromItems(items);
   const wearables = wearablesFromItems(items);
   const drinkFlavor = wearables.drink ?? null;
   const vehicleItem = items.reduce<SlimeShopItem | null>(

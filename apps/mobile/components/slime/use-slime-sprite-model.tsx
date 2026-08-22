@@ -125,6 +125,7 @@ export function FeatheredSceneBackground({
           source={{ uri: backgroundUri }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
+          contentPosition="center"
           recyclingKey={`background:${backgroundUri}`}
           transition={0}
           accessible={false}
@@ -153,6 +154,7 @@ export function useSlimeSpriteModel({
   itemSpritePath,
   propAction,
   backgroundSpritePath,
+  hostBackground = false,
   expandSceneSurfaces = false,
   vehicleSpritePath,
   vehicleGroundedSpritePath,
@@ -370,7 +372,7 @@ export function useSlimeSpriteModel({
   const expandedFloorTop = staticFloor
     ? sceneInsetY +
       staticFloor.slimeFootY * resolution.imageScale * displayScale -
-      staticFloor.surfaceY * staticFloor.imageScale * displayScale * floorScale
+      staticFloor.surfaceY * resolution.imageScale * displayScale * floorScale
     : 0;
   const viewport = {
     width: sceneWidth,
@@ -578,6 +580,7 @@ export function useSlimeSpriteModel({
     vehicleCanvas,
     itemLayer,
     backgroundSpritePath,
+    hostBackground,
     accessibilityLabel,
     slimeColor,
     equippedFloor,
