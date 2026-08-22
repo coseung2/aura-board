@@ -43,6 +43,7 @@ export function StudentReadingScreenView({
     entries,
     notice,
     openComposer,
+    openEditor,
     loading,
     historyBookType,
     setHistoryBookType,
@@ -92,6 +93,7 @@ export function StudentReadingScreenView({
     setReflection,
     saving,
     save,
+    editingEntryId,
   } = model;
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -288,6 +290,16 @@ export function StudentReadingScreenView({
                                 <Text style={styles.body}>
                                   {entry.reflection}
                                 </Text>
+                                <View style={styles.entryActions}>
+                                  <AppButton
+                                    variant="primary"
+                                    compact
+                                    onPress={() => openEditor(entry)}
+                                    accessibilityLabel={`${entry.title} 수정`}
+                                  >
+                                    수정
+                                  </AppButton>
+                                </View>
                                 {entry.aiFeedbackStatus === "generated" &&
                                 entry.aiFeedback ? (
                                   <View style={styles.feedbackRow}>
@@ -301,20 +313,9 @@ export function StudentReadingScreenView({
                                 ) : entry.aiFeedbackStatus === "failed" ? (
                                   <View style={styles.feedbackStatusBox}>
                                     <Text style={styles.feedbackStatusText}>
-                                      "피드백을 준비하지 못했어요. 잠시 후 다시 시도해 주세요."
+                                      피드백을 준비하지 못했어요. 잠시 후 다시
+                                      시도해 주세요.
                                     </Text>
-                                    <ControlPressable
-                                      style={styles.feedbackRetry}
-                                      onPress={() =>
-                                        void requestFeedback(entry.id)
-                                      }
-                                      accessibilityRole="button"
-                                      accessibilityLabel={`${entry.title} 피드백 다시 시도`}
-                                    >
-                                      <Text style={styles.feedbackRetryText}>
-                                        다시 시도
-                                      </Text>
-                                    </ControlPressable>
                                   </View>
                                 ) : (
                                   <View style={styles.feedbackStatusBox}>
@@ -412,8 +413,12 @@ export function StudentReadingScreenView({
                       </AppButton>
                     </View>
                   ) : (
-                    <ReadingWeeklyMissionPanel
-                      reward={
+                    <View style={styles.missionPanelContent}>
+                      <Text style={styles.missionNotice} numberOfLines={1}>
+                        미션은 피드백 5점 이상을 받은 기록만 인정돼요.
+                      </Text>
+                      <ReadingWeeklyMissionPanel
+                        reward={
                         weeklyMissionReward ?? {
                           weekStart: "",
                           weekEnd: "",
@@ -444,7 +449,8 @@ export function StudentReadingScreenView({
                       onClaim={(missionKey, unit) =>
                         void claimWeeklyMissionReward(missionKey, unit)
                       }
-                    />
+                      />
+                    </View>
                   )}
                 </View>
               </View>
@@ -466,7 +472,7 @@ export function StudentReadingScreenView({
         keyboardAvoiding
         closeOnBackdropPress
         align="center"
-        accessibilityLabel="독서 기록 작성"
+        accessibilityLabel={editingEntryId ? "독서 기록 수정" : "독서 기록 작성"}
         sheetStyle={styles.composerSheet}
       >
         <View style={styles.composerHeader}>
@@ -474,7 +480,7 @@ export function StudentReadingScreenView({
             style={styles.composerClose}
             onPress={() => setComposerVisible(false)}
             accessibilityRole="button"
-            accessibilityLabel="독서 기록 작성 닫기"
+            accessibilityLabel={`${editingEntryId ? "독서 기록 수정" : "독서 기록 작성"} 닫기`}
           >
             <X
               size={iconSizes.md}
@@ -496,6 +502,9 @@ export function StudentReadingScreenView({
           automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
+          <Text style={styles.composerTitle}>
+            {editingEntryId ? "독서 기록 수정" : "독서 기록 작성"}
+          </Text>
           <SectionNav accessibilityLabel="책 종류">
             <SectionNavItem
               selected={bookType === "story"}
@@ -586,7 +595,7 @@ export function StudentReadingScreenView({
 
         <View style={styles.composerFooter}>
           <AppButton loading={saving} onPress={() => void save()}>
-            저장하기
+            {editingEntryId ? "수정하기" : "저장하기"}
           </AppButton>
         </View>
       </AppModal>

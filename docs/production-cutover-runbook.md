@@ -5,7 +5,8 @@
 현재 production source of truth는 Oracle self-hosted Supabase다. 앱과 play-engine의
 active release는 `1049cf64175e803b7b443f0002fded3be1a8ad36`이며 외부
 `/api/health`는 `200`/DB reachable이다. managed Supabase는 cutover 당시 read-only와
-pg_cron disabled 상태로 남겨 두었으며 자동 rollback은 seal로 영구 종료됐다.
+pg_cron disabled 상태로 남겨 두었으며 자동 rollback은 seal로 영구 종료됐다. managed
+Supabase는 2026-09-03까지 read-only 안정화용으로 보존한다.
 
 ## 2026-08-21 완료 체크포인트
 

@@ -7,7 +7,7 @@ Replace every bracketed placeholder and complete the production checks in
 
 **Company or developer name**
 
-Aura
+aura-board
 
 **Technical contact details**
 
@@ -16,7 +16,7 @@ Email: mallagaenge@gmail.com
 
 **User contact details**
 
-Aura Support  
+aura-board Support  
 Email: mallagaenge@gmail.com  
 https://aura-board.com/support
 
@@ -34,8 +34,8 @@ Aura Board is a classroom collaboration platform for teachers and students.
 Its Canva integration lets teachers connect their Canva account, attach Canva
 designs to collaborative boards, display design previews, and export selected
 designs as PDF files for classroom use. Teachers can also browse Canva folder
-contents and organize board-related designs into folders named after Aura
-Board sections. The integration reduces repetitive download and organization
+contents and organize board-related designs into folders named after aura-board
+sections. The integration reduces repetitive download and organization
 work while helping teachers move smoothly between Canva’s design tools and
 their classroom workflows.
 
@@ -83,7 +83,7 @@ Steps:
 7. Disconnect Canva in teacher settings and confirm the disconnected state remains after
    reloading the page.
 
-No paid Aura subscription is required for the review account.
+No paid aura-board subscription is required for the review account.
 
 The Canva Connect integration is available only to authenticated teacher
 accounts. Students cannot connect a Canva account or directly access the Canva
@@ -113,7 +113,7 @@ legally required period.
 **Data archival/removal policy**
 
 Customer data is removed when a user deletes the associated content, deletes
-their account, or submits a deletion request to Aura Support. When a user
+their account, or submits a deletion request to aura-board Support. When a user
 disconnects Canva, Aura Board requests revocation of the Canva refresh token
 and its access-token lineage, then immediately deletes the stored access token,
 refresh token, and PKCE data. Legally required records and backups are removed

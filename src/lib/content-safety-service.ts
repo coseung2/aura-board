@@ -91,6 +91,15 @@ export async function hideTarget(input: {
   viaReport?: boolean;
 }): Promise<void> {
   const { studentId, targetKind, targetId, viaReport = false } = input;
+  if (targetKind === "feed_post" || targetKind === "feed_comment") {
+    await db.feedHiddenContent.upsert({
+      where: { studentId_targetKind_targetId: { studentId, targetKind, targetId } },
+      update: viaReport ? { viaReport: true } : {},
+      create: { studentId, targetKind, targetId, viaReport },
+    });
+    invalidateStudentIdentityCache(studentId);
+    return;
+  }
   await db.hiddenContent.upsert({
     where: { studentId_targetKind_targetId: { studentId, targetKind, targetId } },
     // Never downgrade an existing report-driven hide to a manual one.
@@ -107,6 +116,11 @@ export async function unhideTarget(input: {
   targetId: string;
 }): Promise<void> {
   const { studentId, targetKind, targetId } = input;
+  if (targetKind === "feed_post" || targetKind === "feed_comment") {
+    await db.feedHiddenContent.deleteMany({ where: { studentId, targetKind, targetId } });
+    invalidateStudentIdentityCache(studentId);
+    return;
+  }
   await db.hiddenContent.deleteMany({ where: { studentId, targetKind, targetId } });
   invalidateStudentIdentityCache(studentId);
 }
@@ -161,6 +175,74 @@ export async function resolveReportTarget(input: {
   reporterClassroomId: string;
 }): Promise<ResolvedReportTarget | null> {
   const { targetKind, targetId, reporterClassroomId } = input;
+
+  if (targetKind === "feed_post" || targetKind === "feed_comment") {
+    const feedCommentSelect = {
+      content: true,
+      authorStudentId: true,
+      authorUser: { select: { name: true } },
+      authorStudent: { select: { name: true, classroomId: true } },
+    } as const;
+    const post = await db.feedPost.findFirst({
+      where: {
+        ...(targetKind === "feed_post"
+          ? { id: targetId }
+          : { comments: { some: { id: targetId, deletedAt: null } } }),
+        status: "PUBLISHED",
+        publications: {
+          some: {
+            status: "ACTIVE",
+            OR: [{ classroomId: null }, { classroomId: reporterClassroomId }],
+          },
+        },
+      },
+      select: {
+        id: true,
+        authorStudentId: true,
+        authorDisplayName: true,
+        title: true,
+        body: true,
+        publications: {
+          where: {
+            status: "ACTIVE",
+            OR: [{ classroomId: null }, { classroomId: reporterClassroomId }],
+          },
+          select: { classroomId: true },
+          take: 1,
+        },
+        comments: {
+          where:
+            targetKind === "feed_comment"
+              ? { id: targetId, deletedAt: null }
+              : { id: "__no_feed_comment__" },
+          select: feedCommentSelect,
+          take: 1,
+        },
+      },
+    });
+    if (!post) return null;
+    const comment = post.comments[0];
+    if (
+      targetKind === "feed_comment" &&
+      comment?.authorStudent?.classroomId !== reporterClassroomId
+    ) {
+      return null;
+    }
+    const authorStudentId = comment?.authorStudentId ?? post.authorStudentId;
+    const authorLabel =
+      comment?.authorStudent?.name ??
+      comment?.authorUser?.name ??
+      post.authorDisplayName;
+    const content = comment
+      ? comment.content
+      : [post.title, post.body].filter(Boolean).join(" · ");
+    return {
+      classroomId: post.publications[0]?.classroomId ?? reporterClassroomId,
+      authorStudentId,
+      authorLabel,
+      contentSnapshot: buildContentSnapshot(content),
+    };
+  }
 
   if (targetKind === "card") {
     const card = await db.card.findUnique({

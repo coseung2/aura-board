@@ -21,6 +21,7 @@ import {
   loadHiddenContent,
   unhideAuthor,
   unhideContent,
+  type ContentTargetKind,
   type HiddenContentSummary,
 } from "../../lib/content-safety";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
@@ -78,7 +79,7 @@ export default function StudentHiddenContentScreen() {
     void load();
   }, [load]);
 
-  async function restoreItem(targetKind: "card" | "comment", targetId: string) {
+  async function restoreItem(targetKind: ContentTargetKind, targetId: string) {
     try {
       await unhideContent({ targetKind, targetId });
       setSummary((current) => ({
@@ -177,14 +178,14 @@ export default function StudentHiddenContentScreen() {
               {summary.items.map((item) => (
                 <View key={`${item.targetKind}:${item.targetId}`} style={styles.row}>
                   <Text style={styles.rowLabel} numberOfLines={1}>
-                    {item.targetKind === "comment" ? "댓글" : "게시글"}
+                    {item.targetKind === "comment" || item.targetKind === "feed_comment" ? "댓글" : "게시글"}
                     {item.viaReport ? " · 신고함" : ""}
                   </Text>
                   <ControlPressable
                     style={styles.rowAction}
                     onPress={() => void restoreItem(item.targetKind, item.targetId)}
                     accessibilityLabel={`숨긴 ${
-                      item.targetKind === "comment" ? "댓글" : "게시글"
+                      item.targetKind === "comment" || item.targetKind === "feed_comment" ? "댓글" : "게시글"
                     } 다시 보기`}
                   >
                     <Text style={styles.rowActionLabel}>다시 보기</Text>

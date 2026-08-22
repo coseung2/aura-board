@@ -12,6 +12,7 @@ export const runtime = "nodejs";
 
 const STALE_PROCESSING_MS = 2 * 60 * 1_000;
 const MAX_STORED_ERROR_LENGTH = 240;
+const MAX_REFLECTION_LENGTH = 600;
 
 type RouteContext = {
   params: Promise<{ logId: string }>;
@@ -117,13 +118,28 @@ export async function GET(_req: Request, { params }: RouteContext) {
   return NextResponse.json({ evaluation: evaluationResponse(log) });
 }
 
-export async function POST(_req: Request, { params }: RouteContext) {
+export async function POST(req: Request, { params }: RouteContext) {
   const student = await getCurrentStudent();
   if (!student) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
   const { logId } = await params;
+  let forceReevaluation = false;
+  let requestedReflection: string | null = null;
+  try {
+    const body: unknown = await req.json();
+    // Explicit re-evaluation contract: POST {"forceReevaluation":true}.
+    forceReevaluation =
+      typeof body === "object" && body !== null &&
+      (body as Record<string, unknown>).forceReevaluation === true;
+    const reflection = (body as Record<string, unknown>).reflection;
+    if (typeof reflection === "string" && reflection.trim().length > 0) {
+      requestedReflection = reflection.trim().slice(0, MAX_REFLECTION_LENGTH);
+    }
+  } catch {
+    // Empty POST bodies remain valid for the initial evaluation/retry flow.
+  }
   const log = await db.readingLog.findFirst({
     where: {
       id: logId,
@@ -136,6 +152,7 @@ export async function POST(_req: Request, { params }: RouteContext) {
   }
 
   if (
+    !forceReevaluation &&
     log.aiFeedbackStatus === "generated" &&
     log.aiScore !== null &&
     log.aiFeedback
@@ -179,6 +196,7 @@ export async function POST(_req: Request, { params }: RouteContext) {
       studentId: student.id,
       OR: [
         { aiFeedbackStatus: { in: ["pending", "failed"] } },
+        ...(forceReevaluation ? [{ aiFeedbackStatus: "generated" }] : []),
         { aiFeedbackStatus: "processing", updatedAt: { lt: staleBefore } },
       ],
     },
@@ -210,6 +228,8 @@ export async function POST(_req: Request, { params }: RouteContext) {
   }
 
   try {
+    const previousReflection = log.reflection;
+    const reflection = requestedReflection ?? log.reflection;
     const result = await evaluateReadingWithLlm({
       provider: teacherKey.provider,
       apiKey: teacherKey.apiKey,
@@ -219,20 +239,40 @@ export async function POST(_req: Request, { params }: RouteContext) {
         bookType: (log.bookType === "comic" ? "comic" : "story") as ReadingBookType,
         title: log.title,
         author: log.author,
-        reflection: log.reflection,
+        reflection,
+        ...(forceReevaluation && log.aiScore !== null && log.aiFeedback
+          ? {
+              previousReflection,
+              previousScore: log.aiScore,
+              previousFeedback: log.aiFeedback,
+            }
+          : {}),
       },
     });
 
-    const updated = await db.readingLog.update({
-      where: { id: log.id },
-      data: {
-        aiScore: result.evaluation.score,
-        aiFeedback: result.evaluation.feedback,
-        aiFeedbackStatus: "generated",
-        aiFeedbackModel: result.model,
-        aiFeedbackError: null,
-        evaluatedAt: new Date(),
-      },
+    const updated = await db.$transaction(async (tx) => {
+      const evaluatedAt = new Date();
+      const updatedLog = await tx.readingLog.update({
+        where: { id: log.id },
+        data: {
+          aiScore: result.evaluation.score,
+          aiFeedback: result.evaluation.feedback,
+          ...(forceReevaluation && requestedReflection
+            ? { reflection: requestedReflection }
+            : {}),
+          aiFeedbackStatus: "generated",
+          aiFeedbackModel: result.model,
+          aiFeedbackError: null,
+          evaluatedAt,
+        },
+      });
+      if (result.evaluation.score >= 5) {
+        await tx.readingLog.updateMany({
+          where: { id: log.id, missionCounted: false },
+          data: { missionCounted: true, missionCountedAt: evaluatedAt },
+        });
+      }
+      return tx.readingLog.findUnique({ where: { id: log.id } });
     });
 
     return NextResponse.json({

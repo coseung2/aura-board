@@ -5,8 +5,12 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { SquarePen } from "lucide-react-native";
 import { ApiError, apiFetch } from "../../lib/api";
 import { feedApiMessage, type FeedItem, type FeedPage } from "../../lib/feed";
-import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
-import { FeedCard } from "../../components/FeedCard";
+import {
+  clearSessionToken,
+  getUnifiedLoginRoute,
+  loadStudentCache,
+} from "../../lib/session";
+import { FeedPostCard } from "../../components/FeedPostCard";
 import { FeedListSkeleton, FeedLoadMoreSkeleton } from "../../components/loading-skeletons";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
 import { AppButton, AppHeader, IconButton } from "../../components/ui";
@@ -19,12 +23,10 @@ import {
 
 export default function StudentFeedScreen() {
   const router = useRouter();
-  const initialCache = readStudentFeedCache();
-  const [items, setItems] = useState<FeedItem[]>(() => initialCache?.data.items ?? []);
-  const [nextCursor, setNextCursor] = useState<string | null>(
-    () => initialCache?.data.nextCursor ?? null,
-  );
-  const [loading, setLoading] = useState(() => !initialCache);
+  const [studentId, setStudentId] = useState<string | null>(null);
+  const [items, setItems] = useState<FeedItem[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestIdRef = useRef(0);
@@ -36,6 +38,7 @@ export default function StudentFeedScreen() {
   }, [router]);
 
   const loadFeed = useCallback(async (
+    currentStudentId: string,
     cursor?: string | null,
     forceRefresh = false,
   ) => {
@@ -54,11 +57,14 @@ export default function StudentFeedScreen() {
       });
       const page = append
         ? await loader()
-        : await revalidateStudentFeedCache(loader, { force: forceRefresh });
+        : await revalidateStudentFeedCache(loader, {
+            force: forceRefresh,
+            studentId: currentStudentId,
+          });
       if (requestId !== requestIdRef.current) return;
       const cachedPage = append
-        ? appendStudentFeedCache(page).data
-        : readStudentFeedCache()?.data ?? page;
+        ? appendStudentFeedCache(page, { studentId: currentStudentId }).data
+        : readStudentFeedCache({ studentId: currentStudentId })?.data ?? page;
       setItems(cachedPage.items);
       setNextCursor(cachedPage.nextCursor);
     } catch (nextError) {
@@ -81,13 +87,36 @@ export default function StudentFeedScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const cached = readStudentFeedCache();
-      if (cached) {
-        setItems(cached.data.items);
-        setNextCursor(cached.data.nextCursor);
-        setLoading(false);
-      }
-      void loadFeed();
+      let active = true;
+      void loadStudentCache()
+        .then((student) => {
+          if (!active) return;
+          if (!student?.id) {
+            setStudentId(null);
+            setItems([]);
+            setNextCursor(null);
+            setLoading(false);
+            setError("학생 계정 정보를 확인하지 못했어요.");
+            return;
+          }
+          setStudentId(student.id);
+          const cached = readStudentFeedCache({ studentId: student.id });
+          if (cached) {
+            setItems(cached.data.items);
+            setNextCursor(cached.data.nextCursor);
+            setLoading(false);
+          }
+          void loadFeed(student.id);
+        })
+        .catch((nextError) => {
+          if (!active) return;
+          setLoading(false);
+          setError(feedApiMessage(nextError, "피드를 불러오지 못했어요."));
+        });
+      return () => {
+        active = false;
+        requestIdRef.current += 1;
+      };
     }, [loadFeed]),
   );
 
@@ -119,9 +148,11 @@ export default function StudentFeedScreen() {
       <FlatList
         data={items}
         keyExtractor={(item) => item.publicationId}
-        renderItem={({ item }) => <FeedCard item={item} />}
+        renderItem={({ item }) => <FeedPostCard item={item} />}
         onEndReached={() => {
-          if (nextCursor && !loading && !loadingMore) void loadFeed(nextCursor);
+          if (studentId && nextCursor && !loading && !loadingMore) {
+            void loadFeed(studentId, nextCursor);
+          }
         }}
         onEndReachedThreshold={0.4}
         contentContainerStyle={styles.listContent}
@@ -129,7 +160,12 @@ export default function StudentFeedScreen() {
         ListHeaderComponent={items.length > 0 && error ? (
           <View style={styles.inlineError} accessibilityRole="alert">
             <Text style={styles.error}>{error}</Text>
-            <AppButton variant="quiet" onPress={() => void loadFeed(null, true)}>
+            <AppButton
+              variant="quiet"
+              onPress={() => {
+                if (studentId) void loadFeed(studentId, null, true);
+              }}
+            >
               다시 불러오기
             </AppButton>
           </View>
@@ -137,7 +173,9 @@ export default function StudentFeedScreen() {
         refreshControl={(
           <RefreshControl
             refreshing={loading && items.length > 0}
-            onRefresh={() => void loadFeed(null, true)}
+            onRefresh={() => {
+              if (studentId) void loadFeed(studentId, null, true);
+            }}
             tintColor={colors.accent}
           />
         )}
@@ -145,7 +183,16 @@ export default function StudentFeedScreen() {
           <View style={styles.emptyState}>
             {initialLoading ? <FeedListSkeleton /> : null}
             {error ? <Text style={styles.error} accessibilityRole="alert">{error}</Text> : null}
-            {error ? <AppButton variant="secondary" onPress={() => void loadFeed(null, true)}>다시 시도</AppButton> : null}
+            {error ? (
+              <AppButton
+                variant="secondary"
+                onPress={() => {
+                  if (studentId) void loadFeed(studentId, null, true);
+                }}
+              >
+                다시 시도
+              </AppButton>
+            ) : null}
             {showEmpty ? <Text style={styles.muted}>아직 게시물이 없어요.</Text> : null}
           </View>
         )}

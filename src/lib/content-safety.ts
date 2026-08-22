@@ -3,8 +3,14 @@
 // Pure helpers only, so the visibility rules can be unit-tested without a
 // database. Route handlers own the queries; this module owns the decisions.
 
-export const CONTENT_TARGET_KINDS = ["card", "comment"] as const;
-export type ContentTargetKind = (typeof CONTENT_TARGET_KINDS)[number];
+export const CONTENT_TARGET_KINDS = [
+  "card",
+  "comment",
+] as const;
+export const FEED_CONTENT_TARGET_KINDS = ["feed_post", "feed_comment"] as const;
+export type ContentTargetKind =
+  | (typeof CONTENT_TARGET_KINDS)[number]
+  | (typeof FEED_CONTENT_TARGET_KINDS)[number];
 
 export const CONTENT_REPORT_REASONS = [
   "profanity",

@@ -6,6 +6,7 @@ import {
   fetchReadingEntries,
   generateReadingFeedback,
   saveReadingEntry,
+  updateReadingEntry,
   ReadingFeedbackError,
   type BookType,
   type ReadingEntry,
@@ -44,6 +45,7 @@ export function ReadingForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const activeFeedbackIds = useRef(new Set<string>());
   const mounted = useRef(true);
 
@@ -129,17 +131,20 @@ export function ReadingForm() {
     return error.status === 409 || error.status === 429 || error.status >= 500;
   }
 
-  async function requestFeedback(readingLogId: string) {
+  async function requestFeedback(
+    readingLogId: string,
+    options: { forceReevaluation?: boolean; reflection?: string } = {},
+  ) {
     if (activeFeedbackIds.current.has(readingLogId)) return;
     activeFeedbackIds.current.add(readingLogId);
     setFeedbackProcessing(readingLogId);
     try {
       for (let attempt = 0; attempt <= FEEDBACK_RETRY_COUNT; attempt += 1) {
         try {
-          const { evaluation } = await generateReadingFeedback(readingLogId);
+          const { evaluation } = await generateReadingFeedback(readingLogId, options);
           updateEvaluation(readingLogId, evaluation);
           if (mounted.current && evaluation.aiFeedbackStatus === "generated") {
-            setNotice("피드백이 준비됐어요.");
+            setNotice("피드백이 완성되었어요.");
           }
           return;
         } catch (err) {
@@ -156,11 +161,11 @@ export function ReadingForm() {
           }
 
           if (mounted.current) {
-            setNotice("피드백을 기다리는 중이에요. 완료되면 자동으로 표시돼요.");
+            setNotice("피드백을 기다리는 중...");
           }
           const pollResult = await pollFeedback(readingLogId);
           if (pollResult === "generated") {
-            if (mounted.current) setNotice("피드백이 준비됐어요.");
+            if (mounted.current) setNotice("피드백이 완성되었어요.");
             return;
           }
           if (attempt === FEEDBACK_RETRY_COUNT) {
@@ -169,7 +174,7 @@ export function ReadingForm() {
               aiFeedback: null,
               aiFeedbackStatus: "failed",
               aiFeedbackModel: null,
-              aiFeedbackError: "피드백을 준비하는 데 시간이 걸리고 있어요. 잠시 후 다시 시도해 주세요.",
+               aiFeedbackError: "피드백을 준비하지 못했어요. 잠시 후 다시 시도해 주세요.",
               evaluatedAt: null,
             });
             return;
@@ -204,21 +209,47 @@ export function ReadingForm() {
     setError(null);
     setNotice(null);
     try {
-      const { entry } = await saveReadingEntry({
+      const input = {
         bookType: form.bookType,
         title,
         author,
         reflection,
-      });
-      setEntries((prev) => [entry, ...prev]);
+      };
+      const { entry } = editingId
+        ? await updateReadingEntry(editingId, input)
+        : await saveReadingEntry(input);
+      setEntries((prev) =>
+        editingId ? prev.map((item) => (item.id === entry.id ? entry : item)) : [entry, ...prev],
+      );
       setForm(EMPTY_FORM);
-      setNotice("저장했어요. 피드백을 기다리는 중이에요.");
-      void requestFeedback(entry.id);
+      setEditingId(null);
+      setNotice(editingId ? "수정했어요. 피드백을 기다리는 중..." : "저장했어요. 피드백을 기다리는 중...");
+      void requestFeedback(entry.id, editingId ? { forceReevaluation: true, reflection } : {});
     } catch (err) {
       setError(err instanceof Error ? err.message : "저장에 실패했어요.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  function startEditing(entry: ReadingEntry) {
+    setEditingId(entry.id);
+    setForm({
+      bookType: entry.bookType,
+      title: entry.title,
+      author: entry.author,
+      reflection: entry.reflection,
+    });
+    setError(null);
+    setNotice(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelEditing() {
+    setEditingId(null);
+    setForm(EMPTY_FORM);
+    setError(null);
+    setNotice(null);
   }
 
   return (
@@ -296,8 +327,13 @@ export function ReadingForm() {
               className="reading-submit-btn"
               disabled={submitting}
             >
-              {submitting ? "저장 중..." : "저장하기"}
+              {submitting ? "저장 중..." : editingId ? "수정하기" : "저장하기"}
             </button>
+            {editingId && (
+              <button type="button" className="reading-cancel-btn" onClick={cancelEditing} disabled={submitting}>
+                취소
+              </button>
+            )}
           </div>
         </form>
       </section>
@@ -321,6 +357,9 @@ export function ReadingForm() {
                     {entry.bookType === "comic" ? "만화책" : "이야기책"}
                   </span>
                   <span className="reading-entry-title">{entry.title}</span>
+                  <button type="button" className="reading-entry-edit" onClick={() => startEditing(entry)}>
+                    수정
+                  </button>
                 </div>
                 {(entry.author || entry.createdAt) && (
                   <p className="reading-entry-meta">
@@ -349,6 +388,13 @@ export function ReadingForm() {
                         {entry.aiFeedback}
                       </span>
                     )}
+                    <button
+                      type="button"
+                      className="reading-feedback-retry"
+                      onClick={() => void requestFeedback(entry.id, { forceReevaluation: true })}
+                    >
+                      피드백 다시 받기
+                    </button>
                   </div>
                 ) : entry.aiFeedbackStatus === "failed" ? (
                   <div className="reading-entry-evaluation reading-entry-evaluation-status">

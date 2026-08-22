@@ -93,6 +93,7 @@ describe("buildReadingMissions", () => {
     const logs = Array.from({ length: 9 }, (_, index) => ({
       createdAt: `2026-07-${String(20 + (index % 7)).padStart(2, "0")}T12:00:00+09:00`,
       reflection: "책",
+      missionCounted: true,
     }));
     const books = mission({ ...BASE_INPUT, logs }, "weekly_books");
 
@@ -102,15 +103,21 @@ describe("buildReadingMissions", () => {
 
   it("uses distinct KST reading dates within the half-open week", () => {
     const logs = [
-      { createdAt: "2026-07-19T14:59:59.999Z", reflection: "before" },
-      { createdAt: "2026-07-19T15:00:00.000Z", reflection: "day one" },
-      { createdAt: "2026-07-20T14:30:00.000Z", reflection: "same KST day" },
-      { createdAt: "2026-07-20T15:00:00.000Z", reflection: "day two" },
-      { createdAt: "2026-07-21T15:00:00.000Z", reflection: "day three" },
-      { createdAt: "2026-07-22T15:00:00.000Z", reflection: "day four" },
-      { createdAt: "2026-07-26T14:59:59.999Z", reflection: "last instant" },
-      { createdAt: "2026-07-26T15:00:00.000Z", reflection: "at end" },
-      { createdAt: "not-a-date", reflection: "invalid" },
+      ...[
+        ["2026-07-19T14:59:59.999Z", "before", false],
+        ["2026-07-19T15:00:00.000Z", "day one", true],
+        ["2026-07-20T14:30:00.000Z", "same KST day", true],
+        ["2026-07-20T15:00:00.000Z", "day two", true],
+        ["2026-07-21T15:00:00.000Z", "day three", true],
+        ["2026-07-22T15:00:00.000Z", "day four", true],
+        ["2026-07-26T14:59:59.999Z", "last instant", true],
+        ["2026-07-26T15:00:00.000Z", "at end", true],
+        ["not-a-date", "invalid", true],
+      ].map(([createdAt, reflection, missionCounted]) => ({
+        createdAt,
+        reflection,
+        missionCounted,
+      })),
     ];
 
     expect(mission({ ...BASE_INPUT, logs }, "consecutive_days").progress).toBe(4);
@@ -118,10 +125,10 @@ describe("buildReadingMissions", () => {
 
   it("counts Unicode grapheme clusters in Korean reflections", () => {
     const logs = [
-      { createdAt: "2026-07-20T00:00:00+09:00", reflection: "한글" },
-      { createdAt: "2026-07-21T00:00:00+09:00", reflection: "가\u0301" },
-      { createdAt: "2026-07-22T00:00:00+09:00", reflection: "👨‍👩‍👧‍👦" },
-      { createdAt: "2026-07-23T00:00:00+09:00", reflection: "" },
+      { createdAt: "2026-07-20T00:00:00+09:00", reflection: "한글", missionCounted: true },
+      { createdAt: "2026-07-21T00:00:00+09:00", reflection: "가\u0301", missionCounted: true },
+      { createdAt: "2026-07-22T00:00:00+09:00", reflection: "👨‍👩‍👧‍👦", missionCounted: true },
+      { createdAt: "2026-07-23T00:00:00+09:00", reflection: "", missionCounted: true },
     ];
 
     expect(mission({ ...BASE_INPUT, logs }, "reflection_chars").progress).toBe(4);
@@ -132,6 +139,19 @@ describe("buildReadingMissions", () => {
       expect(item.progress).toBe(0);
       expect(item.completed).toBe(false);
     }
+  });
+
+  it("excludes four-point and unapproved rows from every mission", () => {
+    const result = buildReadingMissions({
+      ...BASE_INPUT,
+      logs: [
+        { createdAt: "2026-07-20T12:00:00+09:00", reflection: "네 글자", missionCounted: false },
+        { createdAt: "2026-07-21T12:00:00+09:00", reflection: "승인", missionCounted: true },
+      ],
+    });
+    expect(result.find((item) => item.key === "weekly_books")?.progress).toBe(1);
+    expect(result.find((item) => item.key === "reflection_chars")?.progress).toBe(2);
+    expect(result.find((item) => item.key === "consecutive_days")?.progress).toBe(1);
   });
 });
 
@@ -157,6 +177,7 @@ describe("buildReadingWeeklyMissionReward", () => {
     const completeLogs = Array.from({ length: Math.max(books.target, days.target) }, (_, index) => ({
       createdAt: `2026-07-${String(20 + index).padStart(2, "0")}T12:00:00+09:00`,
       reflection: "가".repeat(Math.ceil(chars.target / Math.max(books.target, days.target))),
+      missionCounted: true,
     }));
     const achieved = buildReadingWeeklyMissionReward({
       ...BASE_INPUT,
@@ -195,6 +216,7 @@ describe("buildReadingWeeklyMissionReward", () => {
     const logs = Array.from({ length: books.target }, (_, index) => ({
       createdAt: `2026-07-${String(20 + index).padStart(2, "0")}T12:00:00+09:00`,
       reflection: "감상",
+      missionCounted: true,
     }));
     const reward = buildReadingWeeklyMissionReward({
       ...BASE_INPUT,

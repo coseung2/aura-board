@@ -8,6 +8,7 @@ import {
 import {
   CONTENT_REPORT_REASONS,
   CONTENT_TARGET_KINDS,
+  FEED_CONTENT_TARGET_KINDS,
   canActOnContent,
   normalizeReportDetail,
   REPORT_DETAIL_MAX_LENGTH,
@@ -25,7 +26,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const CreateSchema = z.object({
-  targetKind: z.enum(CONTENT_TARGET_KINDS),
+  targetKind: z.enum([...CONTENT_TARGET_KINDS, ...FEED_CONTENT_TARGET_KINDS] as [string, ...string[]]),
   targetId: z.string().trim().min(1).max(100),
   reason: z.enum(CONTENT_REPORT_REASONS),
   detail: z.string().trim().max(REPORT_DETAIL_MAX_LENGTH).optional(),
@@ -67,6 +68,52 @@ export async function POST(req: Request) {
   // entry rather than creating a duplicate for the teacher to triage. The
   // report and both hide records must commit or roll back together.
   const report = await db.$transaction(async (tx) => {
+    if (targetKind === "feed_post" || targetKind === "feed_comment") {
+      const createdReport = await tx.feedContentReport.upsert({
+        where: {
+          reporterStudentId_targetKind_targetId: {
+            reporterStudentId: student.id,
+            targetKind,
+            targetId,
+          },
+        },
+        update: {
+          reason,
+          detail,
+          contentSnapshot: target.contentSnapshot,
+          authorStudentId: target.authorStudentId,
+          authorLabel: target.authorLabel,
+          status: "pending",
+          resolvedAt: null,
+          resolvedByUserId: null,
+        },
+        create: {
+          classroomId: target.classroomId,
+          targetKind,
+          targetId,
+          reporterStudentId: student.id,
+          authorStudentId: target.authorStudentId,
+          authorLabel: target.authorLabel,
+          reason,
+          detail,
+          contentSnapshot: target.contentSnapshot,
+        },
+        select: { id: true },
+      });
+      await tx.feedHiddenContent.upsert({
+        where: { studentId_targetKind_targetId: { studentId: student.id, targetKind, targetId } },
+        update: { viaReport: true },
+        create: { studentId: student.id, targetKind, targetId, viaReport: true },
+      });
+      if (shouldHideAuthor && target.authorStudentId) {
+        await tx.hiddenContentAuthor.upsert({
+          where: { studentId_hiddenStudentId: { studentId: student.id, hiddenStudentId: target.authorStudentId } },
+          update: { reportId: null },
+          create: { studentId: student.id, hiddenStudentId: target.authorStudentId, reportId: null },
+        });
+      }
+      return createdReport;
+    }
     const createdReport = await tx.contentReport.upsert({
       where: {
         reporterStudentId_targetKind_targetId: {

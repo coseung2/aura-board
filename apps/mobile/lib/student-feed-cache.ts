@@ -8,7 +8,7 @@ const USABLE_STALE_WINDOW_MS = 5 * 60_000;
 export type StudentFeedCacheState = "fresh" | "stale";
 
 export type StudentFeedCacheSnapshot = {
-  key: typeof STUDENT_FEED_CACHE_KEY;
+  key: string;
   data: FeedPage;
   fetchedAt: number;
   ageMs: number;
@@ -18,6 +18,7 @@ export type StudentFeedCacheSnapshot = {
 };
 
 export type StudentFeedCacheReadOptions = {
+  studentId: string;
   now?: number;
 };
 
@@ -33,10 +34,14 @@ type StudentFeedCacheEntry = {
   fetchedAt: number;
 };
 
-let entry: StudentFeedCacheEntry | null = null;
-let inFlight: Promise<FeedPage> | null = null;
+const entries = new Map<string, StudentFeedCacheEntry>();
+const inFlights = new Map<string, Promise<FeedPage>>();
+const revisions = new Map<string, number>();
 let cacheGeneration = 0;
-let cacheRevision = 0;
+
+function cacheKey(studentId: string): string {
+  return `${STUDENT_FEED_CACHE_KEY}:${studentId}`;
+}
 
 function dedupeItems(items: FeedItem[]): FeedItem[] {
   const seen = new Set<string>();
@@ -55,18 +60,19 @@ function normalizePage(page: FeedPage): FeedPage {
 }
 
 function snapshotFor(
+  key: string,
   current: StudentFeedCacheEntry,
   now: number,
 ): StudentFeedCacheSnapshot | null {
   const ageMs = Math.max(0, now - current.fetchedAt);
   if (ageMs > USABLE_STALE_WINDOW_MS) {
-    if (entry === current) entry = null;
+    if (entries.get(key) === current) entries.delete(key);
     return null;
   }
 
   const isFresh = ageMs < FRESH_WINDOW_MS;
   return {
-    key: STUDENT_FEED_CACHE_KEY,
+    key,
     data: current.data,
     fetchedAt: current.fetchedAt,
     ageMs,
@@ -77,32 +83,40 @@ function snapshotFor(
 }
 
 export function readStudentFeedCache(
-  options: StudentFeedCacheReadOptions = {},
+  options: StudentFeedCacheReadOptions,
 ): StudentFeedCacheSnapshot | null {
+  const key = cacheKey(options.studentId);
+  const entry = entries.get(key);
   if (!entry) return null;
-  return snapshotFor(entry, options.now ?? Date.now());
+  return snapshotFor(key, entry, options.now ?? Date.now());
 }
 
-function setStudentFeedCache(page: FeedPage, now: number): StudentFeedCacheSnapshot {
+function setStudentFeedCache(
+  studentId: string,
+  page: FeedPage,
+  now: number,
+): StudentFeedCacheSnapshot {
+  const key = cacheKey(studentId);
   const nextEntry: StudentFeedCacheEntry = {
     data: normalizePage(page),
     fetchedAt: now,
   };
-  entry = nextEntry;
-  return snapshotFor(nextEntry, now) as StudentFeedCacheSnapshot;
+  entries.set(key, nextEntry);
+  return snapshotFor(key, nextEntry, now) as StudentFeedCacheSnapshot;
 }
 
 export function writeStudentFeedCache(
   page: FeedPage,
-  options: StudentFeedCacheWriteOptions = {},
+  options: StudentFeedCacheWriteOptions,
 ): StudentFeedCacheSnapshot {
-  cacheRevision += 1;
-  return setStudentFeedCache(page, options.now ?? Date.now());
+  const key = cacheKey(options.studentId);
+  revisions.set(key, (revisions.get(key) ?? 0) + 1);
+  return setStudentFeedCache(options.studentId, page, options.now ?? Date.now());
 }
 
 export function appendStudentFeedCache(
   page: FeedPage,
-  options: StudentFeedCacheWriteOptions = {},
+  options: StudentFeedCacheWriteOptions,
 ): StudentFeedCacheSnapshot {
   const current = readStudentFeedCache(options);
   const merged: FeedPage = current
@@ -115,25 +129,27 @@ export function appendStudentFeedCache(
 }
 
 export function clearStudentFeedCache(): void {
+  entries.clear();
+  inFlights.clear();
+  revisions.clear();
   cacheGeneration += 1;
-  cacheRevision += 1;
-  entry = null;
-  inFlight = null;
 }
 
 export function revalidateStudentFeedCache(
   loader: () => Promise<FeedPage>,
-  options: StudentFeedCacheRevalidateOptions = {},
+  options: StudentFeedCacheRevalidateOptions,
 ): Promise<FeedPage> {
   const current = readStudentFeedCache(options);
   if (!options.force && current?.isFresh) {
     return Promise.resolve(current.data);
   }
 
+  const key = cacheKey(options.studentId);
+  const inFlight = inFlights.get(key);
   if (inFlight) return inFlight;
 
   const generationAtStart = cacheGeneration;
-  const revisionAtStart = cacheRevision;
+  const revisionAtStart = revisions.get(key) ?? 0;
   let loaded: Promise<FeedPage>;
   try {
     loaded = Promise.resolve(loader());
@@ -145,19 +161,19 @@ export function revalidateStudentFeedCache(
     .then((page) => {
       if (
         generationAtStart === cacheGeneration &&
-        revisionAtStart === cacheRevision
+        revisionAtStart === (revisions.get(key) ?? 0)
       ) {
-        setStudentFeedCache(page, options.now ?? Date.now());
+        setStudentFeedCache(options.studentId, page, options.now ?? Date.now());
       }
       return page;
     })
     .finally(() => {
-      if (inFlight === request) inFlight = null;
+      if (inFlights.get(key) === request) inFlights.delete(key);
     });
-  inFlight = request;
+  inFlights.set(key, request);
   return request;
 }
 
-export function studentFeedCacheHasInFlight(): boolean {
-  return inFlight !== null;
+export function studentFeedCacheHasInFlight(studentId: string): boolean {
+  return inFlights.has(cacheKey(studentId));
 }

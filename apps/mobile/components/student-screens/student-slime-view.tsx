@@ -110,7 +110,6 @@ export function StudentSlimeScreenView({
       ) : null}
       <AppHeader
         title="펫"
-        onBack={() => router.back()}
         right={
           showInitialLoading || showInitialError ? undefined : (
             <StudentHeaderActions />

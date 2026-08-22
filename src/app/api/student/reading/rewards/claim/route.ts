@@ -111,6 +111,7 @@ async function readCurrentClassroomRank(
         AND log."classroomId" = ${classroomId}
         AND log."createdAt" >= ${weekStart}
         AND log."createdAt" < ${weekEnd}
+        AND log."missionCounted" = true
       WHERE student."classroomId" = ${classroomId}
       GROUP BY student."id", student."number", student."name"
       HAVING COUNT(log."id") > 0

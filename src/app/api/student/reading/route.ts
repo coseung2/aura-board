@@ -114,7 +114,9 @@ type ClassroomRankReward = {
 
 /**
  * Weekly reading leaderboard for the student's classroom. The period matches the
- * walking leaderboard so both surfaces reset on the same KST boundary.
+ * walking leaderboard so both surfaces reset on the same KST boundary. Only
+ * logs counted toward missions (AI feedback score >= 5) count toward the rank,
+ * matching the mission rules.
  */
 async function readClassroomTopFive(
   classroomId: string,
@@ -137,6 +139,7 @@ async function readClassroomTopFive(
       AND log."classroomId" = ${classroomId}
       AND log."createdAt" >= ${weekStart}
       AND log."createdAt" < ${weekEnd}
+      AND log."missionCounted" = true
     WHERE student."classroomId" = ${classroomId}
     GROUP BY student."id", student."number", student."name"
     HAVING COUNT(log."id") > 0
@@ -182,6 +185,7 @@ async function readClassroomRankReward(
         AND log."classroomId" = ${classroomId}
         AND log."createdAt" >= ${weekStart}
         AND log."createdAt" < ${weekEnd}
+        AND log."missionCounted" = true
       WHERE student."classroomId" = ${classroomId}
       GROUP BY student."id", student."number", student."name"
       HAVING COUNT(log."id") > 0
@@ -387,7 +391,7 @@ export async function GET() {
           },
         }),
         db.readingLog.aggregate({
-          where: readingWhere,
+          where: { ...readingWhere, missionCounted: true },
           _avg: { aiScore: true },
         }),
         db.readingLog.findMany({
@@ -539,6 +543,8 @@ export async function POST(req: Request) {
         aiFeedbackModel: null,
         aiFeedbackError: null,
         evaluatedAt: null,
+        missionCounted: false,
+        missionCountedAt: null,
       },
     });
   } catch (e) {

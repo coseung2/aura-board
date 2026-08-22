@@ -20,6 +20,7 @@ type Props = {
   onUnauthorized?: (error: unknown) => Promise<boolean>;
   onChanged?: (state: { likeCount: number; isLiked: boolean }) => void;
   onInteractionStart?: () => void;
+  resourceKind?: "card" | "feed";
 };
 
 export function CommentLikeButton({
@@ -31,6 +32,7 @@ export function CommentLikeButton({
   onUnauthorized,
   onChanged,
   onInteractionStart,
+  resourceKind = "card",
 }: Props) {
   const [likeCount, setLikeCount] = useState(Math.max(0, initialLikeCount ?? 0));
   const [liked, setLiked] = useState(Boolean(initialIsLiked));
@@ -93,7 +95,9 @@ export function CommentLikeButton({
     try {
       const request = viewer === "parent" ? parentApiFetch : apiFetch;
       const response = await request<{ liked: boolean; count: number }>(
-        `/api/cards/${encodeURIComponent(cardId)}/comments/${encodeURIComponent(commentId)}/like`,
+        resourceKind === "feed"
+          ? `/api/student/feed/comments/${encodeURIComponent(commentId)}/like`
+          : `/api/cards/${encodeURIComponent(cardId)}/comments/${encodeURIComponent(commentId)}/like`,
         { method: "POST", json: { liked: nextLiked } },
       );
       const nextState = {

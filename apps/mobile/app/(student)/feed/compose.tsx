@@ -9,6 +9,7 @@ import {
   clearSessionToken,
   getUnifiedLoginRoute,
 } from "../../../lib/session";
+import { clearStudentFeedCache } from "../../../lib/student-feed-cache";
 import { colors } from "../../../theme/tokens";
 
 export default function StudentFeedComposeScreen() {
@@ -17,6 +18,7 @@ export default function StudentFeedComposeScreen() {
   async function submit(draft: FeedDraft) {
     try {
       await apiFetch("/api/student/feed", { method: "POST", json: draft });
+      clearStudentFeedCache();
     } catch (cause) {
       if (cause instanceof ApiError && cause.status === 401) {
         await clearSessionToken();

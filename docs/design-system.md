@@ -453,7 +453,7 @@ src/styles/
 ├── boards-slideshow.css       # Stream 슬라이드쇼 오버레이
 ├── boards-stream-settings.css # Stream 작성/섹션 설정
 ├── boards-stream-breakout.css # Stream 브레이크아웃 UI
-├── boards-aura-evaluation.css # Aura 평가 컨트롤
+├── boards-aura-evaluation.css # aura-board 평가 컨트롤
 ├── assignment.css    # 과제 보드
 ├── home.css          # 대시보드, 보드 리스트
 ├── user-switcher.css # RBAC 스위처

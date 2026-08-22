@@ -1,4 +1,4 @@
-# Aura Creature System v1
+# aura-board Creature System v1
 
 Status: v1 gameplay contract with `creature-catalog-v2` egg pricing and draw pools. Aura Board owns students, the shared classroom wallet, purchases, growth, inventory, and stage relationships. Character Asset Studio produces approved behavior sheets only; asset packages never own price, balance, odds, or student state.
 

@@ -25,7 +25,7 @@ Canva Integration ID: `OC-AZ134Kp64WVh`
 - Canva 폴더 탐색, 생성 및 디자인 이동
 - 교사 설정에서 Canva 연결 해제
 
-학생 Aura 카드 디자인 생성, QR asset 업로드 및 학생 Canva Connect OAuth는
+학생 aura-board 카드 디자인 생성, QR asset 업로드 및 학생 Canva Connect OAuth는
 제거됐다. 별도의 학생 Canva Content Publisher 페어링 기능은 이 Connect API
 심사 설명과 스코프에 포함하지 않는다.
 
@@ -74,11 +74,11 @@ Canva Integration ID: `OC-AZ134Kp64WVh`
 `design:content:write`, asset, permission, comment, brand template scope는 모두
 `n/a`로 제출한다.
 
-### 2. Portal 설명에서 학생 Aura 카드 기능 제거
+### 2. Portal 설명에서 학생 aura-board 카드 기능 제거
 
 현재 심사 양식의 다음 설명은 실제 구현과 다르므로 삭제한다.
 
-- personalized Aura card design 생성
+- personalized aura-board card design 생성
 - QR-code asset 업로드
 - 학생 Canva 계정 연결
 - `design:content:write`
@@ -113,7 +113,7 @@ Canva Integration ID: `OC-AZ134Kp64WVh`
 승인 후 직접 내보내기 화면은 교사 라이브러리 흐름으로 대체한다. 라이브러리에는
 Canva PDF 바이트를 영구 저장하지 않고 디자인 ID와 표시 메타데이터만 보관한다.
 교사가 라이브러리에서 항목을 선택하고 순서를 정해 다운로드할 때 Canva PDF를
-새로 export하고, Aura 이미지 페이지와 함께 하나의 임시 PDF를 만든다. 어느 한
+새로 export하고, aura-board 이미지 페이지와 함께 하나의 임시 PDF를 만든다. 어느 한
 항목이라도 처리하지 못하면 일부만 담긴 PDF를 내려주지 않고 전체 요청을 실패시킨다.
 
 제출 전 다음을 운영에서 검증한다.
@@ -187,9 +187,9 @@ Pen test 날짜는 실제 외부 침투 테스트가 없으므로 비워 둔다.
 
 ## 양식에 사용할 운영 정보
 
-- Company/developer name: `Aura`
+- Company/developer name: `aura-board`
 - Technical contact: `Sim Boseung (심보승), mallagaenge@gmail.com`
-- User support: `Aura Support, https://aura-board.com/support, mallagaenge@gmail.com`
+- User support: `aura-board Support, https://aura-board.com/support, mallagaenge@gmail.com`
 - Terms: `https://aura-board.com/terms`
 - Privacy: `https://aura-board.com/privacy`
 - Security contact: `mallagaenge@gmail.com`, `https://aura-board.com/support`
@@ -205,7 +205,7 @@ Pen test 날짜는 실제 외부 침투 테스트가 없으므로 비워 둔다.
 - `src/lib/canva.ts`: OAuth, token refresh/revoke, design/folder API
 - `src/lib/canva-token-crypto.ts`: OAuth 비밀값 암호화
 - `src/app/api/teacher/library/export/route.ts`: 라이브러리 PDF 처리 방식
-- `src/lib/teacher-library.ts`: Aura 파일 참조 및 Canva 디자인 ID 저장 방식
+- `src/lib/teacher-library.ts`: aura-board 파일 참조 및 Canva 디자인 ID 저장 방식
 - `src/app/api/teacher/me/route.ts`: 계정 삭제 revoke 보완 대상
 - `src/app/terms/page.tsx`: 아동 이용 조건 보완 대상
 - `src/app/privacy/page.tsx`: Canva 데이터 수집·삭제·보관 고지

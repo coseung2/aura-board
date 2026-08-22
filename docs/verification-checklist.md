@@ -65,11 +65,11 @@ creating overlapping testing-notes documents.
 
 ### Teacher content library and Canva PDF export
 
-- Add a columns-board section containing an Aura-hosted image, an external
-  image, and a Canva design. Confirm the Aura image keeps its existing object
+- Add a columns-board section containing an aura-board-hosted image, an external
+  image, and a Canva design. Confirm the aura-board image keeps its existing object
   URL, the external image is copied once into teacher-library storage, and the
   Canva item stores only its design identity and display metadata.
-- Delete the source card and run blob cleanup after its delay. Confirm an Aura
+- Delete the source card and run blob cleanup after its delay. Confirm an aura-board
   image referenced by a library item remains. Delete the final library item and
   confirm the object becomes eligible for cleanup.
 - Select two or more library items and confirm the browser starts exactly one

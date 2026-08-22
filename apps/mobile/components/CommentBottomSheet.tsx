@@ -70,7 +70,18 @@ type Props = {
   onClose: () => void;
   onCommentCountChange?: (change: number) => void;
   viewer?: CommentViewer;
+  resourceKind?: "card" | "feed";
 };
+
+function commentsResourcePath(
+  id: string,
+  audience: CommentAudience,
+  resourceKind: "card" | "feed",
+) {
+  return resourceKind === "feed"
+    ? `/api/student/feed/${encodeURIComponent(id)}/comments`
+    : commentsPath(id, audience);
+}
 
 export function CommentBottomSheet({
   cardId,
@@ -78,6 +89,7 @@ export function CommentBottomSheet({
   onClose,
   onCommentCountChange,
   viewer = "student",
+  resourceKind = "card",
 }: Props) {
   const router = useRouter();
   const [items, setItems] = useState<CommentItem[]>([]);
@@ -102,6 +114,8 @@ export function CommentBottomSheet({
   );
   const [guardianAvailable, setGuardianAvailable] = useState(false);
   const requestVersion = useRef(0);
+  const feedResource = resourceKind === "feed";
+  const commentTargetKind = feedResource ? "feed_comment" : "comment";
 
   const handleAuthError = useCallback(
     async (nextError: unknown) => {
@@ -128,7 +142,7 @@ export function CommentBottomSheet({
         const response = await request<{
           items: CommentItem[];
           guardianAvailable?: boolean;
-        }>(commentsPath(cardId, nextAudience));
+        }>(commentsResourcePath(cardId, nextAudience, resourceKind));
         if (version !== requestVersion.current) return;
         const nextGuardianAvailable = response.guardianAvailable === true;
         setGuardianAvailable(nextGuardianAvailable);
@@ -159,7 +173,7 @@ export function CommentBottomSheet({
         if (version === requestVersion.current) setLoading(false);
       }
     },
-    [cardId, handleAuthError, viewer],
+    [cardId, handleAuthError, resourceKind, viewer],
   );
 
   useEffect(() => {
@@ -203,7 +217,7 @@ export function CommentBottomSheet({
       const response = await request<{
         item?: CommentItem;
         comment?: CommentItem;
-      }>(commentsPath(cardId, audience), {
+      }>(commentsResourcePath(cardId, audience, resourceKind), {
         method: "POST",
         json: { content, audience },
       });
@@ -249,7 +263,9 @@ export function CommentBottomSheet({
     try {
       const request = viewer === "parent" ? parentApiFetch : apiFetch;
       await request(
-        `/api/cards/${encodeURIComponent(cardId)}/comments/${encodeURIComponent(commentId)}`,
+        resourceKind === "feed"
+          ? `/api/student/feed/comments/${encodeURIComponent(commentId)}`
+          : `/api/cards/${encodeURIComponent(cardId)}/comments/${encodeURIComponent(commentId)}`,
         { method: "DELETE" },
       );
       setItems((current) => removeThreadComment(current, commentId));
@@ -280,7 +296,7 @@ export function CommentBottomSheet({
       const response = await request<{
         item?: CommentItem;
         comment?: CommentItem;
-      }>(commentsPath(cardId, audience), {
+      }>(commentsResourcePath(cardId, audience, resourceKind), {
         method: "POST",
         json: {
           content,
@@ -324,7 +340,7 @@ export function CommentBottomSheet({
   async function hideComment(item: CommentItem) {
     applyHiddenReason(item.id, "item");
     try {
-      await hideContent({ targetKind: "comment", targetId: item.id });
+      await hideContent({ targetKind: commentTargetKind, targetId: item.id });
     } catch (nextError) {
       // Roll back so the student never sees a hide that did not persist.
       applyHiddenReason(item.id, item.hiddenReason ?? null);
@@ -336,7 +352,7 @@ export function CommentBottomSheet({
   async function unhideComment(item: CommentItem) {
     applyHiddenReason(item.id, null);
     try {
-      await unhideContent({ targetKind: "comment", targetId: item.id });
+      await unhideContent({ targetKind: commentTargetKind, targetId: item.id });
       // Content was blanked server-side while hidden, so refetch to restore it.
       await loadComments(audience);
     } catch (nextError) {
@@ -355,7 +371,7 @@ export function CommentBottomSheet({
     },
   ) {
     const result = await reportContent({
-      targetKind: "comment",
+      targetKind: commentTargetKind,
       targetId: item.id,
       reason: input.reason,
       detail: input.detail,
@@ -483,6 +499,7 @@ export function CommentBottomSheet({
           <CommentLikeButton
             cardId={cardId ?? ""}
             commentId={item.id}
+            resourceKind={resourceKind}
             likeCount={item.likeCount}
             isLiked={item.isLiked}
             viewer={viewer}
@@ -554,7 +571,7 @@ export function CommentBottomSheet({
         <Text style={styles.familyThreadTitle} accessibilityRole="header">
           가족 댓글
         </Text>
-      ) : (
+      ) : !feedResource ? (
         <View style={styles.tabsInset}>
           <ContentTabs accessibilityLabel="댓글 범위">
             <ContentTab
@@ -573,7 +590,7 @@ export function CommentBottomSheet({
             </ContentTab>
           </ContentTabs>
         </View>
-      )}
+      ) : null}
 
       <View style={styles.flex}>
         {loading ? (

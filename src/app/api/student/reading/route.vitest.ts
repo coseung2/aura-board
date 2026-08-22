@@ -141,6 +141,7 @@ describe("reading logs and missions", () => {
         author: "작가",
         reflection: "감상",
         aiScore: index === 0 ? 5 : null,
+        missionCounted: index === 0,
         aiFeedback: null,
         evaluatedAt: null,
         createdAt: now,
@@ -170,14 +171,14 @@ describe("reading logs and missions", () => {
         "consecutive_days",
         "reflection_chars",
       ]);
-      expect(body.missions[0].progress).toBe(4);
+      expect(body.missions[0].progress).toBe(1);
       expect(body.weeklyMissionReward).toMatchObject({
         totalCount: 3,
         completedCount: expect.any(Number),
         claimed: false,
         claimable: true,
-        claimableStepCount: 5,
-        claimableAmount: 50,
+        claimableStepCount: 2,
+        claimableAmount: 20,
       });
       expect(body.representativeSlime).toBeNull();
       expect(mocks.findMany).toHaveBeenCalledWith(

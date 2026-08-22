@@ -114,6 +114,11 @@ export const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: borders.hairline,
   },
+  buttonCompact: {
+    minHeight: controls.compactButtonMinHeight,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
   buttonText: {
     ...typography.label,
   },
@@ -214,6 +219,7 @@ export const styles = StyleSheet.create({
   },
   appHeaderBack: {
     backgroundColor: colors.transparent,
+    marginLeft: -spacing.md,
   },
   appHeaderTitleGroup: {
     flex: 1,
@@ -231,6 +237,7 @@ export const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
+    marginRight: -spacing.md,
   },
   sectionHeader: {
     minHeight: tapMin + spacing.xs,

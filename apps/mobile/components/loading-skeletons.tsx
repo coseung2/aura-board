@@ -3,10 +3,15 @@ import { StyleSheet, View } from "react-native";
 import {
   borders,
   colors,
+  feed,
+  controls,
   loadingUx,
   pageChrome,
   radii,
+  slimeUi,
   spacing,
+  tapMin,
+  typography,
 } from "../theme/tokens";
 
 type LoadingFrameProps = {
@@ -31,16 +36,16 @@ function FeedCardSkeleton() {
   return (
     <View style={styles.feedCard}>
       <View style={styles.feedHeader}>
-        <View style={styles.avatar} />
         <View style={styles.feedHeaderCopy}>
           <View style={styles.lineMedium} />
-          <View style={styles.lineTiny} />
         </View>
+        <View style={styles.scopeBadge} />
       </View>
       <View style={styles.feedMedia} />
       <View style={styles.feedCopy}>
         <View style={styles.lineWide} />
         <View style={styles.lineMedium} />
+        <View style={styles.lineShort} />
       </View>
     </View>
   );
@@ -49,22 +54,36 @@ function FeedCardSkeleton() {
 export function StudentHomeSkeleton() {
   return (
     <LoadingFrame accessibilityLabel="홈 내용을 준비하는 중">
-      <View style={styles.homeHero}>
-        <View style={styles.homeHeroCopy}>
-          <View style={styles.lineMedium} />
-          <View style={styles.lineWide} />
-          <View style={styles.lineShort} />
+      <View style={styles.dailyGamePanel}>
+        <View style={styles.dailyGameHeader}>
+          <View style={styles.headerHalf} />
+          <View style={styles.headerHalf} />
         </View>
-        <View style={styles.homePet} />
-      </View>
-      <View style={styles.metricRow}>
-        <View style={styles.metricCard} />
-        <View style={styles.metricCard} />
-        <View style={styles.metricCard} />
+        <View style={styles.dailyGameBody}>
+          <View style={styles.petPane} />
+          <View style={styles.rewardList}>
+            {Array.from({ length: 4 }, (_, index) => (
+              <View key={index} style={styles.rewardRow} />
+            ))}
+          </View>
+        </View>
       </View>
       <View style={styles.sectionHeading} />
-      <View style={styles.homeBoardRow} />
-      <View style={styles.homeBoardRow} />
+      <View style={styles.walletCard}>
+        <View style={styles.sectionLine} />
+        <View style={styles.balanceRow}>
+          <View style={styles.lineMedium} />
+          <View style={styles.balanceValue} />
+        </View>
+      </View>
+      <View style={styles.sectionHeading} />
+      <View style={styles.assignmentFilterRow}>
+        <View style={styles.filterChipSmall} />
+        <View style={styles.filterChipSmall} />
+      </View>
+      {Array.from({ length: 4 }, (_, index) => (
+        <View key={index} style={styles.assignmentRow} />
+      ))}
     </LoadingFrame>
   );
 }
@@ -76,14 +95,19 @@ export function BoardListSkeleton() {
         <View style={styles.filterChip} />
         <View style={styles.filterChip} />
         <View style={styles.filterChip} />
+        <View style={styles.filterChipNarrow} />
+        <View style={styles.filterChipNarrow} />
       </View>
-      <View style={styles.boardGridRow}>
-        <View style={styles.boardCard} />
-        <View style={styles.boardCard} />
-      </View>
-      <View style={styles.boardGridRow}>
-        <View style={styles.boardCard} />
-        <View style={styles.boardCard} />
+      <View style={styles.boardTileGrid}>
+        {[0, 1, 2, 3].map((index) => (
+          <View key={index} style={styles.boardTile}>
+            <View style={styles.boardThumbnail} />
+            <View style={styles.boardTileBody}>
+              <View style={styles.lineMedium} />
+              <View style={styles.lineShort} />
+            </View>
+          </View>
+        ))}
       </View>
     </LoadingFrame>
   );
@@ -92,13 +116,9 @@ export function BoardListSkeleton() {
 export function BoardDetailSkeleton() {
   return (
     <LoadingFrame accessibilityLabel="보드 내용을 준비하는 중">
-      <View style={styles.boardDetailHero}>
-        <View style={styles.lineMedium} />
-        <View style={styles.lineShort} />
-      </View>
-      <View style={styles.boardDetailCard} />
-      <View style={styles.boardDetailCard} />
-      <View style={styles.boardDetailCardShort} />
+      {Array.from({ length: 3 }, (_, index) => (
+        <View key={index} style={styles.boardDetailCard} />
+      ))}
     </LoadingFrame>
   );
 }
@@ -139,76 +159,123 @@ const styles = StyleSheet.create({
     paddingHorizontal: pageChrome.horizontalPadding,
     paddingTop: spacing.lg,
   },
-  homeHero: {
-    minHeight: loadingUx.homeHeroHeight,
+  dailyGamePanel: { gap: spacing.none },
+  dailyGameHeader: {
+    minHeight: tapMin,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.lg,
-    padding: spacing.xl,
-    borderRadius: radii.card,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceAlt,
+    gap: spacing.md,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
   },
-  homeHeroCopy: { flex: 1, gap: spacing.md },
-  homePet: {
-    width: "36%",
-    height: "78%",
-    borderRadius: radii.card,
+  headerHalf: {
+    flex: 1,
+    height: loadingUx.lineHeight,
+    borderRadius: radii.pill,
     backgroundColor: colors.border,
   },
-  metricRow: { flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg },
-  metricCard: {
+  dailyGameBody: {
+    minHeight: slimeUi.homePetSceneHeight + spacing.lg * 2,
+    flexDirection: "row",
+    alignItems: "stretch",
+    gap: spacing.sm,
+    paddingTop: spacing.md,
+  },
+  petPane: { width: "46%", borderRadius: radii.card, backgroundColor: colors.surfaceAlt },
+  rewardList: {
     flex: 1,
-    minHeight: loadingUx.homeMetricHeight,
-    borderRadius: radii.control,
+    minWidth: 0,
+    justifyContent: "center",
+    gap: spacing.xs,
+  },
+  rewardRow: {
+    height: tapMin - spacing.sm,
+    borderRadius: radii.pill,
     backgroundColor: colors.surfaceAlt,
   },
   sectionHeading: {
     width: "34%",
     height: loadingUx.lineHeight,
-    marginTop: spacing.xl,
-    marginBottom: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
     borderRadius: radii.pill,
     backgroundColor: colors.border,
   },
-  homeBoardRow: {
-    height: loadingUx.homeMetricHeight,
-    marginBottom: spacing.md,
+  walletCard: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
+    gap: spacing.md,
     borderRadius: radii.card,
     backgroundColor: colors.surfaceAlt,
   },
-  filterRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.xl },
-  filterChip: {
-    width: "26%",
-    height: spacing.xxl,
+  sectionLine: {
+    width: "28%",
+    height: loadingUx.lineHeight,
+    borderRadius: radii.pill,
+    backgroundColor: colors.border,
+  },
+  balanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+  },
+  balanceValue: {
+    width: "32%",
+    height: typography.subtitle.lineHeight,
+    borderRadius: radii.pill,
+    backgroundColor: colors.border,
+  },
+  assignmentFilterRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+    paddingBottom: spacing.sm,
+  },
+  filterChipSmall: {
+    width: tapMin + spacing.xl,
+    height: controls.compactChipHeight,
     borderRadius: radii.pill,
     backgroundColor: colors.surfaceAlt,
   },
-  boardGridRow: { flexDirection: "row", gap: spacing.md, marginBottom: spacing.md },
-  boardCard: {
+  assignmentRow: {
+    height: tapMin,
+    marginBottom: spacing.xs,
+    borderBottomWidth: borders.hairline,
+    borderBottomColor: colors.border,
+  },
+  filterRow: { flexDirection: "row", gap: spacing.sm, marginBottom: spacing.xl },
+  filterChip: {
     flex: 1,
-    height: loadingUx.boardCardHeight,
+    maxWidth: tapMin + spacing.xxxl,
+    height: controls.compactChipHeight,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceAlt,
+  },
+  filterChipNarrow: {
+    width: tapMin + spacing.xs,
+    height: controls.compactChipHeight,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceAlt,
+  },
+  boardTileGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  boardTile: {
+    width: "49%",
+    gap: spacing.xxs,
+  },
+  boardThumbnail: {
+    aspectRatio: 1,
     borderRadius: radii.card,
     backgroundColor: colors.surfaceAlt,
   },
-  boardDetailHero: {
-    minHeight: loadingUx.boardDetailHeroHeight,
-    justifyContent: "center",
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: radii.card,
-    backgroundColor: colors.surfaceAlt,
-  },
+  boardTileBody: { gap: spacing.xxs },
   boardDetailCard: {
     height: loadingUx.boardDetailCardHeight,
     marginBottom: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.surfaceAlt,
-  },
-  boardDetailCardShort: {
-    height: loadingUx.homeMetricHeight,
     borderRadius: radii.card,
     backgroundColor: colors.surfaceAlt,
   },
@@ -221,14 +288,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   feedHeader: { flexDirection: "row", alignItems: "center", gap: spacing.md, padding: spacing.lg },
-  avatar: {
-    width: loadingUx.feedAvatarSize,
-    height: loadingUx.feedAvatarSize,
+  scopeBadge: {
+    width: tapMin + spacing.sm,
+    height: loadingUx.lineSmallHeight,
     borderRadius: radii.pill,
     backgroundColor: colors.surfaceAlt,
   },
   feedHeaderCopy: { flex: 1, gap: spacing.sm },
-  feedMedia: { height: loadingUx.feedMediaHeight, backgroundColor: colors.surfaceAlt },
+  feedMedia: { height: feed.mediaHeight, backgroundColor: colors.surfaceAlt },
   feedCopy: { gap: spacing.sm, padding: spacing.lg },
   lineWide: {
     width: "78%",
@@ -244,12 +311,6 @@ const styles = StyleSheet.create({
   },
   lineShort: {
     width: "38%",
-    height: loadingUx.lineSmallHeight,
-    borderRadius: radii.pill,
-    backgroundColor: colors.border,
-  },
-  lineTiny: {
-    width: "28%",
     height: loadingUx.lineSmallHeight,
     borderRadius: radii.pill,
     backgroundColor: colors.border,

@@ -66,6 +66,13 @@ export function sanitizeReadingEvaluationInput(
     title: sanitizeText(input.title),
     author: sanitizeText(input.author),
     reflection: sanitizeText(input.reflection),
+    previousReflection: input.previousReflection
+      ? sanitizeText(input.previousReflection)
+      : undefined,
+    previousScore: input.previousScore,
+    previousFeedback: input.previousFeedback
+      ? sanitizeText(input.previousFeedback)
+      : undefined,
   };
 }
 
@@ -165,6 +172,15 @@ export async function evaluateReadingWithLlm(args: {
         title: input.title,
         author: input.author,
         reflection: input.reflection,
+        ...(input.previousReflection
+          ? {
+              previousReflection: input.previousReflection,
+              previousScore: input.previousScore,
+              previousFeedback: input.previousFeedback,
+              reEvaluationInstruction:
+                "이전 감상문과 점수, 피드백을 새 감상문과 비교하여 향상된 점과 남은 부족한 점을 피드백에 포함하세요.",
+            }
+          : {}),
       }),
     });
   } finally {

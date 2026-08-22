@@ -6,6 +6,8 @@ const mocks = vi.hoisted(() => ({
   findUnique: vi.fn(),
   updateMany: vi.fn(),
   update: vi.fn(),
+  transaction: vi.fn(),
+  dbTransaction: vi.fn(),
   getTeacherKey: vi.fn(),
   evaluate: vi.fn(),
   limit: vi.fn(),
@@ -43,6 +45,7 @@ vi.mock("@/lib/db", () => ({
       updateMany: mocks.updateMany,
       update: mocks.update,
     },
+    $transaction: mocks.dbTransaction,
   },
 }));
 
@@ -66,6 +69,8 @@ function pendingLog() {
     aiFeedbackStatus: "pending",
     aiFeedbackModel: null,
     aiFeedbackError: null,
+    missionCounted: false,
+    missionCountedAt: null,
     evaluatedAt: null,
     createdAt: now,
     updatedAt: now,
@@ -102,6 +107,12 @@ describe("POST /api/student/reading/[logId]/feedback", () => {
       mocks.log = { ...mocks.log, ...data, updatedAt: new Date() };
       return mocks.log;
     });
+    mocks.transaction.mockReset().mockImplementation(async (operation: (tx: unknown) => Promise<unknown>) =>
+      operation({ readingLog: { update: mocks.update, updateMany: mocks.updateMany, findUnique: mocks.findUnique } }),
+    );
+    mocks.dbTransaction.mockReset().mockImplementation(async (operation: (tx: unknown) => Promise<unknown>) =>
+      operation({ readingLog: { update: mocks.update, updateMany: mocks.updateMany, findUnique: mocks.findUnique } }),
+    );
     mocks.getTeacherKey.mockReset().mockResolvedValue({
       teacherId: "teacher-1",
       provider: "gemini",

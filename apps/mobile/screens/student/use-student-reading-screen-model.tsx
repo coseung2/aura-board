@@ -131,6 +131,7 @@ export function useStudentReadingScreenModel() {
     requestedView === "missions" ? "missions" : "records",
   );
   const [composerVisible, setComposerVisible] = useState(false);
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
   const [composerInstanceId, setComposerInstanceId] = useState(0);
   const [title, setTitle] = useState(EMPTY_READING_COMPOSER_DRAFT.title);
   const [author, setAuthor] = useState(EMPTY_READING_COMPOSER_DRAFT.author);
@@ -419,7 +420,10 @@ export function useStudentReadingScreenModel() {
   }, [activeTab, attendanceReward, loadMission, missionLoading]);
 
   const requestFeedback = useCallback(
-    async (readingLogId: string) => {
+    async (
+      readingLogId: string,
+      options?: { forceReevaluation?: boolean; reflection?: string },
+    ) => {
       if (
         feedbackRequestsRef.current.has(readingLogId) ||
         feedbackPollersRef.current.has(readingLogId)
@@ -518,6 +522,7 @@ export function useStudentReadingScreenModel() {
           `/api/student/reading/${encodeURIComponent(readingLogId)}/feedback`,
           {
             method: "POST",
+            json: options,
             // Gemma 독서 평가는 서버에서 최대 60초까지 걸릴 수 있어 기본
             // 12초 타임아웃으로는 항상 실패로 보인다. (2026-08-15)
             timeoutMs: 65_000,
@@ -586,9 +591,11 @@ export function useStudentReadingScreenModel() {
     setNotice(null);
     try {
       const payload = await apiFetch<{ entry: ReadingEntry }>(
-        "/api/student/reading",
+        editingEntryId
+          ? `/api/student/reading/${encodeURIComponent(editingEntryId)}`
+          : "/api/student/reading",
         {
-          method: "POST",
+          method: editingEntryId ? "PATCH" : "POST",
           json: {
             bookType,
             title: title.trim(),
@@ -597,16 +604,33 @@ export function useStudentReadingScreenModel() {
           },
         },
       );
-      setEntries((current) => [payload.entry, ...current]);
+      setEntries((current) =>
+        editingEntryId
+          ? current.map((entry) =>
+              entry.id === editingEntryId ? payload.entry : entry,
+            )
+          : [payload.entry, ...current],
+      );
       setHistoryBookType(payload.entry.bookType);
       setTitle(EMPTY_READING_COMPOSER_DRAFT.title);
       setAuthor(EMPTY_READING_COMPOSER_DRAFT.author);
       setReflection(EMPTY_READING_COMPOSER_DRAFT.reflection);
       setComposerInstanceId((current) => nextReadingComposerInstanceId(current));
-      setNotice("저장했어요. 피드백을 기다리는 중...");
+      const wasEditing = editingEntryId !== null;
+      setEditingEntryId(null);
+      setNotice(
+        wasEditing
+          ? "수정했어요. 피드백을 기다리는 중..."
+          : "저장했어요. 피드백을 기다리는 중...",
+      );
       setComposerVisible(false);
       feedbackResumeAttemptedRef.current.add(payload.entry.id);
-      void requestFeedback(payload.entry.id);
+      void requestFeedback(
+        payload.entry.id,
+        wasEditing
+          ? { forceReevaluation: true, reflection: payload.entry.reflection }
+          : undefined,
+      );
     } catch (nextError) {
       if (!(await handleError(nextError)))
         setError("독서 기록을 저장하지 못했어요.");
@@ -635,8 +659,21 @@ export function useStudentReadingScreenModel() {
   function openComposer() {
     setError(null);
     setNotice(null);
+    setEditingEntryId(null);
     // Remount TextInputs on every open so controlled draft values always win
     // over any native TextInput cache left from a previous close/clear.
+    setComposerInstanceId((current) => nextReadingComposerInstanceId(current));
+    setComposerVisible(true);
+  }
+
+  function openEditor(entry: ReadingEntry) {
+    setError(null);
+    setNotice(null);
+    setEditingEntryId(entry.id);
+    setBookType(entry.bookType);
+    setTitle(entry.title);
+    setAuthor(entry.author);
+    setReflection(entry.reflection);
     setComposerInstanceId((current) => nextReadingComposerInstanceId(current));
     setComposerVisible(true);
   }
@@ -660,6 +697,7 @@ export function useStudentReadingScreenModel() {
     entries,
     notice,
     openComposer,
+    openEditor,
     loading,
     historyBookType,
     setHistoryBookType,
@@ -694,6 +732,7 @@ export function useStudentReadingScreenModel() {
     claimingTitleKey,
     claimReadingTitle,
     composerVisible,
+    editingEntryId,
     setComposerVisible,
     composerScrollRef,
     setBookType,

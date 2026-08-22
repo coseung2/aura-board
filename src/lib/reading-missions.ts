@@ -42,6 +42,7 @@ export type ReadingMissionStepClaim = {
 export type ReadingMissionLog = {
   createdAt: string | Date;
   reflection: string;
+  missionCounted: boolean;
 };
 
 export type BuildReadingMissionsInput = {
@@ -175,6 +176,7 @@ function longestConsecutiveReadingDays(
 
   const dates = new Set<string>();
   for (const log of logs) {
+    if (!log.missionCounted) continue;
     const timestamp = new Date(log.createdAt).getTime();
     if (Number.isFinite(timestamp) && timestamp >= start && timestamp < end) {
       dates.add(kstDateKey(timestamp));
@@ -290,9 +292,10 @@ export function buildReadingMissions({
   const claimed = claimedKeySet(input);
   const claimedUnits = claimedStepSet(input);
 
-  const booksProgress = logs.length;
+  const approvedLogs = logs.filter((log) => log.missionCounted);
+  const booksProgress = approvedLogs.length;
   const daysProgress = longestConsecutiveReadingDays(logs, weekStart, weekEnd);
-  const charsProgress = logs.reduce(
+  const charsProgress = approvedLogs.reduce(
     (total, log) => total + countGraphemes(log.reflection),
     0,
   );
@@ -324,7 +327,7 @@ export function buildReadingMissions({
     {
       key: "reflection_chars",
       title: "감상문 글자수",
-      description: `독서 감상을 모두 합쳐 ${charsTarget}자 작성해 보세요.`,
+      description: `독서 감상문을 누적 ${charsTarget}자 작성해 보세요.`,
       target: charsTarget,
       progress: charsProgress,
       unit: "자",

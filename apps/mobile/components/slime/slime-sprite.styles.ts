@@ -17,6 +17,7 @@ export const styles = StyleSheet.create({
   itemLayer: { zIndex: layers.spriteItem },
   propLayer: { zIndex: layers.spriteProp },
   frameViewport: { overflow: "hidden" },
+  hostBackground: { position: "absolute", inset: 0, width: "100%", height: "100%" },
   hostScene: {
     position: "absolute",
     bottom: 0,

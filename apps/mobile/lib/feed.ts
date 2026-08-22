@@ -13,18 +13,37 @@ export type FeedMedia = {
   position: number;
 };
 
-export type FeedItem = {
+export type FeedHiddenReason = "item" | "author";
+
+/**
+ * Student feed view returned by the FeedPost/FeedPublication API.
+ *
+ * This is intentionally not a BoardCard-shaped DTO. Feed publications are a
+ * separate content space and keep their own post/publication identities.
+ */
+export type FeedPostView = {
   publicationId: string;
   postId: string;
   scope: FeedPublicationScope;
   classroomId: string | null;
   authorKind: FeedAuthorKind;
+  authorId: string | null;
   authorDisplayName: string;
   title: string | null;
   body: string | null;
   publishedAt: string;
   media: FeedMedia[];
+  likeCount: number;
+  commentCount: number;
+  isLiked: boolean;
+  canDelete: boolean;
+  canHide: boolean;
+  canReport: boolean;
+  canBlockAuthor: boolean;
+  hiddenReason: FeedHiddenReason | null;
 };
+
+export type FeedItem = FeedPostView;
 
 export type FeedPage = {
   items: FeedItem[];

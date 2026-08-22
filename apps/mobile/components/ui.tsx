@@ -463,6 +463,7 @@ type AppButtonProps = PressableProps & {
   children: ReactNode;
   loading?: boolean;
   variant?: ButtonVariant;
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
   textStyle?: StyleProp<TextStyle>;
 };
@@ -471,6 +472,7 @@ export function AppButton({
   children,
   loading,
   variant = "primary",
+  compact,
   style,
   textStyle,
   disabled,
@@ -494,6 +496,7 @@ export function AppButton({
       style={({ pressed }) => [
         styles.button,
         variantStyles[variant],
+        compact && styles.buttonCompact,
         pressed && !disabled && !loading && pressedStyles[variant],
         (disabled || loading) && styles.disabled,
         style,

@@ -135,9 +135,13 @@ model User {
 
   // UGC safety (App Store guideline 1.2).
   contentReportsResolved ContentReport[] @relation("ContentReportResolver")
+  feedContentReportsResolved FeedContentReport[] @relation("FeedContentReportResolver")
 
   // SNS-style feed publication foundation.
   feedPostsAuthored         FeedPost[]
+  feedPostLikes             FeedPostLike[]    @relation("UserFeedPostLikes")
+  feedComments              FeedComment[]     @relation("UserFeedComments")
+  feedCommentLikes          FeedCommentLike[] @relation("UserFeedCommentLikes")
   feedPublicationsPublished FeedPublication[]
   feedPoolEntriesCreated    FeedPoolEntry[]
 }
@@ -682,8 +686,10 @@ model Classroom {
 
   // UGC safety (App Store guideline 1.2).
   contentReports ContentReport[]
+  feedContentReports FeedContentReport[]
 
   feedPublications FeedPublication[]
+  feedComments     FeedComment[]
 
   @@index([teacherId])
   @@index([code])
@@ -836,6 +842,9 @@ model Student {
 
   // UGC safety (App Store guideline 1.2).
   contentReportsFiled   ContentReport[]       @relation("ContentReportReporterStudent")
+  feedHiddenContent     FeedHiddenContent[]
+  feedContentReportsFiled FeedContentReport[] @relation("FeedContentReportReporterStudent")
+  feedContentReportsAgainst FeedContentReport[] @relation("FeedContentReportAuthorStudent")
   contentReportsAgainst ContentReport[]       @relation("ContentReportAuthorStudent")
   hiddenContent         HiddenContent[]       @relation("HiddenContentStudent")
   hiddenByStudents      HiddenContentAuthor[] @relation("HiddenContentAuthorHider")
@@ -846,6 +855,9 @@ model Student {
 
   // SNS-style feed publication foundation.
   feedPostsAuthored         FeedPost[]
+  feedPostLikes             FeedPostLike[]    @relation("StudentFeedPostLikes")
+  feedComments              FeedComment[]     @relation("StudentFeedComments")
+  feedCommentLikes          FeedCommentLike[] @relation("StudentFeedCommentLikes")
   feedPublicationsPublished FeedPublication[]
 
   @@unique([classroomId, number])
@@ -881,6 +893,8 @@ model FeedPost {
   media        FeedPostMedia[]
   publications FeedPublication[]
   poolEntry    FeedPoolEntry?
+  likes        FeedPostLike[]
+  comments     FeedComment[]
 
   @@index([status, createdAt(sort: Desc)])
 }
@@ -944,6 +958,76 @@ model FeedPoolEntry {
   createdByUser User?    @relation(fields: [createdByUserId], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt(sort: Desc)])
+}
+
+// Feed engagement stays separate from Card engagement. Feed posts are not
+// cards and may be published to more than one classroom.
+model FeedPostLike {
+  id String @id @default(cuid())
+
+  postId String
+
+  likerKind      String
+  likerUserId    String?
+  likerStudentId String?
+
+  createdAt DateTime @default(now())
+
+  post         FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  likerUser    User?    @relation("UserFeedPostLikes", fields: [likerUserId], references: [id], onDelete: Cascade)
+  likerStudent Student? @relation("StudentFeedPostLikes", fields: [likerStudentId], references: [id], onDelete: Cascade)
+
+  @@unique([postId, likerUserId])
+  @@unique([postId, likerStudentId])
+  @@index([postId])
+}
+
+model FeedComment {
+  id String @id @default(cuid())
+
+  postId String
+  classroomId String
+
+  authorKind      String
+  authorUserId    String?
+  authorStudentId String?
+  content         String
+  parentCommentId String?
+
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  post          FeedPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  classroom     Classroom      @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  authorUser    User?          @relation("UserFeedComments", fields: [authorUserId], references: [id], onDelete: SetNull)
+  authorStudent Student?       @relation("StudentFeedComments", fields: [authorStudentId], references: [id], onDelete: SetNull)
+  parentComment FeedComment?   @relation("FeedCommentReplies", fields: [parentCommentId], references: [id], onDelete: Cascade)
+  replies       FeedComment[]  @relation("FeedCommentReplies")
+  likes         FeedCommentLike[]
+
+  @@index([postId, classroomId, createdAt])
+  @@index([parentCommentId, createdAt])
+  @@index([authorStudentId])
+}
+
+model FeedCommentLike {
+  id String @id @default(cuid())
+
+  commentId String
+
+  likerKind      String
+  likerUserId    String?
+  likerStudentId String?
+
+  createdAt DateTime @default(now())
+
+  comment      FeedComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  likerUser    User?       @relation("UserFeedCommentLikes", fields: [likerUserId], references: [id], onDelete: Cascade)
+  likerStudent Student?    @relation("StudentFeedCommentLikes", fields: [likerStudentId], references: [id], onDelete: Cascade)
+
+  @@unique([commentId, likerUserId])
+  @@unique([commentId, likerStudentId])
+  @@index([commentId])
 }
 
 // A student-submitted marquee text or image waiting for the submitting
@@ -1143,6 +1227,45 @@ model ContentReport {
   // Drives the teacher queue (oldest pending first).
   @@index([classroomId, status, createdAt])
   @@index([authorStudentId])
+}
+
+model FeedHiddenContent {
+  id String @id @default(cuid())
+  studentId String
+  targetKind String
+  targetId String
+  viaReport Boolean @default(false)
+  createdAt DateTime @default(now())
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, targetKind, targetId])
+  @@index([studentId, createdAt])
+}
+
+model FeedContentReport {
+  id String @id @default(cuid())
+  classroomId String
+  targetKind String
+  targetId String
+  reporterStudentId String
+  authorStudentId String?
+  authorLabel String?
+  reason ContentReportReason
+  detail String?
+  contentSnapshot String?
+  status ContentReportStatus @default(pending)
+  createdAt DateTime @default(now())
+  resolvedAt DateTime?
+  resolvedByUserId String?
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  reporter Student @relation("FeedContentReportReporterStudent", fields: [reporterStudentId], references: [id], onDelete: Cascade)
+  author Student? @relation("FeedContentReportAuthorStudent", fields: [authorStudentId], references: [id], onDelete: SetNull)
+  resolvedBy User? @relation("FeedContentReportResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([reporterStudentId, targetKind, targetId])
+  @@index([classroomId, status, createdAt])
 }
 
 // Per-student, per-item hide. This is the primary path: the student hides the
@@ -4711,15 +4834,39 @@ model ReadingLog {
   aiFeedbackModel  String?
   aiFeedbackError  String?
   evaluatedAt      DateTime?
+  currentRevision  Int      @default(1)
+  missionCounted   Boolean   @default(false)
+  missionCountedAt DateTime?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
   student   Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  revisions ReadingLogRevision[]
 
   @@index([classroomId, createdAt])
   @@index([classroomId, studentId, createdAt])
   @@index([studentId, createdAt])
+}
+
+model ReadingLogRevision {
+  id                String    @id @default(cuid())
+  logId             String
+  revision          Int
+  bookType          String
+  title             String
+  author            String
+  reflection        String    @db.Text
+  aiScore           Int?
+  aiFeedback        String?   @db.Text
+  aiFeedbackStatus  String
+  evaluatedAt       DateTime?
+  createdAt         DateTime  @default(now())
+
+  log ReadingLog @relation(fields: [logId], references: [id], onDelete: Cascade)
+
+  @@unique([logId, revision])
+  @@index([logId, createdAt])
 }
 
 model ShoeFinding {

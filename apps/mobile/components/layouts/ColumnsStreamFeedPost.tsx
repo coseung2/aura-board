@@ -15,6 +15,7 @@ import {
 import { ExpandablePostContent } from "../ExpandablePostContent";
 import { EmbeddedMedia } from "../EmbeddedMedia";
 import type { BoardCard } from "../../lib/types";
+import { youtubeThumbnailUrl, type FeedPostView } from "../../lib/feed";
 import { ApiError, apiFetch, parentApiFetch } from "../../lib/api";
 import type { CommentViewer } from "../../lib/comment-audience";
 import { resolveCardAuthorName } from "../../lib/card-privacy";
@@ -30,7 +31,9 @@ export type StreamFeedPostEngagementMode = "interactive" | "summary";
 const ENGAGEMENT_CACHE_MS = 5 * 60_000;
 
 type Props = {
-  card: BoardCard;
+  card?: BoardCard;
+  /** FeedPostView is rendered directly; it is never converted to a BoardCard. */
+  feedPost?: FeedPostView;
   onOpenComments?: () => void;
   onOpenAuthorPicker?: () => void;
   onLongPress?: (anchor: PostAnchor) => void;
@@ -44,6 +47,7 @@ type Props = {
 
 export function StreamFeedPost({
   card,
+  feedPost,
   onOpenComments,
   onOpenAuthorPicker,
   onLongPress,
@@ -54,23 +58,29 @@ export function StreamFeedPost({
   onUnauthorized,
   deferEmbeddedMedia = false,
 }: Props) {
+  if (!card && !feedPost) return null;
+  const postId = feedPost?.postId ?? card?.id ?? "";
   const author =
-    authorLabel === undefined ? resolveCardAuthorName(card) : authorLabel;
-  const title = card.title.trim();
+    authorLabel === undefined
+      ? feedPost?.authorDisplayName ?? resolveCardAuthorName(card!)
+      : authorLabel;
+  const title = (feedPost?.title ?? card?.title ?? "").trim();
   const displayTitle = title && title !== author?.trim() ? title : "";
-  const content = card.content.trim();
-  const mediaItems = streamPostImages(card);
-  const mediaLabel = streamPostMediaLabel(card);
-  const embedUrl = findPlayableMediaUrl(card);
+  const content = (feedPost?.body ?? card?.content ?? "").trim();
+  const mediaItems = feedPost ? feedPostImages(feedPost) : streamPostImages(card!);
+  const mediaLabel = feedPost ? feedPostMediaLabel(feedPost) : streamPostMediaLabel(card!);
+  const embedUrl = feedPost ? null : findPlayableMediaUrl(card!);
   const hasMediaSurface = Boolean(
     embedUrl || mediaItems.length > 0 || mediaLabel,
   );
   const textActsAsMedia = !hasMediaSurface && Boolean(displayTitle || content);
-  const [likeCount, setLikeCount] = useState(Math.max(0, card.likeCount ?? 0));
-  const [liked, setLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(
+    Math.max(0, feedPost?.likeCount ?? card?.likeCount ?? 0),
+  );
+  const [liked, setLiked] = useState(feedPost?.isLiked ?? false);
   const [likeBusy, setLikeBusy] = useState(false);
-  const commentCount = Math.max(0, card.commentCount ?? 0);
-  const date = formatStreamPostDate(card.createdAt);
+  const commentCount = Math.max(0, feedPost?.commentCount ?? card?.commentCount ?? 0);
+  const date = formatStreamPostDate(feedPost?.publishedAt ?? card?.createdAt);
   const [mediaIndex, setMediaIndex] = useState(0);
   const [mediaWidth, setMediaWidth] = useState(0);
   const postRef = useRef<View>(null);
@@ -84,15 +94,15 @@ export function StreamFeedPost({
 
   useEffect(() => {
     let cancelled = false;
-    setLikeCount(Math.max(0, card.likeCount ?? 0));
-    setLiked(false);
+    setLikeCount(Math.max(0, feedPost?.likeCount ?? card?.likeCount ?? 0));
+    setLiked(feedPost?.isLiked ?? false);
     setLikeBusy(false);
 
-    if (engagementMode !== "interactive") return undefined;
+    if (feedPost || engagementMode !== "interactive") return undefined;
 
     const request = viewer === "parent" ? parentApiFetch : apiFetch;
     void request<{ likeCount: number; isLiked: boolean }>(
-      `/api/cards/${encodeURIComponent(card.id)}/engagement`,
+      `/api/cards/${encodeURIComponent(card!.id)}/engagement`,
       { cacheTtlMs: ENGAGEMENT_CACHE_MS },
     )
       .then((engagement) => {
@@ -109,11 +119,11 @@ export function StreamFeedPost({
     return () => {
       cancelled = true;
     };
-  }, [card.id, card.likeCount, engagementMode, onUnauthorized, viewer]);
+  }, [feedPost, card?.id, card?.likeCount, engagementMode, onUnauthorized, viewer]);
 
   useEffect(() => {
     setMediaIndex(0);
-  }, [card.id]);
+  }, [postId]);
 
   async function toggleLike() {
     if (engagementMode !== "interactive" || likeBusy) return;
@@ -125,18 +135,22 @@ export function StreamFeedPost({
     try {
       const request = viewer === "parent" ? parentApiFetch : apiFetch;
       const response = await request<{ liked: boolean; count: number }>(
-        `/api/cards/${encodeURIComponent(card.id)}/like`,
+        feedPost
+          ? `/api/student/feed/${encodeURIComponent(feedPost.postId)}/like`
+          : `/api/cards/${encodeURIComponent(card!.id)}/like`,
         { method: "POST", json: { liked: nextLiked } },
       );
       setLiked(response.liked);
       setLikeCount(Math.max(0, response.count));
-      void request<{ likeCount: number; isLiked: boolean }>(
-        `/api/cards/${encodeURIComponent(card.id)}/engagement`,
-        {
-          cacheTtlMs: ENGAGEMENT_CACHE_MS,
-          forceRefresh: true,
-        },
-      ).catch(() => undefined);
+      if (!feedPost) {
+        void request<{ likeCount: number; isLiked: boolean }>(
+          `/api/cards/${encodeURIComponent(card!.id)}/engagement`,
+          {
+            cacheTtlMs: ENGAGEMENT_CACHE_MS,
+            forceRefresh: true,
+          },
+        ).catch(() => undefined);
+      }
     } catch (error) {
       setLiked(previous.liked);
       setLikeCount(previous.likeCount);
@@ -246,7 +260,7 @@ export function StreamFeedPost({
           >
             {mediaItems.map((uri) => (
               <View
-                key={`${card.id}:${uri}`}
+                key={`${postId}:${uri}`}
                 style={[
                   styles.feedPostMediaFrame,
                   { width: Math.max(mediaWidth, 1) },
@@ -257,7 +271,7 @@ export function StreamFeedPost({
                   style={styles.feedPostMedia}
                   contentFit="contain"
                   cachePolicy="memory-disk"
-                  recyclingKey={`${card.id}:${uri}`}
+                  recyclingKey={`${postId}:${uri}`}
                   transition={0}
                   accessible={false}
                 />
@@ -402,6 +416,17 @@ export function StreamFeedPost({
 
 function streamPostImages(card: BoardCard): string[] {
   return mediaPreviewUrls(buildMediaItems(card));
+}
+
+function feedPostImages(post: FeedPostView): string[] {
+  return post.media
+    .map((item) => (item.kind === "IMAGE" ? item.url : youtubeThumbnailUrl(item)))
+    .filter((url): url is string => Boolean(url));
+}
+
+function feedPostMediaLabel(post: FeedPostView): string | null {
+  if (post.media.some((item) => item.kind === "YOUTUBE")) return "YouTube 영상";
+  return post.media.length > 0 ? "이미지" : null;
 }
 
 function streamPostMediaLabel(card: BoardCard): string | null {

@@ -4,6 +4,7 @@ export type FeedMediaKind = "IMAGE" | "YOUTUBE";
 export type FeedPublicationScope = "GLOBAL" | "CLASSROOM";
 export type FeedPublicationStatus = "ACTIVE" | "REMOVED";
 export type FeedPoolStatus = "AVAILABLE" | "WITHDRAWN";
+export type FeedHiddenReason = "item" | "author";
 
 export type FeedMediaInput = {
   kind: FeedMediaKind;
@@ -23,11 +24,42 @@ export type FeedItem = {
   scope: FeedPublicationScope;
   classroomId: string | null;
   authorKind: FeedAuthorKind;
+  authorId: string | null;
   authorDisplayName: string;
   title: string | null;
   body: string | null;
   publishedAt: string;
   media: FeedMedia[];
+  likeCount: number;
+  commentCount: number;
+  isLiked: boolean;
+  canDelete: boolean;
+  canHide: boolean;
+  canReport: boolean;
+  canBlockAuthor: boolean;
+  hiddenReason: FeedHiddenReason | null;
+};
+
+export type FeedCommentItem = {
+  id: string;
+  parentCommentId: string | null;
+  content: string;
+  createdAt: string;
+  authorKind: FeedAuthorKind;
+  authorId: string | null;
+  authorStudentId: string | null;
+  authorLabel: string;
+  canDelete: boolean;
+  canModerate: boolean;
+  canReply: boolean;
+  hiddenReason: FeedHiddenReason | null;
+  likeCount: number;
+  isLiked: boolean;
+  replies: FeedCommentItem[];
+};
+
+export type FeedCommentPage = {
+  items: FeedCommentItem[];
 };
 
 export type FeedPage = {

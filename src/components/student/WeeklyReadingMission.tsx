@@ -351,6 +351,10 @@ export function WeeklyReadingMission({
         </strong>
       </div>
 
+      <p className="student-reading-mission-notice">
+        미션은 피드백 5점 이상을 받은 기록만 인정돼요.
+      </p>
+
       <ul className="student-reading-future-mission-list">
         {reward.missions.map((mission) => {
           const steps = missionSteps(mission);

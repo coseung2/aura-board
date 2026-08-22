@@ -1,20 +1,28 @@
 # 4-provider infrastructure handoff
 
-기준일: 2026-08-21
-기준 브랜치: `main` (2026-08-21 warm standby acceptance 기준, production cutover 전)
+기준일: 2026-08-23
+기준 브랜치: `main` (2026-08-21 production Oracle self-hosted cutover 완료 기준)
 
-이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **Oracle A1에서 Aura Board 애플리케이션과 private play engine을 운영하고 있으며, 2026-08-20 self-hosted Supabase staging의 DB·PostgREST/RLS·Realtime·OCI S3 Storage data plane을 검증했다. production database와 일반 파일의 source of truth는 cutover 전까지 managed Supabase Pro다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
+이 문서는 Oracle Cloud, Cloudflare, Supabase, GitHub Actions의 책임 경계와 후속 실행 순서를 기록한다. **Oracle A1에서 Aura Board 애플리케이션과 private play engine을 운영하고 있으며, 2026-08-21 cutover로 production database와 일반 파일의 source of truth는 Oracle self-hosted Supabase다. managed Supabase Pro는 2026-09-03까지 read-only 안정화용으로 보존하며 운영 source가 아니다.** 아래 체크박스는 실제 실행자가 증거를 확인한 뒤에만 갱신한다.
 
 ## 책임과 경계
 
 | 제공자 | 책임 | 책임이 아닌 것 | 현재 상태 |
 | --- | --- | --- | --- |
-| Oracle Cloud | Next.js 앱 호스팅, private play engine, 앱 cron, 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업, self-hosted Supabase staging | cutover 전 managed Supabase 원본 데이터, 자동 DR promotion | `ap-osaka-1`의 `testauram-a1-osaka` A1을 4 OCPU/24 GB로 운영. 100 GB Block Volume의 Supabase OSS 11개 service와 OCI S3 Storage backend가 healthy이며 production cutover는 아직 하지 않음 |
+| Oracle Cloud | Next.js 앱 호스팅, private play engine, 앱 cron, 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업, self-hosted Supabase 운영 | managed Supabase 원본 데이터, 자동 DR promotion | `ap-osaka-1`의 `testauram-a1-osaka` A1을 4 OCPU/24 GB로 운영. 100 GB Block Volume의 Supabase OSS 11개 service와 OCI S3 Storage backend가 healthy이며 2026-08-21 production cutover 완료. 앱/play-engine/백업 timer 및 self-host API 운영 중 |
 | Cloudflare | 운영 DNS·HTTPS proxy, Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | `aura-board.com` apex A와 `www` CNAME을 Oracle origin으로 proxied 운영. Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
-| Supabase Pro (Seoul) | Postgres, Auth, Realtime, 일반 파일·이미지 Storage, `NotificationOutbox`, `pg_net`, `pg_cron` | Cloudflare Stream 비디오, Oracle 작업 실행 환경 | 운영 사용 중. `20260731` 마이그레이션 5개를 2026-08-01 적용하고 RLS·권한·함수·트리거·cron job을 검증함 |
+| Supabase Pro (Seoul) | 2026-09-03까지 read-only 안정화 보존 (과거 Postgres/Auth/Realtime/Storage 원본) | 운영 트래픽, 신규 write, source of truth | cutover 시 read-only/pg_cron disabled/seal 상태로 전환. 운영 source는 Oracle self-hosted Supabase이며 2026-09-03까지 보존 후 폐기 여부 결정 |
 | Supabase Free (DR) | 논리 replica, DR용 Postgres·PostgREST·RLS·Realtime warm standby | Oracle primary write path, 자동 promotion, object payload | Seoul `aura-board-dr`에서 167 tables/148,993 rows exact logical replica, RLS 18, Realtime publication 6, PostgREST share RLS, Broadcast와 Oracle-origin `postgres_changes` 검증 완료. Storage는 Free 한계를 넘어 명시적 media degraded mode 사용 |
 | GitHub Actions | 운영 cron endpoint 수동 실행과 장애 시 대체 호출 | 앱 호스팅, 기본 스케줄러 | 8개 endpoint용 수동 workflow를 비상 운영 경로로 유지 |
 | Vercel | 전환 기간의 마지막 검증 가능한 배포본, Supabase Free warm standby용 DR runtime | Oracle primary의 신규 운영 트래픽, 기본 cron scheduler | `mallagaenge-1872's projects/aura-board-dr` 별도 project와 Next.js preset 생성 완료. production runtime env 구성 완료 기록을 유지하며 acceptance SHA `f35286e1e2e0d97ea79966a378f4d839d19c3302`의 Oracle Actions run `32389558184`가 성공했다. 같은 SHA의 Vercel deployment `dpl_5Hu4bGn2aBDEut8YJop2qUt2R3zo`는 target `production`, `READY`/`icn1`이며 `/api/health`는 `200`과 DB reachable·replication fresh를 반환했다. 평상시 운영 DNS와 scheduler에서는 제외 |
+
+### 개발 DB (`aura_dev`)
+
+- 같은 `supabase-db` PostgreSQL 인스턴스 안에 운영 `postgres` DB와 분리된 `aura_dev` 데이터베이스를 둔다.
+- 접속 role은 `aura_dev`(비슈퍼유저, `public` 스키마 객체 소유자)이며 자격증명은 Infisical `dev`의 `DATABASE_URL`/`DIRECT_URL`에만 저장한다.
+- 접속 경로는 운영과 동일하게 로컬 `127.0.0.1:15434` SSH 터널을 사용하고, DB 이름만 `aura_dev`로 지정한다.
+- 2026-08-23 운영 `public` 스키마/데이터 스냅샷을 복제해 두었다. 운영 DB와 테이블/데이터가 분리되므로 dev에서의 write는 dev DB에만 남는다.
+- 단, Supabase client/Realtime/Storage env는 운영 endpoint를 그대로 사용하므로 이 계층까지 분리하려면 별도 구성이 필요하다.
 
 책임 이전 후에도 cron API의 인증 기준은 [`src/lib/cron-auth.ts`](../src/lib/cron-auth.ts)이며, GitHub Actions와 Supabase callback 모두 동일한 `CRON_SECRET`을 Bearer token으로 사용한다.
 

@@ -44,6 +44,7 @@ import { studentNavIcon } from "../../lib/student-navigation-icons";
 import {
   AppButton,
   AppHeader,
+  BarePressable,
   ControlPressable,
 } from "../../components/ui";
 import { StudentHeaderActions } from "../../components/StudentHeaderActions";
@@ -157,6 +158,11 @@ export default function StudentMoreScreen() {
     void persist(next);
   }
 
+  function openTarget(target: StudentNavTarget) {
+    if (target.id === "more") return;
+    router.push(target.href as Href);
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <AppHeader title="더보기" right={<StudentHeaderActions />} />
@@ -201,20 +207,6 @@ export default function StudentMoreScreen() {
           </AppButton>
         </View>
 
-        <View style={styles.bannerCallout}>
-          <View style={styles.bannerCalloutCopy}>
-            <Text style={styles.bannerCalloutTitle} selectable>
-              우리 반 피드에서 소식을 나눠 보세요.
-            </Text>
-          </View>
-          <AppButton
-            variant="secondary"
-            onPress={() => router.push("/(student)/feed" as Href)}
-          >
-            피드 열기
-          </AppButton>
-        </View>
-
         <View style={styles.menuSection}>
           {saveError ? (
             <Text style={styles.saveError} accessibilityRole="alert">
@@ -235,12 +227,15 @@ export default function StudentMoreScreen() {
                 const isMore = target.id === "more";
                 const Icon = studentNavIcon(target);
                 return (
-                  <View
+                  <BarePressable
                     key={target.id}
                     style={[
                       styles.settingRow,
                       index === orderedTargets.length - 1 && styles.rowLast,
                     ]}
+                    accessible={false}
+                    disabled={isMore}
+                    onPress={() => openTarget(target)}
                   >
                     <View style={styles.menuIcon} accessible={false}>
                       <Icon
@@ -303,7 +298,7 @@ export default function StudentMoreScreen() {
                         accessibilityLabel={`${target.label} 하단 메뉴 ${enabled ? "끄기" : "켜기"}`}
                       />
                     </View>
-                  </View>
+                  </BarePressable>
                 );
               })}
             </View>

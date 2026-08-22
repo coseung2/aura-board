@@ -9,6 +9,9 @@ export type ReadingEvaluationInput = {
   title: string;
   author: string;
   reflection: string;
+  previousReflection?: string;
+  previousScore?: number;
+  previousFeedback?: string;
 };
 
 export type ReadingEvaluationBreakdown = {

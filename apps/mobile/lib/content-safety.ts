@@ -14,7 +14,7 @@ export const CONTENT_REPORT_REASONS = [
 
 export type ContentReportReason = (typeof CONTENT_REPORT_REASONS)[number];
 
-export type ContentTargetKind = "card" | "comment";
+export type ContentTargetKind = "card" | "comment" | "feed_post" | "feed_comment";
 
 /** Why an item is hidden. `item` is undoable inline; `author` is not. */
 export type HiddenReason = "item" | "author";
@@ -34,7 +34,7 @@ export function reasonAcceptsDetail(reason: ContentReportReason): boolean {
 
 /** Placeholder copy shown where a hidden item used to be. */
 export function hiddenPlaceholderText(kind: ContentTargetKind, reason: HiddenReason): string {
-  const noun = kind === "comment" ? "댓글" : "게시글";
+  const noun = kind === "comment" || kind === "feed_comment" ? "댓글" : "게시글";
   if (reason === "author") return `숨긴 친구의 ${noun}이에요`;
   return `내가 숨긴 ${noun}이에요`;
 }
@@ -91,6 +91,13 @@ export async function unhideContent(input: {
 export async function unhideAuthor(hiddenStudentId: string): Promise<void> {
   await apiFetch("/api/student/hidden-content", {
     method: "DELETE",
+    json: { scope: "author", hiddenStudentId },
+  });
+}
+
+export async function blockAuthor(hiddenStudentId: string): Promise<void> {
+  await apiFetch("/api/student/hidden-content", {
+    method: "POST",
     json: { scope: "author", hiddenStudentId },
   });
 }

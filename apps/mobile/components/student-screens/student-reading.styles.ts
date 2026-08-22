@@ -66,6 +66,7 @@ export const styles = StyleSheet.create({
     paddingBottom: spacing.lg,
     gap: spacing.lg,
   },
+  composerTitle: { ...typography.section, color: colors.text },
   composerScroll: { flexShrink: 1 },
   composerFooter: {
     paddingHorizontal: spacing.xl,
@@ -94,6 +95,11 @@ export const styles = StyleSheet.create({
   missionScreen: { gap: spacing.xxl },
   missionSection: { gap: spacing.md },
   missionBlock: { gap: spacing.md },
+  missionPanelContent: { gap: spacing.md },
+  missionNotice: {
+    ...typography.body,
+    color: colors.textMuted,
+  },
   rewardClaimButton: {
     width: "100%",
     maxWidth: walking.rewardClaimButtonWidth,
@@ -229,6 +235,11 @@ export const styles = StyleSheet.create({
     color: colors.accentTintedText,
   },
   entryDetails: { gap: spacing.sm },
+  entryActions: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: spacing.sm,
+  },
   meta: { ...typography.micro, color: colors.textMuted },
   body: { ...typography.body, color: colors.text },
   feedbackRow: {
@@ -250,14 +261,4 @@ export const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   feedbackStatusText: { ...typography.body, color: colors.textMuted, flex: 1 },
-  feedbackRetry: {
-    minHeight: tapMin,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderWidth: borders.hairline,
-    borderColor: colors.border,
-    borderRadius: radii.pill,
-    backgroundColor: colors.surface,
-  },
-  feedbackRetryText: { ...typography.label, color: colors.accent },
 });

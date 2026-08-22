@@ -39,6 +39,11 @@ export type ReadingEntryInput = {
   reflection: string;
 };
 
+export type ReadingFeedbackRequest = {
+  forceReevaluation?: boolean;
+  reflection?: string;
+};
+
 export class ReadingFeedbackError extends Error {
   constructor(
     message: string,
@@ -73,11 +78,28 @@ export async function saveReadingEntry(
   return (await res.json()) as { entry: ReadingEntry };
 }
 
+// PATCH /api/student/reading/:logId { bookType, title, author, reflection } -> { entry }
+export async function updateReadingEntry(
+  readingLogId: string,
+  input: ReadingEntryInput,
+): Promise<{ entry: ReadingEntry }> {
+  const res = await fetch(`/api/student/reading/${encodeURIComponent(readingLogId)}`, {
+    method: "PATCH",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  if (!res.ok) throw new Error(await errorMessage(res));
+  return (await res.json()) as { entry: ReadingEntry };
+}
+
 export async function generateReadingFeedback(
   readingLogId: string,
+  request: ReadingFeedbackRequest = {},
 ): Promise<{ evaluation: ReadingEvaluationFields }> {
   const res = await fetch(`/api/student/reading/${encodeURIComponent(readingLogId)}/feedback`, {
     method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(request),
   });
   if (!res.ok) throw await feedbackError(res);
   return (await res.json()) as { evaluation: ReadingEvaluationFields };

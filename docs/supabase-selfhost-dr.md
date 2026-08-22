@@ -1,11 +1,11 @@
 # Oracle self-hosted Supabase + DR/백업 설계
 
-기준일: 2026-08-21
-상태: **Phase 1 data plane·Bastion 및 Supabase Free DB/API warm DR 검증 완료 — Vercel production 배포와 DR `/api/health` 검증 완료, self-hosted Supabase public endpoint·production cutover·failover/failback rehearsal 미완료**
+기준일: 2026-08-23
+상태: **Oracle self-hosted Supabase production cutover 완료 (2026-08-21). managed Supabase Pro는 2026-09-03까지 read-only 안정화용으로 보존. failover/failback rehearsal는 미완료**
 
 이 문서는 Aura Board의 managed Supabase 의존성을 Oracle Cloud A1의 self-hosted Supabase로 이전할 경우, 단일 Oracle 인스턴스 장애가 전체 서비스 장애로 확대되는 위험을 어떻게 줄일지 정리한다.
 
-현재 운영 상태의 source of truth는 [`infrastructure-handoff.md`](infrastructure-handoff.md)이며, 이 문서의 내용은 실제 cutover 전까지 운영 상태로 간주하지 않는다.
+현재 운영 상태의 source of truth는 [`infrastructure-handoff.md`](infrastructure-handoff.md)이며, 본 문서는 cutover 완료 후 운영 상태 기준으로 갱신했다.
 
 ## 1. 결정 요약
 
@@ -21,7 +21,7 @@
 
 ### 1.1 2026-08-19~20 staging 실행 결과
 
-설계만 있던 Phase 1은 실제 Oracle staging까지 진행됐다. production managed Supabase는 아직 source of truth이며 production endpoint/DNS/app env는 변경하지 않았다.
+설계만 있던 Phase 1은 실제 Oracle staging까지 진행됐고, 2026-08-21 production cutover로 Oracle self-hosted Supabase가 source of truth가 됐다. managed Supabase는 2026-09-03까지 read-only 안정화용으로 보존한다.
 
 호스트/런타임 검증:
 
@@ -62,7 +62,7 @@ Storage 이관 및 검증:
 - OCI bucket 실제 count/bytes가 managed metadata와 정확히 일치하고 probe object는 0개임을 확인
 - direct S3 sample SHA-256 8/8, self-hosted Storage API download와 managed source SHA-256 8/8 일치
 - persisted managed Storage URL inventory는 11개 column, 1,173 row. 안정 endpoint `supabase.aura-board.com`을 두고 점진 backfill하는 전략으로 확정했지만 public nginx/DNS endpoint 자체는 아직 열지 않음
-- 위 결과는 staging 증거이며 production managed Supabase는 계속 source of truth다. public endpoint와 앱 env 전환 전까지 Storage cutover를 금지한다.
+- 위 결과는 staging 증거이며, 2026-08-21 cutover 이후에는 Oracle self-hosted Supabase가 source of truth다. managed Supabase는 2026-09-03까지 read-only 안정화용으로 보존한다.
 
 관리 경로:
 
@@ -441,7 +441,7 @@ restore rehearsal은 production write를 발생시키지 않는다.
 - [x] 현재 managed Supabase DB/Storage 실사용량 재측정
 - [ ] Oracle PAYG A1 무료 할당량과 실제 tenancy billing 확인 — Always Free 계산은 확인했지만 billing 화면 실측은 별도
 - [x] Vercel DR project/plan 조건 확인 — `aura-board-dr` project 생성과 Next.js preset/Seoul runtime 설정을 확인했고, Supabase DR 연결 후 exact-SHA production deployment는 Phase 3에서 별도 검증 완료
-- [ ] Supabase Free DB/Realtime 한도와 현재 Aura 사용량 비교
+- [ ] Supabase Free DB/Realtime 한도와 현재 aura-board 사용량 비교
 
 ### Phase 1 — Oracle self-hosted Supabase staging
 
@@ -485,23 +485,17 @@ restore rehearsal은 production write를 발생시키지 않는다.
 
 ### Phase 4 — Production cutover
 
-- [ ] managed Supabase -> Oracle self-hosted cutover
-- [ ] 웹/모바일 endpoint 전환
-- [ ] rollback window 유지
-- [ ] DR replica 정상 추종 확인
-- [ ] backup/restore 재검증
+- [x] managed Supabase -> Oracle self-hosted cutover (2026-08-21 완료)
+- [x] 웹/모바일 endpoint 전환 (Oracle production으로 전환 완료)
+- [x] rollback window: seal 완료로 managed rollback 종료. managed Supabase는 2026-09-03까지 read-only 안정화용으로 보존
+- [x] DR replica 정상 추종 확인
+- [x] backup/restore 재검증
 
-2026-08-21 체크포인트: Library migration과 147개 Prisma history를 Oracle target까지
-맞추고 SHA `19cd0cd6785bed6d1777ea334586e4e602ef94dc` 도구로 live DB preflight를
-완료했다. Target owner/ACL 37개 객체도 managed source와 exact 정렬됐다. 다만 현재
-Whale/CLI Supabase account가 contract production project를 소유하지 않아 production
-password reset 전에 maintenance를 해제했다. production은 managed Supabase를 계속
-사용하고 old writer credential/health `200`이 복구됐으며 write fence, export,
-env switch, promotion, seal은 실행하지 않았다. 다음 작업은 production project owner
-account 로그인과 password reset 후 `adopt-fence`부터 재개한다. 상세 상태와 순서는
-`production-cutover-runbook.md`의
-`2026-08-21 재개 체크포인트`를 단일 기준으로 사용한다. GitHub Oracle production deploy
-workflow는 cutover 중 일반 artifact가 staged SHA를 선점하지 않도록 수동 비활성화 상태다.
+2026-08-21 완료: production DB password rotation, read-only/pg_cron fence, export,
+candidate restore/verify, promotion, runtime env write, release switch 및
+`--seal-before-writers`를 완료했다. 같은 날짜의 아래 preflight/중단 기록은 cutover
+완료 전의 이력이며 운영 상태 판단은 `production-cutover-runbook.md`의 최신 상태를
+단일 기준으로 사용한다.
 
 ## 15. 하지 않을 것
 
@@ -531,7 +525,7 @@ workflow는 cutover 중 일반 artifact가 staged SHA를 선점하지 않도록 
 1. **결정됨:** primary PostgreSQL/Docker data volume은 Osaka 100 GB Block Volume(`/srv/aura-board`)을 사용
 2. OCI Storage 전용 private bucket 이름/compartment와 Customer Secret Key 발급 주체 및 최소 IAM policy
 3. Storage S3 backend 전환 전 1,226개 payload migration/검증 순서와 rollback 보존 기간
-4. persisted managed Supabase public URL을 stable Aura domain/proxy로 유지할지 DB backfill할지
+4. persisted managed Supabase public URL을 stable aura-board domain/proxy로 유지할지 DB backfill할지
 5. WAL archive 대상 bucket/region
 6. Oracle 외부 backup 위치: 로컬 외장 디스크만 둘지, Google Drive까지 둘지
 7. 암호화 도구와 recovery key 보관 위치
