@@ -430,7 +430,7 @@ export function useStudentSlimeMutations({
               setHome(reconciledHome);
               setNotice({
                 kind: "success",
-                text: `${item.labelKo} 외형을 ${isHidden ? "숨겼어요. 버프는 계속 적용돼요." : "다시 표시했어요."}`,
+                text: `${item.labelKo} 외형을 ${isHidden ? "숨겼어요. 외형만 숨겨지고, 버프는 유지됩니다." : "다시 표시했어요."}`,
               });
             }
           } catch (mutationError) {

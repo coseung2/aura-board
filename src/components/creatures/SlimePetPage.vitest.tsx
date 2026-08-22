@@ -649,7 +649,7 @@ it("renders deterministic stage growth percentages as accessible progress bars",
       within(modal).getByRole("button", { name: "잔디 바닥 외형 숨기기" }),
     );
     expect(
-      await screen.findByText("잔디 바닥 외형을 숨겼어요. 버프는 계속 적용돼요."),
+      await screen.findByText("잔디 바닥 외형을 숨겼어요. 외형만 숨겨지고, 버프는 유지됩니다."),
     ).toBeTruthy();
     expect(fetchMock.mock.calls[1][0]).toBe("/api/student/slimes/items/visibility");
     expect(JSON.parse(fetchMock.mock.calls[1][1].body as string)).toEqual({

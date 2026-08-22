@@ -328,11 +328,6 @@ export function SlimeWardrobeSheet({
                     ]}
                   >
                     <Text style={styles.itemTitle}>{item.labelKo}</Text>
-                    {hidden ? (
-                      <Text style={styles.itemSubtitle}>
-                        외형 숨김 · 버프는 유지
-                      </Text>
-                    ) : null}
                   </View>
                   <View style={styles.actions}>
                     {equipped ? (

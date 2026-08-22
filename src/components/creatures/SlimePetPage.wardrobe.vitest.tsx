@@ -471,7 +471,6 @@ describe("SlimePetPage", () => {
     const modal = await screen.findByRole("dialog", {
       name: "블루 슬라임 꾸미기",
     });
-    expect(within(modal).getByText("외형 숨김 · 버프는 유지")).toBeTruthy();
     fireEvent.click(
       within(modal).getByRole("button", { name: "잔디 바닥 외형 보이기" }),
     );

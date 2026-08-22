@@ -247,7 +247,6 @@ export function SlimeShopItemCard({
                 />
               ) : null}
             </div>
-            {hidden ? <p>외형 숨김 · 버프는 유지</p> : null}
           </div>
           <div className={styles.wardrobeItemActions}>
             {isFood ? (
