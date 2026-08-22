@@ -7,6 +7,7 @@ import sharp from "sharp";
 
 import { db } from "@/lib/db";
 import { resolveCanvaDesignId } from "@/lib/canva";
+import { extractCanvaDesignId } from "@/lib/canva-url";
 import {
   deletePublicObjects,
   parseSupabasePublicObjectUrl,
@@ -108,15 +109,17 @@ export async function importSectionIntoTeacherLibrary(args: {
           id: true,
           title: true,
           imageUrl: true,
+          fileUrl: true,
+          fileName: true,
           fileSize: true,
           fileMimeType: true,
           linkUrl: true,
           linkImage: true,
           canvaDesignId: true,
           attachments: {
-            where: { kind: "image" },
             orderBy: { order: "asc" },
             select: {
+              kind: true,
               url: true,
               fileName: true,
               fileSize: true,
@@ -142,7 +145,8 @@ export async function importSectionIntoTeacherLibrary(args: {
 
   for (const card of section.cards) {
     const designId =
-      card.canvaDesignId ??
+      card.canvaDesignId?.trim() ||
+      (card.linkUrl ? extractCanvaDesignId(card.linkUrl) : null) ||
       (card.linkUrl ? await resolveCanvaDesignId(card.linkUrl).catch(() => null) : null);
     if (designId) {
       const sourceKey = `canva:${designId}`;
@@ -244,9 +248,12 @@ function collectImageCandidates(card: {
   id: string;
   title: string;
   imageUrl: string | null;
+  fileUrl: string | null;
+  fileName: string | null;
   fileSize: number | null;
   fileMimeType: string | null;
   attachments: Array<{
+    kind: string;
     url: string;
     fileName: string | null;
     fileSize: number | null;
@@ -263,8 +270,27 @@ function collectImageCandidates(card: {
       fileSize: card.fileSize,
     });
   }
+  if (
+    card.fileUrl &&
+    isImageMimeType(card.fileMimeType) &&
+    !candidates.some((item) => item.url === card.fileUrl)
+  ) {
+    candidates.push({
+      cardId: card.id,
+      title: card.fileName || card.title,
+      url: card.fileUrl,
+      mimeType: card.fileMimeType,
+      fileSize: card.fileSize,
+    });
+  }
   for (const attachment of card.attachments) {
-    if (!attachment.url || candidates.some((item) => item.url === attachment.url)) continue;
+    if (
+      !attachment.url ||
+      (attachment.kind !== "image" && !isImageMimeType(attachment.mimeType)) ||
+      candidates.some((item) => item.url === attachment.url)
+    ) {
+      continue;
+    }
     candidates.push({
       cardId: card.id,
       title: attachment.fileName || card.title,
@@ -274,6 +300,10 @@ function collectImageCandidates(card: {
     });
   }
   return candidates;
+}
+
+function isImageMimeType(value: string | null): boolean {
+  return value?.split(";", 1)[0]?.trim().toLowerCase().startsWith("image/") ?? false;
 }
 
 async function materializeImage(

@@ -574,7 +574,7 @@ export async function canvaMoveItem(token: string, itemId: string, toFolderId: s
 
 export async function resolveCanvaDesignId(url: string): Promise<string | null> {
   const finalUrl = await expandCanvaShortLink(url);
-  const match = finalUrl.match(/\/design\/([A-Za-z0-9_-]+)\//);
+  const match = finalUrl.match(/\/design\/([A-Za-z0-9_-]+)(?:[/?#]|$)/);
   return match?.[1] ?? null;
 }
 
