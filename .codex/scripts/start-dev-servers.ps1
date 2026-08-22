@@ -24,6 +24,23 @@ $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Write-Host "repo: $repo"
 Write-Host "infisical env: $Env"
 
+$adb = Get-Command adb -ErrorAction SilentlyContinue
+$explicitApiBase = -not [string]::IsNullOrWhiteSpace($ApiBase)
+$usbDevice = $null
+if ($adb) {
+  $usbDevice = (& $adb.Source devices 2>$null |
+    Select-String "^(?<serial>[^\s]+)\s+device$").Matches |
+    Select-Object -First 1 -ExpandProperty Groups |
+    Where-Object Name -eq "serial" |
+    Select-Object -First 1 -ExpandProperty Value
+  if ($usbDevice) {
+    & $adb.Source -s $usbDevice reverse tcp:3000 tcp:3000 | Out-Null
+    & $adb.Source -s $usbDevice reverse tcp:8081 tcp:8081 | Out-Null
+    if (-not $explicitApiBase) { $ApiBase = "http://127.0.0.1:3000" }
+    Write-Host "USB device: $usbDevice (ADB reverse 3000/8081 enabled)"
+  }
+}
+
 if (-not $ApiBase) {
   $lan = Get-NetIPAddress -AddressFamily IPv4 |
     Where-Object { $_.IPAddress -notlike "127.*" -and $_.IPAddress -notlike "169.254.*" } |
