@@ -1,5 +1,3 @@
-import Image from "next/image";
-
 import { SlimeCharacterSprite } from "@/components/creatures/SlimeCharacterSprite";
 import { StudentPetSectionHeader } from "@/components/creatures/StudentPetSectionHeader";
 import { db } from "@/lib/db";
@@ -148,11 +146,10 @@ export async function ClassroomSlimeGallery({ classroomId }: Props) {
                 <div className={styles.titleSlot}>
                   {title ? (
                     <div className={styles.walkingTitle} data-title={title.key}>
-                      <Image
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
                         src={title.imagePath}
                         alt={`${title.label} 칭호`}
-                        fill
-                        sizes="180px"
                         className={styles.walkingTitleFrame}
                       />
                     </div>

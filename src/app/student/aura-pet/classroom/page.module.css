@@ -134,8 +134,12 @@
 }
 
 .walkingTitleFrame {
+  display: block;
+  width: 100%;
+  height: 48px;
   object-fit: contain;
   image-rendering: pixelated;
+  image-rendering: crisp-edges;
 }
 
 .titlePlaceholder {

@@ -27,6 +27,7 @@ import { spacing } from "../../theme/tokens";
 import { stageForColor } from "../../lib/slimes";
 import { styles } from "./student-slime.styles";
 import { visibleEquippedSlimeItemKeys } from "../../lib/slime-item-visibility";
+import { WalkingTitleSlot } from "../../components/WalkingTitleSlot";
 import type { StudentSlimeScreenViewModel } from "../../lib/student-slime-screen/student-slime-screen.types";
 
 type StudentSlimeCollectionSectionProps = Pick<
@@ -242,6 +243,7 @@ export function StudentSlimeCollectionSection({
                       }
                       displayScale={petCardScene.displayScale}
                       expandSceneSurfaces
+                      hostBackground={Boolean(petBackground)}
                       backgroundSpritePath={
                         petBackground
                           ? selectSceneBackgroundSpritePath(petBackground)
@@ -303,6 +305,16 @@ export function StudentSlimeCollectionSection({
                     </View>
                   )}
                 </View>
+                {isOwned && home?.equippedTitleByColor?.[itemColor] ? (
+                  <WalkingTitleSlot
+                    title={
+                      home.claimedTitles.find(
+                        (title) =>
+                          title.key === home.equippedTitleByColor[itemColor],
+                      ) ?? null
+                    }
+                  />
+                ) : null}
                 <View style={styles.myPetNameRow}>
                   {isOwned ? (
                     <View

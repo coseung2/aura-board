@@ -5,7 +5,6 @@ import { useState } from "react";
 import { visibleEquippedSlimeItemKeys } from "@/lib/pets/item-visibility";
 import { formatBpsPercent, slimeBuffBpsForStage } from "@/lib/pets/math";
 import {
-  EQUIPPED_FLOORS,
   SLIME_SHARED_ASSETS,
   type EquippedFloor,
   type SlimeAction,
@@ -79,17 +78,6 @@ function vehicleFromItems(items: readonly SlimeShopItem[]): SlimeShopItem | null
   }
   return vehicle;
 }
-
-function normalizeFloor(
-  value: unknown,
-  fallback: EquippedFloor,
-): EquippedFloor {
-  return typeof value === "string" &&
-    (EQUIPPED_FLOORS as readonly string[]).includes(value)
-    ? (value as EquippedFloor)
-    : fallback;
-}
-
 /** One owned pet card: local animation state plus deterministic presentation. */
 export function SlimeCollectionCard({
   slime,
@@ -98,7 +86,7 @@ export function SlimeCollectionCard({
   ownedItemQuantities,
   equippedItemKeys,
   hiddenItemKeys,
-  equippedFloor,
+  equippedFloor: _unusedEquippedFloor,
   growth,
   claimedTitles,
   equippedTitleKey,
@@ -112,6 +100,7 @@ export function SlimeCollectionCard({
   onFeedCookie,
   onOpenWardrobe,
 }: SlimeCollectionCardProps) {
+  void _unusedEquippedFloor;
   const [manualAction, setManualAction] = useState<SlimeAction | null>(null);
   const [cookiePending, setCookiePending] = useState(false);
 
@@ -139,7 +128,9 @@ export function SlimeCollectionCard({
   const growthTime = growth
     ? calculateGrowthTimeComparison(growth.remainingSeconds, growthSpeedBps)
     : null;
-  const floor = normalizeFloor(equippedFloor, floorFromItems(assignedItems));
+  // Hidden floors stay equipped for buffs, but the sprite must not keep the
+  // persisted equippedFloor once that floor item is visually hidden.
+  const floor = floorFromItems(assignedItems);
   const background = backgroundFromItems(assignedItems);
   const vehicle = vehicleFromItems(assignedItems);
   const usesTrampoline = vehicle?.key === SLIME_TRAMPOLINE_ITEM_KEY;
@@ -190,7 +181,14 @@ export function SlimeCollectionCard({
       </div>
       <div className={styles.itemCopy}>
         {equippedTitle ? (
-          <span className={styles.equippedTitle}>{equippedTitle.label}</span>
+          <div className={styles.equippedTitleSlot}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={equippedTitle.imagePath}
+              alt={`${equippedTitle.label} 칭호`}
+              className={styles.equippedTitleImage}
+            />
+          </div>
         ) : null}
         <div className={styles.nameRow}>
           <div className={styles.nameActionSlot}>
