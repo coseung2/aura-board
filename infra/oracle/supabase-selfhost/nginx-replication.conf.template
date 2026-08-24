@@ -11,7 +11,7 @@ server {
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_alpn postgresql;
     ssl_handshake_timeout 10s;
-    ssl_session_cache shared:aura_board_replication_tls:10m;
+    ssl_session_cache shared:auraboardrepltls:10m;
     ssl_session_timeout 1h;
     ssl_session_tickets off;
 }

@@ -50,10 +50,12 @@ class StaticContractTests(unittest.TestCase):
             "proxy_timeout 1h;",
             "ssl_handshake_timeout 10s;",
             "so_keepalive=on",
+            "ssl_session_cache shared:auraboardrepltls:10m;",
         ):
             self.assertIn(expected, rendered)
         self.assertNotIn("location ", rendered)
         self.assertNotIn("proxy_pass http", rendered)
+        self.assertNotRegex(rendered, r"__[A-Z][A-Z0-9_]*__")
 
     def test_hba_order_contract(self) -> None:
         hba = HBA_TEMPLATE.read_text(encoding="utf-8")
