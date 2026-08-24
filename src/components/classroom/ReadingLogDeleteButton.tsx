@@ -57,7 +57,11 @@ export function ReadingLogDeleteButton({
       <button
         type="button"
         className="classroom-reading-delete"
-        onClick={() => void remove()}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          void remove();
+        }}
         disabled={busy}
         aria-label={`${studentLabel} ${title} 독서 기록 삭제`}
       >

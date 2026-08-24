@@ -134,7 +134,7 @@ describe("TopNav classroom mega menu", () => {
     expect(groupLinks(panel, "활동·기록")).toEqual([
       { label: "포트폴리오", href: "/classroom/class-1/portfolio" },
       { label: "독서", href: "/classroom/class-1/reading" },
-      { label: "걷기 현황", href: "/classroom/class-1/walking" },
+      { label: "걷기", href: "/classroom/class-1/walking" },
       { label: "일일 배너", href: "/classroom/class-1/daily-banners" },
     ]);
   });

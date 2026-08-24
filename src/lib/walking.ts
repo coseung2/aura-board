@@ -169,7 +169,11 @@ export async function getClassroomWalkingSummary(classroomId: string) {
       COALESCE(SUM(CASE WHEN w."day" = (CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date THEN w."steps" ELSE 0 END), 0)::int AS "todaySteps",
       COALESCE(SUM(CASE WHEN w."day" >= ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date - 6) THEN w."steps" ELSE 0 END), 0)::int AS "sevenDaySteps",
       COALESCE(SUM(CASE WHEN w."day" >= ((CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Seoul')::date - 6) THEN w."distanceMeters" ELSE 0 END), 0)::float8 AS "sevenDayDistanceMeters",
-      MAX(w."syncedAt") AS "lastSyncedAt",
+      (
+        SELECT MAX(all_w."syncedAt")
+        FROM "StudentWalkingDailyStat" all_w
+        WHERE all_w."studentId" = s."id"
+      ) AS "lastSyncedAt",
       COALESCE(
         (
           SELECT json_agg(COALESCE(day_stat."steps", 0) ORDER BY day_series."day")

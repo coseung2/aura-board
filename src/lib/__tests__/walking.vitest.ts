@@ -1,15 +1,22 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@/lib/db", () => ({ db: {} }));
+const mocks = vi.hoisted(() => ({ queryRaw: vi.fn() }));
+
+vi.mock("@/lib/db", () => ({ db: { $queryRaw: mocks.queryRaw } }));
 
 import {
   addWalkingDays,
+  getClassroomWalkingSummary,
   getWalkingDayKey,
   getWalkingDayRange,
   isValidWalkingDay,
 } from "../walking";
 
 describe("walking day helpers", () => {
+  beforeEach(() => {
+    mocks.queryRaw.mockReset();
+  });
+
   it("uses the Asia/Seoul calendar day at UTC midnight boundaries", () => {
     expect(getWalkingDayKey(new Date("2026-07-11T14:59:59.999Z"))).toBe("2026-07-11");
     expect(getWalkingDayKey(new Date("2026-07-11T15:00:00.000Z"))).toBe("2026-07-12");
@@ -34,5 +41,17 @@ describe("walking day helpers", () => {
       maxDay: "2026-07-12",
     });
     expect(addWalkingDays("2024-03-01", -1)).toBe("2024-02-29");
+  });
+
+  it("reads the last sync from all history while keeping activity sums bounded", async () => {
+    mocks.queryRaw.mockResolvedValue([]);
+
+    await getClassroomWalkingSummary("classroom-1");
+
+    const query = mocks.queryRaw.mock.calls[0]?.[0] as { sql?: string };
+    expect(query.sql).toContain('SELECT MAX(all_w."syncedAt")');
+    expect(query.sql).toContain('WHERE all_w."studentId" = s."id"');
+    expect(query.sql).toContain('AND w."day" >=');
+    expect(query.sql).toContain('AND w."day" <=');
   });
 });

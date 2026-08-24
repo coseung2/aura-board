@@ -236,13 +236,12 @@
 
 .classroom-reading-list { border-top: 2px solid var(--color-text); }
 .classroom-reading-list-head,
-.classroom-reading-row {
+.classroom-reading-summary {
   display: grid;
   grid-template-columns:
     minmax(8rem, 1.1fr)
     minmax(11rem, 1.35fr)
     minmax(7rem, 0.8fr)
-    minmax(14rem, 2fr)
     minmax(4.5rem, 0.6fr)
     minmax(7rem, 0.8fr)
     minmax(4.5rem, 0.6fr);
@@ -257,11 +256,22 @@
   font-weight: 800;
 }
 .classroom-reading-row {
-  padding: 16px 0;
   border-bottom: 1px solid var(--color-border);
   font-size: 13px;
 }
-.classroom-reading-row > [role="cell"] { min-width: 0; }
+.classroom-reading-summary {
+  position: relative;
+  padding: 16px 0;
+  cursor: pointer;
+  list-style: none;
+}
+.classroom-reading-summary::-webkit-details-marker { display: none; }
+.classroom-reading-summary:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+.classroom-reading-summary > [role="cell"] { min-width: 0; }
 .classroom-reading-student,
 .classroom-reading-book {
   display: grid;
@@ -270,6 +280,22 @@
 .classroom-reading-student strong,
 .classroom-reading-book strong {
   overflow-wrap: anywhere;
+}
+.classroom-reading-student {
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: start;
+}
+.classroom-reading-disclosure-icon {
+  width: 8px;
+  height: 8px;
+  margin-top: 3px;
+  border-right: 2px solid var(--color-text-muted);
+  border-bottom: 2px solid var(--color-text-muted);
+  transform: rotate(-45deg);
+  transition: transform 160ms ease;
+}
+.classroom-reading-row[open] .classroom-reading-disclosure-icon {
+  transform: rotate(45deg);
 }
 .classroom-reading-book small,
 .classroom-reading-date,
@@ -281,7 +307,7 @@
 .classroom-reading-date { overflow-wrap: anywhere; }
 .classroom-reading-reflection {
   margin: 0;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   line-height: 1.6;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
@@ -295,10 +321,29 @@
   white-space: nowrap;
 }
 .classroom-reading-ai-feedback {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 13px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.classroom-reading-detail-rows {
+  padding: 0 0 16px 30px;
+}
+.classroom-reading-detail-row {
+  padding: 14px 0;
+  border-top: 1px solid var(--color-border);
+}
+.classroom-reading-detail-row > [role="cell"] {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.classroom-reading-detail-row strong {
   color: var(--color-text-muted);
   font-size: 11px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
+  letter-spacing: 0.04em;
 }
 .classroom-reading-date { text-align: right; }
 .classroom-reading-actions {
@@ -307,7 +352,7 @@
   gap: 4px;
 }
 .classroom-reading-delete {
-  min-height: 30px;
+  min-height: 44px;
   padding: 0 9px;
   border: 1px solid var(--color-border-strong);
   border-radius: 4px;
@@ -573,11 +618,11 @@
   .classroom-feature-metrics > div:nth-child(3) { padding-left: 0; }
   .walking-roster-head { display: none; }
   .classroom-reading-list-head { display: none; }
-  .classroom-reading-row {
+  .classroom-reading-summary {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 12px;
   }
-  .classroom-reading-row > [data-label]::before {
+  .classroom-reading-summary > [data-label]::before {
     display: block;
     margin-bottom: 3px;
     color: var(--color-text-muted);
@@ -588,12 +633,13 @@
   }
   .classroom-reading-student,
   .classroom-reading-book,
-  .classroom-reading-author,
-  .classroom-reading-reflection { grid-column: 1 / -1; }
+  .classroom-reading-author { grid-column: 1 / -1; }
+  .classroom-reading-student::before { grid-column: 1 / -1; }
   .classroom-reading-score { grid-column: 1; }
   .classroom-reading-date { grid-column: 2; text-align: right; }
   .classroom-reading-actions { grid-column: 1 / -1; justify-items: start; }
   .classroom-reading-delete-error { max-width: none; text-align: left; }
+  .classroom-reading-detail-rows { padding-left: 0; }
   .classroom-banner-toolbar,
   .classroom-banner-list-head { align-items: flex-start; flex-direction: column; gap: 12px; }
   .classroom-banner-calendar-cell,

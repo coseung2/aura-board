@@ -41,7 +41,7 @@ describe("classroom section headers", () => {
   });
 
   it.each([
-    ["walking", "걷기 현황"],
+    ["walking", "걷기"],
     ["daily-banners", "배너 관리"],
     ["reading", "독서"],
   ] as const)("maps %s to its standalone title", (active, title) => {

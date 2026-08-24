@@ -44,7 +44,6 @@ export default async function ClassroomWalkingPage({ params }: Props) {
       <ClassroomFeatureHeader
         classroomId={id}
         eyebrow={classroom.name}
-        description="학생 앱에서 동기화한 오늘 기록과 최근 7일 활동량을 확인합니다."
         active="walking"
       />
 
@@ -75,7 +74,6 @@ export default async function ClassroomWalkingPage({ params }: Props) {
         <div className="classroom-feature-section-head">
           <div>
             <h2>학생별 활동</h2>
-            <p>최근 7일의 날짜별 걸음 추이를 비교합니다.</p>
           </div>
           <span>{students.length}명</span>
         </div>

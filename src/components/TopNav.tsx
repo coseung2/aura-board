@@ -57,7 +57,7 @@ const CLASSROOM_OPERATION_TABS = [
 const CLASSROOM_ACTIVITY_TABS = [
   { key: "portfolio", label: "포트폴리오" },
   { key: "reading", label: "독서" },
-  { key: "walking", label: "걷기 현황" },
+  { key: "walking", label: "걷기" },
   { key: "daily-banners", label: "일일 배너" },
 ] as const;
 

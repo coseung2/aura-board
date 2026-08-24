@@ -46,7 +46,7 @@ describe("ClassroomHomeFeatureGrid", () => {
       ["은행", "/classroom/classroom-1/bank"],
       ["포트폴리오", "/classroom/classroom-1/portfolio"],
       ["독서", "/classroom/classroom-1/reading"],
-      ["걷기 현황", "/classroom/classroom-1/walking"],
+      ["걷기", "/classroom/classroom-1/walking"],
       ["일일 배너", "/classroom/classroom-1/daily-banners"],
     ] as const;
 

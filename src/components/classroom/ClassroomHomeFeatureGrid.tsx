@@ -104,7 +104,7 @@ export function ClassroomHomeFeatureGrid({ classroomId, summary }: Props) {
         {
           key: "walking",
           href: classroomHref("walking"),
-          title: "걷기 현황",
+          title: "걷기",
           metric: `학급 합계 ${numberFormatter.format(summary.walking.todaySteps)}걸음`,
           note: `연결 ${summary.walking.connectedCount}/${students}명`,
         },

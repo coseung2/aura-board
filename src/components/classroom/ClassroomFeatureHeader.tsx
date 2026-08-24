@@ -12,7 +12,7 @@ type Props = {
 };
 
 const FEATURE_TITLES: Record<ClassroomFeatureKey, string> = {
-  walking: "걷기 현황",
+  walking: "걷기",
   "daily-banners": "배너 관리",
   reading: "독서",
 };
