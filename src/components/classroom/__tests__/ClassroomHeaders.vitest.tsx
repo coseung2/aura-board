@@ -25,15 +25,15 @@ describe("classroom section headers", () => {
       <ClassroomSectionHeader
         classroomId="classroom-1"
         eyebrow="1반"
-        title="금융 관리"
-        ariaLabel="금융 관리 메뉴"
+        title="은행"
+        ariaLabel="은행 메뉴"
         links={[{ key: "actions", label: "입출금", href: "/bank" }]}
         activeKey="actions"
       />,
     );
 
     expect(
-      screen.getByRole("navigation", { name: "금융 관리 메뉴" }),
+      screen.getByRole("navigation", { name: "은행 메뉴" }),
     ).toBeTruthy();
     expect(
       screen.getByRole("link", { name: "입출금" }).getAttribute("aria-current"),

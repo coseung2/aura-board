@@ -124,13 +124,13 @@ describe("TopNav classroom mega menu", () => {
     ]);
     expect(groupLinks(panel, "학급 운영")).toEqual([
       { label: "1인1역", href: "/classroom/class-1/roles" },
-      { label: "청소·당번", href: "/classroom/class-1/morning" },
       { label: "과제 현황", href: "/classroom/class-1/assignments" },
-      { label: "제출 체크", href: "/classroom/class-1/check" },
-      { label: "금융 관리", href: "/classroom/class-1/bank" },
-      { label: "QR결제", href: "/classroom/class-1/pay" },
-      { label: "매점", href: "/classroom/class-1/store" },
+      { label: "은행", href: "/classroom/class-1/bank" },
     ]);
+    expect(within(panel).queryByRole("link", { name: "청소·당번" })).toBeNull();
+    expect(within(panel).queryByRole("link", { name: "제출 체크" })).toBeNull();
+    expect(within(panel).queryByRole("link", { name: "QR결제" })).toBeNull();
+    expect(within(panel).queryByRole("link", { name: "매점" })).toBeNull();
     expect(groupLinks(panel, "활동·기록")).toEqual([
       { label: "포트폴리오", href: "/classroom/class-1/portfolio" },
       { label: "독서", href: "/classroom/class-1/reading" },
@@ -140,7 +140,7 @@ describe("TopNav classroom mega menu", () => {
   });
 
   it("keeps classroom preview behavior and marks the current tab active", async () => {
-    navigation.pathname = "/classroom/class-1/check/details";
+    navigation.pathname = "/classroom/class-1/assignments/details";
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(JSON.stringify(classroomNavData))),
@@ -150,7 +150,7 @@ describe("TopNav classroom mega menu", () => {
     openClassroomMenu();
     const panel = await screen.findByRole("region", { name: "학급 메뉴" });
     expect(
-      within(panel).getByRole("link", { name: "제출 체크" }),
+      within(panel).getByRole("link", { name: "과제 현황" }),
     ).toHaveAttribute("aria-current", "page");
 
     await waitFor(() =>

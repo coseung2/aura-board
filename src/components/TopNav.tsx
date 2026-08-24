@@ -50,12 +50,8 @@ const CLASSROOM_MANAGEMENT_TABS = [
 
 const CLASSROOM_OPERATION_TABS = [
   { key: "roles", label: "1인1역" },
-  { key: "morning", label: "청소·당번" },
   { key: "assignments", label: "과제 현황" },
-  { key: "check", label: "제출 체크" },
-  { key: "bank", label: "금융 관리" },
-  { key: "pay", label: "QR결제" },
-  { key: "store", label: "매점" },
+  { key: "bank", label: "은행" },
 ] as const;
 
 const CLASSROOM_ACTIVITY_TABS = [

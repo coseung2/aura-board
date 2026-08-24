@@ -65,6 +65,7 @@ creating overlapping testing-notes documents.
 
 ### Teacher content library and Canva PDF export
 
+
 - Add a columns-board section containing an aura-board-hosted image, an external
   image, and a Canva design. Confirm the aura-board image keeps its existing object
   URL, the external image is copied once into teacher-library storage, and the
@@ -158,9 +159,10 @@ Object payload replication or a documented media degraded-mode is a separate gat
 
 ## Teacher classroom navigation
 
-- Open the teacher `학급` mega menu and confirm its groups are `학급 선택`, the selected classroom's `관리`, `학급 운영`, and `활동·기록`. Confirm `1인1역` opens `/classroom/:id/roles`; the misleading `1인1역할` group is absent.
-- Open the classroom dashboard and confirm it contains only the classroom name actions and non-interactive summary values. It must not render feature links, a local navigation landmark, a tablist, or the former `대시보드 / 학생 명단 / 자리 배치 / 학급 보드 / 금융 관리` and `포트폴리오 / 1인1역 / 과제 / 청소` controls.
+- Open the teacher `학급` mega menu and confirm its groups are `학급 선택`, the selected classroom's `관리`, `학급 운영`, and `활동·기록`. `학급 운영` contains only `1인1역`, `과제 현황`, and `은행`; `청소·당번`, `제출 체크`, `QR결제`, and `매점` are absent. Confirm `1인1역` opens `/classroom/:id/roles`; the misleading `1인1역할` group is absent.
+- Open the classroom dashboard and confirm the read-only KPI row is followed by the grouped `학급 기능` card grid. Feature cards follow the assignments-page language: a tinted head bar with the metric and title, plus a thin supporting line, with no boxed surface, decorative emoji, or arrow. The walking card metric is the classroom student total for today, labeled `학급 합계`, not a teacher step count. The grid uses four columns on wide screens, two columns at the intermediate breakpoint, and one column on mobile. It retains teacher destinations such as students, groups, boards, parent access, roles, assignments, bank, portfolio, reading, walking, and daily banners, while `청소·당번`, `제출 체크`, `QR결제`, and `매점` are absent.
 - Open `/roles`, `/morning`, and `/assignments` as the owning teacher and confirm each page renders only its named task. Verify another teacher receives the existing not-found boundary.
+- Assign the checker, cleaning-inspector, and store-clerk roles to students and confirm `내 역할` opens their dedicated check, cleaning, and store-payment pages. Confirm those execution pages reject a teacher-only session, while the store clerk can still reach product management from the payment page. Keep the digital store routes and data until a current production usage audit confirms there are no active customers; the offline `매점` role label and assignment must remain either way.
 - Open walking, daily-banner, and reading pages and confirm each uses its own page title without cross-feature navigation tabs. Preserve the finance page's `입출금 / 거래 기록` view switch because it changes views within one task.
 
 ## Authoritative Multiplayer Play

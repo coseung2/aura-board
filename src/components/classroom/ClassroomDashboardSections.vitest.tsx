@@ -61,7 +61,7 @@ describe("ClassroomDashboardSections", () => {
       "학생 명단",
       "자리 배치",
       "학급 보드",
-      "금융 관리",
+      "은행",
       "포트폴리오",
       "1인1역",
       "과제",

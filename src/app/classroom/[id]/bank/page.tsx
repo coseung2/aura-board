@@ -37,8 +37,8 @@ export default async function ClassroomBankPage({ params, searchParams }: Props)
       <ClassroomSectionHeader
         classroomId={classroom.id}
         eyebrow={classroom.name}
-        title="금융 관리"
-        ariaLabel="금융 관리 메뉴"
+        title="은행"
+        ariaLabel="은행 메뉴"
         activeKey={view}
         backHref="/classroom"
         backLabel="학급 목록"
