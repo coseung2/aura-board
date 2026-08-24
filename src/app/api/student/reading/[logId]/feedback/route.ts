@@ -272,7 +272,7 @@ export async function POST(req: Request, { params }: RouteContext) {
           data: { missionCounted: true, missionCountedAt: evaluatedAt },
         });
       }
-      return tx.readingLog.findUnique({ where: { id: log.id } });
+      return updatedLog;
     });
 
     return NextResponse.json({

@@ -362,7 +362,11 @@ export async function GET() {
   let classroomTopFive: Awaited<ReturnType<typeof readClassroomTopFive>> = [];
   let classroomRankRewards: ClassroomRankReward[] = [];
   let titles: Awaited<ReturnType<typeof readReadingTitles>> = [];
-  let weeklyMissionLogs: Array<{ createdAt: Date; reflection: string }> = [];
+  let weeklyMissionLogs: Array<{
+    createdAt: Date;
+    reflection: string;
+    missionCounted: boolean;
+  }> = [];
   const weekStart = new Date(`${rankPeriods.active.weekStart}T00:00:00+09:00`);
   const weekEnd = new Date(`${rankPeriods.active.weekEnd}T00:00:00+09:00`);
   const readingWhere = {
@@ -399,7 +403,7 @@ export async function GET() {
             ...readingWhere,
             createdAt: { gte: weekStart, lt: weekEnd },
           },
-          select: { createdAt: true, reflection: true },
+          select: { createdAt: true, reflection: true, missionCounted: true },
         }),
       ]);
     rows = recentRows;

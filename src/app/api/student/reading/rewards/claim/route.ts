@@ -285,7 +285,7 @@ export async function POST(req: NextRequest) {
                     lt: new Date(`${weekEnd}T00:00:00+09:00`),
                   },
                 },
-                select: { createdAt: true, reflection: true },
+                select: { createdAt: true, reflection: true, missionCounted: true },
               }),
               tx.transaction.findMany({
                 where: {

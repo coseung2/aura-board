@@ -186,7 +186,7 @@ describe("reading logs and missions", () => {
       );
       expect(mocks.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          select: { createdAt: true, reflection: true },
+          select: { createdAt: true, reflection: true, missionCounted: true },
         }),
       );
       expect(mocks.count).toHaveBeenCalledTimes(2);

@@ -132,31 +132,6 @@ export async function POST(
           },
           data: { deletedAt: new Date() },
         });
-      } else if (report.targetKind === "feed_comment") {
-        const comment = await tx.feedComment.findUnique({
-          where: { id: report.targetId },
-          select: { parentCommentId: true, classroomId: true },
-        });
-        if (!comment || comment.classroomId !== classroomId) {
-          throw new Error("feed_comment_out_of_scope");
-        }
-        const rootCommentId = comment?.parentCommentId ?? report.targetId;
-        await tx.feedComment.updateMany({
-          where: {
-            OR: [{ id: rootCommentId }, { parentCommentId: rootCommentId }],
-            deletedAt: null,
-          },
-          data: { deletedAt: new Date() },
-        });
-      } else if (report.targetKind === "feed_post") {
-        await tx.feedPost.updateMany({
-          where: {
-            id: report.targetId,
-            authorStudentId: { not: null },
-            publications: { some: { classroomId } },
-          },
-          data: { status: "ARCHIVED", updatedAt: new Date() },
-        });
       } else {
         await tx.card.deleteMany({ where: { id: report.targetId } });
       }

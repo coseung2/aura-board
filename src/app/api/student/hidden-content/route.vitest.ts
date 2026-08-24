@@ -26,6 +26,7 @@ vi.mock("@/lib/student-auth", () => ({
 vi.mock("@/lib/db", () => ({
   db: {
     hiddenContent: { findMany: vi.fn(async () => mocks.targets) },
+    feedHiddenContent: { findMany: vi.fn(async () => []) },
     hiddenContentAuthor: { findMany: vi.fn(async () => mocks.authors) },
   },
 }));

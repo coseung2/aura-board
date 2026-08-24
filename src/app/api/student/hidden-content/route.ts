@@ -3,8 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import {
-  CONTENT_TARGET_KINDS,
-  FEED_CONTENT_TARGET_KINDS,
+  ALL_CONTENT_TARGET_KINDS,
   canActOnContent,
 } from "@/lib/content-safety";
 import {
@@ -25,7 +24,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const HideSchema = z.object({
-  targetKind: z.enum([...CONTENT_TARGET_KINDS, ...FEED_CONTENT_TARGET_KINDS] as [string, ...string[]]),
+  targetKind: z.enum(ALL_CONTENT_TARGET_KINDS),
   targetId: z.string().trim().min(1).max(100),
 });
 
@@ -37,7 +36,7 @@ const HideAuthorSchema = z.object({
 const UnhideSchema = z.discriminatedUnion("scope", [
   z.object({
     scope: z.literal("target"),
-    targetKind: z.enum([...CONTENT_TARGET_KINDS, ...FEED_CONTENT_TARGET_KINDS] as [string, ...string[]]),
+    targetKind: z.enum(ALL_CONTENT_TARGET_KINDS),
     targetId: z.string().trim().min(1).max(100),
   }),
   z.object({

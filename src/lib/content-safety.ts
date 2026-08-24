@@ -11,6 +11,10 @@ export const FEED_CONTENT_TARGET_KINDS = ["feed_post", "feed_comment"] as const;
 export type ContentTargetKind =
   | (typeof CONTENT_TARGET_KINDS)[number]
   | (typeof FEED_CONTENT_TARGET_KINDS)[number];
+export const ALL_CONTENT_TARGET_KINDS = [
+  ...CONTENT_TARGET_KINDS,
+  ...FEED_CONTENT_TARGET_KINDS,
+] as const satisfies readonly [ContentTargetKind, ...ContentTargetKind[]];
 
 export const CONTENT_REPORT_REASONS = [
   "profanity",

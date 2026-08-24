@@ -6,9 +6,8 @@ import {
   invalidateStudentIdentityCache,
 } from "@/lib/student-auth";
 import {
+  ALL_CONTENT_TARGET_KINDS,
   CONTENT_REPORT_REASONS,
-  CONTENT_TARGET_KINDS,
-  FEED_CONTENT_TARGET_KINDS,
   canActOnContent,
   normalizeReportDetail,
   REPORT_DETAIL_MAX_LENGTH,
@@ -26,7 +25,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const CreateSchema = z.object({
-  targetKind: z.enum([...CONTENT_TARGET_KINDS, ...FEED_CONTENT_TARGET_KINDS] as [string, ...string[]]),
+  targetKind: z.enum(ALL_CONTENT_TARGET_KINDS),
   targetId: z.string().trim().min(1).max(100),
   reason: z.enum(CONTENT_REPORT_REASONS),
   detail: z.string().trim().max(REPORT_DETAIL_MAX_LENGTH).optional(),

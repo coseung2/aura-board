@@ -80,7 +80,7 @@ export default async function StudentReadingPage({
           classroomId: student.classroomId,
           createdAt: { gte: missionWeekStart, lt: missionWeekEnd },
         },
-        select: { createdAt: true, reflection: true },
+        select: { createdAt: true, reflection: true, missionCounted: true },
       }),
       readReadingWeeklyMissionClaimed(student.id, missionPeriod.weekStart),
       db.studentSlime.findFirst({
