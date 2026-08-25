@@ -3,8 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type RoleStudent = { id: string; name: string; number: number | null };
 
-type RolePanelProps = {
+type RolesViewProps = {
   classroomId: string;
+  classroomName: string;
   unit: string;
   students: RoleStudent[];
 };
@@ -20,13 +21,12 @@ vi.mock("@/lib/db", () => ({
   db: { classroom: { findUnique: mocks.classroomFindUnique } },
 }));
 vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
-vi.mock("@/components/classroom/ClassroomSectionHeader", () => ({
-  ClassroomSectionHeader: ({ title }: { title: string }) => <h1>{title}</h1>,
-}));
-vi.mock("@/components/classroom/ClassroomRolePanel", () => ({
-  ClassroomRolePanel: ({ classroomId, unit, students }: RolePanelProps) => (
+vi.mock("@/components/classroom/ClassroomRolesView", () => ({
+  ClassroomRolesView: ({ classroomId, classroomName, unit, students }: RolesViewProps) => (
     <section aria-label="역할 패널">
+      <h1>1인 1역</h1>
       <span data-testid="role-panel-classroom-id">{classroomId}</span>
+      <span data-testid="role-panel-classroom-name">{classroomName}</span>
       <span data-testid="role-panel-unit">{unit}</span>
       <span data-testid="role-panel-students">
         {students
@@ -91,6 +91,7 @@ describe("ClassroomRolesPage", () => {
       "classroom-1",
     );
     expect(screen.getByTestId("role-panel-unit").textContent).toBe("별");
+    expect(screen.getByTestId("role-panel-classroom-name").textContent).toBe("햇살반");
     expect(screen.getByTestId("role-panel-students").textContent).toBe(
       "student-1:가온:3|student-2:나래:",
     );

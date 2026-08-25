@@ -88,8 +88,15 @@ export function LibraryItemList({
                   onClick={() => onToggle(item.id)}
                 >
                   <strong>{item.title}</strong>
-                  <span>
-                    {item.kind === "canva" ? "Canva 디자인" : formatFileSize(item.fileSize)}
+                  <span className="teacher-library-item-meta">
+                    <span className={`teacher-library-kind-chip is-${item.kind}`}>
+                      {item.kind === "canva" ? "Canva" : "이미지"}
+                    </span>
+                    {item.kind === "canva"
+                      ? item.pageCount
+                        ? `${item.pageCount}페이지`
+                        : "디자인"
+                      : formatFileSize(item.fileSize)}
                   </span>
                 </button>
                 <select

@@ -34,6 +34,7 @@ import {
   type BoardSectionsReorderedDetail,
 } from "@/lib/board-section-events";
 import { sortSections } from "@/lib/sort-sections";
+import { ToastProvider } from "@/components/ui/Toast";
 import type {
   ColumnsCardDropPreview,
   ColumnsFeedbackTarget,
@@ -60,6 +61,16 @@ type Props = {
 };
 
 export function ColumnsBoard({
+  ...props
+}: Props) {
+  return (
+    <ToastProvider>
+      <ColumnsBoardContent {...props} />
+    </ToastProvider>
+  );
+}
+
+function ColumnsBoardContent({
   boardId,
   initialCards,
   initialSections,

@@ -7,6 +7,7 @@ export type TeacherLibraryCollectionDto = {
 };
 
 export type TeacherLibraryItemKind = "image" | "canva";
+export type TeacherLibraryPdfLayout = "a4-auto" | "a4-fit" | "original";
 
 export type TeacherLibraryItemDto = {
   id: string;

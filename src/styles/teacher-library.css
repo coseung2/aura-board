@@ -275,6 +275,12 @@ body:has(.teacher-library-page) .board-toolkit-menu {
   font-size: 12px;
 }
 
+.teacher-library-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .teacher-library-item-list select {
   width: 100%;
   height: 38px;
@@ -317,6 +323,7 @@ body:has(.teacher-library-page) .board-toolkit-menu {
   padding: 28px 24px;
   border-left: 1px solid #e7e9f1;
   background: #fafbfe;
+  overflow-y: auto;
 }
 
 .teacher-library-builder-head {
@@ -349,8 +356,8 @@ body:has(.teacher-library-page) .board-toolkit-menu {
 }
 
 .teacher-library-builder-list {
-  min-height: 330px;
-  max-height: 450px;
+  min-height: 180px;
+  max-height: 290px;
   overflow: auto;
   margin: 22px -5px 18px;
   padding: 0 5px;
@@ -423,7 +430,7 @@ body:has(.teacher-library-page) .board-toolkit-menu {
 }
 
 .teacher-library-builder-empty {
-  min-height: 280px;
+  min-height: 160px;
   display: flex;
   flex-direction: column;
   align-items: center;

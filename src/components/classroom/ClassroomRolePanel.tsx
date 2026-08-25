@@ -8,7 +8,13 @@ import {
   type PayPeriod, type Props,
 } from "./useClassroomRolePanel";
 
-export function ClassroomRolePanel({ classroomId, unit, students, payBarSlot }: Props) {
+export function ClassroomRolePanel({
+  classroomId,
+  unit,
+  students,
+  payBarSlot,
+  payBarPlacement = "inline",
+}: Props) {
   const {
     roles,
     payPolicy,
@@ -159,7 +165,11 @@ export function ClassroomRolePanel({ classroomId, unit, students, payBarSlot }: 
 
   return (
     <section className="classroom-roles-view">
-      {payBarSlot ? createPortal(payBar, payBarSlot) : payBar}
+      {payBarSlot
+        ? createPortal(payBar, payBarSlot)
+        : payBarPlacement === "inline"
+          ? payBar
+          : null}
 
       {error ? (
         <p className="classroom-dashboard-empty" role="alert">

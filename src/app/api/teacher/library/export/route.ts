@@ -15,6 +15,7 @@ export const maxDuration = 300;
 const BodySchema = z.object({
   itemIds: z.array(z.string().min(1)).min(1).max(20),
   filename: z.string().trim().min(1).max(100).default("수업 자료"),
+  layout: z.enum(["a4-auto", "a4-fit", "original"]).default("a4-auto"),
 });
 
 export async function POST(request: Request) {
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
       userId: user.id,
       items: ordered,
       baseUrl: request.url,
+      layout: parsed.data.layout,
     });
     const safeAscii = parsed.data.filename.replace(/[^a-zA-Z0-9._-]+/g, "_") || "aura-library";
     return new Response(bytes.buffer as ArrayBuffer, {

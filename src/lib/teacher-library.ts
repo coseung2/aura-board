@@ -51,6 +51,7 @@ type ImageCandidate = {
   cardId: string;
   title: string;
   url: string;
+  fallbackUrl: string | null;
   mimeType: string | null;
   fileSize: number | null;
 };
@@ -80,6 +81,18 @@ export async function getTeacherLibrary(
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     }),
   ]);
+  const sourceCardIds = [
+    ...new Set(items.map((item) => item.sourceCardId).filter((id): id is string => Boolean(id))),
+  ];
+  const sourceCards = sourceCardIds.length
+    ? await db.card.findMany({
+        where: { id: { in: sourceCardIds } },
+        select: { id: true, title: true, content: true },
+      })
+    : [];
+  const sourceTitleByCardId = new Map(
+    sourceCards.map((card) => [card.id, sourcePostTitle(card.title, card.content)] as const),
+  );
 
   return {
     collections: collections.map((collection) => ({
@@ -89,7 +102,14 @@ export async function getTeacherLibrary(
       createdAt: collection.createdAt.toISOString(),
       updatedAt: collection.updatedAt.toISOString(),
     })),
-    items: items.map(serializeTeacherLibraryItem),
+    items: items.map((item) =>
+      serializeTeacherLibraryItem({
+        ...item,
+        title: item.sourceCardId
+          ? sourceTitleByCardId.get(item.sourceCardId) ?? item.title
+          : item.title,
+      }),
+    ),
   };
 }
 
@@ -108,7 +128,9 @@ export async function importSectionIntoTeacherLibrary(args: {
         select: {
           id: true,
           title: true,
+          content: true,
           imageUrl: true,
+          thumbUrl: true,
           fileUrl: true,
           fileName: true,
           fileSize: true,
@@ -121,6 +143,7 @@ export async function importSectionIntoTeacherLibrary(args: {
             select: {
               kind: true,
               url: true,
+              previewUrl: true,
               fileName: true,
               fileSize: true,
               mimeType: true,
@@ -144,6 +167,7 @@ export async function importSectionIntoTeacherLibrary(args: {
   const failures: Array<{ cardId: string; reason: string }> = [];
 
   for (const card of section.cards) {
+    const postTitle = sourcePostTitle(card.title, card.content);
     const designId =
       card.canvaDesignId?.trim() ||
       (card.linkUrl ? extractCanvaDesignId(card.linkUrl) : null) ||
@@ -159,7 +183,7 @@ export async function importSectionIntoTeacherLibrary(args: {
           userId: args.userId,
           collectionId: collection.id,
           kind: "canva",
-          title: normalizeItemTitle(card.title, "Canva 디자인"),
+          title: postTitle,
           sourceKey,
           previewUrl: card.linkImage,
           canvaDesignId: designId,
@@ -170,7 +194,7 @@ export async function importSectionIntoTeacherLibrary(args: {
         },
         update: {
           collectionId: collection.id,
-          title: normalizeItemTitle(card.title, "Canva 디자인"),
+          title: postTitle,
           previewUrl: card.linkImage,
           canvaViewUrl: card.linkUrl,
           sourceBoardId: section.boardId,
@@ -247,7 +271,9 @@ export async function importSectionIntoTeacherLibrary(args: {
 function collectImageCandidates(card: {
   id: string;
   title: string;
+  content: string;
   imageUrl: string | null;
+  thumbUrl: string | null;
   fileUrl: string | null;
   fileName: string | null;
   fileSize: number | null;
@@ -255,17 +281,20 @@ function collectImageCandidates(card: {
   attachments: Array<{
     kind: string;
     url: string;
+    previewUrl: string | null;
     fileName: string | null;
     fileSize: number | null;
     mimeType: string | null;
   }>;
 }): ImageCandidate[] {
   const candidates: ImageCandidate[] = [];
+  const postTitle = sourcePostTitle(card.title, card.content);
   if (card.imageUrl) {
     candidates.push({
       cardId: card.id,
-      title: card.title,
+      title: postTitle,
       url: card.imageUrl,
+      fallbackUrl: card.thumbUrl,
       mimeType: card.fileMimeType,
       fileSize: card.fileSize,
     });
@@ -277,8 +306,9 @@ function collectImageCandidates(card: {
   ) {
     candidates.push({
       cardId: card.id,
-      title: card.fileName || card.title,
+      title: postTitle,
       url: card.fileUrl,
+      fallbackUrl: null,
       mimeType: card.fileMimeType,
       fileSize: card.fileSize,
     });
@@ -293,8 +323,9 @@ function collectImageCandidates(card: {
     }
     candidates.push({
       cardId: card.id,
-      title: attachment.fileName || card.title,
+      title: postTitle,
       url: attachment.url,
+      fallbackUrl: attachment.previewUrl,
       mimeType: attachment.mimeType,
       fileSize: attachment.fileSize,
     });
@@ -310,27 +341,44 @@ async function materializeImage(
   userId: string,
   candidate: ImageCandidate,
 ): Promise<{ url: string; mimeType: string | null; fileSize: number | null; uploaded: boolean }> {
-  if (parseSupabasePublicObjectUrl(candidate.url) || candidate.url.startsWith("/uploads/")) {
-    return {
-      url: candidate.url,
-      mimeType: candidate.mimeType,
-      fileSize: candidate.fileSize,
-      uploaded: false,
-    };
+  const normalizedCandidateMime = normalizeMimeType(candidate.mimeType);
+  const preferPreview =
+    Boolean(candidate.fallbackUrl) &&
+    (!normalizedCandidateMime || !SUPPORTED_IMAGE_MIME.has(normalizedCandidateMime));
+  const sources = [
+    ...(preferPreview ? [candidate.fallbackUrl, candidate.url] : [candidate.url, candidate.fallbackUrl]),
+  ].filter((value, index, all): value is string => Boolean(value) && all.indexOf(value) === index);
+  let lastError: unknown = null;
+
+  for (const sourceUrl of sources) {
+    try {
+      if (parseSupabasePublicObjectUrl(sourceUrl) || sourceUrl.startsWith("/uploads/")) {
+        return {
+          url: sourceUrl,
+          mimeType: sourceUrl === candidate.url ? candidate.mimeType : null,
+          fileSize: sourceUrl === candidate.url ? candidate.fileSize : null,
+          uploaded: false,
+        };
+      }
+
+      const response = await fetchSafeImage(sourceUrl);
+      const mimeType = normalizeMimeType(response.headers.get("content-type"));
+      const extension = mimeType ? SUPPORTED_IMAGE_MIME.get(mimeType) : null;
+      if (!mimeType || !extension) throw new Error("unsupported_image_type");
+      const body = await readLimitedBody(response, MAX_EXTERNAL_IMAGE_BYTES);
+      await sharp(body).metadata();
+      const pathname = `teacher-library/${userId}/${randomUUID()}.${extension}`;
+      const stored = await uploadPublicObject(pathname, body, {
+        contentType: mimeType,
+        cacheControlMaxAge: 60 * 60 * 24 * 365,
+      });
+      return { url: stored.url, mimeType, fileSize: body.byteLength, uploaded: true };
+    } catch (error) {
+      lastError = error;
+    }
   }
 
-  const response = await fetchSafeImage(candidate.url);
-  const mimeType = normalizeMimeType(response.headers.get("content-type"));
-  const extension = mimeType ? SUPPORTED_IMAGE_MIME.get(mimeType) : null;
-  if (!mimeType || !extension) throw new Error("unsupported_image_type");
-  const body = await readLimitedBody(response, MAX_EXTERNAL_IMAGE_BYTES);
-  await sharp(body).metadata();
-  const pathname = `teacher-library/${userId}/${randomUUID()}.${extension}`;
-  const stored = await uploadPublicObject(pathname, body, {
-    contentType: mimeType,
-    cacheControlMaxAge: 60 * 60 * 24 * 365,
-  });
-  return { url: stored.url, mimeType, fileSize: body.byteLength, uploaded: true };
+  throw lastError instanceof Error ? lastError : new Error("image_import_failed");
 }
 
 async function fetchSafeImage(rawUrl: string): Promise<Response> {
@@ -428,6 +476,17 @@ function normalizeCollectionName(value: string): string {
 
 function normalizeItemTitle(value: string, fallback: string): string {
   return value.trim().replace(/\s+/g, " ").slice(0, 160) || fallback;
+}
+
+const GENERIC_POST_TITLES = new Set(["Canva 디자인", "이미지", "제목 없음"]);
+
+function sourcePostTitle(title: string, content: string): string {
+  const normalizedTitle = title.trim().replace(/\s+/g, " ");
+  const normalizedContent = content.trim().replace(/\s+/g, " ");
+  if (normalizedTitle && !GENERIC_POST_TITLES.has(normalizedTitle)) {
+    return normalizeItemTitle(normalizedTitle, "제목 없는 게시물");
+  }
+  return normalizeItemTitle(normalizedContent, normalizedTitle || "제목 없는 게시물");
 }
 
 function hash(value: string): string {

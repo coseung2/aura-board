@@ -128,6 +128,26 @@ describe("ClassroomRolePanel", () => {
     expect(screen.getByRole("button", { name: "지급" })).toBeTruthy();
   });
 
+  it("portals pay controls into the section header action slot", async () => {
+    const slot = document.createElement("div");
+    document.body.appendChild(slot);
+    const view = render(
+      <ClassroomRolePanel
+        classroomId="classroom-1"
+        unit="원"
+        students={students}
+        payBarSlot={slot}
+        payBarPlacement="header"
+      />,
+    );
+
+    const manualPay = await screen.findByRole("radio", { name: "수동지급" });
+    expect(slot.contains(manualPay)).toBe(true);
+    expect(view.container.querySelector(".classroom-role-pay-bar")).toBeNull();
+    view.unmount();
+    slot.remove();
+  });
+
   it("renders a cardless three-column role list with student names only", async () => {
     fetchMock.mockReset();
     fetchMock

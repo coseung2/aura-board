@@ -36,10 +36,12 @@ describe("LibraryFileBuilder", () => {
       <LibraryFileBuilder
         selectedItems={[item("image", "image"), item("canva", "canva")]}
         filename="수업 자료"
+        layout="a4-auto"
         busy={false}
         canvaConnected={true}
         error={null}
         onFilename={vi.fn()}
+        onLayout={vi.fn()}
         onMove={onMove}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
@@ -50,6 +52,9 @@ describe("LibraryFileBuilder", () => {
     fireEvent.click(screen.getByRole("button", { name: "Canva 활동지 위로 이동" }));
     expect(onMove).toHaveBeenCalledWith(1, -1);
     expect(screen.getByRole("button", { name: "한 파일로 다운로드" })).toBeEnabled();
+    expect(screen.getByText("Canva", { selector: ".teacher-library-kind-chip" })).toBeTruthy();
+    expect(screen.getByRole("radio", { name: /A4 균등 배치/ })).toBeChecked();
+    expect(screen.getByLabelText("PDF 배치 미리보기")).toBeTruthy();
   });
 
   it("blocks Canva export and offers reconnection when disconnected", () => {
@@ -58,10 +63,12 @@ describe("LibraryFileBuilder", () => {
       <LibraryFileBuilder
         selectedItems={[item("canva", "canva")]}
         filename="수업 자료"
+        layout="a4-fit"
         busy={false}
         canvaConnected={false}
         error={null}
         onFilename={vi.fn()}
+        onLayout={vi.fn()}
         onMove={vi.fn()}
         onRemove={vi.fn()}
         onDownload={vi.fn()}

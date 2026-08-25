@@ -6,6 +6,7 @@ import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
 import type {
   TeacherLibraryCollectionDto,
   TeacherLibraryItemDto,
+  TeacherLibraryPdfLayout,
   TeacherLibraryPayload,
 } from "@/lib/teacher-library-types";
 import { LibraryFileBuilder } from "./LibraryFileBuilder";
@@ -27,6 +28,7 @@ export function TeacherLibraryWorkspace({
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filename, setFilename] = useState("수업 자료");
+  const [layout, setLayout] = useState<TeacherLibraryPdfLayout>("a4-auto");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -116,7 +118,7 @@ export function TeacherLibraryWorkspace({
       const response = await fetch("/api/teacher/library/export", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ itemIds: selectedIds, filename: filename.trim() }),
+        body: JSON.stringify({ itemIds: selectedIds, filename: filename.trim(), layout }),
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -161,10 +163,12 @@ export function TeacherLibraryWorkspace({
         <LibraryFileBuilder
           selectedItems={selectedItems}
           filename={filename}
+          layout={layout}
           busy={busy}
           canvaConnected={initialCanvaConnected}
           error={error}
           onFilename={setFilename}
+          onLayout={setLayout}
           onMove={moveSelected}
           onRemove={toggle}
           onDownload={download}

@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 
-import { ClassroomRolePanel } from "@/components/classroom/ClassroomRolePanel";
-import { ClassroomSectionHeader } from "@/components/classroom/ClassroomSectionHeader";
+import { ClassroomRolesView } from "@/components/classroom/ClassroomRolesView";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 
@@ -30,16 +29,9 @@ export default async function ClassroomRolesPage({ params }: Props) {
 
   return (
     <main className="classroom-page classroom-page-detail classroom-section-page">
-      <ClassroomSectionHeader
+      <ClassroomRolesView
         classroomId={classroom.id}
-        eyebrow={classroom.name}
-        title="1인 1역"
-        ariaLabel="1인 1역 메뉴"
-        links={[]}
-        activeKey="roles"
-      />
-      <ClassroomRolePanel
-        classroomId={classroom.id}
+        classroomName={classroom.name}
         unit={classroom.currency?.unitLabel ?? "원"}
         students={classroom.students}
       />

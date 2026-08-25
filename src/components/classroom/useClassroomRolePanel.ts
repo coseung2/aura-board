@@ -75,6 +75,7 @@ export type Props = {
    * portals them there so the divider owns their placement.
    */
   payBarSlot?: HTMLElement | null;
+  payBarPlacement?: "inline" | "header";
 };
 
 export const PAY_PERIODS: Array<{ value: PayPeriod; label: string }> = [

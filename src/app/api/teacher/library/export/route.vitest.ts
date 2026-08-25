@@ -21,11 +21,11 @@ vi.mock("@/lib/teacher-library-pdf", () => ({
 
 import { POST } from "./route";
 
-function request(itemIds: string[]) {
+function request(itemIds: string[], layout = "a4-auto") {
   return new Request("http://localhost/api/teacher/library/export", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ itemIds, filename: "우리 반 자료" }),
+    body: JSON.stringify({ itemIds, filename: "우리 반 자료", layout }),
   });
 }
 
@@ -46,6 +46,7 @@ describe("teacher library PDF export route", () => {
     expect(mocks.buildPdf).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "teacher-1",
+        layout: "a4-auto",
         items: [
           expect.objectContaining({ id: "canva-1" }),
           expect.objectContaining({ id: "image-1" }),
