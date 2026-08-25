@@ -125,10 +125,16 @@ export default async function ClassroomReadingPage({ params }: Props) {
             <details className="classroom-reading-row" key={log.id}>
               <summary className="classroom-reading-summary" role="row">
                 <div className="classroom-reading-student" data-label="학생" role="cell">
-                  <span className="classroom-reading-disclosure-icon" aria-hidden="true" />
-                  <strong>
-                    {log.student?.number ?? "-"}번 {log.student?.name ?? "알 수 없는 학생"}
-                  </strong>
+                  <span className="ds-inline-mark">
+                    <span
+                      className="ds-inline-mark-icon"
+                      data-glyph="chevron"
+                      aria-hidden="true"
+                    />
+                    <strong>
+                      {log.student?.number ?? "-"}번 {log.student?.name ?? "알 수 없는 학생"}
+                    </strong>
+                  </span>
                 </div>
                 <div className="classroom-reading-book" data-label="책 제목" role="cell">
                   <strong>{log.title}</strong>

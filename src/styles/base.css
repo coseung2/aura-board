@@ -107,6 +107,9 @@ img.emoji {
   --radius-control: 12px;
   --radius-pill: 9999px;
   --control-inline-gap: 6px;
+  --icon-inline-size: 0.62em;
+  --icon-inline-gap: 0.45em;
+  --text-tight-leading: 1.2;
 
   /* Typography */
   --font-display: "Noto Sans KR", "Pretendard Variable", "SUIT", "Segoe UI", sans-serif;

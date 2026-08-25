@@ -58,6 +58,10 @@ describe("ClassroomReadingPage", () => {
     expect(screen.getByText("긴 독서 기록")).toBeTruthy();
     expect(screen.getByText("평가 중")).toBeTruthy();
     expect(view.container.querySelector("details")?.hasAttribute("open")).toBe(false);
+    const mark = view.container.querySelector(".classroom-reading-student .ds-inline-mark");
+    const icon = mark?.querySelector(".ds-inline-mark-icon");
+    expect(mark?.className).toContain("ds-inline-mark");
+    expect(icon?.getAttribute("data-glyph")).toBe("chevron");
   });
 
   it("shows only a generated numeric score in the score column", async () => {

@@ -83,6 +83,38 @@ h5.ds-h5 {
   border-radius: 4px;
 }
 
+/* Inline glyph + text: share one cap-height box so chevrons, status
+   marks, and names stay optically aligned without page-local offsets. */
+.ds-inline-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--icon-inline-gap);
+  min-width: 0;
+  line-height: var(--text-tight-leading);
+}
+.ds-inline-mark > :where(strong, span, small, time, em) {
+  min-width: 0;
+  line-height: inherit;
+}
+.ds-inline-mark-icon {
+  flex: 0 0 var(--icon-inline-size);
+  width: var(--icon-inline-size);
+  height: var(--icon-inline-size);
+  color: var(--color-text-muted);
+}
+.ds-inline-mark-icon[data-glyph="chevron"] {
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transform-origin: 50% 50%;
+  transition: transform 160ms ease;
+}
+[open] > .ds-inline-mark .ds-inline-mark-icon[data-glyph="chevron"],
+[aria-expanded="true"] .ds-inline-mark-icon[data-glyph="chevron"] {
+  transform: rotate(45deg);
+}
+
+
 /* ── Reusable patterns ───────────────────────────────── */
 .ds-card {
   background: var(--color-surface);

@@ -36,6 +36,25 @@ export default function DesignPage() {
         </div>
       </Section>
 
+      <Section title="Inline marks">
+        <div className="ds-card" style={{ padding: 24 }}>
+          <div style={{ display: "grid", gap: 12 }}>
+            <span className="ds-inline-mark">
+              <span className="ds-inline-mark-icon" data-glyph="chevron" aria-hidden="true" />
+              <strong>12번 서현우</strong>
+            </span>
+            <span className="ds-inline-mark" aria-expanded="true">
+              <span className="ds-inline-mark-icon" data-glyph="chevron" aria-hidden="true" />
+              <strong>펼친 상태</strong>
+            </span>
+          </div>
+          <p className="ds-micro" style={{ color: "var(--color-text-muted)", marginTop: 12 }}>
+            Classes: .ds-inline-mark, .ds-inline-mark-icon[data-glyph="chevron"]. Align
+            chevrons and names to the same cap-height; do not add page-local top offsets.
+          </p>
+        </div>
+      </Section>
+
       <Section title="Cards">
         <div className="ds-card" style={{ padding: 24 }}>
           <p className="ds-label" style={{ marginBottom: 8 }}>.ds-card - default</p>
