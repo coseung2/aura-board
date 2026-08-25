@@ -1,6 +1,7 @@
 "use client";
 
 import { createPortal } from "react-dom";
+import { Trash2 } from "lucide-react";
 import { RolePermissionModal } from "./RolePermissionModal";
 import {
   PAY_PERIODS, WEEKDAYS, formatNumber, useClassroomRolePanel,
@@ -157,7 +158,7 @@ export function ClassroomRolePanel({ classroomId, unit, students, payBarSlot }: 
   ].filter((columnRoles) => columnRoles.length > 0);
 
   return (
-    <>
+    <section className="classroom-roles-view">
       {payBarSlot ? createPortal(payBar, payBarSlot) : payBar}
 
       {error ? (
@@ -173,42 +174,53 @@ export function ClassroomRolePanel({ classroomId, unit, students, payBarSlot }: 
               <span>역할</span>
               <span>금액</span>
               <span>담당 학생</span>
+              <span />
             </div>
 
             {columnRoles.map((role) => (
-              <button
-                key={role.id}
-                type="button"
-                className="classroom-role-mini-row"
-                onClick={() => openEdit(role)}
-                aria-label={`${role.labelKo} 역할 설정`}
-              >
-                <span className="classroom-role-mini-head">
-                  <strong className="classroom-role-mini-label">
-                    {role.labelKo}
-                  </strong>
-                  <span className="classroom-role-mini-salary">
-                    {formatNumber(role.salaryAmount)} {unit}
+              <div className="classroom-role-mini-row" key={role.id}>
+                <button
+                  type="button"
+                  className="classroom-role-mini-edit"
+                  onClick={() => openEdit(role)}
+                  aria-label={`${role.labelKo} 역할 설정`}
+                >
+                  <span className="classroom-role-mini-head">
+                    <strong className="classroom-role-mini-label">
+                      {role.labelKo}
+                    </strong>
+                    <span className="classroom-role-mini-salary">
+                      {formatNumber(role.salaryAmount)} {unit}
+                    </span>
                   </span>
-                </span>
 
-                <span className="classroom-role-mini-students">
-                  {role.students.length > 0
-                    ? role.students.map((student) => (
-                        <span
-                          className="classroom-role-mini-student"
-                          key={student.id}
-                        >
-                          {student.name}
-                        </span>
-                      ))
-                    : (
-                        <span className="classroom-role-mini-student classroom-role-mini-student--empty">
-                          미배정
-                        </span>
-                      )}
-                </span>
-              </button>
+                  <span className="classroom-role-mini-students">
+                    {role.students.length > 0
+                      ? role.students.map((student) => (
+                          <span
+                            className="classroom-role-mini-student"
+                            key={student.id}
+                          >
+                            {student.name}
+                          </span>
+                        ))
+                      : (
+                          <span className="classroom-role-mini-student classroom-role-mini-student--empty">
+                            미배정
+                          </span>
+                        )}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="classroom-role-mini-remove"
+                  onClick={() => void removeRole(role)}
+                  disabled={saving}
+                  aria-label={`${role.labelKo} 역할 삭제`}
+                >
+                  <Trash2 size={16} strokeWidth={1.8} aria-hidden="true" />
+                </button>
+              </div>
             ))}
           </div>
         ))}
@@ -518,6 +530,6 @@ export function ClassroomRolePanel({ classroomId, unit, students, payBarSlot }: 
           }}
         />
       ) : null}
-    </>
+    </section>
   );
 }

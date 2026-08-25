@@ -137,9 +137,7 @@ describe("ClassroomRolePanel", () => {
 
     const roleRows = await waitFor(() => {
       const rows = Array.from(
-        document.querySelectorAll<HTMLButtonElement>(
-          ".classroom-role-mini-row",
-        ),
+        document.querySelectorAll<HTMLElement>(".classroom-role-mini-row"),
       );
       if (rows.length !== 8) {
         throw new Error("three-column role rows are not rendered yet");
@@ -151,7 +149,16 @@ describe("ClassroomRolePanel", () => {
       Array.from(
         document.querySelectorAll(".classroom-role-mini-columns > span"),
       ).map((column) => column.textContent),
-    ).toEqual(["역할", "금액", "담당 학생", "역할", "금액", "담당 학생"]);
+    ).toEqual([
+      "역할",
+      "금액",
+      "담당 학생",
+      "",
+      "역할",
+      "금액",
+      "담당 학생",
+      "",
+    ]);
     expect(
       Array.from(document.querySelectorAll(".classroom-role-mini-list")).map(
         (column) => column.querySelectorAll(".classroom-role-mini-row").length,
@@ -179,6 +186,32 @@ describe("ClassroomRolePanel", () => {
       "미배정",
     ]);
     expect(studentNames.some((name) => /\d/.test(name ?? ""))).toBe(false);
+    expect(
+      screen.getAllByRole("button", { name: /역할 [A-H] 역할 삭제/ }),
+    ).toHaveLength(8);
+  });
+
+  it("removes a role from its row delete icon", async () => {
+    vi.spyOn(window, "confirm").mockReturnValue(true);
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ ok: true }))
+      .mockResolvedValueOnce(jsonResponse({ ...rolesBody, defs: [] }))
+      .mockResolvedValueOnce(jsonResponse(permissionsBody));
+    renderPanel();
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "도우미 역할 삭제" }),
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(5));
+    expect(fetchMock.mock.calls[2][0]).toBe(
+      "/api/classrooms/classroom-1/roles",
+    );
+    expect(fetchMock.mock.calls[2][1]).toMatchObject({ method: "PATCH" });
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({
+      roleKey: "helper",
+      enabled: false,
+    });
   });
 
   it("creates a teacher-authored role from the typed name", async () => {

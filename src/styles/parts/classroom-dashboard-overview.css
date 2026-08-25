@@ -251,11 +251,16 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .classroom-role-mini-columns,
-  .classroom-role-mini-row {
+  .classroom-role-mini-columns {
+    grid-template-columns: minmax(0, 1.05fr) minmax(72px, 0.7fr) minmax(0, 1.3fr) 44px;
+    column-gap: 10px;
+    padding-inline: 6px 0;
+  }
+
+  .classroom-role-mini-edit {
     grid-template-columns: minmax(0, 1.05fr) minmax(72px, 0.7fr) minmax(0, 1.3fr);
     column-gap: 10px;
-    padding-inline: 6px;
+    padding-inline: 6px 0;
   }
 
   .classroom-role-mini-students {

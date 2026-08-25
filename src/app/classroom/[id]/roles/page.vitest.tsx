@@ -86,7 +86,7 @@ describe("ClassroomRolesPage", () => {
       }),
     );
 
-    expect(screen.getByRole("heading", { name: "1인1역" })).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "1인 1역" })).toBeTruthy();
     expect(screen.getByTestId("role-panel-classroom-id").textContent).toBe(
       "classroom-1",
     );

@@ -33,8 +33,8 @@ export default async function ClassroomRolesPage({ params }: Props) {
       <ClassroomSectionHeader
         classroomId={classroom.id}
         eyebrow={classroom.name}
-        title="1인1역"
-        ariaLabel="1인1역 메뉴"
+        title="1인 1역"
+        ariaLabel="1인 1역 메뉴"
         links={[]}
         activeKey="roles"
       />

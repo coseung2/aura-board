@@ -33,14 +33,14 @@
   min-height: 40px;
 }
 
-/* Pay controls render inside the section divider row, right-aligned. */
+/* Pay controls follow the same open top rhythm as the assignments page. */
 .classroom-role-pay-bar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
   margin-left: auto;
-  padding-bottom: 6px;
+  padding-bottom: 18px;
 }
 
 .classroom-role-pay-bar .segmented-control-item {
