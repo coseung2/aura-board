@@ -53,6 +53,18 @@ export function TeacherLibraryWorkspace({
     setError(null);
   }
 
+  function toggleAll(ids: string[]) {
+    setSelectedIds((current) => {
+      const visibleIds = new Set(ids);
+      const allSelected = ids.every((id) => current.includes(id));
+      if (allSelected) return current.filter((id) => !visibleIds.has(id));
+
+      const currentIds = new Set(current);
+      return [...current, ...ids.filter((id) => !currentIds.has(id))];
+    });
+    setError(null);
+  }
+
   function moveSelected(index: number, direction: -1 | 1) {
     setSelectedIds((current) => {
       const target = index + direction;
@@ -157,6 +169,7 @@ export function TeacherLibraryWorkspace({
           search={search}
           onSearch={setSearch}
           onToggle={toggle}
+          onToggleAll={toggleAll}
           onMove={moveItem}
           onDelete={deleteItem}
         />

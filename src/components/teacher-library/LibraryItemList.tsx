@@ -1,6 +1,7 @@
 "use client";
 
 import { FileText, Image as ImageIcon, Search, Trash2 } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import type {
@@ -15,6 +16,7 @@ type Props = {
   search: string;
   onSearch: (value: string) => void;
   onToggle: (id: string) => void;
+  onToggleAll: (ids: string[]) => void;
   onMove: (id: string, collectionId: string | null) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 };
@@ -26,9 +28,22 @@ export function LibraryItemList({
   search,
   onSearch,
   onToggle,
+  onToggleAll,
   onMove,
   onDelete,
 }: Props) {
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const selectedVisibleCount = items.filter((item) =>
+    selectedIds.has(item.id),
+  ).length;
+  const allSelected = items.length > 0 && selectedVisibleCount === items.length;
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = selectedVisibleCount > 0 && !allSelected;
+    }
+  }, [allSelected, selectedVisibleCount]);
+
   return (
     <section className="teacher-library-list-panel" aria-labelledby="teacher-library-list-title">
       <div className="teacher-library-list-head">
@@ -55,10 +70,23 @@ export function LibraryItemList({
           <span>{search ? "다른 검색어를 입력해 보세요." : "보드 컬럼 메뉴에서 라이브러리에 추가할 수 있습니다."}</span>
         </div>
       ) : (
-        <ul className="teacher-library-item-list">
-          {items.map((item) => {
-            const checked = selectedIds.has(item.id);
-            return (
+        <>
+          <div className="teacher-library-select-all">
+            <label>
+              <input
+                ref={selectAllRef}
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => onToggleAll(items.map((item) => item.id))}
+              />
+              <span>전체 선택</span>
+            </label>
+            {selectedVisibleCount > 0 && <span>{selectedVisibleCount}개 선택</span>}
+          </div>
+          <ul className="teacher-library-item-list">
+            {items.map((item) => {
+              const checked = selectedIds.has(item.id);
+              return (
               <li key={item.id} className={checked ? "is-selected" : ""}>
                 <label className="teacher-library-check">
                   <input
@@ -75,6 +103,7 @@ export function LibraryItemList({
                       alt=""
                       sizes="72px"
                       unoptimized={item.kind === "canva"}
+                      fit="contain"
                     />
                   ) : item.kind === "canva" ? (
                     <FileText size={24} aria-hidden="true" />
@@ -120,9 +149,10 @@ export function LibraryItemList({
                   <Trash2 size={17} aria-hidden="true" />
                 </button>
               </li>
-            );
-          })}
-        </ul>
+              );
+            })}
+          </ul>
+        </>
       )}
     </section>
   );

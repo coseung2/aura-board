@@ -100,6 +100,20 @@
   font-size: 10px;
 }
 
+.teacher-library-preview-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.teacher-library-preview-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+}
+
 .teacher-library-preview-sheet,
 .teacher-library-preview-empty {
   width: 142px;
@@ -142,7 +156,7 @@
   place-items: center;
   border: 1px solid #e7e8ef;
   border-radius: 3px;
-  background: #f1f2f7;
+  background: #fff;
   color: #858c9c;
 }
 
@@ -168,6 +182,12 @@
   background: rgb(35 40 55 / 72%);
   color: #fff;
   font-size: 9px;
+}
+
+.teacher-library-preview-page-number {
+  color: #8b91a1;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
 }
 
 .teacher-library-preview-empty {

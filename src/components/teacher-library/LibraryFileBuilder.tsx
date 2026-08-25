@@ -220,25 +220,59 @@ function PdfLayoutPreview({
   items: TeacherLibraryItemDto[];
   layout: TeacherLibraryPdfLayout;
 }) {
-  const previewItems = items.slice(0, layout === "a4-auto" ? 6 : 1);
-  if (previewItems.length === 0) {
+  const previewUnits = items.flatMap((item) =>
+    Array.from({ length: Math.max(1, item.pageCount ?? 1) }, (_, pageIndex) => ({
+      item,
+      pageIndex,
+    })),
+  );
+  if (previewUnits.length === 0) {
     return <div className="teacher-library-preview-empty">자료를 선택하면 배치를 볼 수 있습니다.</div>;
   }
+
+  const unitsPerPage = layout === "a4-auto" ? 6 : 1;
+  const pages = Array.from(
+    { length: Math.ceil(previewUnits.length / unitsPerPage) },
+    (_, pageIndex) =>
+      previewUnits.slice(pageIndex * unitsPerPage, (pageIndex + 1) * unitsPerPage),
+  );
+
   return (
-    <div className={`teacher-library-preview-sheet is-${layout}`} aria-label="PDF 배치 미리보기">
-      {previewItems.map((item, index) => (
-        <div className="teacher-library-preview-item" key={item.id}>
-          {item.previewUrl ? (
-            <OptimizedImage
-              src={item.previewUrl}
-              alt=""
-              sizes="160px"
-              unoptimized={item.kind === "canva"}
-            />
-          ) : (
-            <FileText size={20} aria-hidden="true" />
-          )}
-          <span className="teacher-library-preview-index">{index + 1}</span>
+    <div className="teacher-library-preview-pages" aria-label="PDF 배치 미리보기">
+      {pages.map((page, pageIndex) => (
+        <div className="teacher-library-preview-page" key={pageIndex}>
+          <div
+            className={`teacher-library-preview-sheet is-${layout}`}
+            aria-label={`PDF 미리보기 ${pageIndex + 1}페이지`}
+          >
+            {page.map(({ item, pageIndex: itemPageIndex }, unitIndex) => {
+              const sourceIndex = pageIndex * unitsPerPage + unitIndex;
+              return (
+                <div
+                  className="teacher-library-preview-item"
+                  key={`${item.id}-${itemPageIndex}`}
+                >
+                  {item.previewUrl ? (
+                    <OptimizedImage
+                      src={item.previewUrl}
+                      alt=""
+                      sizes="160px"
+                      unoptimized={item.kind === "canva"}
+                      fit="contain"
+                    />
+                  ) : (
+                    <FileText size={20} aria-hidden="true" />
+                  )}
+                  <span className="teacher-library-preview-index">
+                    {sourceIndex + 1}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <span className="teacher-library-preview-page-number">
+            {pageIndex + 1} / {pages.length}
+          </span>
         </div>
       ))}
     </div>

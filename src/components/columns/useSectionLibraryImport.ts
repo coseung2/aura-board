@@ -10,6 +10,14 @@ type ImportResult = {
   reused?: number;
   failed?: number;
   error?: string;
+  timing?: {
+    totalMs?: number;
+    prepareMs?: number;
+    lookupMs?: number;
+    processMs?: number;
+    uniqueItems?: number;
+    concurrency?: number;
+  };
 };
 
 export function useSectionLibraryImport(sections: ColumnsSection[]) {
@@ -26,6 +34,7 @@ export function useSectionLibraryImport(sections: ColumnsSection[]) {
         variant: "info",
         message: `“${section.title}” 자료를 라이브러리에 추가하는 중입니다.`,
         duration: 120_000,
+        showAccent: false,
       });
       try {
         const response = await fetch("/api/teacher/library/import-section", {
@@ -39,6 +48,12 @@ export function useSectionLibraryImport(sections: ColumnsSection[]) {
         const created = body?.created ?? 0;
         const reused = body?.reused ?? 0;
         const failed = body?.failed ?? 0;
+        if (process.env.NODE_ENV === "development" && body?.timing) {
+          console.info(
+            "[teacher-library-import]",
+            JSON.stringify(body.timing),
+          );
+        }
         if (created === 0 && reused === 0) {
           toast.dismiss(pendingToastId);
           toast.show({
@@ -46,14 +61,16 @@ export function useSectionLibraryImport(sections: ColumnsSection[]) {
             message: failed
               ? `추가할 수 있는 자료를 찾지 못했습니다. 이미지 ${failed}개를 처리하지 못했습니다.`
               : "이 컬럼에서 추가할 이미지나 Canva 디자인을 찾지 못했습니다.",
+            showAccent: false,
           });
           return;
         }
         toast.dismiss(pendingToastId);
         toast.show({
           variant: failed ? "info" : "success",
-          message: `“${section.title}” 추가 완료 · 새 자료 ${created}개${reused ? ` · 기존 자료 ${reused}개` : ""}${failed ? ` · 실패 ${failed}개` : ""}`,
+          message: `“${section.title}” 추가 완료${created ? ` - 새 자료 ${created}개` : ""}${failed ? ` - 실패 ${failed}개` : ""}`,
           duration: failed ? 5_000 : 3_000,
+          showAccent: false,
         });
       } catch (error) {
         console.error("[handleAddToLibrary]", error);
@@ -62,6 +79,7 @@ export function useSectionLibraryImport(sections: ColumnsSection[]) {
           variant: "error",
           message: "라이브러리에 추가하지 못했습니다. 잠시 후 다시 시도해 주세요.",
           duration: 5_000,
+          showAccent: false,
         });
       } finally {
         setLibraryAddingSectionId(null);

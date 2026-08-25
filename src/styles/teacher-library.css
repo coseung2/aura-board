@@ -201,7 +201,39 @@ body:has(.teacher-library-page) .board-toolkit-menu {
 .teacher-library-item-list {
   list-style: none;
   margin: 0;
-  padding: 10px 0 0;
+  padding: 0;
+}
+
+.teacher-library-select-all {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 7px;
+  border-bottom: 1px solid #eff0f5;
+  color: #737a8c;
+  font-size: 13px;
+}
+
+.teacher-library-select-all label {
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.teacher-library-select-all input {
+  width: 18px;
+  height: 18px;
+  margin: 0 7px;
+  accent-color: #5c52d6;
+}
+
+.teacher-library-select-all > span {
+  color: #6961cd;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .teacher-library-item-list li {
@@ -242,7 +274,8 @@ body:has(.teacher-library-page) .board-toolkit-menu {
   display: grid;
   place-items: center;
   border-radius: 10px;
-  background: #eceafc;
+  padding: 3px;
+  background: #fff;
   color: #665cd1;
 }
 

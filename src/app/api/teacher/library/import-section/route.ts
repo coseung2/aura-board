@@ -33,6 +33,13 @@ export async function POST(request: Request) {
       userId: user.id,
       sectionId: parsed.data.sectionId,
     });
+    console.info("[teacher-library-import]", {
+      sectionId: parsed.data.sectionId,
+      created: result.created,
+      reused: result.reused,
+      failed: result.failed,
+      ...result.timing,
+    });
     return jsonPrivateNoStore(result);
   } catch (error) {
     if (error instanceof ForbiddenError) {

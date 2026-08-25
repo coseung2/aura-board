@@ -80,4 +80,35 @@ describe("LibraryFileBuilder", () => {
     fireEvent.click(screen.getByRole("button", { name: "재연결" }));
     expect(reconnect).toHaveBeenCalledOnce();
   });
+
+  it("shows every source page in a vertical preview sequence", () => {
+    render(
+      <LibraryFileBuilder
+        selectedItems={[
+          {
+            ...item("canva", "canva"),
+            pageCount: 3,
+            previewUrl: "/canva-name-tag.png",
+          },
+        ]}
+        filename="수업 자료"
+        layout="a4-fit"
+        busy={false}
+        canvaConnected={true}
+        error={null}
+        onFilename={vi.fn()}
+        onLayout={vi.fn()}
+        onMove={vi.fn()}
+        onRemove={vi.fn()}
+        onDownload={vi.fn()}
+        onReconnectCanva={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByLabelText(/PDF 미리보기 \d+페이지/)).toHaveLength(3);
+    expect(screen.getByText("3 / 3")).toBeInTheDocument();
+    document
+      .querySelectorAll<HTMLImageElement>(".teacher-library-preview-item img")
+      .forEach((image) => expect(image).toHaveStyle({ objectFit: "contain" }));
+  });
 });

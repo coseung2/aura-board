@@ -20,6 +20,7 @@ import type {
 
 const MAX_EXTERNAL_IMAGE_BYTES = 12 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
+const IMPORT_CONCURRENCY = 6;
 const SUPPORTED_IMAGE_MIME = new Map([
   ["image/jpeg", "jpg"],
   ["image/png", "png"],
@@ -54,6 +55,20 @@ type ImageCandidate = {
   fallbackUrl: string | null;
   mimeType: string | null;
   fileSize: number | null;
+};
+
+type CanvaCandidate = {
+  cardId: string;
+  title: string;
+  designId: string;
+  previewUrl: string | null;
+  viewUrl: string | null;
+};
+
+type ImportWorkResult = {
+  created: number;
+  reused: number;
+  failures: Array<{ cardId: string; reason: string }>;
 };
 
 export function serializeTeacherLibraryItem(
@@ -117,6 +132,7 @@ export async function importSectionIntoTeacherLibrary(args: {
   userId: string;
   sectionId: string;
 }) {
+  const startedAt = Date.now();
   const section = await db.section.findUnique({
     where: { id: args.sectionId },
     select: {
@@ -162,56 +178,101 @@ export async function importSectionIntoTeacherLibrary(args: {
     update: { updatedAt: new Date() },
   });
 
-  let created = 0;
-  let reused = 0;
-  const failures: Array<{ cardId: string; reason: string }> = [];
+  const prepareStartedAt = Date.now();
+  const preparedCards = await mapWithConcurrency(
+    section.cards,
+    IMPORT_CONCURRENCY,
+    async (card) => {
+      const designId =
+        card.canvaDesignId?.trim() ||
+        (card.linkUrl ? extractCanvaDesignId(card.linkUrl) : null) ||
+        (card.linkUrl
+          ? await resolveCanvaDesignId(card.linkUrl).catch(() => null)
+          : null);
+      return {
+        card,
+        designId,
+        postTitle: sourcePostTitle(card.title, card.content),
+        imageCandidates: collectImageCandidates(card),
+      };
+    },
+  );
 
-  for (const card of section.cards) {
-    const postTitle = sourcePostTitle(card.title, card.content);
-    const designId =
-      card.canvaDesignId?.trim() ||
-      (card.linkUrl ? extractCanvaDesignId(card.linkUrl) : null) ||
-      (card.linkUrl ? await resolveCanvaDesignId(card.linkUrl).catch(() => null) : null);
-    if (designId) {
-      const sourceKey = `canva:${designId}`;
-      const existing = await db.teacherLibraryItem.findUnique({
-        where: { userId_sourceKey: { userId: args.userId, sourceKey } },
+  const canvaGroups = new Map<string, CanvaCandidate[]>();
+  const imageGroups = new Map<string, ImageCandidate[]>();
+  for (const prepared of preparedCards) {
+    if (prepared.designId) {
+      const sourceKey = `canva:${prepared.designId}`;
+      appendGroup(canvaGroups, sourceKey, {
+        cardId: prepared.card.id,
+        title: prepared.postTitle,
+        designId: prepared.designId,
+        previewUrl: prepared.card.linkImage,
+        viewUrl: prepared.card.linkUrl,
       });
+    }
+    for (const candidate of prepared.imageCandidates) {
+      appendGroup(imageGroups, `image:${hash(candidate.url)}`, candidate);
+    }
+  }
+  const prepareMs = Date.now() - prepareStartedAt;
+
+  const lookupStartedAt = Date.now();
+  const sourceKeys = [...canvaGroups.keys(), ...imageGroups.keys()];
+  const existingRows = sourceKeys.length
+    ? await db.teacherLibraryItem.findMany({
+        where: { userId: args.userId, sourceKey: { in: sourceKeys } },
+        select: { id: true, sourceKey: true },
+      })
+    : [];
+  const existingBySourceKey = new Map(
+    existingRows.map((item) => [item.sourceKey, item] as const),
+  );
+  const lookupMs = Date.now() - lookupStartedAt;
+
+  const work: Array<() => Promise<ImportWorkResult>> = [];
+  for (const [sourceKey, candidates] of canvaGroups) {
+    work.push(async () => {
+      const candidate = candidates.at(-1)!;
+      const existing = existingBySourceKey.has(sourceKey);
       await db.teacherLibraryItem.upsert({
         where: { userId_sourceKey: { userId: args.userId, sourceKey } },
         create: {
           userId: args.userId,
           collectionId: collection.id,
           kind: "canva",
-          title: postTitle,
+          title: candidate.title,
           sourceKey,
-          previewUrl: card.linkImage,
-          canvaDesignId: designId,
-          canvaViewUrl: card.linkUrl,
+          previewUrl: candidate.previewUrl,
+          canvaDesignId: candidate.designId,
+          canvaViewUrl: candidate.viewUrl,
           sourceBoardId: section.boardId,
           sourceSectionId: section.id,
-          sourceCardId: card.id,
+          sourceCardId: candidate.cardId,
         },
         update: {
           collectionId: collection.id,
-          title: postTitle,
-          previewUrl: card.linkImage,
-          canvaViewUrl: card.linkUrl,
+          title: candidate.title,
+          previewUrl: candidate.previewUrl,
+          canvaViewUrl: candidate.viewUrl,
           sourceBoardId: section.boardId,
           sourceSectionId: section.id,
-          sourceCardId: card.id,
+          sourceCardId: candidate.cardId,
         },
       });
-      if (existing) reused += 1;
-      else created += 1;
-    }
+      return {
+        created: existing ? 0 : 1,
+        reused: existing ? candidates.length : candidates.length - 1,
+        failures: [],
+      };
+    });
+  }
 
-    const imageCandidates = collectImageCandidates(card);
-    for (const candidate of imageCandidates) {
-      const sourceKey = `image:${hash(candidate.url)}`;
-      const existing = await db.teacherLibraryItem.findUnique({
-        where: { userId_sourceKey: { userId: args.userId, sourceKey } },
-      });
+  for (const [sourceKey, candidates] of imageGroups) {
+    work.push(async () => {
+      const firstCandidate = candidates[0];
+      const lastCandidate = candidates.at(-1)!;
+      const existing = existingBySourceKey.get(sourceKey);
       if (existing) {
         await db.teacherLibraryItem.update({
           where: { id: existing.id },
@@ -219,23 +280,22 @@ export async function importSectionIntoTeacherLibrary(args: {
             collectionId: collection.id,
             sourceBoardId: section.boardId,
             sourceSectionId: section.id,
-            sourceCardId: candidate.cardId,
+            sourceCardId: lastCandidate.cardId,
           },
         });
-        reused += 1;
-        continue;
+        return { created: 0, reused: candidates.length, failures: [] };
       }
 
       let uploadedUrl: string | null = null;
       try {
-        const stored = await materializeImage(args.userId, candidate);
+        const stored = await materializeImage(args.userId, firstCandidate);
         uploadedUrl = stored.uploaded ? stored.url : null;
         await db.teacherLibraryItem.create({
           data: {
             userId: args.userId,
             collectionId: collection.id,
             kind: "image",
-            title: normalizeItemTitle(candidate.title, "이미지"),
+            title: normalizeItemTitle(firstCandidate.title, "이미지"),
             sourceKey,
             assetUrl: stored.url,
             previewUrl: stored.url,
@@ -243,21 +303,38 @@ export async function importSectionIntoTeacherLibrary(args: {
             fileSize: stored.fileSize,
             sourceBoardId: section.boardId,
             sourceSectionId: section.id,
-            sourceCardId: candidate.cardId,
+            sourceCardId: lastCandidate.cardId,
           },
         });
-        created += 1;
+        return {
+          created: 1,
+          reused: candidates.length - 1,
+          failures: [],
+        };
       } catch (error) {
         if (uploadedUrl) {
           await deletePublicObjects([uploadedUrl]).catch(() => undefined);
         }
-        failures.push({
-          cardId: candidate.cardId,
-          reason: error instanceof Error ? error.message : "image_import_failed",
-        });
+        const reason =
+          error instanceof Error ? error.message : "image_import_failed";
+        return {
+          created: 0,
+          reused: 0,
+          failures: candidates.map((candidate) => ({
+            cardId: candidate.cardId,
+            reason,
+          })),
+        };
       }
-    }
+    });
   }
+
+  const processStartedAt = Date.now();
+  const results = await runTasksWithConcurrency(work, IMPORT_CONCURRENCY);
+  const processMs = Date.now() - processStartedAt;
+  const created = results.reduce((sum, result) => sum + result.created, 0);
+  const reused = results.reduce((sum, result) => sum + result.reused, 0);
+  const failures = results.flatMap((result) => result.failures);
 
   return {
     collection: { id: collection.id, name: collection.name },
@@ -265,7 +342,48 @@ export async function importSectionIntoTeacherLibrary(args: {
     reused,
     failed: failures.length,
     failures,
+    timing: {
+      totalMs: Date.now() - startedAt,
+      prepareMs,
+      lookupMs,
+      processMs,
+      uniqueItems: work.length,
+      concurrency: IMPORT_CONCURRENCY,
+    },
   };
+}
+
+function appendGroup<T>(groups: Map<string, T[]>, key: string, value: T) {
+  const current = groups.get(key);
+  if (current) current.push(value);
+  else groups.set(key, [value]);
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  mapper: (value: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(values.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (nextIndex < values.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(values[index], index);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(concurrency, values.length) }, () => worker()),
+  );
+  return results;
+}
+
+async function runTasksWithConcurrency<T>(
+  tasks: Array<() => Promise<T>>,
+  concurrency: number,
+): Promise<T[]> {
+  return mapWithConcurrency(tasks, concurrency, (task) => task());
 }
 
 function collectImageCandidates(card: {

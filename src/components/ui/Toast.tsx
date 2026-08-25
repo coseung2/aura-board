@@ -29,6 +29,7 @@ export interface ToastInput {
   message: string;
   duration?: number;
   onClose?: () => void;
+  showAccent?: boolean;
 }
 
 interface ToastInternal extends ToastInput {
@@ -149,7 +150,7 @@ function ToastItem({ toast, onDismiss }: { toast: ToastInternal; onDismiss: () =
         borderRadius: "var(--radius-card, 12px)",
         boxShadow: "var(--shadow-card-hover, 0 12px 34px rgba(0,0,0,0.06))",
         background: "var(--color-surface, #fff)",
-        borderLeft: `3px solid ${barColor}`,
+        borderLeft: toast.showAccent === false ? "none" : `3px solid ${barColor}`,
       }}
     >
       <span style={{ flex: 1, fontSize: 14, color: "var(--color-text, #111)" }}>
