@@ -69,14 +69,22 @@ export type SupabaseStorageConfig = {
 export function getSupabaseStorageConfig(): SupabaseStorageConfig | null {
   const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const bucket = process.env.SUPABASE_STORAGE_BUCKET ?? process.env.AURA_STORAGE_BUCKET ?? DEFAULT_BUCKET;
+  const bucket = configuredPublicBucket();
 
   if (!url || !serviceRoleKey) return null;
   return { url: url.replace(/\/+$/, ""), serviceRoleKey, bucket };
 }
 
 export function getPublicStorageBucket(): string {
-  return process.env.SUPABASE_STORAGE_BUCKET ?? process.env.AURA_STORAGE_BUCKET ?? DEFAULT_BUCKET;
+  return configuredPublicBucket();
+}
+
+function configuredPublicBucket(): string {
+  return (
+    process.env.SUPABASE_STORAGE_BUCKET?.trim() ||
+    process.env.AURA_STORAGE_BUCKET?.trim() ||
+    DEFAULT_BUCKET
+  );
 }
 
 export function isSupabaseStoragePublicUrl(url: URL): boolean {
