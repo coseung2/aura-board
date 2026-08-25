@@ -16,6 +16,7 @@ case "${job}:${method}" in
   billing-renew:POST | \
   blob-cleanup:GET | \
   notification-push:GET | \
+  reading-feedback:POST | \
   attendance-reminder:GET | \
   role-salary-payout:GET | \
   play-outbox:POST) ;;
