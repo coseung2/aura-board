@@ -15,9 +15,13 @@ concurrency:
 
 jobs:
   build:
-    name: Build ${{ github.sha }} on GitHub ARM64
+    name: Build ${{ github.sha }} on Oracle ARM64
     if: github.repository == 'coseung2/aura-board' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-24.04-arm
+    runs-on:
+      - self-hosted
+      - Linux
+      - ARM64
+      - aura-board-prod
     timeout-minutes: 60
     outputs:
       artifact-id: ${{ steps.upload.outputs.artifact-id }}
