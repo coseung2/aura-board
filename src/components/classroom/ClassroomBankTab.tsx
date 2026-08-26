@@ -227,48 +227,52 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
   return (
     <section className="classroom-bank">
       {isTeacher && (
-        /* Matches the dashboard's KPI strip (classroom-dashboard-kpis) so every
-           section header reads the same (2026-07-27). */
-        <section className="classroom-dashboard-kpis" aria-label="금융 요약">
-          <article className="classroom-dashboard-kpi">
-            <span>지갑 합계</span>
-            <strong>
-              {data.totals.totalBalance.toLocaleString()} {unit}
-            </strong>
+        <section className="bank-summary-grid" aria-label="금융 요약">
+          <article className="bank-summary-card">
+            <div className="bank-summary-head">
+              <span className="bank-summary-label">지갑 합계</span>
+              <strong className="bank-summary-value">
+                {data.totals.totalBalance.toLocaleString()} {unit}
+              </strong>
+            </div>
           </article>
-          <article className="classroom-dashboard-kpi">
-            <span>적금 ({data.activeFDs.length}건)</span>
-            <strong>
-              {data.totals.activeFDTotal.toLocaleString()} {unit}
-            </strong>
+          <article className="bank-summary-card">
+            <div className="bank-summary-head">
+              <span className="bank-summary-label">
+                적금 ({data.activeFDs.length}건)
+              </span>
+              <strong className="bank-summary-value">
+                {data.totals.activeFDTotal.toLocaleString()} {unit}
+              </strong>
+            </div>
           </article>
-          <article className="classroom-dashboard-kpi">
-            <span>월 이자율</span>
-            {/* The input replaces the value line, so this cell stays the same
-                height as the other KPI cells (2026-07-27). */}
-            <div className="bank-summary-rate">
-              <input
-                className="bank-rate-input"
-                type="number"
-                step="0.1"
-                min="0"
-                max="50"
-                value={rateInput}
-                onChange={(e) => setRateInput(e.target.value)}
-                placeholder={
-                  data.currency.monthlyInterestRate === null ? "미설정" : "0.0"
-                }
-                aria-label="월 이자율"
-              />
-              <span className="bank-rate-unit">%</span>
-              <button
-                type="button"
-                className="bank-rate-save"
-                onClick={handleRateSave}
-                disabled={busy}
-              >
-                저장
-              </button>
+          <article className="bank-summary-card">
+            <div className="bank-summary-head">
+              <span className="bank-summary-label">월 이자율</span>
+              <div className="bank-summary-rate">
+                <input
+                  className="bank-rate-input"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="50"
+                  value={rateInput}
+                  onChange={(e) => setRateInput(e.target.value)}
+                  placeholder={
+                    data.currency.monthlyInterestRate === null ? "미설정" : "0.0"
+                  }
+                  aria-label="월 이자율"
+                />
+                <span className="bank-rate-unit">%</span>
+                <button
+                  type="button"
+                  className="bank-rate-save"
+                  onClick={handleRateSave}
+                  disabled={busy}
+                >
+                  저장
+                </button>
+              </div>
             </div>
           </article>
         </section>

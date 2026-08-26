@@ -2,59 +2,97 @@
 .classroom-bank {
   display: flex;
   flex-direction: column;
-  gap: 32px;
+  gap: 24px;
+  padding-top: 24px;
 }
 .bank-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0;
-  border-top: 1px solid var(--color-border);
-  border-bottom: 1px solid var(--color-border);
+  gap: 16px 24px;
 }
 .bank-summary-card {
   min-width: 0;
-  padding: 20px 24px;
+  padding: 0;
   background: transparent;
-  border-right: 1px solid var(--color-border);
 }
-.bank-summary-card:first-child {
-  padding-left: 0;
-}
-.bank-summary-card:last-child {
-  padding-right: 0;
-  border-right: 0;
+.bank-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 10px 14px;
+  border-radius: var(--radius-btn);
+  background: var(--color-surface-alt);
 }
 .bank-summary-label {
-  font-size: 12px;
-  color: var(--color-text-muted);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.4;
 }
 .bank-summary-value {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-muted);
   font-family: var(--font-display);
-  font-size: 22px;
+  font-size: 13px;
   font-weight: 700;
-  color: var(--color-text);
-  margin-top: 2px;
+  line-height: 1.4;
 }
 .bank-summary-rate {
   display: flex;
-  gap: 4px;
-  margin-top: 6px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 .bank-rate-input {
-  width: 72px;
-  padding: 4px 8px;
+  width: 64px;
+  height: 32px;
+  padding: 0 8px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-control);
-  font-size: 12px;
+  border-radius: var(--radius-btn);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+}
+.bank-rate-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+.bank-rate-unit {
+  color: var(--color-text-muted);
+  font-size: 13px;
+  font-weight: 700;
 }
 .bank-rate-save {
-  padding: 4px 10px;
-  font-size: 12px;
+  height: 32px;
+  padding: 0 12px;
+  border: 0;
   border-radius: var(--radius-btn);
-  border: 1px solid var(--color-accent);
   background: var(--color-accent);
-  color: white;
+  color: #fff;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
+}
+.bank-rate-save:hover {
+  background: var(--color-accent-active);
+}
+.bank-rate-save:disabled {
+  cursor: default;
+  opacity: 0.6;
 }
 
 .bank-action-grid {
@@ -86,22 +124,17 @@
   padding-left: 32px;
   border-left: 1px solid var(--color-border);
 }
+@media (max-width: 960px) {
+  .bank-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
 @media (max-width: 720px) {
   .bank-summary-grid {
     grid-template-columns: 1fr;
   }
   .bank-student-list {
     grid-template-columns: 1fr;
-  }
-  .bank-summary-card,
-  .bank-summary-card:first-child,
-  .bank-summary-card:last-child {
-    padding: 16px 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--color-border-subtle, var(--color-border));
-  }
-  .bank-summary-card:last-child {
-    border-bottom: 0;
   }
   .bank-student-panel,
   .bank-action-panel {
