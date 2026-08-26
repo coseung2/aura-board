@@ -68,13 +68,13 @@ jobs:
 
       - name: Verify replication endpoint installer
         shell: bash
-        run: sudo -E python3 infra/oracle/supabase-selfhost/tests/test_replication_endpoint_tools.py -v
+        run: python3 infra/oracle/supabase-selfhost/tests/test_replication_endpoint_tools.py -v
 
       - name: Verify production cutover tooling
         shell: bash
         run: |
           set -euo pipefail
-          sudo -E python3 -m unittest \
+          python3 -m unittest \
             infra.oracle.supabase-selfhost.tests.test_production_cutover_db \
             infra.oracle.tests.test_production_cutover_runtime \
             infra.oracle.tests.test_create_cutover_build_manifest \
