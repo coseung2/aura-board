@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: oracle-production-arm64
+  group: oracle-production-arm64-v2
   cancel-in-progress: false
 
 jobs:
@@ -36,6 +36,7 @@ jobs:
       NEXTAUTH_URL: https://aura-board.com
       PLAYTOKEN_JWT_SECRET: build-only-not-a-runtime-secret
       CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: "0"
 
     steps:
       - name: Checkout exact revision
