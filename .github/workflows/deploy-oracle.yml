@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: oracle-production
+  group: oracle-production-arm64
   cancel-in-progress: false
 
 jobs:
