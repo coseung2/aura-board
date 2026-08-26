@@ -101,3 +101,16 @@ export function proxiedCanvaThumbnailUrl(
     return rawUrl;
   }
 }
+
+export function canvaPageThumbnailUrl(
+  rawUrl: string,
+  page: number,
+  width: 160 | 320 | 640 = 320,
+): string {
+  const params = new URLSearchParams({
+    design: rawUrl,
+    page: String(Math.max(1, Math.floor(page))),
+    w: String(width),
+  });
+  return `/api/canva/thumbnail?${params.toString()}`;
+}

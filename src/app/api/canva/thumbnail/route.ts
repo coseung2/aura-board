@@ -35,6 +35,8 @@ export async function GET(req: Request) {
   const design = searchParams.get("design");
   let url = searchParams.get("url");
   const w = searchParams.get("w");
+  const pageValue = searchParams.get("page") ?? "1";
+  const page = Number(pageValue);
   let privateThumbnail = false;
 
   if (!url && !design) {
@@ -46,14 +48,20 @@ export async function GET(req: Request) {
       { status: 400 },
     );
   }
+  if (!Number.isInteger(page) || page < 1 || page > 100) {
+    return NextResponse.json(
+      { error: "page must be an integer between 1 and 100" },
+      { status: 400 },
+    );
+  }
 
   if (!url && design) {
-    url = await resolvePublicCanvaPageThumbnail(design);
-    if (!url) {
+    url = await resolvePublicCanvaPageThumbnail(design, page);
+    if (!url && page === 1) {
       const embed = await resolveCanvaEmbedUrl(design);
       url = normalizeResolvedThumbnailUrl(embed?.thumbnailUrl);
     }
-    if (!url) {
+    if (!url && page === 1) {
       const designId = extractCanvaDesignId(design);
       const user = await getCurrentUser().catch(() => null);
       const rateLimit = user ? await limitCanvaRead(user.id) : null;
@@ -110,7 +118,7 @@ export async function GET(req: Request) {
     });
 
     if (!upstream.ok || !upstream.body) {
-      const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed);
+      const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed, page);
       const fallbackResponse = fallbackUrl
         ? await fetchThumbnailFallback(fallbackUrl.url, w, fallbackUrl.private)
         : null;
@@ -135,7 +143,7 @@ export async function GET(req: Request) {
 
     const contentType = upstream.headers.get("content-type") ?? "image/webp";
     if (!contentType.startsWith("image/")) {
-      const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed);
+      const fallbackUrl = await resolveDesignThumbnailFromScreenUrl(parsed, page);
       const fallbackResponse = fallbackUrl
         ? await fetchThumbnailFallback(fallbackUrl.url, w, fallbackUrl.private)
         : null;
@@ -179,6 +187,7 @@ export async function GET(req: Request) {
 
 async function resolveDesignThumbnailFromScreenUrl(
   parsed: URL,
+  page: number,
 ): Promise<{ url: string; private: boolean } | null> {
   const match = parsed.pathname.match(
     /\/design\/([A-Za-z0-9_-]+)(?:\/([A-Za-z0-9_-]+))?\/screen/
@@ -188,17 +197,19 @@ async function resolveDesignThumbnailFromScreenUrl(
   const designUrl = shareToken
     ? `https://www.canva.com/design/${designId}/${shareToken}/view`
     : `https://www.canva.com/design/${designId}/view`;
-  const publicThumbnail = await resolvePublicCanvaPageThumbnail(designUrl);
+  const publicThumbnail = await resolvePublicCanvaPageThumbnail(designUrl, page);
   if (publicThumbnail) return { url: publicThumbnail, private: false };
 
-  const embed = await resolveCanvaEmbedUrl(designUrl);
-  const embedThumbnail = normalizeResolvedThumbnailUrl(embed?.thumbnailUrl);
-  if (embedThumbnail) return { url: embedThumbnail, private: false };
+  if (page === 1) {
+    const embed = await resolveCanvaEmbedUrl(designUrl);
+    const embedThumbnail = normalizeResolvedThumbnailUrl(embed?.thumbnailUrl);
+    if (embedThumbnail) return { url: embedThumbnail, private: false };
+  }
 
   const user = await getCurrentUser().catch(() => null);
   const rateLimit = user ? await limitCanvaRead(user.id) : null;
   const token = user && rateLimit?.ok ? await getAccessToken(user.id) : null;
-  if (!token) return null;
+  if (!token || page !== 1) return null;
   try {
     const info = await canvaGetDesign(token, designId);
     return info.thumbnail?.url
@@ -263,7 +274,10 @@ async function fetchThumbnailFallback(
   });
 }
 
-async function resolvePublicCanvaPageThumbnail(rawDesignUrl: string): Promise<string | null> {
+async function resolvePublicCanvaPageThumbnail(
+  rawDesignUrl: string,
+  page: number,
+): Promise<string | null> {
   const expandedUrl = await expandCanvaShortLink(rawDesignUrl);
   let pageUrl: URL;
   try {
@@ -302,11 +316,46 @@ async function resolvePublicCanvaPageThumbnail(rawDesignUrl: string): Promise<st
     }
     await reader.cancel().catch(() => undefined);
 
+    const documentImageCandidates = readCanvaThumbnailUrls(html).filter((candidate) => {
+      try {
+        const candidateUrl = new URL(candidate);
+        return (
+          candidateUrl.hostname.toLowerCase() === "media.canva.com" &&
+          candidateUrl.pathname.startsWith("/v2/document-image/")
+        );
+      } catch {
+        return false;
+      }
+    });
+    const exactPage = documentImageCandidates.find((candidate) => {
+      try {
+        return new URL(candidate).searchParams.get("page") === String(page);
+      } catch {
+        return false;
+      }
+    });
+    const firstPage = documentImageCandidates.find((candidate) => {
+      try {
+        return new URL(candidate).searchParams.get("page") === "1";
+      } catch {
+        return false;
+      }
+    });
+    const pageCandidate = exactPage ?? (page > 1 && firstPage
+      ? withDocumentImagePage(firstPage, page)
+      : null);
     const candidates = [
-      ...readCanvaThumbnailUrls(html),
-      readMetaContent(html, "og:image"),
-      readMetaContent(html, "twitter:image"),
-      readMetaContent(html, "twitter:image:src"),
+      pageCandidate,
+      ...(page === 1
+        ? [
+            readMetaContent(html, "og:image"),
+            readMetaContent(html, "twitter:image"),
+            readMetaContent(html, "twitter:image:src"),
+          ]
+        : []),
+      ...readCanvaThumbnailUrls(html).filter(
+        (candidate) => !documentImageCandidates.includes(candidate),
+      ),
     ].filter((candidate): candidate is string => Boolean(candidate));
 
     for (const candidate of candidates) {
@@ -331,13 +380,23 @@ async function resolvePublicCanvaPageThumbnail(rawDesignUrl: string): Promise<st
   }
 }
 
+function withDocumentImagePage(rawUrl: string, page: number): string | null {
+  try {
+    const url = new URL(rawUrl);
+    url.searchParams.set("page", String(page));
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
 function readCanvaThumbnailUrls(html: string): string[] {
   const normalizedHtml = decodeHtmlEntities(html)
     .replace(/\\+u0026/gi, "&")
     .replace(/\\+u003d/gi, "=")
     .replace(/\\+u002f/gi, "/")
     .replace(/\\+\//g, "/");
-  const firstPageUrls = new Set<string>();
+  const documentImageUrls = new Set<string>();
   const documentImagePattern =
     /https:\/\/media\.canva\.com\/v2\/document-image\/[^"'\\\s<>]+/gi;
   for (const match of normalizedHtml.matchAll(documentImagePattern)) {
@@ -346,9 +405,9 @@ function readCanvaThumbnailUrls(html: string): string[] {
       if (
         candidate.hostname.toLowerCase() === "media.canva.com" &&
         candidate.pathname.startsWith("/v2/document-image/") &&
-        candidate.searchParams.get("page") === "1"
+        candidate.searchParams.has("page")
       ) {
-        firstPageUrls.add(candidate.toString());
+        documentImageUrls.add(candidate.toString());
       }
     } catch {
       // Ignore malformed embedded values and continue to legacy candidates.
@@ -361,7 +420,7 @@ function readCanvaThumbnailUrls(html: string): string[] {
   for (const match of normalizedHtml.matchAll(legacyPattern)) {
     legacyUrls.add(match[0]);
   }
-  return [...firstPageUrls, ...legacyUrls];
+  return [...documentImageUrls, ...legacyUrls];
 }
 
 function readMetaContent(html: string, property: string): string | null {

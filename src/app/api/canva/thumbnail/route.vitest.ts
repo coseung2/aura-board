@@ -27,6 +27,15 @@ function requestForDesign() {
   return new Request(`https://example.test/api/canva/thumbnail?${params}`);
 }
 
+function requestForDesignPage(page: number) {
+  const params = new URLSearchParams({
+    design: designUrl,
+    page: String(page),
+    w: "320",
+  });
+  return new Request(`https://example.test/api/canva/thumbnail?${params}`);
+}
+
 function htmlResponse(html: string) {
   return new Response(html, {
     status: 200,
@@ -88,6 +97,32 @@ describe("GET /api/canva/thumbnail public design page", () => {
 
     expect(response.status).toBe(200);
     expect(String(mocks.fetch.mock.calls[1][0])).toBe(pageOne);
+  });
+
+  it("derives the requested page from Canva's page-one document image", async () => {
+    const pageOne =
+      "https://media.canva.com/v2/document-image/design.png?token=abc&page=1&width=640";
+    const pageTwo =
+      "https://media.canva.com/v2/document-image/design.png?token=abc&page=2&width=640";
+    mocks.fetch
+      .mockResolvedValueOnce(htmlResponse(`<script>${pageOne}</script>`))
+      .mockResolvedValueOnce(imageResponse());
+
+    const response = await GET(requestForDesignPage(2));
+
+    expect(response.status).toBe(200);
+    expect(String(mocks.fetch.mock.calls[1][0])).toBe(pageTwo);
+  });
+
+  it("does not repeat the first-page oEmbed thumbnail for a missing later page", async () => {
+    mocks.fetch.mockResolvedValueOnce(
+      htmlResponse("<html><head></head><body></body></html>"),
+    );
+    const response = await GET(requestForDesignPage(2));
+
+    expect(response.status).toBe(404);
+    expect(mocks.resolveCanvaEmbedUrl).not.toHaveBeenCalled();
+    expect(mocks.fetch).toHaveBeenCalledTimes(1);
   });
 
   it("does not mistake another document page for page one and keeps legacy fallback", async () => {

@@ -12,8 +12,10 @@ import {
   Scan,
   X,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
+import { canvaPageThumbnailUrl } from "@/lib/canva-url";
 import type {
   TeacherLibraryItemDto,
   TeacherLibraryPdfLayout,
@@ -32,6 +34,7 @@ type Props = {
   onRemove: (id: string) => void;
   onDownload: () => Promise<void>;
   onReconnectCanva: () => void;
+  onPageCount: (itemId: string, pageCount: number) => void;
 };
 
 export function LibraryFileBuilder({
@@ -47,11 +50,69 @@ export function LibraryFileBuilder({
   onRemove,
   onDownload,
   onReconnectCanva,
+  onPageCount,
 }: Props) {
+  const [resolvedPageCounts, setResolvedPageCounts] = useState<Record<string, number>>({});
   const needsCanva = selectedItems.some((item) => item.kind === "canva");
   const blocked = selectedItems.length === 0 || (needsCanva && !canvaConnected);
+  const canvaLookupKey = useMemo(
+    () =>
+      selectedItems
+        .filter((item) => item.kind === "canva" && item.canvaDesignId && !item.pageCount)
+        .map((item) => `${item.id}:${item.canvaDesignId}`)
+        .join("|"),
+    [selectedItems],
+  );
+
+  useEffect(() => {
+    const unresolved = selectedItems.filter(
+      (item) => item.kind === "canva" && item.canvaDesignId && !item.pageCount,
+    );
+    if (unresolved.length === 0) return;
+    let cancelled = false;
+
+    async function loadPageCounts() {
+      const results = await Promise.all(
+        unresolved.map(async (item) => {
+          try {
+            const response = await fetch(
+              `/api/canva/design/${encodeURIComponent(item.canvaDesignId!)}`,
+              { cache: "no-store" },
+            );
+            if (!response.ok) return null;
+            const body = (await response.json()) as {
+              design?: { pageCount?: number };
+            };
+            const pageCount = body.design?.pageCount;
+            if (typeof pageCount !== "number" || !Number.isInteger(pageCount) || pageCount < 1) {
+              return null;
+            }
+            return { id: item.id, pageCount };
+          } catch {
+            return null;
+          }
+        }),
+      );
+      if (cancelled) return;
+      for (const result of results) {
+        if (!result) continue;
+        setResolvedPageCounts((current) => ({ ...current, [result.id]: result.pageCount }));
+        onPageCount(result.id, result.pageCount);
+      }
+    }
+
+    void loadPageCounts();
+    return () => {
+      cancelled = true;
+    };
+    // The key changes only when a new unresolved Canva item is selected.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canvaLookupKey]);
+
+  const pageCountForItem = (item: TeacherLibraryItemDto) =>
+    Math.max(1, resolvedPageCounts[item.id] ?? item.pageCount ?? 1);
   const sourcePageCount = selectedItems.reduce(
-    (sum, item) => sum + Math.max(1, item.pageCount ?? 1),
+    (sum, item) => sum + pageCountForItem(item),
     0,
   );
 
@@ -147,7 +208,11 @@ export function LibraryFileBuilder({
           <strong id="teacher-library-preview-title">미리보기</strong>
           <span>원본 {sourcePageCount}페이지</span>
         </div>
-        <PdfLayoutPreview items={selectedItems} layout={layout} />
+        <PdfLayoutPreview
+          items={selectedItems}
+          layout={layout}
+          pageCountForItem={pageCountForItem}
+        />
       </section>
 
       {needsCanva && !canvaConnected ? (
@@ -216,12 +281,14 @@ const PDF_LAYOUT_OPTIONS: Array<{
 function PdfLayoutPreview({
   items,
   layout,
+  pageCountForItem,
 }: {
   items: TeacherLibraryItemDto[];
   layout: TeacherLibraryPdfLayout;
+  pageCountForItem: (item: TeacherLibraryItemDto) => number;
 }) {
   const previewUnits = items.flatMap((item) =>
-    Array.from({ length: Math.max(1, item.pageCount ?? 1) }, (_, pageIndex) => ({
+    Array.from({ length: pageCountForItem(item) }, (_, pageIndex) => ({
       item,
       pageIndex,
     })),
@@ -252,9 +319,9 @@ function PdfLayoutPreview({
                   className="teacher-library-preview-item"
                   key={`${item.id}-${itemPageIndex}`}
                 >
-                  {item.previewUrl ? (
+                  {previewUrlForPage(item, itemPageIndex) ? (
                     <OptimizedImage
-                      src={item.previewUrl}
+                      src={previewUrlForPage(item, itemPageIndex)!}
                       alt=""
                       sizes="160px"
                       unoptimized={item.kind === "canva"}
@@ -277,4 +344,16 @@ function PdfLayoutPreview({
       ))}
     </div>
   );
+}
+
+function previewUrlForPage(
+  item: TeacherLibraryItemDto,
+  pageIndex: number,
+): string | null {
+  if (item.kind !== "canva" || !item.canvaDesignId) return item.previewUrl;
+  if (pageIndex === 0 && item.previewUrl) return item.previewUrl;
+
+  const designUrl =
+    item.canvaViewUrl ?? `https://www.canva.com/design/${item.canvaDesignId}/view`;
+  return canvaPageThumbnailUrl(designUrl, pageIndex + 1, 320);
 }

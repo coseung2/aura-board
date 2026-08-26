@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
 import type {
@@ -45,6 +45,12 @@ export function TeacherLibraryWorkspace({
   const selectedItems = selectedIds
     .map((id) => itemById.get(id))
     .filter((item): item is TeacherLibraryItemDto => Boolean(item));
+
+  const onPageCount = useCallback((itemId: string, pageCount: number) => {
+    setItems((current) =>
+      current.map((item) => (item.id === itemId ? { ...item, pageCount } : item)),
+    );
+  }, []);
 
   function toggle(id: string) {
     setSelectedIds((current) =>
@@ -185,6 +191,7 @@ export function TeacherLibraryWorkspace({
           onMove={moveSelected}
           onRemove={toggle}
           onDownload={download}
+          onPageCount={onPageCount}
           onReconnectCanva={() => {
             window.location.href = buildCanvaConnectUrl();
           }}

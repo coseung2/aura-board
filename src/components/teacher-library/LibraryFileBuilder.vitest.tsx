@@ -46,6 +46,7 @@ describe("LibraryFileBuilder", () => {
         onRemove={vi.fn()}
         onDownload={vi.fn()}
         onReconnectCanva={vi.fn()}
+        onPageCount={vi.fn()}
       />,
     );
 
@@ -73,6 +74,7 @@ describe("LibraryFileBuilder", () => {
         onRemove={vi.fn()}
         onDownload={vi.fn()}
         onReconnectCanva={reconnect}
+        onPageCount={vi.fn()}
       />,
     );
 
@@ -102,6 +104,7 @@ describe("LibraryFileBuilder", () => {
         onRemove={vi.fn()}
         onDownload={vi.fn()}
         onReconnectCanva={vi.fn()}
+        onPageCount={vi.fn()}
       />,
     );
 
@@ -110,5 +113,38 @@ describe("LibraryFileBuilder", () => {
     document
       .querySelectorAll<HTMLImageElement>(".teacher-library-preview-item img")
       .forEach((image) => expect(image).toHaveStyle({ objectFit: "contain" }));
+  });
+
+  it("uses a different page thumbnail for each page of each Canva design", () => {
+    const items = ["one", "two", "three"].map((id) => ({
+      ...item(id, "canva"),
+      pageCount: 3,
+      previewUrl: `/canva-${id}-page-1.png`,
+      canvaViewUrl: `https://www.canva.com/design/${id}/view`,
+    }));
+    render(
+      <LibraryFileBuilder
+        selectedItems={items}
+        filename="자료"
+        layout="a4-fit"
+        busy={false}
+        canvaConnected={true}
+        error={null}
+        onFilename={vi.fn()}
+        onLayout={vi.fn()}
+        onMove={vi.fn()}
+        onRemove={vi.fn()}
+        onDownload={vi.fn()}
+        onReconnectCanva={vi.fn()}
+        onPageCount={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByLabelText(/PDF 미리보기 \d+페이지/)).toHaveLength(9);
+    const thumbnails = Array.from(
+      document.querySelectorAll<HTMLImageElement>(".teacher-library-preview-item img"),
+    ).map((image) => image.getAttribute("src") ?? "");
+    expect(thumbnails.filter((src) => src.includes("page=2"))).toHaveLength(3);
+    expect(thumbnails.filter((src) => src.includes("page=3"))).toHaveLength(3);
   });
 });
