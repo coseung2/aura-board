@@ -7,7 +7,8 @@ import {
 } from "./mobile-update-policy";
 
 const policyInput = {
-  latestVersion: "2.4.0",
+  androidLatestVersion: "2.4.0",
+  iosLatestVersion: "2.4.0",
   minimumSupportedVersion: "2.0.0",
   message: "새 버전에서 더 안정적으로 사용할 수 있어요.",
   storeUrls: {
@@ -30,7 +31,12 @@ describe("mobile update policy", () => {
   });
 
   it("rejects malformed policies so callers can fail open", () => {
-    expect(parseMobileVersionPolicy({ ...policyInput, latestVersion: "latest" })).toBeNull();
+    expect(
+      parseMobileVersionPolicy({
+        ...policyInput,
+        androidLatestVersion: "latest",
+      }),
+    ).toBeNull();
     expect(
       parseMobileVersionPolicy({
         ...policyInput,

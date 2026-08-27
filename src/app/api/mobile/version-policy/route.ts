@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-const DEFAULT_LATEST_VERSION = "1.0.8";
 const DEFAULT_MINIMUM_VERSION = "1.0.4";
 const DEFAULT_MESSAGE = "안정성 개선";
 const DEFAULT_ANDROID_STORE_URL =
@@ -41,20 +40,25 @@ export function getMobileVersionPolicy() {
     process.env.MOBILE_MINIMUM_SUPPORTED_VERSION,
     DEFAULT_MINIMUM_VERSION,
   );
-  const configuredLatestVersion = validVersion(
-    process.env.MOBILE_LATEST_VERSION,
-    process.env.MOBILE_LATEST_VERSION === undefined
-      ? DEFAULT_LATEST_VERSION
-      : minimumSupportedVersion,
-  );
-  const latestVersion =
-    compareVersions(configuredLatestVersion, minimumSupportedVersion) >= 0
-      ? configuredLatestVersion
+  // Keep each store's release state independent. An unset value intentionally
+  // means "no optional update" until that platform's review and release are
+  // complete. The legacy variable remains a compatibility fallback for both
+  // platforms during the migration.
+  const legacyLatestVersion = process.env.MOBILE_LATEST_VERSION;
+  const configuredLatestVersion = (platform: "ANDROID" | "IOS") => {
+    const configured = validVersion(
+      process.env[`MOBILE_${platform}_LATEST_VERSION`] ?? legacyLatestVersion,
+      minimumSupportedVersion,
+    );
+    return compareVersions(configured, minimumSupportedVersion) >= 0
+      ? configured
       : minimumSupportedVersion;
+  };
   const configuredMessage = process.env.MOBILE_UPDATE_MESSAGE?.trim();
 
   return {
-    latestVersion,
+    androidLatestVersion: configuredLatestVersion("ANDROID"),
+    iosLatestVersion: configuredLatestVersion("IOS"),
     minimumSupportedVersion,
     message: configuredMessage || DEFAULT_MESSAGE,
     storeUrls: {

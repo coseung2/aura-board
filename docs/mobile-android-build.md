@@ -141,14 +141,18 @@ Get-FileHash -Algorithm SHA256 -LiteralPath "<artifact>"
 ## Mobile Version Policy
 
 The mobile app checks `GET /api/mobile/version-policy` at launch and whenever
-the app returns to the foreground. A version below `MOBILE_LATEST_VERSION`
-gets an optional update prompt. A version below
+the app returns to the foreground. A version below the platform-specific
+`MOBILE_ANDROID_LATEST_VERSION` or `MOBILE_IOS_LATEST_VERSION` gets an optional
+update prompt. Leave those variables unset until the matching mobile build has
+passed store review and is publicly available; when unset, the API does not
+advertise a newer optional version. A version below
 `MOBILE_MINIMUM_SUPPORTED_VERSION` gets a blocking update prompt.
 
-Configure the deployed web/API environment when releasing a mobile version:
+Configure the deployed web/API environment only after releasing a mobile version:
 
 ```text
-MOBILE_LATEST_VERSION=1.0.8
+MOBILE_ANDROID_LATEST_VERSION=1.0.8
+MOBILE_IOS_LATEST_VERSION=1.0.8
 MOBILE_MINIMUM_SUPPORTED_VERSION=1.0.4
 MOBILE_UPDATE_MESSAGE=더 안정적인 Aura Board를 사용하려면 최신 버전으로 업데이트해 주세요.
 MOBILE_ANDROID_STORE_URL=https://play.google.com/store/apps/details?id=com.auraboard.app

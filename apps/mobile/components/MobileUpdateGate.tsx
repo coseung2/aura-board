@@ -45,7 +45,10 @@ export function MobileUpdateGate({ children }: { children: ReactNode }) {
 
     const applyPolicy = (policy: MobileVersionPolicy) => {
       if (!mounted) return;
-      const kind = getMobileUpdateKind(installedVersion, policy);
+      const platformLatestVersion =
+        Platform.OS === "ios" ? policy.iosLatestVersion : policy.androidLatestVersion;
+      const platformPolicy = { ...policy, latestVersion: platformLatestVersion };
+      const kind = getMobileUpdateKind(installedVersion, platformPolicy);
       if (!kind) {
         setPrompt(null);
         return;
@@ -54,7 +57,7 @@ export function MobileUpdateGate({ children }: { children: ReactNode }) {
         if (optionalPromptShownRef.current) return;
         optionalPromptShownRef.current = true;
       }
-      setPrompt({ kind, policy });
+      setPrompt({ kind, policy: platformPolicy });
     };
 
     const checkPolicy = () => {

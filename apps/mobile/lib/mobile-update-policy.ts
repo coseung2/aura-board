@@ -1,4 +1,7 @@
 export type MobileVersionPolicy = {
+  androidLatestVersion: string;
+  iosLatestVersion: string;
+  /** Platform-selected latest version used by the shared comparison helper. */
   latestVersion: string;
   minimumSupportedVersion: string;
   message: string;
@@ -74,29 +77,35 @@ export function parseMobileVersionPolicy(
 ): MobileVersionPolicy | null {
   if (!isRecord(value) || !isRecord(value.storeUrls)) return null;
 
-  const latestVersion = nonEmptyString(value.latestVersion);
+  const androidLatestVersion = nonEmptyString(value.androidLatestVersion);
+  const iosLatestVersion = nonEmptyString(value.iosLatestVersion);
   const minimumSupportedVersion = nonEmptyString(value.minimumSupportedVersion);
   const message = nonEmptyString(value.message);
   const android = nonEmptyString(value.storeUrls.android);
   const ios = nonEmptyString(value.storeUrls.ios);
 
   if (
-    !latestVersion ||
+    !androidLatestVersion ||
+    !iosLatestVersion ||
     !minimumSupportedVersion ||
     !message ||
     !android ||
     !ios ||
-    !versionSegments(latestVersion) ||
+    !versionSegments(androidLatestVersion) ||
+    !versionSegments(iosLatestVersion) ||
     !versionSegments(minimumSupportedVersion) ||
     !isStoreUrl(android) ||
     !isStoreUrl(ios) ||
-    compareVersions(minimumSupportedVersion, latestVersion) > 0
+    compareVersions(minimumSupportedVersion, androidLatestVersion) > 0 ||
+    compareVersions(minimumSupportedVersion, iosLatestVersion) > 0
   ) {
     return null;
   }
 
   return {
-    latestVersion,
+    androidLatestVersion,
+    iosLatestVersion,
+    latestVersion: androidLatestVersion,
     minimumSupportedVersion,
     message,
     storeUrls: { android, ios },

@@ -9,6 +9,7 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useRouter, type Href } from "expo-router";
+import Constants from "expo-constants";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { apiFetch, ApiError } from "../../lib/api";
@@ -322,6 +323,10 @@ export default function StudentMoreScreen() {
           </AppButton>
         </View>
 
+        <Text style={styles.appVersion} selectable>
+          앱 버전 v{Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? "개발"}
+        </Text>
+
       </ScrollView>
     </SafeAreaView>
   );
@@ -375,6 +380,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   mutedText: { ...typography.body, color: colors.textMuted },
+  appVersion: { ...typography.micro, color: colors.textFaint, textAlign: "center" },
   saveError: { ...typography.micro, color: colors.danger },
   settingList: { gap: spacing.none },
   settingRow: {

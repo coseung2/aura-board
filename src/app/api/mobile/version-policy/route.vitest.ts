@@ -12,7 +12,8 @@ describe("GET /api/mobile/version-policy", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toContain("s-maxage=300");
     await expect(response.json()).resolves.toEqual({
-      latestVersion: "1.0.8",
+      androidLatestVersion: "1.0.4",
+      iosLatestVersion: "1.0.4",
       minimumSupportedVersion: "1.0.4",
       message: "안정성 개선",
       storeUrls: {
@@ -36,7 +37,8 @@ describe("GET /api/mobile/version-policy", () => {
     const response = await GET();
 
     await expect(response.json()).resolves.toEqual({
-      latestVersion: "2.4.0",
+      androidLatestVersion: "2.4.0",
+      iosLatestVersion: "2.4.0",
       minimumSupportedVersion: "2.4.0",
       message: "새 버전으로 업데이트해 주세요.",
       storeUrls: {
@@ -54,6 +56,7 @@ describe("GET /api/mobile/version-policy", () => {
     const body = await response.json();
 
     expect(body.minimumSupportedVersion).toBe("1.0.4");
-    expect(body.latestVersion).toBe("1.0.4");
+    expect(body.androidLatestVersion).toBe("1.0.4");
+    expect(body.iosLatestVersion).toBe("1.0.4");
   });
 });

@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { useRouter } from "expo-router";
+import Constants from "expo-constants";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { ParentBottomNav } from "../../components/parent-bottom-nav";
 import {
@@ -218,6 +219,9 @@ export default function ParentAccountScreen() {
             <Text selectable style={styles.error}>{actionError}</Text>
           ) : null}
         </View>
+        <Text style={styles.appVersion} selectable>
+          앱 버전 v{Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? "개발"}
+        </Text>
       </ScrollView>
       <ParentBottomNav
         active="account"
@@ -254,4 +258,5 @@ const styles = StyleSheet.create({
   flatAction: { borderRadius: radii.none, boxShadow: "none" },
   flatSurface: { backgroundColor: colors.transparent, borderWidth: borders.none, borderRadius: radii.none, boxShadow: "none" },
   error: { ...typography.body, color: colors.danger, textAlign: "center" },
+  appVersion: { ...typography.micro, color: colors.textFaint, textAlign: "center", marginTop: spacing.md },
 });
