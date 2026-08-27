@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { buildStudentQrLoginUrl, isLoopbackAppOrigin } from "@/lib/student-qr-url";
 
 type Student = {
   id: string;
@@ -13,6 +14,7 @@ type Student = {
 type Props = {
   students: Student[];
   classroomName: string;
+  studentQrOrigin: string;
 };
 
 /** Render Korean text to a data URL via canvas (jsPDF can't render Korean natively) */
@@ -32,12 +34,18 @@ function textToImage(text: string, fontSize: number, maxWidth: number): string {
   return canvas.toDataURL("image/png");
 }
 
-export function QRPrintSheet({ students, classroomName }: Props) {
+export function QRPrintSheet({ students, classroomName, studentQrOrigin }: Props) {
   const [generating, setGenerating] = useState(false);
 
   async function handlePrint() {
     if (students.length === 0) {
       alert("출력할 학생이 없습니다.");
+      return;
+    }
+    if (isLoopbackAppOrigin(studentQrOrigin)) {
+      alert(
+        "localhost 주소는 학생 기기에서 열 수 없습니다. 공개 주소나 같은 네트워크의 접속 주소로 연 뒤 QR 카드를 출력해 주세요.",
+      );
       return;
     }
 
@@ -63,7 +71,7 @@ export function QRPrintSheet({ students, classroomName }: Props) {
       // Generate all QR data URLs
       const qrDataUrls = await Promise.all(
         students.map((s) => {
-          const url = `${window.location.origin}/qr/${s.qrToken}`;
+          const url = buildStudentQrLoginUrl(studentQrOrigin, s.qrToken);
           return QRCode.toDataURL(url, { width: 200, margin: 1 });
         })
       );

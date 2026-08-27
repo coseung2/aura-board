@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { buildStudentQrLoginUrl } from "@/lib/student-qr-url";
 
 type Props = {
   student: {
@@ -9,16 +10,17 @@ type Props = {
     qrToken: string;
     textCode: string;
   };
+  studentQrOrigin: string;
   size?: number;
 };
 
-export function StudentQRCard({ student, size = 160 }: Props) {
+export function StudentQRCard({ student, studentQrOrigin, size = 160 }: Props) {
   const [qrSrc, setQrSrc] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     import("qrcode").then((QRCode) => {
-      const url = `${window.location.origin}/qr/${student.qrToken}`;
+      const url = buildStudentQrLoginUrl(studentQrOrigin, student.qrToken);
       QRCode.toDataURL(url, { width: size, margin: 2 }).then((dataUrl) => {
         if (!cancelled) setQrSrc(dataUrl);
       });
@@ -26,7 +28,7 @@ export function StudentQRCard({ student, size = 160 }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [student.qrToken, size]);
+  }, [student.qrToken, studentQrOrigin, size]);
 
   return (
     <div className="student-qr-card">

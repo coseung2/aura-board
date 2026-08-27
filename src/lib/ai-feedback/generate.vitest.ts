@@ -34,7 +34,7 @@ describe("feature-selected feedback models", () => {
     const body = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body));
     expect(body).toMatchObject({
       model: "gpt-5.6-terra",
-      max_completion_tokens: 1024,
+      max_completion_tokens: 4096,
     });
     expect(body).not.toHaveProperty("max_tokens");
   });

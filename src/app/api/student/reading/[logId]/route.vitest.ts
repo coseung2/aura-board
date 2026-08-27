@@ -30,7 +30,7 @@ const baseLog = () => ({
   aiFeedback: "좋은 감상이에요", aiFeedbackStatus: "generated", aiFeedbackModel: "gemma",
   aiFeedbackError: null, evaluatedAt: new Date("2026-08-20T00:00:00Z"),
   missionCounted: true, missionCountedAt: new Date("2026-08-20T01:00:00Z"),
-  currentRevision: 1, createdAt: new Date("2026-08-20T00:00:00Z"), updatedAt: new Date("2026-08-20T00:00:00Z"),
+  currentRevision: 1, createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), updatedAt: new Date(),
 });
 
 function request(body: unknown) {

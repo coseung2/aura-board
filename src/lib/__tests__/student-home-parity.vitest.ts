@@ -59,6 +59,7 @@ describe("student mobile navigation parity", () => {
       "more",
     ]);
     expect(studentOptionalNavTargets.map((target) => target.id)).toEqual([
+      "feed",
       "portfolio",
       "wallet",
       "notifications",

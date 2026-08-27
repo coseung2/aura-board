@@ -32,12 +32,13 @@ type Props = {
     students: Student[];
     boards: Board[];
   };
+  studentQrOrigin: string;
 };
 
 // Tab navigation moved into the shared teacher <TopNav />. 학부모 연결/공유된 보드
 // = 각자 페이지로 이동. 설정 = 학급명 옆 톱니바퀴 → 모달. (2026-04-21)
 
-export function ClassroomDetail({ classroom }: Props) {
+export function ClassroomDetail({ classroom, studentQrOrigin }: Props) {
   const router = useRouter();
   const [students, setStudents] = useState(classroom.students);
   const [showAddStudents, setShowAddStudents] = useState(false);
@@ -419,7 +420,11 @@ export function ClassroomDetail({ classroom }: Props) {
             {deleting ? "삭제 중..." : `${selected.size}명 삭제`}
           </button>
         )}
-        <QRPrintSheet students={students} classroomName={classroomName} />
+        <QRPrintSheet
+          students={students}
+          classroomName={classroomName}
+          studentQrOrigin={studentQrOrigin}
+        />
         <a
           href={`/classroom/${classroom.id}/parent-access`}
           className="classroom-action-btn"
@@ -476,6 +481,7 @@ export function ClassroomDetail({ classroom }: Props) {
                 <StudentRow
                   key={s.id}
                   student={s}
+                  studentQrOrigin={studentQrOrigin}
                   classroomId={classroom.id}
                   parentCount={parentCounts[s.id] ?? 0}
                   roleKey={studentRoleKey[s.id] ?? ""}

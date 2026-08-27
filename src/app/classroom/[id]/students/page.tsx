@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { ClassroomDetail } from "@/components/ClassroomDetail";
+import { publicAppOriginFromHeaders } from "@/lib/public-app-origin";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 
 type Props = {
@@ -9,7 +11,7 @@ type Props = {
 
 export default async function ClassroomStudentsPage({ params }: Props) {
   const { id } = await params;
-  const user = await getCurrentUser();
+  const [user, requestHeaders] = await Promise.all([getCurrentUser(), headers()]);
 
   const classroom = await db.classroom.findUnique({
     where: { id },
@@ -49,7 +51,10 @@ export default async function ClassroomStudentsPage({ params }: Props) {
       <a href="/classroom" className="classroom-back-link">
         &larr; 학급 목록
       </a>
-      <ClassroomDetail classroom={serialized} />
+      <ClassroomDetail
+        classroom={serialized}
+        studentQrOrigin={publicAppOriginFromHeaders(requestHeaders)}
+      />
     </main>
   );
 }

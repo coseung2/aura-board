@@ -16,7 +16,16 @@ export default defineConfig({
       // `import "server-only"` is a Next.js guard; vitest runs outside the
       // Next bundler so we point it at a no-op module.
       "server-only": path.resolve(__dirname, "./test/stubs/server-only.ts"),
+      // Auth.js imports this extensionless entrypoint. Vite's native config
+      // loader follows Node ESM resolution, while Next's own bundler resolves
+      // it to server.js. Keep the unit-test resolver aligned with production.
+      "next/server": path.resolve(__dirname, "./node_modules/next/server.js"),
     },
+  },
+  ssr: {
+    // Keep Auth.js inside Vite's resolver so the `next/server` alias above
+    // also applies to its extensionless ESM import.
+    noExternal: ["next-auth"],
   },
   test: {
     environment: "jsdom",

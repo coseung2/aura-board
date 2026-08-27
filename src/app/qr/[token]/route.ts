@@ -12,6 +12,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { db } from "@/lib/db";
+import { requestPublicAppOrigin } from "@/lib/public-app-origin";
 import { createStudentSession } from "@/lib/student-auth";
 
 export const runtime = "nodejs";
@@ -63,6 +64,7 @@ export async function GET(
   const { token } = await params;
 
   const requestUrl = new URL(_req.url);
+  const publicOrigin = requestPublicAppOrigin(_req);
   const next = resolveSafeNext(requestUrl.searchParams.get("next"));
 
   const student = await db.student.findUnique({
@@ -72,7 +74,7 @@ export async function GET(
 
   if (!student) {
     const response = NextResponse.redirect(
-      new URL("/qr/invalid", _req.url),
+      new URL("/qr/invalid", publicOrigin),
       { status: 302 }
     );
     response.headers.set("Cache-Control", "private, no-store, max-age=0");
@@ -80,7 +82,7 @@ export async function GET(
   }
 
   await createStudentSession(student.id, student.classroomId);
-  const response = NextResponse.redirect(new URL(next ?? DEFAULT_NEXT, _req.url), {
+  const response = NextResponse.redirect(new URL(next ?? DEFAULT_NEXT, publicOrigin), {
     status: 302,
   });
   const cookieStore = await cookies();

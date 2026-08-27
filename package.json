@@ -42,7 +42,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.102.0",
-    "@auth/prisma-adapter": "^2.11.1",
+    "@auth/prisma-adapter": "^2.11.3",
     "@fontsource/noto-sans-kr": "^5.2.9",
     "@monaco-editor/react": "^4.7.0",
     "@prisma/client": "^6.0.0",
@@ -60,8 +60,8 @@
     "jspdf": "^4.2.1",
     "lucide-react": "^1.25.0",
     "maplibre-gl": "^5.24.0",
-    "next": "^16.2.7",
-    "next-auth": "^5.0.0-beta.30",
+    "next": "^16.3.3",
+    "next-auth": "^5.0.0-beta.32",
     "pdf-lib": "^1.17.1",
     "pdf-parse": "^2.4.5",
     "perfect-freehand": "^1.2.3",
@@ -72,7 +72,7 @@
     "read-excel-file": "^9.1.1",
     "resend": "^6.12.4",
     "server-only": "^0.0.1",
-    "sharp": "^0.34.5",
+    "sharp": "^0.35.4",
     "zod": "^4.0.0"
   },
   "devDependencies": {
@@ -83,15 +83,18 @@
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@vitejs/plugin-react": "^6.0.1",
-    "jsdom": "^29.0.2",
+    "@vitejs/plugin-react": "^6.1.0",
+    "jsdom": "^29.1.1",
     "prisma": "^6.0.0",
-    "tsx": "^4.0.0",
+    "tsx": "^4.23.12",
     "typescript": "^5.0.0",
-    "vitest": "^4.1.4"
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   },
   "overrides": {
-    "dompurify": "^3.4.12",
-    "postcss": "^8.5.15"
+    "deepmerge-ts": "^8.0.2",
+    "dompurify": "^3.4.14",
+    "postcss": "^8.5.26",
+    "undici": "^7.29.0"
   }
 }

@@ -46,6 +46,22 @@ creating overlapping testing-notes documents.
 - Inspect production data shape when the symptom is data-dependent.
 - Re-test the exact route, board, classroom, or student flow named by the user.
 
+### Student QR login behind Oracle nginx
+
+- Simulate the standalone request URL as `http://localhost:3000/qr/<token>` with
+  `X-Forwarded-Proto: https` and `X-Forwarded-Host: aura-board.com`; confirm the
+  response is `302` with `Location: https://aura-board.com/student` (or the
+  accepted safe internal `next` path), never a loopback URL.
+- Confirm an invalid QR token redirects to
+  `https://aura-board.com/qr/invalid`, and external, protocol-relative, login,
+  and API `next` targets still fall back to `/student`.
+- Confirm direct local development requests retain their local HTTP origin,
+  while printable QR cards refuse a loopback origin and allow a LAN origin for
+  physical-device testing.
+- After deployment, scan one current student QR on a physical device and verify
+  the browser remains on `https://aura-board.com`, the student session is set,
+  and `/student` loads without another login prompt.
+
 ### Canva card thumbnails
 
 - Test the design-page `media.canva.com ... page=1` path, the oEmbed

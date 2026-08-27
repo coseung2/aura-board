@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   rankAward: vi.fn(),
   queryRaw: vi.fn(),
   deposits: [] as Array<{ sourceRef: string; accountId: string }>,
-  logs: [{ createdAt: new Date("2026-07-20T03:00:00.000Z"), reflection: "감상" }],
+  logs: [{ createdAt: new Date("2026-07-20T03:00:00.000Z"), reflection: "감상", missionCounted: true }],
 }));
 
 vi.mock("@/lib/student-auth", () => ({
