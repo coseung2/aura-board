@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { Ban, CircleAlert, Pencil, Trash2 } from "lucide-react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { BoardCard } from "../lib/types";
 import { resolveCardAuthorName } from "../lib/card-privacy";
 import { apiFetch } from "../lib/api";
@@ -56,26 +57,29 @@ export function PostModerationOverlay({
   onDeleted,
 }: Props) {
   const window = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
   const author = resolveCardAuthorName(card) || "작성자";
   const preview = mediaPreviewUrls(buildMediaItems(card))[0] ?? null;
   const width = Math.min(anchor.width, window.width - SCREEN_MARGIN * 2);
+  const safeTop = insets.top + SCREEN_MARGIN;
+  const safeBottom = window.height - insets.bottom - SCREEN_MARGIN;
+  const safeHeight = Math.max(0, safeBottom - safeTop);
   const maxFocusHeight = Math.max(
     tapMin * 2,
-    window.height - SCREEN_MARGIN * 2 - ACTION_PANEL_HEIGHT - spacing.sm,
+    safeHeight - ACTION_PANEL_HEIGHT - spacing.sm,
   );
   const focusHeight = Math.min(anchor.height, maxFocusHeight);
   const left = Math.max(
     SCREEN_MARGIN,
     Math.min(anchor.x, window.width - width - SCREEN_MARGIN),
   );
-  const maxTop =
-    window.height -
-    SCREEN_MARGIN -
-    ACTION_PANEL_HEIGHT -
-    spacing.sm -
-    focusHeight;
-  const top = Math.max(SCREEN_MARGIN, Math.min(anchor.y, maxTop));
+  const focusedContentHeight =
+    focusHeight + ACTION_PANEL_HEIGHT + spacing.sm;
+  const top = Math.max(
+    safeTop,
+    safeTop + (safeHeight - focusedContentHeight) / 2,
+  );
   const authorStudentId =
     card.studentAuthorId ??
     card.authors?.find((item) => Boolean(item.studentId))?.studentId ??
