@@ -52,12 +52,6 @@
   }
 }
 
-@media (max-width: 900px) {
-  .inlineShop .shopList {
-    grid-template-columns: 1fr;
-  }
-}
-
 @media (max-width: 560px) {
   .header,
   .sectionHeading {
@@ -123,7 +117,7 @@
   }
 
   .shopList {
-    grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(192px, 100%), 1fr));
     gap: 12px;
   }
 

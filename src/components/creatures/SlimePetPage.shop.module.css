@@ -139,7 +139,7 @@
 }
 
 .inlineShop .shopList {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(192px, 100%), 1fr));
   gap: 16px;
 }
 
@@ -381,7 +381,9 @@
 
 .shopList {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  /* Keep the 192px pet preview intact and let the panel width decide how
+     many columns fit after tablet orientation changes. */
+  grid-template-columns: repeat(auto-fit, minmax(min(192px, 100%), 1fr));
   gap: 16px;
   margin-top: 18px;
 }
