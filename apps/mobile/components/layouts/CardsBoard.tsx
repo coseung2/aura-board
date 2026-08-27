@@ -10,6 +10,7 @@ import {
 } from "../../theme/tokens";
 import { CardComposer } from "../CardComposer";
 import { CardAuthorBottomSheet } from "../CardAuthorBottomSheet";
+import { CardEditModal } from "../CardEditModal";
 import { CommentBottomSheet } from "../CommentBottomSheet";
 import {
   PostModerationOverlay,
@@ -44,7 +45,9 @@ export function CardsBoard({
   const [moderationTarget, setModerationTarget] = useState<{
     card: BoardCard;
     anchor: PostAnchor;
+    owner: boolean;
   } | null>(null);
+  const [editingCard, setEditingCard] = useState<BoardCard | null>(null);
   // 서버 정렬이 order asc 로 바뀌었지만 클라이언트에서 한번 더 안정화한다.
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(sortCards(data.cards), data.board),
@@ -89,9 +92,12 @@ export function CardsBoard({
               item.canEdit === true ? () => setAuthorCard(item) : undefined
             }
             onLongPress={
-              item.isMine === true
-                ? undefined
-                : (anchor) => setModerationTarget({ card: item, anchor })
+              item.isMine === true &&
+              (item.canEdit === true || item.canDelete === true)
+                ? (anchor) =>
+                    setModerationTarget({ card: item, anchor, owner: true })
+                : (anchor) =>
+                    setModerationTarget({ card: item, anchor, owner: false })
             }
           />
         )}
@@ -130,6 +136,36 @@ export function CardsBoard({
           );
         }}
       />
+      <CardEditModal
+        card={editingCard}
+        visible={editingCard !== null}
+        onClose={() => setEditingCard(null)}
+        onSaved={(updated) => {
+          setCards((current) =>
+            current.map((card) =>
+              card.id === updated.id
+                ? withBoardAnonymousAuthor(
+                    {
+                      ...card,
+                      ...updated,
+                      isMine: card.isMine,
+                      canEdit: card.canEdit,
+                      canDelete: card.canDelete,
+                    },
+                    data.board,
+                  )
+                : card,
+            ),
+          );
+          setCommentCard((current) =>
+            current?.id === updated.id ? updated : current,
+          );
+          setAuthorCard((current) =>
+            current?.id === updated.id ? updated : current,
+          );
+          onMutate();
+        }}
+      />
       <CardAuthorBottomSheet
         cardId={authorCard?.id ?? null}
         classroomId={
@@ -164,11 +200,33 @@ export function CardsBoard({
         <PostModerationOverlay
           card={moderationTarget.card}
           anchor={moderationTarget.anchor}
+          mode={moderationTarget.owner ? "owner" : "moderation"}
           onClose={() => setModerationTarget(null)}
+          onEdit={
+            moderationTarget.owner && moderationTarget.card.canEdit === true
+              ? () => setEditingCard(moderationTarget.card)
+              : undefined
+          }
           onHidden={(cardId) => {
             setCards((current) => current.filter((card) => card.id !== cardId));
             onMutate();
           }}
+          onDeleted={
+            moderationTarget.owner && moderationTarget.card.canDelete === true
+              ? (cardId) => {
+                  setCards((current) =>
+                    current.filter((card) => card.id !== cardId),
+                  );
+                  setCommentCard((current) =>
+                    current?.id === cardId ? null : current,
+                  );
+                  setAuthorCard((current) =>
+                    current?.id === cardId ? null : current,
+                  );
+                  onMutate();
+                }
+              : undefined
+          }
         />
       ) : null}
     </View>

@@ -33,6 +33,7 @@ export type FeedItem = {
   likeCount: number;
   commentCount: number;
   isLiked: boolean;
+  canEdit?: boolean;
   canDelete: boolean;
   canHide: boolean;
   canReport: boolean;

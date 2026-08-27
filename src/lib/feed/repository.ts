@@ -49,6 +49,12 @@ type CreateFeedPostInput = {
   poolCreatedByUserId?: string | null;
 };
 
+export type UpdateFeedPostInput = {
+  title: string | null;
+  body: string | null;
+  media: FeedMediaInput[];
+};
+
 type FeedRow = {
   publicationId: string;
   postId: string;
@@ -585,6 +591,43 @@ export async function deleteFeedPost(postId: string, viewer: FeedViewer) {
   return "deleted" as const;
 }
 
+/** Update a student's own published post and replace its media atomically. */
+export async function updateStudentFeedPost(
+  postId: string,
+  viewer: FeedViewer,
+  input: UpdateFeedPostInput,
+) {
+  const post = await findAccessibleFeedPost(postId, viewer, true);
+  if (!post) return "not_found" as const;
+  if (viewer.kind !== "student" || post.authorStudentId !== viewer.id) {
+    return "forbidden" as const;
+  }
+  if (post.status === "ARCHIVED") return "not_found" as const;
+
+  const now = new Date();
+  await db.$transaction(async (tx) => {
+    await tx.feedPost.update({
+      where: { id: postId },
+      data: { title: input.title, body: input.body, updatedAt: now },
+    });
+    await tx.feedPostMedia.deleteMany({ where: { postId } });
+    for (const [position, media] of input.media.entries()) {
+      await tx.feedPostMedia.create({
+        data: {
+          id: randomUUID(),
+          postId,
+          kind: media.kind,
+          url: media.url,
+          youtubeVideoId: media.youtubeVideoId ?? null,
+          altText: media.altText ?? null,
+          position,
+        },
+      });
+    }
+  });
+  return "updated" as const;
+}
+
 function toFeedItem(
   row: FeedRow,
   hidden: FeedHiddenState | null = null,
@@ -612,6 +655,7 @@ function toFeedItem(
     likeCount: row.likeCount,
     commentCount: row.commentCount,
     isLiked: row.isLiked,
+    canEdit: viewer?.kind === "student" && own,
     canDelete: Boolean(viewer) && (own || viewer?.kind === "teacher"),
     canHide: viewer?.kind === "student" && !own && !hiddenReason,
     canReport: viewer?.kind === "student" && !own,

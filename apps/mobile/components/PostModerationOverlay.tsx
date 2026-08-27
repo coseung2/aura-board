@@ -1,9 +1,16 @@
 import { useState } from "react";
-import { Alert, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import {
+  Alert,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import { Image } from "expo-image";
-import { Ban, CircleAlert } from "lucide-react-native";
+import { Ban, CircleAlert, Pencil, Trash2 } from "lucide-react-native";
 import type { BoardCard } from "../lib/types";
 import { resolveCardAuthorName } from "../lib/card-privacy";
+import { apiFetch } from "../lib/api";
 import { hideContent, reportContent } from "../lib/content-safety";
 import { buildMediaItems, mediaPreviewUrls } from "../lib/media";
 import {
@@ -30,13 +37,24 @@ type Props = {
   anchor: PostAnchor;
   onClose: () => void;
   onHidden: (cardId: string) => void;
+  mode?: "moderation" | "owner";
+  onEdit?: () => void;
+  onDeleted?: (cardId: string) => void;
 };
 
 const SCREEN_MARGIN = spacing.lg;
 const ACTION_PANEL_HEIGHT = tapMin * 2 + spacing.sm;
 
 /** Full-screen focus layer for hiding or reporting another student's post. */
-export function PostModerationOverlay({ card, anchor, onClose, onHidden }: Props) {
+export function PostModerationOverlay({
+  card,
+  anchor,
+  onClose,
+  onHidden,
+  mode = "moderation",
+  onEdit,
+  onDeleted,
+}: Props) {
   const window = useWindowDimensions();
   const [busy, setBusy] = useState(false);
   const author = resolveCardAuthorName(card) || "작성자";
@@ -52,7 +70,11 @@ export function PostModerationOverlay({ card, anchor, onClose, onHidden }: Props
     Math.min(anchor.x, window.width - width - SCREEN_MARGIN),
   );
   const maxTop =
-    window.height - SCREEN_MARGIN - ACTION_PANEL_HEIGHT - spacing.sm - focusHeight;
+    window.height -
+    SCREEN_MARGIN -
+    ACTION_PANEL_HEIGHT -
+    spacing.sm -
+    focusHeight;
   const top = Math.max(SCREEN_MARGIN, Math.min(anchor.y, maxTop));
   const authorStudentId =
     card.studentAuthorId ??
@@ -71,6 +93,40 @@ export function PostModerationOverlay({ card, anchor, onClose, onHidden }: Props
     } finally {
       setBusy(false);
     }
+  }
+
+  async function deletePost() {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await apiFetch(`/api/cards/${encodeURIComponent(card.id)}`, {
+        method: "DELETE",
+      });
+      onDeleted?.(card.id);
+      onClose();
+    } catch {
+      Alert.alert(
+        "삭제 실패",
+        "게시글을 삭제하지 못했어요. 다시 시도해 주세요.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function confirmDelete() {
+    Alert.alert(
+      "게시글 삭제",
+      "이 게시글을 삭제할까요? 삭제하면 되돌릴 수 없어요.",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: () => void deletePost(),
+        },
+      ],
+    );
   }
 
   function confirmReport() {
@@ -118,37 +174,99 @@ export function PostModerationOverlay({ card, anchor, onClose, onHidden }: Props
         />
         <View style={[styles.focusWrap, { left, top, width }]}>
           <View style={[styles.post, { height: focusHeight }]}>
-            <Text style={styles.author} numberOfLines={1}>{author}</Text>
+            <Text style={styles.author} numberOfLines={1}>
+              {author}
+            </Text>
             {preview ? (
-              <Image source={{ uri: preview }} style={styles.preview} contentFit="cover" />
+              <Image
+                source={{ uri: preview }}
+                style={styles.preview}
+                contentFit="cover"
+              />
             ) : null}
             {card.title.trim() ? (
-              <Text style={styles.title} numberOfLines={2}>{card.title.trim()}</Text>
+              <Text style={styles.title} numberOfLines={2}>
+                {card.title.trim()}
+              </Text>
             ) : null}
             {card.content.trim() ? (
-              <Text style={styles.content} numberOfLines={preview ? 3 : 7}>{card.content.trim()}</Text>
+              <Text style={styles.content} numberOfLines={preview ? 3 : 7}>
+                {card.content.trim()}
+              </Text>
             ) : null}
           </View>
 
           <View style={styles.actions} accessibilityLabel="게시글 관리 메뉴">
-            <ControlPressable
-              style={styles.action}
-              onPress={() => void hidePost()}
-              disabled={busy}
-              accessibilityLabel="게시글 숨기기"
-            >
-              <Ban size={iconSizes.lg} color={colors.textMuted} strokeWidth={1.75} accessible={false} />
-              <Text style={styles.actionLabel}>숨기기</Text>
-            </ControlPressable>
-            <ControlPressable
-              style={[styles.action, styles.actionLast]}
-              onPress={confirmReport}
-              disabled={busy}
-              accessibilityLabel="게시글 신고"
-            >
-              <CircleAlert size={iconSizes.lg} color={colors.danger} strokeWidth={1.75} accessible={false} />
-              <Text style={[styles.actionLabel, styles.reportLabel]}>신고</Text>
-            </ControlPressable>
+            {mode === "owner" ? (
+              <>
+                <ControlPressable
+                  style={styles.action}
+                  onPress={() => {
+                    onClose();
+                    onEdit?.();
+                  }}
+                  disabled={busy || !onEdit}
+                  accessibilityLabel="게시글 수정"
+                >
+                  <Pencil
+                    size={iconSizes.lg}
+                    color={colors.textMuted}
+                    strokeWidth={1.75}
+                    accessible={false}
+                  />
+                  <Text style={styles.actionLabel}>수정</Text>
+                </ControlPressable>
+                <ControlPressable
+                  style={[styles.action, styles.actionLast]}
+                  onPress={confirmDelete}
+                  disabled={busy || !onDeleted}
+                  accessibilityLabel="게시글 삭제"
+                >
+                  <Trash2
+                    size={iconSizes.lg}
+                    color={colors.danger}
+                    strokeWidth={1.75}
+                    accessible={false}
+                  />
+                  <Text style={[styles.actionLabel, styles.reportLabel]}>
+                    삭제
+                  </Text>
+                </ControlPressable>
+              </>
+            ) : (
+              <>
+                <ControlPressable
+                  style={styles.action}
+                  onPress={() => void hidePost()}
+                  disabled={busy}
+                  accessibilityLabel="게시글 숨기기"
+                >
+                  <Ban
+                    size={iconSizes.lg}
+                    color={colors.textMuted}
+                    strokeWidth={1.75}
+                    accessible={false}
+                  />
+                  <Text style={styles.actionLabel}>숨기기</Text>
+                </ControlPressable>
+                <ControlPressable
+                  style={[styles.action, styles.actionLast]}
+                  onPress={confirmReport}
+                  disabled={busy}
+                  accessibilityLabel="게시글 신고"
+                >
+                  <CircleAlert
+                    size={iconSizes.lg}
+                    color={colors.danger}
+                    strokeWidth={1.75}
+                    accessible={false}
+                  />
+                  <Text style={[styles.actionLabel, styles.reportLabel]}>
+                    신고
+                  </Text>
+                </ControlPressable>
+              </>
+            )}
           </View>
         </View>
       </View>
@@ -158,7 +276,10 @@ export function PostModerationOverlay({ card, anchor, onClose, onHidden }: Props
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.modalBackdrop },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: colors.modalBackdrop,
+  },
   focusWrap: { position: "absolute", gap: spacing.sm },
   post: {
     overflow: "hidden",

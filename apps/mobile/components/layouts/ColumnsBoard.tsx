@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import {
   borders,
   colors,
@@ -18,6 +13,7 @@ import {
 import { CardComposer } from "../CardComposer";
 import { nextCardOrder } from "./cards-board-utils";
 import { CardAuthorBottomSheet } from "../CardAuthorBottomSheet";
+import { CardEditModal } from "../CardEditModal";
 import { CommentBottomSheet } from "../CommentBottomSheet";
 import {
   PostModerationOverlay,
@@ -32,15 +28,8 @@ import {
   withBoardAnonymousAuthor,
   withBoardAnonymousAuthors,
 } from "../../lib/card-privacy";
-import {
-  ControlPressable,
-  Fab,
-  SurfaceCard,
-} from "../ui";
-import {
-  SectionNav,
-  SectionNavItem,
-} from "../NavigationTabs";
+import { ControlPressable, Fab, SurfaceCard } from "../ui";
+import { SectionNav, SectionNavItem } from "../NavigationTabs";
 import { useBoardRealtime } from "../../lib/use-board-realtime";
 import { StreamFeedPost } from "./ColumnsStreamFeedPost";
 
@@ -89,7 +78,9 @@ export function ColumnsBoard({
   const [moderationTarget, setModerationTarget] = useState<{
     card: BoardCard;
     anchor: PostAnchor;
+    owner: boolean;
   } | null>(null);
+  const [editingCard, setEditingCard] = useState<BoardCard | null>(null);
   const [topicFilter, setTopicFilter] = useState<TopicFilter>("all");
   const writableSections = useMemo(
     () =>
@@ -197,14 +188,15 @@ export function ColumnsBoard({
               deferEmbeddedMedia={index > 0}
               onOpenComments={() => setCommentCard(item)}
               onOpenAuthorPicker={
-                item.canEdit === true
-                  ? () => setAuthorCard(item)
-                  : undefined
+                item.canEdit === true ? () => setAuthorCard(item) : undefined
               }
               onLongPress={
-                item.isMine === true
-                  ? undefined
-                  : (anchor) => setModerationTarget({ card: item, anchor })
+                item.isMine === true &&
+                (item.canEdit === true || item.canDelete === true)
+                  ? (anchor) =>
+                      setModerationTarget({ card: item, anchor, owner: true })
+                  : (anchor) =>
+                      setModerationTarget({ card: item, anchor, owner: false })
               }
             />
           )}
@@ -312,6 +304,36 @@ export function ColumnsBoard({
           );
         }}
       />
+      <CardEditModal
+        card={editingCard}
+        visible={editingCard !== null}
+        onClose={() => setEditingCard(null)}
+        onSaved={(updated) => {
+          setCards((current) =>
+            current.map((card) =>
+              card.id === updated.id
+                ? withBoardAnonymousAuthor(
+                    {
+                      ...card,
+                      ...updated,
+                      isMine: card.isMine,
+                      canEdit: card.canEdit,
+                      canDelete: card.canDelete,
+                    },
+                    data.board,
+                  )
+                : card,
+            ),
+          );
+          setCommentCard((current) =>
+            current?.id === updated.id ? updated : current,
+          );
+          setAuthorCard((current) =>
+            current?.id === updated.id ? updated : current,
+          );
+          onMutate();
+        }}
+      />
       <CardAuthorBottomSheet
         cardId={authorCard?.id ?? null}
         classroomId={
@@ -346,11 +368,33 @@ export function ColumnsBoard({
         <PostModerationOverlay
           card={moderationTarget.card}
           anchor={moderationTarget.anchor}
+          mode={moderationTarget.owner ? "owner" : "moderation"}
           onClose={() => setModerationTarget(null)}
+          onEdit={
+            moderationTarget.owner && moderationTarget.card.canEdit === true
+              ? () => setEditingCard(moderationTarget.card)
+              : undefined
+          }
           onHidden={(cardId) => {
             setCards((current) => current.filter((card) => card.id !== cardId));
             onMutate();
           }}
+          onDeleted={
+            moderationTarget.owner && moderationTarget.card.canDelete === true
+              ? (cardId) => {
+                  setCards((current) =>
+                    current.filter((card) => card.id !== cardId),
+                  );
+                  setCommentCard((current) =>
+                    current?.id === cardId ? null : current,
+                  );
+                  setAuthorCard((current) =>
+                    current?.id === cardId ? null : current,
+                  );
+                  onMutate();
+                }
+              : undefined
+          }
         />
       ) : null}
     </View>

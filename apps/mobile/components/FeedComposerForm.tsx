@@ -20,6 +20,8 @@ const MAX_MEDIA_ITEMS = 10;
 type Props = {
   onSubmit: (draft: FeedDraft) => Promise<void>;
   onSuccess: () => void;
+  initialDraft?: FeedDraft;
+  submitLabel?: string;
 };
 
 async function uploadImage(uri: string, name: string, mimeType: string) {
@@ -45,11 +47,11 @@ async function uploadImage(uri: string, name: string, mimeType: string) {
  * Shared student feed composer. Used by the full-screen compose page; the
  * fields, media picker, and submit flow live here.
  */
-export function FeedComposerForm({ onSubmit, onSuccess }: Props) {
-  const [title, setTitle] = useState("");
-  const [body, setBody] = useState("");
+export function FeedComposerForm({ onSubmit, onSuccess, initialDraft, submitLabel = "게시하기" }: Props) {
+  const [title, setTitle] = useState(initialDraft?.title ?? "");
+  const [body, setBody] = useState(initialDraft?.body ?? "");
   const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [media, setMedia] = useState<FeedMediaInput[]>([]);
+  const [media, setMedia] = useState<FeedMediaInput[]>(initialDraft?.media ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -239,7 +241,7 @@ export function FeedComposerForm({ onSubmit, onSuccess }: Props) {
         </Text>
       ) : null}
       <AppButton onPress={() => void submit()} loading={busy} disabled={busy}>
-        게시하기
+        {submitLabel}
       </AppButton>
     </ScrollView>
   );
