@@ -148,7 +148,7 @@ gets an optional update prompt. A version below
 Configure the deployed web/API environment when releasing a mobile version:
 
 ```text
-MOBILE_LATEST_VERSION=1.0.5
+MOBILE_LATEST_VERSION=1.0.8
 MOBILE_MINIMUM_SUPPORTED_VERSION=1.0.4
 MOBILE_UPDATE_MESSAGE=더 안정적인 Aura Board를 사용하려면 최신 버전으로 업데이트해 주세요.
 MOBILE_ANDROID_STORE_URL=https://play.google.com/store/apps/details?id=com.auraboard.app

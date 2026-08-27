@@ -12,7 +12,7 @@ describe("GET /api/mobile/version-policy", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Cache-Control")).toContain("s-maxage=300");
     await expect(response.json()).resolves.toEqual({
-      latestVersion: "1.0.4",
+      latestVersion: "1.0.8",
       minimumSupportedVersion: "1.0.4",
       message: "안정성 개선",
       storeUrls: {

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
-const DEFAULT_VERSION = "1.0.4";
+const DEFAULT_LATEST_VERSION = "1.0.8";
+const DEFAULT_MINIMUM_VERSION = "1.0.4";
 const DEFAULT_MESSAGE = "안정성 개선";
 const DEFAULT_ANDROID_STORE_URL =
   "https://play.google.com/store/apps/details?id=com.auraboard.app";
@@ -38,11 +39,13 @@ function validStoreUrl(value: string | undefined, fallback: string): string {
 export function getMobileVersionPolicy() {
   const minimumSupportedVersion = validVersion(
     process.env.MOBILE_MINIMUM_SUPPORTED_VERSION,
-    DEFAULT_VERSION,
+    DEFAULT_MINIMUM_VERSION,
   );
   const configuredLatestVersion = validVersion(
     process.env.MOBILE_LATEST_VERSION,
-    minimumSupportedVersion,
+    process.env.MOBILE_LATEST_VERSION === undefined
+      ? DEFAULT_LATEST_VERSION
+      : minimumSupportedVersion,
   );
   const latestVersion =
     compareVersions(configuredLatestVersion, minimumSupportedVersion) >= 0
