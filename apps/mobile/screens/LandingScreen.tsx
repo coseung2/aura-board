@@ -88,7 +88,9 @@ import {
 type ParentOAuthProvider = "google" | "kakao";
 
 const PARENT_OAUTH_CALLBACK_PATH = "parent/auth/callback";
-const EXPO_GO_PHONE_CALLBACK = "exp://127.0.0.1:8081/--/parent/auth/callback";
+const EXPO_GO_METRO_PORT =
+  Constants.expoConfig?.hostUri?.match(/:(\d+)$/)?.[1] ?? "8081";
+const EXPO_GO_PHONE_CALLBACK = `exp://127.0.0.1:${EXPO_GO_METRO_PORT}/--/parent/auth/callback`;
 // Student join codes are fixed at six characters, but the server-side review
 // credential contract accepts any non-empty code up to 256 characters. Keep
 // the reviewer field aligned with that contract so short Expo Go codes (for
@@ -601,12 +603,12 @@ export function Landing() {
                         AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
                       }
                       cornerRadius={radii.btn}
-                      style={styles.oauthApple}
+                      style={[styles.oauthButton, styles.oauthApple]}
                       onPress={handleParentAppleSignIn}
                     />
                   ) : null}
                   <ControlPressable
-                    style={styles.oauthGoogle}
+                    style={[styles.oauthButton, styles.oauthGoogle]}
                     onPress={() => handleParentOAuth("google")}
                     disabled={parentLoading}
                     accessibilityLabel="Google로 로그인"
@@ -616,7 +618,7 @@ export function Landing() {
                     <Text style={styles.oauthGoogleText}>Google로 로그인</Text>
                   </ControlPressable>
                   <ControlPressable
-                    style={styles.oauthKakao}
+                    style={[styles.oauthButton, styles.oauthKakao]}
                     onPress={() => handleParentOAuth("kakao")}
                     disabled={parentLoading}
                     accessibilityLabel="Kakao로 로그인"

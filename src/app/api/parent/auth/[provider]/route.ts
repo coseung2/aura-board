@@ -15,9 +15,14 @@ export const runtime = "nodejs";
 const MOBILE_DEEP_LINK = "auraboard://parent/auth/callback";
 const EXPO_GO_EMULATOR_CALLBACK = "exp://10.0.2.2:8081/--/parent/auth/callback";
 const EXPO_GO_DEVICE_CALLBACK = "exp://127.0.0.1:8081/--/parent/auth/callback";
+const EXPO_GO_EMULATOR_CALLBACK_8082 = "exp://10.0.2.2:8082/--/parent/auth/callback";
+const EXPO_GO_DEVICE_CALLBACK_8082 = "exp://127.0.0.1:8082/--/parent/auth/callback";
 
 function mobileCallbackUrl(value: string | null): string {
-  return value === EXPO_GO_EMULATOR_CALLBACK || value === EXPO_GO_DEVICE_CALLBACK
+  return value === EXPO_GO_EMULATOR_CALLBACK ||
+    value === EXPO_GO_DEVICE_CALLBACK ||
+    value === EXPO_GO_EMULATOR_CALLBACK_8082 ||
+    value === EXPO_GO_DEVICE_CALLBACK_8082
     ? value
     : MOBILE_DEEP_LINK;
 }

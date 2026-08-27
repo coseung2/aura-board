@@ -625,10 +625,15 @@ export default function LoginPage() {
           ) : null}
         </section>
 
-        <div className="login-legal-links">
-          <Link href="/terms">이용약관</Link>
-          <span aria-hidden="true" className="login-legal-divider" />
-          <Link href="/privacy">개인정보처리방침</Link>
+        <div className="login-legal">
+          <p className="login-consent">
+            로그인하면 아래 약관에 동의한 것으로 간주합니다.
+          </p>
+          <div className="login-legal-links">
+            <Link href="/terms">이용약관</Link>
+            <span aria-hidden="true" className="login-legal-divider" />
+            <Link href="/privacy">개인정보처리방침</Link>
+          </div>
         </div>
       </div>
     </main>

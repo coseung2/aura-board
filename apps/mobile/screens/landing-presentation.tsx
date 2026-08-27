@@ -28,23 +28,28 @@ export function TermsNotice() {
 
   return (
     <View style={styles.termsNotice}>
-      <TextActionPressable
-        style={styles.termsNoticeLinkButton}
-        accessibilityRole="link"
-        accessibilityLabel="이용약관 열기"
-        onPress={() => void open("/terms")}
-      >
-        <Text style={styles.termsNoticeLink}>이용약관</Text>
-      </TextActionPressable>
-      <View style={styles.termsNoticeDivider} accessible={false} />
-      <TextActionPressable
-        style={styles.termsNoticeLinkButton}
-        accessibilityRole="link"
-        accessibilityLabel="개인정보처리방침 열기"
-        onPress={() => void open("/privacy")}
-      >
-        <Text style={styles.termsNoticeLink}>개인정보처리방침</Text>
-      </TextActionPressable>
+      <Text style={styles.termsNoticeCopy}>
+        로그인하면 아래 약관에 동의한 것으로 간주합니다.
+      </Text>
+      <View style={styles.termsNoticeLinks}>
+        <TextActionPressable
+          style={styles.termsNoticeLinkButton}
+          accessibilityRole="link"
+          accessibilityLabel="이용약관 열기"
+          onPress={() => void open("/terms")}
+        >
+          <Text style={styles.termsNoticeLink}>이용약관</Text>
+        </TextActionPressable>
+        <View style={styles.termsNoticeDivider} accessible={false} />
+        <TextActionPressable
+          style={styles.termsNoticeLinkButton}
+          accessibilityRole="link"
+          accessibilityLabel="개인정보처리방침 열기"
+          onPress={() => void open("/privacy")}
+        >
+          <Text style={styles.termsNoticeLink}>개인정보처리방침</Text>
+        </TextActionPressable>
+      </View>
     </View>
   );
 }

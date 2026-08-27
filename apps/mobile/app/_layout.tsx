@@ -46,7 +46,7 @@ function parseCallback(url: string) {
   const expoGoCallback =
     parsed.protocol === "exp:" &&
     EXPO_GO_CALLBACK_HOSTS.has(parsed.hostname) &&
-    parsed.port === "8081" &&
+    (parsed.port === "8081" || parsed.port === "8082") &&
     parsed.pathname === "/--/parent/auth/callback";
   if (!auraCallback && !expoGoCallback) return null;
 
