@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useEffect, useState } from "react";
+import { memo, useEffect, useId, useRef, useState } from "react";
 import { extractCanvaDesignId } from "@/lib/canva-url";
 import { extractVideoId } from "@/lib/youtube";
 import { shouldPromoteLinkPreview } from "@/lib/card-content-policy";
@@ -9,7 +9,12 @@ import { CanvaEmbedSlot } from "./CanvaEmbedSlot";
 import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { CardFileAttachment } from "./CardFileAttachment";
 import { LinkPreviewImage } from "./cards/LinkPreviewImage";
-import { ChevronLeftIcon, ChevronRightIcon, PlayIcon } from "./icons/UiIcons";
+import {
+  useCardVideoPlayer,
+  type CardVideoSource,
+} from "./cards/CardVideoProvider";
+import { CardVideoPoster } from "./cards/CardVideoPoster";
+import { ChevronLeftIcon, ChevronRightIcon } from "./icons/UiIcons";
 
 function getYouTubeId(url: string): string | null {
   return extractVideoId(url);
@@ -26,6 +31,26 @@ function hasSameYouTubeId(a?: string | null, b?: string | null): boolean {
   return Boolean(aId && bId && aId === bId);
 }
 
+function getVideoSourceKey(cardId: string | undefined, item: AttachmentItem): string {
+  return `${cardId ?? "card"}:${item.id}`;
+}
+
+function toCardVideoSource(
+  cardId: string | undefined,
+  item: AttachmentItem,
+): CardVideoSource | null {
+  if (item.kind !== "video") return null;
+  const youtubeId = getYouTubeId(item.url);
+  return {
+    key: getVideoSourceKey(cardId, item),
+    kind: youtubeId ? "youtube" : "upload",
+    src: item.url,
+    youtubeId,
+    posterUrl: item.previewUrl ?? (youtubeId ? getYouTubeThumbnailUrl(youtubeId) : null),
+    title: item.fileName,
+  };
+}
+
 type AttachmentItem = {
   id: string;
   kind: string;
@@ -38,6 +63,7 @@ type AttachmentItem = {
 };
 
 type Props = {
+  cardId?: string;
   imageUrl?: string | null;
   thumbUrl?: string | null;
   linkUrl?: string | null;
@@ -63,8 +89,14 @@ type Props = {
 // All props are primitives/null, so default shallow equality is safe.
 // Memoizing avoids re-rendering attachment previews on every unrelated
 // parent state update (drag, selection, modal toggles, etc.).
-export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUrl, linkUrl, linkTitle, linkDesc, linkImage, videoUrl, fileUrl, fileName, fileSize, fileMimeType, attachments, variant = "detail", onImageClick }: Props) {
+export const CardAttachments = memo(function CardAttachments({ cardId, imageUrl, thumbUrl, linkUrl, linkTitle, linkDesc, linkImage, videoUrl, fileUrl, fileName, fileSize, fileMimeType, attachments, variant = "detail", onImageClick }: Props) {
   const [playedVideoIds, setPlayedVideoIds] = useState<Set<string>>(new Set());
+  const videoPlayer = useCardVideoPlayer();
+  const registerVideoHost = videoPlayer?.registerHost;
+  const playSharedVideo = videoPlayer?.play;
+  const activeVideoKey = videoPlayer?.active?.key ?? null;
+  const hostRef = useRef<HTMLDivElement | null>(null);
+  const hostOwnerId = useId();
   // media-attach-carousel (2026-06-12): detail 모드에서 media 항목이 2개
   // 이상이면 슬라이드 + 인디케이터로 전환. 단일 항목은 기존 표시 유지.
   const [mediaIndex, setMediaIndex] = useState(0);
@@ -154,6 +186,13 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   // 슬라이드 활성화. 단일 항목은 기존 풀 표시 유지.
   const isCarousel = variant === "detail" && sorted.length > 1;
   const currentItem = isCarousel ? sorted[Math.min(mediaIndex, sorted.length - 1)] : null;
+  const visibleMediaItems = isCarousel && currentItem ? [currentItem] : sorted;
+  const visibleVideoSources = visibleMediaItems
+    .map((item) => toCardVideoSource(cardId, item))
+    .filter((source): source is CardVideoSource => Boolean(source));
+  const videoRegistrationSignature = visibleVideoSources
+    .map((source) => `${source.key}:${source.src}`)
+    .join("|");
   const extraCount =
     variant === "thumbnail"
       ? Math.max(
@@ -179,6 +218,31 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
     }
     setMediaIndex((i) => (i >= mediaSorted.length ? 0 : i));
   }, [mediaSorted.length]);
+
+  useEffect(() => {
+    if (!registerVideoHost || visibleVideoSources.length === 0) return;
+    const host = hostRef.current;
+    if (!host) return;
+    for (const source of visibleVideoSources) {
+      registerVideoHost(
+        source.key,
+        hostOwnerId,
+        host,
+        variant,
+      );
+    }
+    return () => {
+      for (const source of visibleVideoSources) {
+        registerVideoHost(source.key, hostOwnerId, null, variant);
+      }
+    };
+  }, [
+    registerVideoHost,
+    videoRegistrationSignature,
+    hostOwnerId,
+    variant,
+    mediaIndex,
+  ]);
   // meta-download-zone (2026-06-13): detail 모드에서 file 첨부는 미디어
   // 영역이 아니라 메타 영역 다운로드 리스트로 옮김. thumbnail 모드에서는
   // file-only 카드도 카드 목록에서 첨부 신호가 보이도록 파일 타일을 렌더.
@@ -186,53 +250,23 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
   const renderVideoPoster = (
     key: string,
     videoUrlForFallback: string | null,
-    posterUrl?: string | null,
-    extraBadge = true,
-    source: "youtube" | "upload" = "upload",
+    posterUrl: string | null | undefined,
+    extraBadge: boolean,
+    source: "youtube" | "upload",
     onClick?: () => void,
   ) => (
-    <div
+    <CardVideoPoster
       key={key}
-      className={`card-attach-video card-attach-media-poster card-attach-media-poster-${source}${onClick ? " is-clickable" : ""}`}
-      onClick={onClick ? (e) => { e.stopPropagation(); onClick(); } : undefined}
-      role={onClick ? "button" : undefined}
-      tabIndex={onClick ? 0 : undefined}
-      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onClick(); } } : undefined}
-    >
-      {posterUrl ? (
-        <img
-          src={posterUrl}
-          alt=""
-          loading="lazy"
-          decoding="async"
-          className="card-attach-video-poster-img"
-        />
-      ) : videoUrlForFallback ? (
-        <video
-          src={videoUrlForFallback}
-          preload="metadata"
-          muted
-          playsInline
-          className="card-attach-video-poster-img"
-        />
-      ) : (
-        <div className="card-attach-video-placeholder" aria-hidden="true" />
-      )}
-      {source === "youtube" && onClick ? (
-        <span className="card-attach-youtube-play" aria-hidden="true">
-          <PlayIcon size={18} />
-        </span>
-      ) : source !== "youtube" ? (
-        <span className="card-attach-video-play" aria-hidden="true">
-          <PlayIcon size={20} />
-        </span>
-      ) : null}
-      {extraBadge && extraCount > 0 && (
-        <span className="card-attach-multi-badge" aria-label={`+${extraCount}개 더`}>
-          +{extraCount}
-        </span>
-      )}
-    </div>
+      posterKey={key}
+      hostRef={hostRef}
+      isSharedHost={Boolean(registerVideoHost)}
+      videoUrlForFallback={videoUrlForFallback}
+      posterUrl={posterUrl}
+      extraCount={extraCount}
+      extraBadge={extraBadge}
+      source={source}
+      onClick={onClick}
+    />
   );
 
   // media-attach-carousel (2026-06-12): 단일 미디어 항목 렌더 함수.
@@ -282,6 +316,18 @@ export const CardAttachments = memo(function CardAttachments({ imageUrl, thumbUr
       );
     }
     if (a.kind === "video") {
+      const sharedSource = toCardVideoSource(cardId, a);
+      if (playSharedVideo && registerVideoHost && sharedSource) {
+        const isActive = activeVideoKey === sharedSource.key;
+        return renderVideoPoster(
+          a.id,
+          null,
+          sharedSource.posterUrl,
+          true,
+          sharedSource.kind,
+          isActive ? undefined : () => playSharedVideo(sharedSource),
+        );
+      }
       if (variant === "thumbnail") {
         const yt = getYouTubeId(a.url);
         if (yt && playedVideoIds.has(a.id)) {

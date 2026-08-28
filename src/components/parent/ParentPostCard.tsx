@@ -7,6 +7,7 @@ import {
   resolveParentFeedAuthor,
 } from "@/lib/parent-feed-presentation";
 import { buildSourceLabel } from "@/components/portfolio/source-label";
+import { CardAttachments } from "../CardAttachments";
 
 type Props = {
   post: ParentPostDTO;
@@ -25,6 +26,30 @@ export function ParentPostCard({ post, onOpen, highlighted = false }: Props) {
   const imageUrl = getPostImage(post);
   const videoUrl =
     post.videoUrl ?? post.attachments.find((item) => item.kind === "video")?.url ?? null;
+  const videoAttachments = post.attachments
+    .filter((item) => item.kind === "video")
+    .map((item) => ({
+      id: item.id,
+      kind: item.kind,
+      url: item.url,
+      previewUrl: item.previewUrl ?? imageUrl,
+      fileName: item.fileName ?? null,
+      fileSize: item.fileSize ?? null,
+      mimeType: item.mimeType ?? "video/*",
+      order: item.order,
+    }));
+  if (videoUrl && videoAttachments.length === 0) {
+    videoAttachments.push({
+      id: `legacy-video-${videoUrl}`,
+      kind: "video",
+      url: videoUrl,
+      previewUrl: imageUrl,
+      fileName: null,
+      fileSize: null,
+      mimeType: "video/*",
+      order: 0,
+    });
+  }
   const attachmentCount = countParentFeedAttachments(post);
   const authorName = resolveParentFeedAuthor(post, attribution);
 
@@ -47,9 +72,12 @@ export function ParentPostCard({ post, onOpen, highlighted = false }: Props) {
 
       <div className="parent-feed-post-media">
         {videoUrl ? (
-          <video controls preload="metadata" poster={imageUrl ?? undefined}>
-            <source src={videoUrl} />
-          </video>
+          <CardAttachments
+            cardId={post.id}
+            videoUrl={videoUrl}
+            attachments={videoAttachments}
+            variant="thumbnail"
+          />
         ) : imageUrl ? (
           <button type="button" onClick={() => onOpen(post)} aria-label={`${post.title || "게시물"} 자세히 보기`}>
             <Image

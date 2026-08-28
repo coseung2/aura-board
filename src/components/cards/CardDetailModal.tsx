@@ -286,6 +286,7 @@ export function CardDetailModal({
               {hasMedia && (
                 <div className="card-detail-media" aria-label="첨부">
                   <CardAttachments
+                    cardId={card.id}
                     imageUrl={card.imageUrl}
                     thumbUrl={card.thumbUrl}
                     linkUrl={mediaLinkUrl}

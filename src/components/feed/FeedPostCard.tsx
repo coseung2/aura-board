@@ -48,6 +48,7 @@ export function FeedPostCard({ item, actions }: Props) {
       </div>
       <CardBody
         card={{
+          id: item.postId,
           title: item.title ?? "",
           content: item.body ?? "",
           attachments,

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import { AppBackgroundLayer } from "@/components/AppBackground";
 import { AuthProvider } from "@/components/AuthProvider";
+import { CardVideoProvider } from "@/components/cards/CardVideoProvider";
 import { DJPlayerProvider } from "@/components/dj/DJPlayerProvider";
 import { Footer } from "@/components/Footer";
 import { GlobalToolkitFab } from "@/components/GlobalToolkitFab";
@@ -68,8 +69,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         <TwemojiRoot />
         <AuthProvider>
           <DJPlayerProvider>
-            {children}
-            <GlobalToolkitFab />
+            <CardVideoProvider>
+              {children}
+              <GlobalToolkitFab />
+            </CardVideoProvider>
           </DJPlayerProvider>
         </AuthProvider>
         <Footer />

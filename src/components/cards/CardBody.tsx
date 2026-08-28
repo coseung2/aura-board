@@ -167,6 +167,7 @@ export const CardBody = memo(function CardBody({
   return (
     <>
       <CardAttachments
+        cardId={card.id}
         imageUrl={card.imageUrl}
         thumbUrl={card.thumbUrl}
         linkUrl={card.linkUrl}
