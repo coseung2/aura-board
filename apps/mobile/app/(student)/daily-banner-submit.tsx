@@ -12,12 +12,12 @@ import * as ImagePicker from "expo-image-picker";
 import { useRouter } from "expo-router";
 import { ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { apiFetch, getApiBase, ApiError } from "../../lib/api";
+import { apiFetch, ApiError } from "../../lib/api";
 import {
   clearSessionToken,
   getUnifiedLoginRoute,
-  loadSessionToken,
 } from "../../lib/session";
+import { uploadMobileImage } from "../../lib/upload";
 import {
   borders,
   colors,
@@ -177,21 +177,7 @@ function submissionStatusLabel(status: string | null | undefined) {
 }
 
 async function uploadImage(uri: string, name: string, mimeType: string) {
-  const token = await loadSessionToken();
-  const form = new FormData();
-  form.append("file", { uri, name, type: mimeType } as unknown as Blob);
-  const response = await fetch(`${getApiBase()}/api/upload`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: form as unknown as BodyInit,
-  });
-  if (!response.ok)
-    throw new Error(`이미지를 업로드하지 못했어요. (${response.status})`);
-  const body = (await response.json()) as { url?: unknown };
-  if (typeof body.url !== "string" || !body.url) {
-    throw new Error("업로드된 이미지 주소를 확인하지 못했어요.");
-  }
-  return body.url;
+  return (await uploadMobileImage({ uri, name, mimeType })).url;
 }
 
 export default function DailyBannerSubmitScreen() {

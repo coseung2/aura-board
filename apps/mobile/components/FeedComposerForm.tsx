@@ -2,8 +2,7 @@ import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import type { FeedDraft, FeedMediaInput } from "../lib/feed";
-import { getApiBase } from "../lib/api";
-import { loadSessionToken } from "../lib/session";
+import { uploadMobileImage } from "../lib/upload";
 import {
   borders,
   colors,
@@ -25,22 +24,7 @@ type Props = {
 };
 
 async function uploadImage(uri: string, name: string, mimeType: string) {
-  const token = await loadSessionToken();
-  const form = new FormData();
-  form.append("file", { uri, name, type: mimeType } as unknown as Blob);
-  const response = await fetch(`${getApiBase()}/api/upload`, {
-    method: "POST",
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
-    body: form as unknown as BodyInit,
-  });
-  const body = (await response.json().catch(() => null)) as {
-    url?: string;
-    error?: string;
-  } | null;
-  if (!response.ok || !body?.url) {
-    throw new Error(body?.error ?? "이미지 업로드에 실패했어요.");
-  }
-  return body.url;
+  return (await uploadMobileImage({ uri, name, mimeType })).url;
 }
 
 /**

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { getCurrentUser } from "@/lib/auth";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentStudentUploadIdentityRaw } from "@/lib/student-auth";
 import { ALLOWED_FILE_MIMES, isAllowedFileUpload, normalizeUploadMime } from "@/lib/file-attachment";
 import { ALLOWED_IMAGE, ALLOWED_VIDEO, MAX_SIZE, UploadPolicyError } from "./upload-policy";
 import { resizeBufferToWebPPreview, uploadWebPBuffer, extractVideoThumbnail } from "@/lib/blob";
@@ -75,7 +75,7 @@ export async function POST(req: Request) {
     // 모바일 학생 앱이 카드/과제 첨부를 직접 업로드할 수 있게 하기 위함.
     const teacher = await getCurrentUser().catch(() => null);
     if (!teacher) {
-      const student = await getCurrentStudent();
+      const student = await getCurrentStudentUploadIdentityRaw();
       if (!student) {
         return NextResponse.json({ error: "unauthorized" }, { status: 401 });
       }
@@ -116,8 +116,8 @@ export async function POST(req: Request) {
 
     // multipart 경로 — 서버 검증 후 Supabase Storage canonical 저장소에 업로드.
     const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) {
+    const file = formData.get("file");
+    if (!isMultipartFile(file)) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
     uploadMetadata = {
@@ -297,4 +297,15 @@ export async function POST(req: Request) {
     const msg = e instanceof Error ? e.message : "Upload failed";
     return NextResponse.json({ error: msg }, { status: 500 });
   }
+}
+
+function isMultipartFile(value: FormDataEntryValue | null): value is File {
+  return Boolean(
+    value &&
+      typeof value !== "string" &&
+      typeof value.name === "string" &&
+      typeof value.size === "number" &&
+      typeof value.type === "string" &&
+      typeof value.arrayBuffer === "function",
+  );
 }

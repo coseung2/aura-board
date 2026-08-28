@@ -60,4 +60,26 @@ describe("POST /api/student/auth", () => {
     expect(mocks.limitStudentLogin).not.toHaveBeenCalled();
     expect(mocks.findUnique).not.toHaveBeenCalled();
   });
+
+  it("loads only stable student login fields before creating a session", async () => {
+    mocks.findUnique.mockResolvedValue({
+      id: "student-1",
+      name: "학생",
+      classroomId: "classroom-1",
+    });
+    mocks.createStudentSession.mockResolvedValue("session-token");
+    mocks.cookies.mockResolvedValue({ getAll: () => [] });
+
+    const response = await POST(request("ABC123"));
+
+    expect(response.status).toBe(200);
+    expect(mocks.findUnique).toHaveBeenCalledWith({
+      where: { qrToken: "ABC123" },
+      select: { id: true, name: true, classroomId: true },
+    });
+    expect(mocks.createStudentSession).toHaveBeenCalledWith(
+      "student-1",
+      "classroom-1",
+    );
+  });
 });

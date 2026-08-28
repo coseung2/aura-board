@@ -7,12 +7,14 @@ import {
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
-  getCurrentStudent: vi.fn(),
+  getCurrentStudentUploadIdentityRaw: vi.fn(),
   uploadPublicObject: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.getCurrentUser }));
-vi.mock("@/lib/student-auth", () => ({ getCurrentStudent: mocks.getCurrentStudent }));
+vi.mock("@/lib/student-auth", () => ({
+  getCurrentStudentUploadIdentityRaw: mocks.getCurrentStudentUploadIdentityRaw,
+}));
 vi.mock("@/lib/media-storage", () => ({ uploadPublicObject: mocks.uploadPublicObject }));
 vi.mock("@/lib/blob", () => ({
   resizeBufferToWebPPreview: vi.fn(),
@@ -63,7 +65,7 @@ describe("POST /api/upload limits", () => {
   it("keeps authentication ahead of the degraded-mode availability response", async () => {
     vi.stubEnv("AURA_DR_MEDIA_DEGRADED_MODE", "1");
     mocks.getCurrentUser.mockResolvedValue(null);
-    mocks.getCurrentStudent.mockResolvedValue(null);
+    mocks.getCurrentStudentUploadIdentityRaw.mockResolvedValue(null);
     const formData = vi.fn();
     const response = await POST({ headers: new Headers(), formData } as unknown as Request);
 
@@ -110,7 +112,12 @@ describe("POST /api/upload limits", () => {
     const request = {
       headers: new Headers({ "content-type": "multipart/form-data; boundary=test" }),
       formData: vi.fn(async () => ({
-        get: () => ({ name: "large.png", size: MAX_SIZE + 1, type: "image/png" }),
+        get: () => ({
+          name: "large.png",
+          size: MAX_SIZE + 1,
+          type: "image/png",
+          arrayBuffer: vi.fn(),
+        }),
       })),
     } as unknown as Request;
 
@@ -125,7 +132,12 @@ describe("POST /api/upload limits", () => {
     const request = {
       headers: new Headers({ "content-type": "multipart/form-data; boundary=test" }),
       formData: vi.fn(async () => ({
-        get: () => ({ name: "vector.svg", size: 100, type: "image/svg+xml" }),
+        get: () => ({
+          name: "vector.svg",
+          size: 100,
+          type: "image/svg+xml",
+          arrayBuffer: vi.fn(),
+        }),
       })),
     } as unknown as Request;
 
@@ -133,6 +145,21 @@ describe("POST /api/upload limits", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: "svg_not_allowed" });
+    expect(mocks.uploadPublicObject).not.toHaveBeenCalled();
+  });
+
+  it("returns 400 when a malformed native multipart part is not file-like", async () => {
+    const request = {
+      headers: new Headers({ "content-type": "multipart/form-data; boundary=test" }),
+      formData: vi.fn(async () => ({
+        get: () => ({ name: "photo.jpg", size: 100, type: "image/jpeg" }),
+      })),
+    } as unknown as Request;
+
+    const response = await POST(request);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ error: "No file provided" });
     expect(mocks.uploadPublicObject).not.toHaveBeenCalled();
   });
 });

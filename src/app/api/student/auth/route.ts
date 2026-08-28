@@ -54,9 +54,20 @@ export async function POST(req: Request) {
     }
 
     // Try qrToken first, then textCode
-    let student = await db.student.findUnique({ where: { qrToken: token } });
+    const studentSelect = {
+      id: true,
+      name: true,
+      classroomId: true,
+    } as const;
+    let student = await db.student.findUnique({
+      where: { qrToken: token },
+      select: studentSelect,
+    });
     if (!student) {
-      student = await db.student.findUnique({ where: { textCode: token.toUpperCase() } });
+      student = await db.student.findUnique({
+        where: { textCode: token.toUpperCase() },
+        select: studentSelect,
+      });
     }
 
     if (!student) {

@@ -17,8 +17,8 @@ import {
   spacing,
   typography,
 } from "../theme/tokens";
-import { apiFetch, getApiBase } from "../lib/api";
-import { loadSessionToken } from "../lib/session";
+import { apiFetch } from "../lib/api";
+import { uploadMobileFile } from "../lib/upload";
 import type { BoardCard } from "../lib/types";
 import { AppButton, AppModal, IconButton, TextField } from "./ui";
 
@@ -65,34 +65,12 @@ export function CardComposer({
   }
 
   async function uploadAsset(uri: string, name: string, mime: string): Promise<UploadResult> {
-    const token = await loadSessionToken();
-    const form = new FormData();
-    // RN FormData file 포맷.
-    form.append("file", {
-      uri,
-      name,
-      type: mime,
-    } as unknown as Blob);
-    const res = await fetch(`${getApiBase()}/api/upload`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form as unknown as BodyInit,
-    });
-    if (!res.ok) {
-      const txt = await res.text();
-      throw new Error(`업로드 실패 (${res.status}): ${txt}`);
-    }
-    const body = (await res.json()) as {
-      url: string;
-      name?: string;
-      size?: number;
-      mimeType?: string;
-    };
+    const body = await uploadMobileFile({ uri, name, mimeType: mime });
     return {
       url: body.url,
-      fileName: body.name ?? name,
-      fileSize: body.size ?? 0,
-      mimeType: body.mimeType ?? mime,
+      fileName: body.name,
+      fileSize: body.size,
+      mimeType: body.mimeType,
     };
   }
 

@@ -1,6 +1,7 @@
 // 식물관찰일지 전용 API 클라이언트.
 // 웹의 usePlantMutations 훅과 동일한 엔드포인트를 호출한다.
 import { apiFetch } from "./api";
+import { uploadMobileImage } from "./upload";
 import type { PlantJournalResponse, StudentPlantDTO, ObservationDTO } from "./types";
 
 // ─── 조회 ───
@@ -106,20 +107,5 @@ export async function updateNickname(
 
 /** 이미지 업로드 (multipart/form-data) → URL 반환 */
 export async function uploadImage(uri: string): Promise<string> {
-  const formData = new FormData();
-  const filename = uri.split("/").pop() ?? "photo.jpg";
-  const match = /\.(\w+)$/.exec(filename);
-  const type = match ? `image/${match[1]}` : "image/jpeg";
-
-  formData.append("file", {
-    uri,
-    name: filename,
-    type,
-  } as unknown as Blob);
-
-  const res = await apiFetch<{ url: string }>("/api/upload", {
-    method: "POST",
-    body: formData,
-  });
-  return res.url;
+  return (await uploadMobileImage({ uri })).url;
 }

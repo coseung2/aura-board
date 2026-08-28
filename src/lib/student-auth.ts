@@ -281,6 +281,19 @@ export async function getCurrentStudent() {
   return getCurrentStudentRaw();
 }
 
+/** Minimal upload principal that avoids loading the full, rapidly evolving
+ * Student/Classroom graph for a request that only needs an authenticated id. */
+export async function getCurrentStudentUploadIdentityRaw(): Promise<{ id: string } | null> {
+  const payload = await getVerifiedStudentPayload();
+  if (!payload) return null;
+  const student = await db.student.findUnique({
+    where: { id: payload.studentId },
+    select: { id: true, sessionVersion: true },
+  });
+  if (!student || student.sessionVersion !== payload.sessionVersion) return null;
+  return { id: student.id };
+}
+
 export async function getCurrentStudentRaw() {
   const payload = await getVerifiedStudentPayload();
   if (!payload) return null;

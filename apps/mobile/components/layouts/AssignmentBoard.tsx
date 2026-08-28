@@ -22,8 +22,8 @@ import {
   typography,
   pageChrome,
 } from "../../theme/tokens";
-import { ApiError, apiFetch, getApiBase } from "../../lib/api";
-import { loadSessionToken } from "../../lib/session";
+import { ApiError, apiFetch } from "../../lib/api";
+import { uploadMobileFile } from "../../lib/upload";
 import type { BoardDetailResponse } from "../../lib/types";
 import { ExpandablePostContent } from "../ExpandablePostContent";
 import { AppButton, AppModal, IconButton, Pill, SurfaceCard, TextField } from "../ui";
@@ -310,17 +310,7 @@ function SubmitModal({
   }, [slotId]);
 
   async function upload(uri: string, name: string, mime: string): Promise<string> {
-    const token = await loadSessionToken();
-    const form = new FormData();
-    form.append("file", { uri, name, type: mime } as unknown as Blob);
-    const res = await fetch(`${getApiBase()}/api/upload`, {
-      method: "POST",
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-      body: form as unknown as BodyInit,
-    });
-    if (!res.ok) throw new Error(`upload ${res.status}`);
-    const body = (await res.json()) as { url: string };
-    return body.url;
+    return (await uploadMobileFile({ uri, name, mimeType: mime })).url;
   }
 
   async function pickImage() {
