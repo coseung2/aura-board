@@ -1,0 +1,50 @@
+name: Recover Oracle Services
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oracle-production-recovery
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    name: Restore Supabase and app health
+    runs-on:
+      - self-hosted
+      - Linux
+      - ARM64
+      - aura-board-prod
+    timeout-minutes: 20
+
+    steps:
+      - name: Start Oracle production services
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo systemctl start docker
+          cd /srv/aura-board/supabase
+          sudo docker compose up -d
+
+          db_status=""
+          for _ in $(seq 1 90); do
+            db_status=$(sudo docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' supabase-db 2>/dev/null || true)
+            if [[ "$db_status" == "healthy" ]]; then
+              break
+            fi
+            sleep 5
+          done
+          test "$db_status" = "healthy"
+
+          sudo systemctl restart aura-board-app.service
+          for _ in $(seq 1 30); do
+            if curl --fail --silent --show-error http://127.0.0.1:3000/api/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          sudo systemctl status aura-board-app.service --no-pager
+          exit 1
