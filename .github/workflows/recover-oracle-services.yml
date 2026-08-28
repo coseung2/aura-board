@@ -25,13 +25,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          sudo systemctl start docker
           cd /srv/aura-board/supabase
-          sudo docker compose up -d
+          docker compose up -d
 
           db_status=""
           for _ in $(seq 1 90); do
-            db_status=$(sudo docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' supabase-db 2>/dev/null || true)
+            db_status=$(docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}' supabase-db 2>/dev/null || true)
             if [[ "$db_status" == "healthy" ]]; then
               break
             fi
@@ -39,12 +38,10 @@ jobs:
           done
           test "$db_status" = "healthy"
 
-          sudo systemctl restart aura-board-app.service
           for _ in $(seq 1 30); do
             if curl --fail --silent --show-error http://127.0.0.1:3000/api/health; then
               exit 0
             fi
             sleep 2
           done
-          sudo systemctl status aura-board-app.service --no-pager
           exit 1
