@@ -131,7 +131,7 @@ These checks are staging evidence only. They do not authorize production endpoin
 
 ## Supabase Free + Vercel Warm Standby DR
 
-Oracle Osaka remains the primary for this DR scope. Supabase Free and Vercel are a warm standby path, not active-active production. Until the separately approved production cutover, managed Supabase Pro remains the current production database source of truth. The operational scope and evidence handoff are in [`docs/infrastructure-handoff.md`](infrastructure-handoff.md) and the design constraints are in [`docs/supabase-selfhost-dr.md`](supabase-selfhost-dr.md).
+Oracle Osaka is the production primary and source of truth for this DR scope. Supabase Free and Vercel are a warm standby path, not active-active production. The operational scope and evidence handoff are in [`docs/infrastructure-handoff.md`](infrastructure-handoff.md) and the design constraints are in [`docs/supabase-selfhost-dr.md`](supabase-selfhost-dr.md).
 
 Do not mark any item below complete from a staging-only observation. Record the target project/endpoint, UTC timestamp, deployment or commit SHA, and sanitized SQL/log artifact for every result; never record secret values.
 
@@ -148,6 +148,7 @@ Do not mark any item below complete from a staging-only observation. Record the 
 - [x] Join DR Realtime and verify Broadcast plus Oracle-origin `postgres_changes`; the canary update was received in 1.134 seconds.
 - [x] Create a dedicated `aura-board-dr` Vercel project in the approved team, apply the Next.js framework preset, and verify it has no production env or deployment before Supabase DR is connected.
 - [x] Verify Vercel DR deployment `dpl_5Hu4bGn2aBDEut8YJop2qUt2R3zo` is production `READY` in `icn1` for exact SHA `f35286e1`, with 42 production env names, `/api/health` returning `200`/database reachable/replication fresh, the global media-degraded notice present, unauthenticated upload remaining auth-first `401`, and no deployment error logs.
+- [ ] Enable `.github/workflows/dr-watchdog.yml` with `AURA_DR_HEALTH_URL` and, only for a protected endpoint, `VERCEL_DR_PROTECTION_BYPASS`. Require the DR Vercel production environment to set `AURA_DR_EXPECT_REPLICATION=true` and a valid `AURA_DR_MAX_HEARTBEAT_AGE_SECONDS`; verify a scheduled run every 15 minutes, failure on stale/paused replication, and no automatic promotion or provider mutation.
 
 ### Traffic switch and recovery rehearsal
 

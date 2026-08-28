@@ -318,6 +318,22 @@ DR은 평상시 user traffic을 받지 않는 warm standby로 둔다.
 
 DR 프로젝트가 실제 복구 가능한 상태인지 주기적으로 확인한다.
 
+저장소의 `.github/workflows/dr-watchdog.yml`가 15분마다 DR Vercel의
+`/api/health`를 호출한다. 이 endpoint는 DR database reachability와
+`private.aura_dr_heartbeat`의 freshness를 함께 판정하므로, HTTP 200이 아니거나
+replication이 stale/paused이면 workflow가 실패한다. `AURA_DR_HEALTH_URL`은
+`https://.../api/health` 형식의 repository variable로 설정한다. endpoint에 Vercel
+Deployment Protection이 적용된 경우에만 `VERCEL_DR_PROTECTION_BYPASS` repository
+secret을 추가한다. watchdog은
+자동 failover, subscriber promotion, Supabase unpause, DB write를 수행하지 않는다.
+DR Vercel production 환경에는 `AURA_DR_EXPECT_REPLICATION=true`와 유효한
+`AURA_DR_MAX_HEARTBEAT_AGE_SECONDS`를 설정해야 한다. 이 flag가 빠지면 health route는
+database reachability만 반환하므로 watchdog이 의도적으로 실패한다.
+
+Free project가 pause된 경우 watchdog은 이를 감지할 뿐 자동으로 깨우지 않는다.
+Unpause와 replication 재연결은 올바른 Supabase project owner 권한으로 수동 복구한
+뒤, watchdog 성공과 마지막 heartbeat/lag 증거를 확인해야 한다.
+
 최소 확인 항목:
 
 - DB connection 성공

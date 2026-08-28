@@ -1,0 +1,96 @@
+name: Check Supabase Free and Vercel DR
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: aura-board-dr-watchdog
+  cancel-in-progress: true
+
+jobs:
+  health:
+    name: Verify DR health and replication freshness
+    if: github.repository == 'coseung2/aura-board'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DR_HEALTH_URL: ${{ vars.AURA_DR_HEALTH_URL }}
+      VERCEL_PROTECTION_BYPASS: ${{ secrets.VERCEL_DR_PROTECTION_BYPASS }}
+    steps:
+      - name: Require configured DR endpoint
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 <<'PY'
+          import os
+          from urllib.parse import urlsplit
+
+          value = os.environ.get("DR_HEALTH_URL", "")
+          parsed = urlsplit(value)
+          valid = (
+              parsed.scheme == "https"
+              and parsed.hostname is not None
+              and parsed.username is None
+              and parsed.password is None
+              and parsed.port in (None, 443)
+              and parsed.path == "/api/health"
+              and parsed.query == ""
+              and parsed.fragment == ""
+          )
+          if not valid:
+              raise SystemExit(
+                  "AURA_DR_HEALTH_URL must be an HTTPS origin plus exact /api/health"
+              )
+          PY
+
+      - name: Check DR health
+        shell: bash
+        run: |
+          set -euo pipefail
+          response_file="${RUNNER_TEMP}/dr-health.json"
+          headers=(--header 'Accept: application/json')
+          if [[ -n "${VERCEL_PROTECTION_BYPASS}" ]]; then
+            headers+=(--header "x-vercel-protection-bypass: ${VERCEL_PROTECTION_BYPASS}")
+          fi
+
+          status="$(curl --silent --show-error --max-time 20 \
+            --retry 2 --retry-delay 2 --retry-all-errors \
+            "${headers[@]}" --output "${response_file}" \
+            --write-out '%{http_code}' "${DR_HEALTH_URL}")"
+          if [[ "${status}" != "200" ]]; then
+            echo "DR health returned HTTP ${status}" >&2
+            exit 1
+          fi
+
+          python3 - "${response_file}" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as stream:
+              payload = json.load(stream)
+
+          if not isinstance(payload, dict):
+              raise SystemExit("DR health response is not an object")
+          if payload.get("database") not in ("reachable", "ok", True):
+              raise SystemExit("DR database is not reachable")
+          if payload.get("replication") not in ("fresh", "ok", True):
+              raise SystemExit("DR replication is not fresh")
+          print("DR health: database reachable, replication fresh")
+          PY
+
+      - name: Write failure summary
+        if: ${{ failure() }}
+        shell: bash
+        run: |
+          {
+            echo "## DR watchdog failed"
+            echo
+            echo "Supabase Free/Vercel DR did not report a reachable database and fresh replication."
+            echo "No failover, promotion, or provider mutation was attempted."
+            echo "Inspect the Supabase project state and replication subscriber before recovery."
+          } >> "$GITHUB_STEP_SUMMARY"
