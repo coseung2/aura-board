@@ -158,10 +158,20 @@ const versionsData = await asc(
   token
 );
 const versions = versionsData.data ?? [];
-if (!versions.length) {
-  throw new Error(`No App Store version ${VERSION} (iOS) found for ${app.id}.`);
-}
-const version = versions[0];
+const version = versions[0] ?? (await asc(
+  `/v1/apps/${app.id}/appStoreVersions`,
+  {
+    method: "POST",
+    body: JSON.stringify({
+      data: {
+        type: "appStoreVersions",
+        attributes: { platform: "IOS", versionString: VERSION },
+        relationships: { app: { data: { type: "apps", id: app.id } } },
+      },
+    }),
+  },
+  token
+)).data;
 const state = version.attributes?.appStoreState ?? "UNKNOWN";
 console.log(`App Store version ${VERSION}: id=${version.id} state=${state}`);
 
@@ -175,7 +185,21 @@ if (
 
 // 3. Make sure the version has a non-expired build attached.
 const buildData = await asc(`/v1/appStoreVersions/${version.id}/build`, { method: "GET" }, token);
-const build = buildData?.data;
+let build = buildData?.data;
+if (!build) {
+  const buildsData = await asc(
+    `/v1/builds?filter[app]=${app.id}&filter[preReleaseVersion.version]=${encodeURIComponent(VERSION)}&limit=50`,
+    { method: "GET" },
+    token,
+  );
+  build = (buildsData.data ?? []).find((candidate) => candidate.attributes?.buildState === "VALID") ?? buildsData.data?.[0];
+  if (build) {
+    await asc(`/v1/appStoreVersions/${version.id}/relationships/build`, {
+      method: "PATCH",
+      body: JSON.stringify({ data: { type: "builds", id: build.id } }),
+    }, token);
+  }
+}
 if (!build) {
   throw new Error(`App Store version ${VERSION} has no build attached yet.`);
 }
