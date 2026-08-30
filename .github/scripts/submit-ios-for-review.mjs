@@ -159,7 +159,7 @@ const versionsData = await asc(
 );
 const versions = versionsData.data ?? [];
 const version = versions[0] ?? (await asc(
-  `/v1/apps/${app.id}/appStoreVersions`,
+  "/v1/appStoreVersions",
   {
     method: "POST",
     body: JSON.stringify({
