@@ -24,10 +24,15 @@ describe("sendExpoPush", () => {
   });
 
   it("reports only batches accepted by Expo as attempted", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({
       ok: true,
-      json: vi.fn().mockResolvedValue({ data: [{ status: "ok" }] }),
-    }));
+      json: vi.fn().mockResolvedValue({ data: [{ status: "ok", id: "ticket-1" }] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ data: { "ticket-1": { status: "ok" } } }),
+      }));
 
     await expect(sendExpoPush(devices, message)).resolves.toEqual({
       attempted: 1,
@@ -93,12 +98,16 @@ describe("sendExpoPush", () => {
   });
 
   it("splits 2,000 device-specific messages into batches of 100", async () => {
-    const fetchMock = vi.fn().mockImplementation(async (_url, init: RequestInit) => {
+    const fetchMock = vi.fn().mockImplementation(async (url, init: RequestInit) => {
       const batch = JSON.parse(String(init.body)) as unknown[];
+      if (String(url).includes("getReceipts")) {
+        const ids = (batch as unknown as { ids: string[] }).ids;
+        return { ok: true, json: vi.fn().mockResolvedValue({ data: Object.fromEntries(ids.map((id) => [id, { status: "ok" }])) }) };
+      }
       return {
         ok: true,
         json: vi.fn().mockResolvedValue({
-          data: batch.map(() => ({ status: "ok" })),
+          data: batch.map((_, index) => ({ status: "ok", id: `ticket-${index}` })),
         }),
       };
     });
@@ -120,16 +129,20 @@ describe("sendExpoPush", () => {
       attempted: 2_000,
       invalidDeviceIds: [],
     });
-    expect(fetchMock).toHaveBeenCalledTimes(20);
+    expect(fetchMock).toHaveBeenCalledTimes(40);
   });
 
   it("batches device-specific messages in groups of 100", async () => {
-    const fetchMock = vi.fn().mockImplementation(async (_url, init: RequestInit) => {
+    const fetchMock = vi.fn().mockImplementation(async (url, init: RequestInit) => {
       const payload = JSON.parse(String(init.body)) as unknown[];
+      if (String(url).includes("getReceipts")) {
+        const ids = (payload as unknown as { ids: string[] }).ids;
+        return { ok: true, json: vi.fn().mockResolvedValue({ data: Object.fromEntries(ids.map((id) => [id, { status: "ok" }])) }) };
+      }
       return {
         ok: true,
         json: vi.fn().mockResolvedValue({
-          data: payload.map(() => ({ status: "ok" })),
+          data: payload.map((_, index) => ({ status: "ok", id: `ticket-${index}` })),
         }),
       };
     });
@@ -150,10 +163,10 @@ describe("sendExpoPush", () => {
       attempted: 205,
       invalidDeviceIds: [],
     });
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
     expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toHaveLength(100);
-    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toHaveLength(100);
-    expect(JSON.parse(String(fetchMock.mock.calls[2][1]?.body))).toHaveLength(5);
+    expect(JSON.parse(String(fetchMock.mock.calls[2][1]?.body))).toHaveLength(100);
+    expect(JSON.parse(String(fetchMock.mock.calls[4][1]?.body))).toHaveLength(5);
   });
 
   it("keeps DeviceNotRegistered terminal and observable for cleanup", async () => {
@@ -163,6 +176,46 @@ describe("sendExpoPush", () => {
         data: [{ status: "error", details: { error: "DeviceNotRegistered" } }],
       }),
     }));
+
+    await expect(sendExpoPush(devices, message)).resolves.toEqual({
+      attempted: 1,
+      invalidDeviceIds: ["device-1"],
+    });
+  });
+
+  it("surfaces final receipt errors without exposing tokens", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ data: [{ status: "ok", id: "ticket-1" }] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          data: { "ticket-1": { status: "error", details: { error: "MismatchSenderId" } } },
+        }),
+      }));
+
+    const error = await sendExpoPush(devices, message).catch((value) => value);
+    expect(expoPushFailureDetails(error)).toEqual({
+      reason: "receipt_error",
+      receiptErrors: { MismatchSenderId: 1 },
+    });
+    expect(JSON.stringify(expoPushFailureDetails(error))).not.toContain("token1");
+  });
+
+  it("returns receipt-level unregistered devices for cleanup", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({ data: [{ status: "ok", id: "ticket-1" }] }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          data: { "ticket-1": { status: "error", details: { error: "DeviceNotRegistered" } } },
+        }),
+      }));
 
     await expect(sendExpoPush(devices, message)).resolves.toEqual({
       attempted: 1,
