@@ -8,7 +8,7 @@ Aura Board 모바일 앱의 Android APK/AAB 빌드는 Expo 소스를 직접 네�
 
 ## Core Rule
 
-모바일 앱마다 전용 ASCII 빌드 디렉터리 하나를 사용한다.
+모바일 앱마다 전용 ASCII 빌드 디렉터리 하나를 사용한다. 아래의 `C:\build-...` 경로는 앱별 기본값이며, 다른 드라이브를 사용할 때 `-BuildDir`로 덮어쓸 수 있다.
 
 | App | Source | Build directory |
 |---|---|---|
@@ -36,7 +36,8 @@ Gradle, Android SDK 도구가 사용자 홈이나 임시 디렉터리를 읽고 
 - `GRADLE_USER_HOME`
 - Java `user.home`
 
-또한 Android `local.properties`의 `sdk.dir`는 `C:/Android/Sdk`처럼 forward
+Android SDK는 `ANDROID_HOME`, `ANDROID_SDK_ROOT`, `%LOCALAPPDATA%\Android\Sdk`,
+`C:\Android\Sdk` 순서로 자동 탐색하며, `-AndroidSdkRoot`로 덮어쓸 수 있다. 또한 Android `local.properties`의 `sdk.dir`는 `C:/Android/Sdk`처럼 forward
 slash로 기록한다. Java properties 파일에서 `C:\Android\Sdk` 형태의 백슬래시는
 escape 문자로 해석될 수 있다.
 

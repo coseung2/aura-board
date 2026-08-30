@@ -2,7 +2,7 @@ param(
   [string]$AppSource,
   [string]$BuildDir,
   [ValidateSet('Apk', 'Aab', 'Both')][string]$Output = 'Apk',
-  [string]$AndroidSdkRoot = 'C:\Android\Sdk',
+  [string]$AndroidSdkRoot = '',
   [string]$GradleUserHome,
   [string]$TempDir,
   [string]$JavaUserHome,
@@ -251,6 +251,21 @@ if ($Help) {
 if (-not $AppSource -or -not $BuildDir) {
   Show-Help
   throw 'AppSource and BuildDir are required.'
+}
+
+if ([string]::IsNullOrWhiteSpace($AndroidSdkRoot)) {
+  $sdkCandidates = @($env:ANDROID_HOME, $env:ANDROID_SDK_ROOT)
+  if ($env:LOCALAPPDATA) {
+    $sdkCandidates += Join-Path $env:LOCALAPPDATA 'Android\Sdk'
+  }
+  $sdkCandidates += 'C:\Android\Sdk'
+  foreach ($candidate in $sdkCandidates) {
+    if (-not [string]::IsNullOrWhiteSpace($candidate) -and
+        (Test-Path -LiteralPath $candidate -PathType Container)) {
+      $AndroidSdkRoot = $candidate
+      break
+    }
+  }
 }
 
 $AppSource = Resolve-RequiredPath -Path $AppSource -Label 'AppSource'
