@@ -95,9 +95,9 @@ compose, database, app, and nginx checks pass. Rollback validates the snapshot o
 paths, domain, private IP, and installed file digests before the first attempt. It never
 reads or handles the dedicated role credential.
 
-### DevSpace Bastion session keeper
+### Aura Board Bastion session keeper
 
-Keep public SSH closed. DevSpace administration uses OCI Bastion SSH port-forwarding sessions to the instance private IP and port 22. Because Bastion sessions are intentionally short-lived, the self-hosted `aura-board-prod` GitHub runner can refresh the session through the instance principal after the dedicated IAM policy below is installed and verified. Until then, create Bastion sessions manually.
+Keep public SSH closed. Aura Board administration uses OCI Bastion SSH port-forwarding sessions to the instance private IP and port 22. Because Bastion sessions are intentionally short-lived, the self-hosted `aura-board-prod` GitHub runner can refresh the session through the instance principal after the dedicated IAM policy below is installed and verified. Until then, create Bastion sessions manually.
 
 Create a dedicated dynamic group named `aura-board-bastion-runner` with exactly this matching rule for the current production instance:
 
@@ -108,9 +108,9 @@ instance.id = 'ocid1.instance.oc1.ap-osaka-1.anvwsljrwauhlkacvztijko427vjz6f4zca
 Create a root policy named `aura-board-bastion-session-policy` with the following statements. The session-management permission is constrained to the one Bastion name and one target Compute instance; the remaining permissions are read-only dependencies required by OCI Bastion session creation.
 
 ```text
-Allow dynamic-group aura-board-bastion-runner to use bastion in tenancy where target.bastion.name = 'aura-board-devspace-bastion'
+Allow dynamic-group aura-board-bastion-runner to use bastion in tenancy where target.bastion.name = 'auraboardbastion'
 Allow dynamic-group aura-board-bastion-runner to read bastion-session in tenancy
-Allow dynamic-group aura-board-bastion-runner to manage bastion-session in tenancy where ALL {target.bastion.name = 'aura-board-devspace-bastion', target.resource.ocid = '<CURRENT_PRODUCTION_INSTANCE_OCID>'}
+Allow dynamic-group aura-board-bastion-runner to manage bastion-session in tenancy where ALL {target.bastion.name = 'auraboardbastion', target.resource.ocid = '<CURRENT_PRODUCTION_INSTANCE_OCID>'}
 Allow dynamic-group aura-board-bastion-runner to read instances in tenancy
 Allow dynamic-group aura-board-bastion-runner to read vcn in tenancy
 Allow dynamic-group aura-board-bastion-runner to read subnets in tenancy
@@ -120,9 +120,9 @@ Allow dynamic-group aura-board-bastion-runner to read private-ips in tenancy
 Allow dynamic-group aura-board-bastion-runner to inspect work-requests in tenancy
 ```
 
-`.github/workflows/oci-bastion-session.yml` runs only on the trusted `main` branch and only on the repository-scoped `aura-board-prod` self-hosted ARM64 runner, checking every 10 minutes. The former repository-variable gate was removed only after the live instance-principal session create/reuse, local SSH port forwarding, and public TCP/22 closure all passed. `infra/oracle/renew-bastion-session.sh` reads IMDSv2 for the current instance OCID/private IP, finds the active `aura-board-devspace-bastion`, reuses an existing `aura-board-devspace-auto` session while it has more than 20 minutes left, and otherwise creates a new port-forwarding session using the Bastion's configured maximum TTL. The workflow publishes only session metadata as a one-day GitHub Actions artifact; it never uploads a private SSH key.
+`.github/workflows/oci-bastion-session.yml` runs only on the trusted `main` branch and only on the repository-scoped `aura-board-prod` self-hosted ARM64 runner, checking every 10 minutes. The former repository-variable gate was removed only after the live instance-principal session create/reuse, local SSH port forwarding, and public TCP/22 closure all passed. `infra/oracle/renew-bastion-session.sh` reads IMDSv2 for the current instance OCID/private IP, finds the active `auraboardbastion`, reuses an existing `aura-board-bastion-auto` session while it has more than 20 minutes left, and otherwise creates a new port-forwarding session using the Bastion's configured maximum TTL. The workflow publishes only session metadata as a one-day GitHub Actions artifact; it never uploads a private SSH key.
 
-The current DevSpace SSH public key is embedded in the trusted workflow because public keys are not secrets. Its matching private key remains outside the repository. Rotate this transitional key to a dedicated DevSpace-only SSH key when the execution environment gains a supported secret/key store; do not copy a private key into source control.
+The current Bastion SSH public key is embedded in the trusted workflow because public keys are not secrets. Its matching private key remains outside the repository. Rotate this transitional key to a dedicated Aura Board administration key when the execution environment gains a supported secret/key store; do not copy a private key into source control.
 
 #### Operator session CLI
 
@@ -132,9 +132,9 @@ On an operator machine with an authenticated OCI CLI profile, create or reuse th
 python3 ./infra/oracle/create-bastion-session.py \
   --profile OPERATOR_PROFILE \
   --instance-name testauram-a1-osaka \
-  --bastion-name aura-board-devspace-bastion \
-  --session-name aura-board-devspace-auto \
-  --ssh-public-key-file /path/to/devspace.pub \
+  --bastion-name auraboardbastion \
+  --session-name aura-board-bastion-auto \
+  --ssh-public-key-file /path/to/bastion.pub \
   --output-file /path/to/bastion-session.json
 ```
 

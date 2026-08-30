@@ -3,8 +3,8 @@
 set -Eeuo pipefail
 umask 077
 
-BASTION_NAME="${BASTION_NAME:-aura-board-devspace-bastion}"
-SESSION_NAME="${SESSION_NAME:-aura-board-devspace-auto}"
+BASTION_NAME="${BASTION_NAME:-auraboardbastion}"
+SESSION_NAME="${SESSION_NAME:-aura-board-bastion-auto}"
 TARGET_PORT="${TARGET_PORT:-22}"
 MIN_REMAINING_SECONDS="${MIN_REMAINING_SECONDS:-1200}"
 SSH_PUBLIC_KEY_FILE="${SSH_PUBLIC_KEY_FILE:?SSH_PUBLIC_KEY_FILE is required}"

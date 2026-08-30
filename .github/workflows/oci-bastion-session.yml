@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   renew:
-    name: Keep DevSpace Bastion session active
+    name: Keep Aura Board Bastion session active
     if: github.repository == 'coseung2/aura-board' && github.ref == 'refs/heads/main'
     runs-on:
       - self-hosted
@@ -37,24 +37,24 @@ jobs:
           persist-credentials: false
           clean: true
 
-      - name: Prepare DevSpace Bastion public key
+      - name: Prepare Aura Board Bastion public key
         shell: bash
         env:
-          DEVSPACE_BASTION_PUBLIC_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINu4u9bcaAugHGyhhmX5mTCgYqKsrJtOccLLurH99AoV aura-devspace-bastion
+          BASTION_PUBLIC_KEY: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAINu4u9bcaAugHGyhhmX5mTCgYqKsrJtOccLLurH99AoV aura-board-bastion
         run: |
           set -euo pipefail
           install -d -m 0700 "$RUNNER_TEMP/aura-bastion-session"
-          printf '%s\n' "$DEVSPACE_BASTION_PUBLIC_KEY" > "$RUNNER_TEMP/aura-bastion-session/devspace.pub"
-          chmod 0600 "$RUNNER_TEMP/aura-bastion-session/devspace.pub"
+          printf '%s\n' "$BASTION_PUBLIC_KEY" > "$RUNNER_TEMP/aura-bastion-session/bastion.pub"
+          chmod 0600 "$RUNNER_TEMP/aura-bastion-session/bastion.pub"
 
       - name: Ensure an active OCI Bastion session
         shell: bash
         env:
-          BASTION_NAME: aura-board-devspace-bastion
-          SESSION_NAME: aura-board-devspace-auto
+          BASTION_NAME: auraboardbastion
+          SESSION_NAME: aura-board-bastion-auto
           TARGET_PORT: "22"
           MIN_REMAINING_SECONDS: "1200"
-          SSH_PUBLIC_KEY_FILE: ${{ runner.temp }}/aura-bastion-session/devspace.pub
+          SSH_PUBLIC_KEY_FILE: ${{ runner.temp }}/aura-bastion-session/bastion.pub
           OUTPUT_FILE: ${{ runner.temp }}/aura-bastion-session/session.json
         run: bash infra/oracle/renew-bastion-session.sh
 
