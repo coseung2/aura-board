@@ -533,11 +533,165 @@ describe("notification outbox leases and retries", () => {
     expect(mocks.dispatchStudent).toHaveBeenCalledWith(
       expect.objectContaining({
         kind: "wallet",
+        eventKey: "wallet:transaction-1",
         title: "500원이 나갔어요",
         body: "학급 상점 구매로 처리됐어요. 현재 잔액은 1,500원이에요.",
       }),
       { propagateFailure: true },
     );
     expect(JSON.stringify(mocks.dispatchStudent.mock.calls)).not.toContain("·");
+  });
+
+  it("classifies a recognized reward deposit onto the historical reward event key", async () => {
+    mocks.queryRaw.mockResolvedValueOnce([{
+      id: "outbox-reward",
+      eventType: "transaction",
+      sourceId: "transaction-reward",
+      attempts: 1,
+      lockToken: "lease-reward",
+    }]);
+    mocks.findTransaction.mockResolvedValue({
+      id: "transaction-reward",
+      type: "deposit",
+      amount: 50,
+      balanceAfter: 2050,
+      note: "comment_reward reward [comment:abc123]",
+      sourceType: "comment_reward",
+      createdAt: new Date("2026-08-06T12:21:00.000Z"),
+      account: {
+        studentId: "student-1",
+        classroom: { currency: { unitLabel: "원" } },
+      },
+    });
+
+    await consumeNotificationOutbox({ concurrency: 1 });
+
+    expect(mocks.dispatchStudent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "reward",
+        eventKey: "reward:transaction-reward",
+        sourceId: "transaction-reward",
+        title: "50원이 들어왔어요",
+        body: "댓글 작성 보상으로 처리됐어요. 현재 잔액은 2,050원이에요.",
+        href: "/my/wallet",
+      }),
+      { propagateFailure: true },
+    );
+    expect(JSON.stringify(mocks.dispatchStudent.mock.calls)).not.toContain("wallet:transaction-reward");
+  });
+
+  it("classifies a slime item refund onto the historical refund event key", async () => {
+    mocks.queryRaw.mockResolvedValueOnce([{
+      id: "outbox-refund",
+      eventType: "transaction",
+      sourceId: "transaction-refund",
+      attempts: 1,
+      lockToken: "lease-refund",
+    }]);
+    mocks.findTransaction.mockResolvedValue({
+      id: "transaction-refund",
+      type: "refund",
+      amount: 700,
+      balanceAfter: 2750,
+      note: "slime-item-refund:water-puddle-background",
+      sourceType: "slime_item_refund",
+      createdAt: new Date("2026-08-06T12:22:00.000Z"),
+      account: {
+        studentId: "student-1",
+        classroom: { currency: { unitLabel: "원" } },
+      },
+    });
+
+    await consumeNotificationOutbox({ concurrency: 1 });
+
+    expect(mocks.dispatchStudent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "refund",
+        eventKey: "refund:transaction-refund",
+        sourceId: "transaction-refund",
+        title: "700원이 들어왔어요",
+        body: "슬라임 아이템 환불로 처리됐어요. 현재 잔액은 2,750원이에요.",
+        href: "/my/wallet",
+      }),
+      { propagateFailure: true },
+    );
+    expect(JSON.stringify(mocks.dispatchStudent.mock.calls)).not.toContain("wallet:transaction-refund");
+  });
+
+  it("classifies a slime character refund onto the historical refund event key", async () => {
+    mocks.queryRaw.mockResolvedValueOnce([{
+      id: "outbox-slime-refund",
+      eventType: "transaction",
+      sourceId: "transaction-slime-refund",
+      attempts: 1,
+      lockToken: "lease-slime-refund",
+    }]);
+    mocks.findTransaction.mockResolvedValue({
+      id: "transaction-slime-refund",
+      type: "refund",
+      amount: 500,
+      balanceAfter: 2500,
+      note: "slime-refund:blue",
+      sourceType: "slime_refund",
+      createdAt: new Date("2026-08-06T12:23:00.000Z"),
+      account: {
+        studentId: "student-1",
+        classroom: { currency: { unitLabel: "원" } },
+      },
+    });
+
+    await consumeNotificationOutbox({ concurrency: 1 });
+
+    expect(mocks.dispatchStudent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "refund",
+        eventKey: "refund:transaction-slime-refund",
+        sourceId: "transaction-slime-refund",
+        title: "500원이 들어왔어요",
+        body: "슬라임 환불로 처리됐어요. 현재 잔액은 2,500원이에요.",
+        href: "/my/wallet",
+      }),
+      { propagateFailure: true },
+    );
+    expect(JSON.stringify(mocks.dispatchStudent.mock.calls)).not.toContain(
+      "wallet:transaction-slime-refund",
+    );
+  });
+
+  it("keeps unrecognized transactions on the wallet event key", async () => {
+    mocks.queryRaw.mockResolvedValueOnce([{
+      id: "outbox-wallet-keep",
+      eventType: "transaction",
+      sourceId: "transaction-wallet",
+      attempts: 1,
+      lockToken: "lease-wallet-keep",
+    }]);
+    mocks.findTransaction.mockResolvedValue({
+      id: "transaction-wallet",
+      type: "withdraw",
+      amount: 500,
+      balanceAfter: 1500,
+      note: "학급 상점 구매",
+      sourceType: null,
+      createdAt: new Date("2026-08-06T12:20:00.000Z"),
+      account: {
+        studentId: "student-1",
+        classroom: { currency: { unitLabel: "원" } },
+      },
+    });
+
+    await consumeNotificationOutbox({ concurrency: 1 });
+
+    expect(mocks.dispatchStudent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "wallet",
+        eventKey: "wallet:transaction-wallet",
+        sourceId: "transaction-wallet",
+        title: "500원이 나갔어요",
+        body: "학급 상점 구매로 처리됐어요. 현재 잔액은 1,500원이에요.",
+        href: "/my/wallet",
+      }),
+      { propagateFailure: true },
+    );
   });
 });

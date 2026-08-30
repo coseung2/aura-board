@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   disableDevices: vi.fn(),
   upsertNotification: vi.fn(),
   createManyNotifications: vi.fn(),
+  findManyNotifications: vi.fn(),
   sendExpoPush: vi.fn(),
   sendExpoPushMessages: vi.fn(),
 }));
@@ -31,6 +32,7 @@ vi.mock("@/lib/db", () => ({
     studentNotification: {
       upsert: mocks.upsertNotification,
       createMany: mocks.createManyNotifications,
+      findMany: mocks.findManyNotifications,
     },
   },
 }));
@@ -74,7 +76,12 @@ describe("dispatchStudentNotificationPush", () => {
     mocks.sendExpoPush.mockResolvedValue({ attempted: 1, invalidDeviceIds: [] });
     mocks.sendExpoPushMessages.mockResolvedValue({ attempted: 0, invalidDeviceIds: [] });
     mocks.disableDevices.mockResolvedValue({ count: 0 });
-    mocks.upsertNotification.mockResolvedValue({ id: "notification-1" });
+    mocks.upsertNotification.mockResolvedValue({
+      kind: input.kind,
+      title: input.title,
+      content: input.body,
+      href: input.href,
+    });
   });
 
   it("sends a typed student notification payload to active devices", async () => {
@@ -110,6 +117,12 @@ describe("dispatchStudentNotificationPush", () => {
         kind: "comment",
       }),
       update: {},
+      select: {
+        kind: true,
+        title: true,
+        content: true,
+        href: true,
+      },
     });
     expect(mocks.sendExpoPush).toHaveBeenCalledWith(
       [{ id: "device-1", expoPushToken: "ExpoPushToken[token1]" }],
@@ -120,6 +133,47 @@ describe("dispatchStudentNotificationPush", () => {
           type: "student_notification",
           kind: "comment",
           href: "/board/class-board",
+        },
+      },
+    );
+  });
+
+  it("sends an existing notification center row as the canonical push payload", async () => {
+    mocks.upsertNotification.mockResolvedValue({
+      kind: "reward",
+      title: "독서 보상",
+      content: "책을 읽어 보상을 받았어요.",
+      href: "/my/wallet",
+    });
+
+    await dispatchStudentNotificationPush({
+      ...input,
+      eventKey: "reward:transaction-1",
+      sourceId: "transaction-1",
+      kind: "wallet",
+      title: "500원이 들어왔어요",
+      body: "현재 잔액은 1,500원이에요.",
+    });
+
+    expect(mocks.createDispatch).toHaveBeenCalledWith({
+      data: {
+        studentId: input.studentId,
+        eventKey: "reward:transaction-1",
+        kind: "reward",
+        title: "독서 보상",
+        body: "책을 읽어 보상을 받았어요.",
+        href: "/my/wallet",
+      },
+    });
+    expect(mocks.sendExpoPush).toHaveBeenCalledWith(
+      [{ id: "device-1", expoPushToken: "ExpoPushToken[token1]" }],
+      {
+        title: "독서 보상",
+        body: "책을 읽어 보상을 받았어요.",
+        data: {
+          type: "student_notification",
+          kind: "reward",
+          href: "/my/wallet",
         },
       },
     );
@@ -223,6 +277,24 @@ describe("dispatchStudentNotificationPushBatch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.createManyNotifications.mockResolvedValue({ count: 2 });
+    mocks.findManyNotifications.mockResolvedValue([
+      {
+        studentId: "student-1",
+        eventKey: "morning-tasks:student-1:2026-08-07",
+        kind: "attendance",
+        title: "오늘 출석을 확인해 주세요",
+        content: "오늘 출석을 확인해 주세요.",
+        href: "/student",
+      },
+      {
+        studentId: "student-2",
+        eventKey: "morning-tasks:student-2:2026-08-07",
+        kind: "attendance",
+        title: "오늘 출석을 확인해 주세요",
+        content: "오늘 출석을 확인해 주세요.",
+        href: "/student",
+      },
+    ]);
     mocks.createManyDispatches.mockResolvedValue([
       { id: "dispatch-1", studentId: "student-1", eventKey: "morning-tasks:student-1:2026-08-07" },
       { id: "dispatch-2", studentId: "student-2", eventKey: "morning-tasks:student-2:2026-08-07" },
@@ -256,6 +328,58 @@ describe("dispatchStudentNotificationPushBatch", () => {
     expect(mocks.sendExpoPushMessages).toHaveBeenCalledWith([
       expect.objectContaining({ device: expect.objectContaining({ id: "device-1" }) }),
       expect.objectContaining({ device: expect.objectContaining({ id: "device-2" }) }),
+    ]);
+  });
+
+  it("uses stored notification rows as the canonical batch push payloads", async () => {
+    const push = morningTaskReminderPush({
+      studentId: "student-1",
+      day: "2026-08-07",
+    });
+    mocks.findManyNotifications.mockResolvedValue([
+      {
+        studentId: "student-1",
+        eventKey: push.eventKey,
+        kind: "assignment",
+        title: "저장된 알림 제목",
+        content: "저장된 알림 내용",
+        href: "/board/stored-board",
+      },
+    ]);
+    mocks.createManyDispatches.mockResolvedValue([
+      { id: "dispatch-1", studentId: "student-1", eventKey: push.eventKey },
+    ]);
+    mocks.findDevices.mockResolvedValue([
+      { id: "device-1", studentId: "student-1", expoPushToken: "ExpoPushToken[token1]" },
+    ]);
+
+    await dispatchStudentNotificationPushBatch([push]);
+
+    expect(mocks.createManyDispatches).toHaveBeenCalledWith({
+      data: [{
+        studentId: "student-1",
+        eventKey: push.eventKey,
+        kind: "assignment",
+        title: "저장된 알림 제목",
+        body: "저장된 알림 내용",
+        href: "/board/stored-board",
+      }],
+      skipDuplicates: true,
+      select: { id: true, studentId: true, eventKey: true },
+    });
+    expect(mocks.sendExpoPushMessages).toHaveBeenCalledWith([
+      {
+        device: { id: "device-1", expoPushToken: "ExpoPushToken[token1]" },
+        message: {
+          title: "저장된 알림 제목",
+          body: "저장된 알림 내용",
+          data: {
+            type: "student_notification",
+            kind: "assignment",
+            href: "/board/stored-board",
+          },
+        },
+      },
     ]);
   });
 });

@@ -24,6 +24,8 @@ type StudentSlimeShopSectionProps = Pick<
   | "confirmItemPurchase"
   | "busyColor"
   | "confirmSlimePurchase"
+  | "confirmItemRefund"
+  | "confirmSlimeRefund"
 >;
 
 export function StudentSlimeShopSection({
@@ -40,6 +42,8 @@ export function StudentSlimeShopSection({
   confirmItemPurchase,
   busyColor,
   confirmSlimePurchase,
+  confirmItemRefund,
+  confirmSlimeRefund,
 }: StudentSlimeShopSectionProps) {
   const renderShopItemCard = (item: SlimeShopItem) => (
     <SlimeShopItemCard
@@ -51,6 +55,7 @@ export function StudentSlimeShopSection({
       ownedItemQuantities={home?.ownedItemQuantities ?? {}}
       busyItemKey={busyItemKey}
       onPress={confirmItemPurchase}
+      onRefundItem={confirmItemRefund}
     />
   );
 
@@ -62,6 +67,7 @@ export function StudentSlimeShopSection({
       ownedColors={home?.ownedColors ?? []}
       busyColor={busyColor}
       onPress={confirmSlimePurchase}
+      onRefundSlime={confirmSlimeRefund}
     />
   );
   return (

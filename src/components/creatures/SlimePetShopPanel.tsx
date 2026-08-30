@@ -101,7 +101,9 @@ export function SlimePetShopPanel({
   onFilterChange,
   onWardrobeFilterChange,
   onPurchaseSlime,
+  onRefundSlime,
   onPurchaseItem,
+  onRefundItem,
   onEquipItem,
   onToggleItemVisibility,
   onEquipTitle,
@@ -125,6 +127,7 @@ export function SlimePetShopPanel({
     hiddenItemsByColor,
     busyItemKey,
     onPurchaseItem,
+    onRefundItem,
     onEquipItem,
     onToggleItemVisibility,
   };
@@ -186,6 +189,7 @@ export function SlimePetShopPanel({
           onFilterChange={onFilterChange}
           onWardrobeFilterChange={onWardrobeFilterChange}
           onPurchaseSlime={onPurchaseSlime}
+          onRefundSlime={onRefundSlime}
           onEquipTitle={onEquipTitle}
         />
       </div>

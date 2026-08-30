@@ -72,6 +72,8 @@ export function StudentSlimeScreenView({
     busyColor,
     confirmSlimePurchase,
     confirmItemPurchase,
+    confirmSlimeRefund,
+    confirmItemRefund,
     visibleShopItems,
     nestedShopGroups,
     visibleShopTiers,
@@ -240,6 +242,8 @@ export function StudentSlimeScreenView({
                     confirmItemPurchase={confirmItemPurchase}
                     busyColor={busyColor}
                     confirmSlimePurchase={confirmSlimePurchase}
+                    confirmItemRefund={confirmItemRefund}
+                    confirmSlimeRefund={confirmSlimeRefund}
                   />
                 ) : null}
               </>

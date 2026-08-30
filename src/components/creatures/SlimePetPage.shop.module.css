@@ -581,30 +581,45 @@
   cursor: default;
 }
 
-.shopItemOwned > *:not(.shopOwnedOverlay) {
+.shopItemOwned > .shopCardBody,
+.shopMediaOwned > *:not(.shopRefundOverlay) {
   opacity: 0.42;
   filter: saturate(0.45);
 }
 
-.shopOwnedOverlay {
+.shopRefundOverlay {
   position: absolute;
   inset: 0;
   z-index: 5;
-  display: grid;
-  align-content: center;
-  justify-items: center;
-  gap: 4px;
-  color: var(--color-text-muted);
-  pointer-events: none;
-  text-align: center;
-}
-
-.shopOwnedOverlay svg {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 44px;
+  margin: auto;
+  padding: 0 8px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 0;
   color: var(--color-danger);
+  background: transparent;
+  cursor: pointer;
 }
 
-.shopOwnedOverlay span {
-  color: var(--color-text);
+.shopRefundOverlay:hover,
+.shopRefundOverlay:focus-visible {
+  color: var(--color-danger-active, #912018);
+}
+
+.shopRefundOverlay:focus-visible {
+  outline: 2px solid var(--color-danger);
+  outline-offset: 2px;
+}
+
+.shopRefundOverlay:disabled {
+  cursor: progress;
+}
+
+.shopRefundOverlay span {
   font-size: 12px;
   font-weight: 800;
 }
@@ -742,5 +757,3 @@
 .shopItemActions .shopOwnedChip {
   display: none;
 }
-
-/* Refund keeps the same full-width footer control as buy. */

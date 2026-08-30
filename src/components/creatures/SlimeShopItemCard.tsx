@@ -1,6 +1,8 @@
 "use client";
 
-import { Ban } from "lucide-react";
+import type { KeyboardEvent } from "react";
+
+import { Undo2 } from "lucide-react";
 
 import {
   isSlimeSceneBackground,
@@ -44,6 +46,7 @@ export type SlimeShopItemCardProps = {
   hiddenItemsByColor: Partial<Record<SlimeColor, string[]>>;
   busyItemKey: string | null;
   onPurchaseItem: (item: SlimeShopItem) => void;
+  onRefundItem: (item: SlimeShopItem) => void;
   onEquipItem: (
     color: SlimeColor,
     item: SlimeShopItem,
@@ -70,6 +73,7 @@ export function SlimeShopItemCard({
   hiddenItemsByColor,
   busyItemKey,
   onPurchaseItem,
+  onRefundItem,
   onEquipItem,
   onToggleItemVisibility,
 }: SlimeShopItemCardProps) {
@@ -297,11 +301,24 @@ export function SlimeShopItemCard({
                 {busy ? "처리 중…" : actionLabel}
               </button>
             )}
+            {!isFood ? (
+              <button
+                type="button"
+                className={`${styles.wardrobeInlineAction} ${styles.wardrobeInlineActionDanger}`.trim()}
+                disabled={busyItemKey !== null}
+                onClick={() => onRefundItem(item)}
+                aria-label={`${item.labelKo} 환불`}
+              >
+                {busy ? "처리 중…" : "환불"}
+              </button>
+            ) : null}
           </div>
         </div>
       </li>
     );
   }
+
+  const refundable = owned && !repeatable && !isFood;
 
   return (
     <li
@@ -310,28 +327,32 @@ export function SlimeShopItemCard({
         styles.shopProductCard,
         hasScene ? styles.shopItemScene : "",
         sceneBackground ? styles.shopItemSceneBackground : "",
-        owned && !repeatable ? styles.shopItemOwned : "",
+        refundable ? styles.shopItemOwned : "",
       ]
         .filter(Boolean)
         .join(" ")}
-      role="button"
-      tabIndex={busy || (owned && !repeatable) ? -1 : 0}
-      aria-disabled={busy || (owned && !repeatable)}
-      aria-label={`${item.labelKo} ${owned && !repeatable ? "보유 중" : "구매 미리보기"}`}
-      onClick={() => {
-        if (!busy && (!owned || repeatable)) onPurchaseItem(item);
-      }}
-      onKeyDown={(event) => {
-        if (
-          busy ||
-          (owned && !repeatable) ||
-          (event.key !== "Enter" && event.key !== " ")
-        ) {
-          return;
-        }
-        event.preventDefault();
-        onPurchaseItem(item);
-      }}
+      {...(refundable
+        ? {}
+        : {
+            role: "button",
+            tabIndex: busy ? -1 : 0,
+            "aria-disabled": busy,
+            "aria-label": `${item.labelKo} 구매 미리보기`,
+            onClick: () => {
+              if (!busy && (!owned || repeatable)) onPurchaseItem(item);
+            },
+            onKeyDown: (event: KeyboardEvent<HTMLLIElement>) => {
+              if (
+                busy ||
+                (owned && !repeatable) ||
+                (event.key !== "Enter" && event.key !== " ")
+              ) {
+                return;
+              }
+              event.preventDefault();
+              onPurchaseItem(item);
+            },
+          })}
     >
       <div
         className={[
@@ -339,6 +360,7 @@ export function SlimeShopItemCard({
           styles.shopMedia,
           hasScene ? styles.shopImageFrameScene : "",
           sceneBackground ? styles.shopImageFrameSceneBackground : "",
+          refundable ? styles.shopMediaOwned : "",
         ]
           .filter(Boolean)
           .join(" ")}
@@ -386,6 +408,18 @@ export function SlimeShopItemCard({
             alt={`${item.labelKo} 미리보기`}
           />
         )}
+        {refundable ? (
+          <button
+            type="button"
+            className={styles.shopRefundOverlay}
+            disabled={busyItemKey !== null}
+            onClick={() => onRefundItem(item)}
+            aria-label={`${item.labelKo} 환불`}
+          >
+            <Undo2 size={16} strokeWidth={2.25} aria-hidden="true" />
+            <span>{busy ? "처리 중…" : "환불하기"}</span>
+          </button>
+        ) : null}
       </div>
       <div className={`${styles.shopItemCopy} ${styles.shopCardBody}`.trim()}>
         <div className={styles.shopCardCopy}>
@@ -404,12 +438,6 @@ export function SlimeShopItemCard({
           </p>
         </div>
       </div>
-      {owned && !repeatable ? (
-        <div className={styles.shopOwnedOverlay} aria-hidden="true">
-          <Ban size={22} strokeWidth={2.25} />
-          <span>보유 중</span>
-        </div>
-      ) : null}
     </li>
   );
 }

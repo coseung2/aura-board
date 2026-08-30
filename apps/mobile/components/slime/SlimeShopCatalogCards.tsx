@@ -1,4 +1,4 @@
-import { Ban } from "lucide-react-native";
+import { Undo2 } from "lucide-react-native";
 import {
   StyleSheet,
   Text,
@@ -44,6 +44,7 @@ type SlimeShopItemCardProps = {
   ownedItemQuantities: Readonly<Record<string, number>>;
   busyItemKey: string | null;
   onPress: (item: SlimeShopItem) => void;
+  onRefundItem: (item: SlimeShopItem) => void;
 };
 
 /** Native catalog item card shared by overview and category/tier lists. */
@@ -55,6 +56,7 @@ export function SlimeShopItemCard({
   ownedItemQuantities,
   busyItemKey,
   onPress,
+  onRefundItem,
 }: SlimeShopItemCardProps) {
   const cardWidth = useShopCardWidth();
   const quantity = Math.max(0, ownedItemQuantities[item.key] ?? 0);
@@ -79,17 +81,17 @@ export function SlimeShopItemCard({
   return (
     <ControlPressable
       style={[styles.card, { width: cardWidth }]}
-      disabled={busyItemKey !== null || unavailable}
-      onPress={() => onPress(item)}
+      disabled={busyItemKey !== null}
+      onPress={() => (unavailable ? onRefundItem(item) : onPress(item))}
       accessibilityLabel={`${item.labelKo} ${
         repeatable && quantity > 0
           ? `${quantity}개 보유, 구매`
           : unavailable
-            ? "보유 중"
+            ? "환불하기"
             : `${priceLabel}, 구매`
       }`}
       accessibilityState={{
-        disabled: busyItemKey !== null || unavailable,
+        disabled: busyItemKey !== null,
         busy,
       }}
     >
@@ -97,46 +99,59 @@ export function SlimeShopItemCard({
         style={[
           styles.preview,
           sceneBackground && styles.previewScene,
-          unavailable && styles.contentMuted,
         ]}
         accessible={false}
       >
-        <SlimeSprite
-          slimeColor={slimeShopPreviewColor(item, selectedColor)}
-          evolution="base"
-          action={preview.action}
-          equippedFloor={preview.equippedFloor}
-          displayScale={previewDisplayScale}
-          repeat={Boolean(preview.propAction) && !ballPreviewImagePath}
-          animate={!ballPreviewImagePath}
-          expandSceneSurfaces={preview.expandSceneSurfaces || sceneBackground}
-          itemSpritePath={itemSpritePath}
-          propAction={ballPreviewImagePath ? undefined : preview.propAction}
-          backgroundSpritePath={
-            sceneBackground ? selectSceneBackgroundSpritePath(item) : undefined
-          }
-          wearables={preview.wearables}
-          drinkFlavor={preview.drinkFlavor}
-          vehicleSpritePath={
-            preview.vehicle?.vehicleSheetPath ?? preview.vehicle?.spritePath
-          }
-          vehicleGroundedSpritePath={preview.vehicle?.vehicleGroundedSpritePath}
-          vehicleEffectSpritePaths={preview.vehicle?.vehicleEffectSpritePaths}
-          vehicleFrameCount={preview.vehicle?.vehicleFrameCount}
-          vehicleGroundedFrameCount={preview.vehicle?.vehicleGroundedFrameCount}
-          vehicleGroundedFrameDurationMs={
-            preview.vehicle?.vehicleGroundedFrameDurationMs
-          }
-          vehicleCanvasHeight={preview.vehicle?.vehicleCanvasHeight}
-          vehicleCharacterOffsetY={preview.vehicle?.vehicleCharacterOffsetY}
-          vehicleBobY={preview.vehicle?.vehicleBobY}
-          vehicleRiseY={preview.vehicle?.vehicleRiseY}
-          vehicleOffsetX={preview.vehicle?.vehicleOffsetX}
-          accessibilityLabel={`${item.labelKo} 미리보기`}
-        />
-        {buffLabel ? (
-          <SlimeBuffTierChip label={buffLabel} bps={item.effectBps ?? 0} />
-        ) : null}
+        <View
+          style={[
+            styles.previewContent,
+            unavailable && styles.contentMuted,
+          ]}
+        >
+          <SlimeSprite
+            slimeColor={slimeShopPreviewColor(item, selectedColor)}
+            evolution="base"
+            action={preview.action}
+            equippedFloor={preview.equippedFloor}
+            displayScale={previewDisplayScale}
+            repeat={Boolean(preview.propAction) && !ballPreviewImagePath}
+            animate={!ballPreviewImagePath}
+            expandSceneSurfaces={preview.expandSceneSurfaces || sceneBackground}
+            itemSpritePath={itemSpritePath}
+            propAction={ballPreviewImagePath ? undefined : preview.propAction}
+            backgroundSpritePath={
+              sceneBackground
+                ? selectSceneBackgroundSpritePath(item)
+                : undefined
+            }
+            wearables={preview.wearables}
+            drinkFlavor={preview.drinkFlavor}
+            vehicleSpritePath={
+              preview.vehicle?.vehicleSheetPath ?? preview.vehicle?.spritePath
+            }
+            vehicleGroundedSpritePath={
+              preview.vehicle?.vehicleGroundedSpritePath
+            }
+            vehicleEffectSpritePaths={preview.vehicle?.vehicleEffectSpritePaths}
+            vehicleFrameCount={preview.vehicle?.vehicleFrameCount}
+            vehicleGroundedFrameCount={
+              preview.vehicle?.vehicleGroundedFrameCount
+            }
+            vehicleGroundedFrameDurationMs={
+              preview.vehicle?.vehicleGroundedFrameDurationMs
+            }
+            vehicleCanvasHeight={preview.vehicle?.vehicleCanvasHeight}
+            vehicleCharacterOffsetY={preview.vehicle?.vehicleCharacterOffsetY}
+            vehicleBobY={preview.vehicle?.vehicleBobY}
+            vehicleRiseY={preview.vehicle?.vehicleRiseY}
+            vehicleOffsetX={preview.vehicle?.vehicleOffsetX}
+            accessibilityLabel={`${item.labelKo} 미리보기`}
+          />
+          {buffLabel ? (
+            <SlimeBuffTierChip label={buffLabel} bps={item.effectBps ?? 0} />
+          ) : null}
+        </View>
+        {unavailable ? <RefundOverlay busy={busy} /> : null}
       </View>
       <View style={[styles.cardBody, unavailable && styles.contentMuted]}>
         <Text style={styles.title} numberOfLines={2}>
@@ -148,7 +163,6 @@ export function SlimeShopItemCard({
         ) : null}
         {busy ? <Text style={styles.detail}>처리 중…</Text> : null}
       </View>
-      {unavailable ? <OwnedOverlay /> : null}
     </ControlPressable>
   );
 }
@@ -159,6 +173,7 @@ type SlimeCharacterCatalogCardProps = {
   ownedColors: readonly SlimeColor[];
   busyColor: SlimeColor | null;
   onPress: (slime: SlimeCatalogItem) => void;
+  onRefundSlime: (slime: SlimeCatalogItem) => void;
 };
 
 /** Native character catalog card shared by overview and character tab. */
@@ -168,6 +183,7 @@ export function SlimeCharacterCatalogCard({
   ownedColors,
   busyColor,
   onPress,
+  onRefundSlime,
 }: SlimeCharacterCatalogCardProps) {
   const cardWidth = useShopCardWidth();
   const owned = ownedColors.includes(slime.color);
@@ -177,44 +193,45 @@ export function SlimeCharacterCatalogCard({
   return (
     <ControlPressable
       style={[styles.card, { width: cardWidth }]}
-      disabled={owned || busyColor !== null}
-      onPress={() => onPress(slime)}
-      accessibilityLabel={`${slime.nameKo} ${owned ? "보유 중" : `${priceLabel}, 구매`}`}
-      accessibilityState={{ disabled: owned || busyColor !== null, busy }}
+      disabled={busyColor !== null}
+      onPress={() => (owned ? onRefundSlime(slime) : onPress(slime))}
+      accessibilityLabel={`${slime.nameKo} ${owned ? "환불하기" : `${priceLabel}, 구매`}`}
+      accessibilityState={{ disabled: busyColor !== null, busy }}
     >
-      <View
-        style={[styles.preview, owned && styles.contentMuted]}
-        accessible={false}
-      >
-        <SlimeSprite
-          slimeColor={slime.color}
-          evolution="base"
-          action="idle"
-          equippedFloor="none"
-          displayScale={slimeUi.shopCardSceneDisplayScale}
-          accessibilityLabel={`${slime.nameKo} 미리보기`}
-        />
-        <SlimeBuffTierChip
-          label={`기본 효과 +${slime.baseBuffBps / 100}%`}
-          bps={slime.baseBuffBps}
-        />
+      <View style={styles.preview} accessible={false}>
+        <View style={[styles.previewContent, owned && styles.contentMuted]}>
+          <SlimeSprite
+            slimeColor={slime.color}
+            evolution="base"
+            action="idle"
+            equippedFloor="none"
+            displayScale={slimeUi.shopCardSceneDisplayScale}
+            accessibilityLabel={`${slime.nameKo} 미리보기`}
+          />
+          <SlimeBuffTierChip
+            label={`기본 효과 +${slime.baseBuffBps / 100}%`}
+            bps={slime.baseBuffBps}
+          />
+        </View>
+        {owned ? <RefundOverlay busy={busy} /> : null}
       </View>
       <View style={[styles.cardBody, owned && styles.contentMuted]}>
         <Text style={styles.title} numberOfLines={2}>
           {slime.nameKo}
         </Text>
-        <Text style={styles.price}>{busy ? "구매 중…" : priceLabel}</Text>
+        <Text style={styles.price}>{busy ? "처리 중…" : priceLabel}</Text>
       </View>
-      {owned ? <OwnedOverlay /> : null}
     </ControlPressable>
   );
 }
 
-function OwnedOverlay() {
+function RefundOverlay({ busy }: { busy: boolean }) {
   return (
-    <View style={styles.ownedOverlay} pointerEvents="none" accessible={false}>
-      <Ban size={iconSizes.md} color={colors.danger} strokeWidth={2.25} />
-      <Text style={styles.ownedOverlayText}>보유 중</Text>
+    <View style={styles.refundOverlay} pointerEvents="none" accessible={false}>
+      <Undo2 size={iconSizes.sm} color={colors.danger} strokeWidth={2.25} />
+      <Text style={styles.refundOverlayText}>
+        {busy ? "처리 중…" : "환불하기"}
+      </Text>
     </View>
   );
 }
@@ -249,6 +266,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   previewScene: { backgroundColor: colors.transparent },
+  previewContent: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   cardBody: {
     width: "100%",
     minWidth: 0,
@@ -279,16 +301,17 @@ const styles = StyleSheet.create({
   contentMuted: {
     opacity: states.disabledOpacity,
   },
-  ownedOverlay: {
+  refundOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: layers.cardOverlay,
     alignItems: "center",
     justifyContent: "center",
+    flexDirection: "row",
     gap: spacing.xxs,
   },
-  ownedOverlayText: {
+  refundOverlayText: {
     ...typography.micro,
-    color: colors.text,
+    color: colors.danger,
     fontWeight: "800",
     textAlign: "center",
     includeFontPadding: false,

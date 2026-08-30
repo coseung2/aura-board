@@ -54,6 +54,7 @@ type SlimeShopCatalogContentProps = {
   onFilterChange: (filter: ShopFilter) => void;
   onWardrobeFilterChange?: (filter: WardrobeFilter) => void;
   onPurchaseSlime: (color: SlimeColor) => void;
+  onRefundSlime: (slime: SlimeDefinition) => void;
   onEquipTitle?: (color: SlimeColor, titleKey: string | null) => void;
 };
 
@@ -82,6 +83,7 @@ export function SlimeShopCatalogContent({
   onFilterChange,
   onWardrobeFilterChange,
   onPurchaseSlime,
+  onRefundSlime,
   onEquipTitle,
 }: SlimeShopCatalogContentProps) {
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
@@ -135,6 +137,7 @@ export function SlimeShopCatalogContent({
         busyColor={busyColor}
         unitLabel={unitLabel}
         onPurchaseSlime={onPurchaseSlime}
+        onRefundSlime={onRefundSlime}
       />
     );
   }
@@ -153,6 +156,7 @@ export function SlimeShopCatalogContent({
         cardContext={cardContext}
         onFilterChange={onFilterChange}
         onPurchaseSlime={onPurchaseSlime}
+        onRefundSlime={onRefundSlime}
       />
     );
   }

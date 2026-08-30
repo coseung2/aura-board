@@ -1,6 +1,8 @@
 "use client";
 
-import { Ban } from "lucide-react";
+import type { KeyboardEvent } from "react";
+
+import { Undo2 } from "lucide-react";
 
 import { formatBpsPercent, slimeBuffBpsForStage } from "@/lib/pets/math";
 import { SLIME_HOME_HERO_RENDERER_SCALE } from "@/lib/pets/slime-sprite-geometry";
@@ -22,6 +24,7 @@ type SlimeShopSlimeListProps = {
   busyColor: SlimeColor | null;
   unitLabel: string;
   onPurchaseSlime: (color: SlimeColor) => void;
+  onRefundSlime: (slime: SlimeDefinition) => void;
 };
 
 /** Character catalog list shared by the character tab and all-category carousel. */
@@ -34,6 +37,7 @@ export function SlimeShopSlimeList({
   busyColor,
   unitLabel,
   onPurchaseSlime,
+  onRefundSlime,
 }: SlimeShopSlimeListProps) {
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
   return (
@@ -59,27 +63,30 @@ export function SlimeShopSlimeList({
             <li
               key={slime.key}
               className={`${styles.shopItem} ${styles.shopProductCard} ${owned ? styles.shopItemOwned : ""}`.trim()}
-              role="button"
-              tabIndex={busy || owned ? -1 : 0}
-              aria-disabled={busy || owned}
-              aria-label={`${slime.nameKo} ${owned ? "보유 중" : "구매"}`}
-              onClick={() => {
-                if (!busy && !owned) onPurchaseSlime(slime.color);
-              }}
-              onKeyDown={(event) => {
-                if (
-                  busy ||
-                  owned ||
-                  (event.key !== "Enter" && event.key !== " ")
-                ) {
-                  return;
-                }
-                event.preventDefault();
-                onPurchaseSlime(slime.color);
-              }}
+              {...(owned
+                ? {}
+                : {
+                    role: "button",
+                    tabIndex: busy ? -1 : 0,
+                    "aria-disabled": busy,
+                    "aria-label": `${slime.nameKo} 구매`,
+                    onClick: () => {
+                      if (!busy) onPurchaseSlime(slime.color);
+                    },
+                    onKeyDown: (event: KeyboardEvent<HTMLLIElement>) => {
+                      if (
+                        busy ||
+                        (event.key !== "Enter" && event.key !== " ")
+                      ) {
+                        return;
+                      }
+                      event.preventDefault();
+                      onPurchaseSlime(slime.color);
+                    },
+                  })}
             >
               <div
-                className={`${styles.shopImageFrame} ${styles.shopMedia}`.trim()}
+                className={`${styles.shopImageFrame} ${styles.shopMedia} ${owned ? styles.shopMediaOwned : ""}`.trim()}
                 style={{ minHeight: SHOP_PREVIEW_SLOT_PX }}
               >
                 <OfficialSlimeSprite
@@ -90,6 +97,18 @@ export function SlimeShopSlimeList({
                   scale={SLIME_HOME_HERO_RENDERER_SCALE}
                   alt={`${slime.nameKo} 미리보기`}
                 />
+                {owned ? (
+                  <button
+                    type="button"
+                    className={styles.shopRefundOverlay}
+                    disabled={busyColor !== null}
+                    onClick={() => onRefundSlime(slime)}
+                    aria-label={`${slime.nameKo} 환불`}
+                  >
+                    <Undo2 size={16} strokeWidth={2.25} aria-hidden="true" />
+                    <span>{busy ? "처리 중…" : "환불하기"}</span>
+                  </button>
+                ) : null}
               </div>
               <div
                 className={`${styles.shopItemCopy} ${styles.shopCardBody}`.trim()}
@@ -105,12 +124,6 @@ export function SlimeShopSlimeList({
                   </p>
                 </div>
               </div>
-              {owned ? (
-                <div className={styles.shopOwnedOverlay} aria-hidden="true">
-                  <Ban size={22} strokeWidth={2.25} />
-                  <span>보유 중</span>
-                </div>
-              ) : null}
             </li>
           );
         })}

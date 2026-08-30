@@ -148,7 +148,6 @@ export default function StudentNotificationsScreen() {
               ) : undefined
             }
           />
-          <Text style={styles.subtitle}>좋아요, 댓글과 답글, 입출금, 출석과 과제 소식이에요.</Text>
           {!payload?.items.length ? (
             <View style={styles.emptyState}>
               <Text style={styles.emptyTitle}>새 알림이 없어요.</Text>
@@ -259,11 +258,10 @@ const styles = StyleSheet.create({
     maxWidth: layout.readableMaxWidth,
     alignSelf: "center",
     paddingHorizontal: pageChrome.horizontalPadding,
-    paddingTop: pageChrome.directContentStartGap,
+    paddingTop: pageChrome.contentStartGap,
     paddingBottom: spacing.xxxl + spacing.xl,
     gap: spacing.md,
   },
-  subtitle: { ...typography.body, color: colors.textMuted },
   error: { ...typography.body, color: colors.danger },
   itemList: { gap: spacing.none },
   item: {

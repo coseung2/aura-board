@@ -4,6 +4,10 @@ import {
   ACTIVITY_REWARD_SOURCE_TYPES,
   type ActivityRewardSourceType,
 } from "@/lib/creatures/activity-rewards";
+import {
+  SLIME_ITEM_REFUND_SOURCE_TYPE,
+  SLIME_REFUND_SOURCE_TYPE,
+} from "@/lib/pets/service-contract";
 
 export const STUDENT_NOTIFICATION_KINDS = [
   "like",
@@ -21,14 +25,11 @@ export const STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES =
   ACTIVITY_REWARD_SOURCE_TYPES;
 export type StudentNotificationRewardSourceType = ActivityRewardSourceType;
 
-/**
- * Refund ledger source that students are told about.
- *
- * Mirrors `SLIME_ITEM_REFUND_SOURCE_TYPE`. Refunds are the one case where money
- * arrives without the student doing anything, so they would otherwise land in
- * the wallet silently.
- */
-export const STUDENT_NOTIFICATION_REFUND_SOURCE_TYPE = "slime_item_refund" as const;
+/** Refund ledger sources that students are told about. */
+export const STUDENT_NOTIFICATION_REFUND_SOURCE_TYPES = [
+  SLIME_REFUND_SOURCE_TYPE,
+  SLIME_ITEM_REFUND_SOURCE_TYPE,
+] as const;
 
 /** Item key embedded in a refund note, when the note still carries one. */
 export function studentRefundItemKey(note: string | null): string | null {

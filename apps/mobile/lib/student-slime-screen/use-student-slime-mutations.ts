@@ -268,6 +268,104 @@ export function useStudentSlimeMutations({
     setPendingPurchase(item);
   }, []);
 
+  const refundSlime = useCallback(
+    async (color: SlimeColor) => {
+      if (!home || busyColor || !home.ownedColors.includes(color)) return;
+      setBusyColor(color);
+      setNotice(null);
+      try {
+        await apiFetch("/api/student/slimes/refund", {
+          method: "POST",
+          json: { color },
+        });
+        setNotice({
+          kind: "success",
+          text: `${SLIME_COLOR_LABELS[color]} 슬라임을 환불했어요.`,
+        });
+        await load(true);
+      } catch (mutationError) {
+        setNotice({ kind: "error", text: apiErrorMessage(mutationError) });
+      } finally {
+        setBusyColor(null);
+      }
+    },
+    [busyColor, home, load],
+  );
+
+  const refundItem = useCallback(
+    async (item: SlimeShopItem) => {
+      if (
+        !home ||
+        busyItemKey ||
+        item.category === "food" ||
+        !home.ownedItemKeys.includes(item.key)
+      )
+        return;
+      setBusyItemKey(item.key);
+      setNotice(null);
+      try {
+        await apiFetch("/api/student/slimes/items/refund", {
+          method: "POST",
+          json: { itemKey: item.key },
+        });
+        setNotice({
+          kind: "success",
+          text: `${item.labelKo}를 환불했어요. 모든 펫에서 장착이 해제됐어요.`,
+        });
+        await load(true);
+      } catch (mutationError) {
+        setNotice({ kind: "error", text: apiErrorMessage(mutationError) });
+      } finally {
+        setBusyItemKey(null);
+      }
+    },
+    [busyItemKey, home, load],
+  );
+
+  const confirmSlimeRefund = useCallback(
+    (slime: SlimeCatalogItem) => {
+      if (busyColor || !home?.ownedColors.includes(slime.color)) return;
+      Alert.alert(
+        "환불 확인",
+        `${slime.nameKo}을(를) 환불할까요? 장착 중인 꾸미기 아이템은 환불되지 않아요.`,
+        [
+          { text: "취소", style: "cancel" },
+          {
+            text: "환불",
+            style: "destructive",
+            onPress: () => void refundSlime(slime.color),
+          },
+        ],
+      );
+    },
+    [busyColor, home?.ownedColors, refundSlime],
+  );
+
+  const confirmItemRefund = useCallback(
+    (item: SlimeShopItem) => {
+      if (
+        busyItemKey ||
+        item.category === "food" ||
+        !home?.ownedItemKeys.includes(item.key)
+      ) {
+        return;
+      }
+      Alert.alert(
+        "환불 확인",
+        `${item.labelKo}을(를) 환불할까요? 장착 중인 모든 슬라임에서 자동으로 해제돼요.`,
+        [
+          { text: "취소", style: "cancel" },
+          {
+            text: "환불",
+            style: "destructive",
+            onPress: () => void refundItem(item),
+          },
+        ],
+      );
+    },
+    [busyItemKey, home?.ownedItemKeys, refundItem],
+  );
+
   const toggleItem = useCallback(
     (item: SlimeShopItem) => {
       const currentHome = homeRef.current;
@@ -531,6 +629,8 @@ export function useStudentSlimeMutations({
     purchaseItem,
     confirmSlimePurchase,
     confirmItemPurchase,
+    confirmSlimeRefund,
+    confirmItemRefund,
     toggleItem,
     toggleItemVisibility,
     toggleTitle,

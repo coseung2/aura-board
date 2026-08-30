@@ -124,7 +124,7 @@ export async function dispatchStudentNotificationPush(
 ): Promise<{ attempted: number; skipped: number }> {
   let dispatchId: string | null = null;
   try {
-    await db.studentNotification.upsert({
+    const notification = await db.studentNotification.upsert({
       where: {
         studentId_eventKey: {
           studentId: input.studentId,
@@ -133,17 +133,24 @@ export async function dispatchStudentNotificationPush(
       },
       create: notificationCreateData(input),
       update: {},
+      select: {
+        kind: true,
+        title: true,
+        content: true,
+        href: true,
+      },
     });
+    const canonicalInput = notificationPushFromStoredRow(input, notification);
 
     try {
       const dispatch = await db.studentPushDispatch.create({
         data: {
-          studentId: input.studentId,
-          eventKey: input.eventKey,
-          kind: input.kind,
-          title: input.title,
-          body: input.body,
-          href: input.href,
+          studentId: canonicalInput.studentId,
+          eventKey: canonicalInput.eventKey,
+          kind: canonicalInput.kind,
+          title: canonicalInput.title,
+          body: canonicalInput.body,
+          href: canonicalInput.href,
         },
       });
       dispatchId = dispatch.id;
@@ -163,8 +170,8 @@ export async function dispatchStudentNotificationPush(
     });
     if (devices.length === 0) return { attempted: 0, skipped: 0 };
 
-    const result = await sendExpoPush(devices, pushMessage(input));
-    await disableInvalidDevices(result.invalidDeviceIds, input);
+    const result = await sendExpoPush(devices, pushMessage(canonicalInput));
+    await disableInvalidDevices(result.invalidDeviceIds, canonicalInput);
     return { attempted: result.attempted, skipped: 0 };
   } catch (error) {
     const released = dispatchId
@@ -194,9 +201,6 @@ export async function dispatchStudentNotificationPushBatch(
   ).values());
   if (unique.length === 0) return { attempted: 0, skipped: 0, reserved: 0 };
 
-  const inputByKey = new Map(
-    unique.map((input) => [`${input.studentId}\u001f${input.eventKey}`, input]),
-  );
   let reservations: Array<{ id: string; studentId: string; eventKey: string }> = [];
 
   try {
@@ -204,8 +208,38 @@ export async function dispatchStudentNotificationPushBatch(
       data: unique.map(notificationCreateData),
       skipDuplicates: true,
     });
+    const notifications = await db.studentNotification.findMany({
+      where: {
+        OR: unique.map((input) => ({
+          studentId: input.studentId,
+          eventKey: input.eventKey,
+        })),
+      },
+      select: {
+        studentId: true,
+        eventKey: true,
+        kind: true,
+        title: true,
+        content: true,
+        href: true,
+      },
+    });
+    const notificationsByKey = new Map(
+      notifications.map((notification) => [
+        notificationKey(notification),
+        notification,
+      ]),
+    );
+    const canonicalInputs = unique.map((input) => {
+      const notification = notificationsByKey.get(notificationKey(input));
+      if (!notification) throw new Error("student_notification_canonical_row_missing");
+      return notificationPushFromStoredRow(input, notification);
+    });
+    const inputByKey = new Map(
+      canonicalInputs.map((input) => [notificationKey(input), input]),
+    );
     reservations = await db.studentPushDispatch.createManyAndReturn({
-      data: unique.map((input) => ({
+      data: canonicalInputs.map((input) => ({
         studentId: input.studentId,
         eventKey: input.eventKey,
         kind: input.kind,
@@ -293,6 +327,29 @@ function notificationCreateData(input: StudentNotificationPush) {
     content: input.content === undefined ? input.body : input.content,
     ...(input.createdAt ? { createdAt: input.createdAt } : {}),
   };
+}
+
+function notificationPushFromStoredRow(
+  input: StudentNotificationPush,
+  notification: {
+    kind: string;
+    title: string | null;
+    content: string | null;
+    href: string;
+  },
+): StudentNotificationPush {
+  const kind = notification.kind as StudentPushKind;
+  return {
+    ...input,
+    kind,
+    title: notification.title ?? input.title,
+    body: notification.content ?? input.body,
+    href: notification.href,
+  };
+}
+
+function notificationKey(input: { studentId: string; eventKey: string }): string {
+  return `${input.studentId}\u001f${input.eventKey}`;
 }
 
 function pushMessage(input: StudentNotificationPush) {

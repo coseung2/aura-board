@@ -33,6 +33,7 @@ type SlimeShopAllCategoriesProps = {
   cardContext: SlimeShopItemCardContext;
   onFilterChange: (filter: ShopFilter) => void;
   onPurchaseSlime: (color: SlimeColor) => void;
+  onRefundSlime: (slime: SlimeDefinition) => void;
 };
 
 /** Popular five-up category previews with independent carousel state. */
@@ -48,6 +49,7 @@ export function SlimeShopAllCategories({
   cardContext,
   onFilterChange,
   onPurchaseSlime,
+  onRefundSlime,
 }: SlimeShopAllCategoriesProps) {
   const [categoryPages, setCategoryPages] = useState<Record<string, number>>({});
   const popularCatalog = [...catalog].sort(
@@ -114,6 +116,7 @@ export function SlimeShopAllCategories({
             busyColor={busyColor}
             unitLabel={unitLabel}
             onPurchaseSlime={onPurchaseSlime}
+            onRefundSlime={onRefundSlime}
           />
           {characterPage < characterMaxPage ? (
             <CarouselArrow

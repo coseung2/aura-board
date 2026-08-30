@@ -9,6 +9,13 @@ const migration = readFileSync(join(
   "20260731130000_durable_notification_outbox",
   "migration.sql",
 ), "utf8");
+const slimeRefundMigration = readFileSync(join(
+  process.cwd(),
+  "prisma",
+  "migrations",
+  "20260830173000_enqueue_all_slime_refunds",
+  "migration.sql",
+), "utf8");
 
 describe("durable notification migration", () => {
   it("installs one compact INSERT trigger for every non-attendance source", () => {
@@ -35,5 +42,17 @@ describe("durable notification migration", () => {
   it("documents the polling-to-webhook handoff without adding an Edge runtime", () => {
     expect(migration).toContain("At handoff, remove only the notification-push cron schedule");
     expect(migration).not.toMatch(/Deno\.serve|supabase\/functions/i);
+  });
+
+  it("enqueues both slime character and cosmetic refunds", () => {
+    expect(slimeRefundMigration).toContain(
+      'DROP TRIGGER IF EXISTS "notification_outbox_transaction_insert"',
+    );
+    expect(slimeRefundMigration).toContain(
+      "NEW.\"sourceType\" IN ('slime_refund', 'slime_item_refund')",
+    );
+    expect(slimeRefundMigration).toContain(
+      "EXECUTE FUNCTION private.enqueue_notification_outbox('transaction')",
+    );
   });
 });

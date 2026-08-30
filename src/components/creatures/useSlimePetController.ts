@@ -295,7 +295,7 @@ export function useSlimePetController() {
     if (busyColor || !ownedKeys.includes(slime.color)) return;
     if (
       !window.confirm(
-        `${slime.nameKo}을(를) 환불할까요? 장착한 꾸미기는 보유 목록에 남아요.`,
+        `${slime.nameKo}을(를) 환불할까요? 장착 중인 꾸미기 아이템은 환불되지 않아요.`,
       )
     ) {
       return;
@@ -365,7 +365,7 @@ export function useSlimePetController() {
     if (busyItemKey || !ownedItemKeys.includes(item.key)) return;
     if (
       !window.confirm(
-        `${item.labelKo}을(를) 환불할까요? 모든 펫에서 자동으로 해제돼요.`,
+        `${item.labelKo}을(를) 환불할까요? 장착 중인 모든 슬라임에서 자동으로 해제돼요.`,
       )
     ) {
       return;

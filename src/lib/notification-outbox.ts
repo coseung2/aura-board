@@ -13,6 +13,11 @@ import {
 } from "@/lib/reward-service";
 import { dispatchParentNotificationPush } from "@/lib/parent-push";
 import { dispatchStudentNotificationPush } from "@/lib/student-push";
+import {
+  STUDENT_NOTIFICATION_REFUND_SOURCE_TYPES,
+  STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES,
+  type StudentNotificationKind,
+} from "@/lib/student-notification-contract";
 import { getWalletTransactionDisplay } from "@/lib/wallet-transaction-display";
 
 const DEFAULT_BATCH_SIZE = 50;
@@ -463,11 +468,12 @@ async function processTransaction(sourceId: string): Promise<void> {
   const title = incoming ? `${amount}이 들어왔어요` : `${amount}이 나갔어요`;
   const reason = display.noteLabel ?? display.typeLabel;
   const content = `${reason}${roEuroParticle(reason)} 처리됐어요. ${balance}`;
+  const { kind, eventKey } = classifyTransactionNotification(transaction);
   await dispatchStudentNotificationPush({
-    eventKey: `wallet:${transaction.id}`,
+    eventKey,
     sourceId: transaction.id,
     studentId: transaction.account.studentId,
-    kind: "wallet",
+    kind,
     title,
     body: content,
     href: "/my/wallet",
@@ -554,6 +560,29 @@ function actorLabelFor(
 
 function isIncomingTransaction(type: string): boolean {
   return INCOMING_TRANSACTION_TYPES.has(type);
+}
+
+function classifyTransactionNotification(transaction: {
+  id: string;
+  type: string;
+  sourceType?: string | null;
+}): { kind: Extract<StudentNotificationKind, "reward" | "refund" | "wallet">; eventKey: string } {
+  const sourceType = transaction.sourceType ?? null;
+  if (
+    transaction.type === "deposit"
+    && sourceType
+    && (STUDENT_NOTIFICATION_REWARD_SOURCE_TYPES as readonly string[]).includes(sourceType)
+  ) {
+    return { kind: "reward", eventKey: `reward:${transaction.id}` };
+  }
+  if (
+    transaction.type === "refund"
+    && sourceType
+    && (STUDENT_NOTIFICATION_REFUND_SOURCE_TYPES as readonly string[]).includes(sourceType)
+  ) {
+    return { kind: "refund", eventKey: `refund:${transaction.id}` };
+  }
+  return { kind: "wallet", eventKey: `wallet:${transaction.id}` };
 }
 
 function roEuroParticle(value: string): "로" | "으로" {
