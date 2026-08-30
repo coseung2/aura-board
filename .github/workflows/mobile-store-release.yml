@@ -55,9 +55,9 @@ jobs:
           method: oidc
           identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
           oidc-audience: https://github.com/coseung2
-          project-slug: mobile-release-d-w6g
+          project-slug: aura-board-zp9-h
           env-slug: prod
-          secret-path: /aura-board
+          secret-path: /mobile
 
       - name: Setup Node 24
         uses: actions/setup-node@v6
@@ -107,12 +107,10 @@ jobs:
 
       - name: Materialize Firebase Android config for preflight
         if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android-build' || inputs.platform == 'android' }}
-        env:
-          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.AURA_BOARD_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
-          test -n "$GOOGLE_SERVICES_JSON_BASE64"
+          test -n "$GOOGLE_SERVICES_JSON"
           GOOGLE_SERVICES_PATH="$RUNNER_TEMP/google-services.json"
-          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > "$GOOGLE_SERVICES_PATH"
+          printf '%s' "$GOOGLE_SERVICES_JSON" > "$GOOGLE_SERVICES_PATH"
           chmod 600 "$GOOGLE_SERVICES_PATH"
           node - "$GOOGLE_SERVICES_PATH" <<'NODE'
           const fs = require("node:fs");
@@ -165,9 +163,9 @@ jobs:
           method: oidc
           identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
           oidc-audience: https://github.com/coseung2
-          project-slug: mobile-release-d-w6g
+          project-slug: aura-board-zp9-h
           env-slug: prod
-          secret-path: /aura-board
+          secret-path: /mobile
 
       - name: Setup Node 24
         uses: actions/setup-node@v6
@@ -186,12 +184,10 @@ jobs:
         run: npm ci --legacy-peer-deps
 
       - name: Materialize Firebase Android config
-        env:
-          GOOGLE_SERVICES_JSON_BASE64: ${{ secrets.AURA_BOARD_GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
-          test -n "$GOOGLE_SERVICES_JSON_BASE64"
+          test -n "$GOOGLE_SERVICES_JSON"
           GOOGLE_SERVICES_PATH="$RUNNER_TEMP/google-services.json"
-          printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | tr -d '[:space:]' | base64 --decode > "$GOOGLE_SERVICES_PATH"
+          printf '%s' "$GOOGLE_SERVICES_JSON" > "$GOOGLE_SERVICES_PATH"
           chmod 600 "$GOOGLE_SERVICES_PATH"
           node - "$GOOGLE_SERVICES_PATH" <<'NODE'
           const fs = require("node:fs");
@@ -284,9 +280,9 @@ jobs:
           method: oidc
           identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
           oidc-audience: https://github.com/coseung2
-          project-slug: mobile-release-d-w6g
+          project-slug: aura-board-zp9-h
           env-slug: prod
-          secret-path: /aura-board
+          secret-path: /mobile
 
       - name: Validate promotion input
         run: test "${{ inputs.android_version_code }}" -gt 0
@@ -325,9 +321,9 @@ jobs:
           method: oidc
           identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
           oidc-audience: https://github.com/coseung2
-          project-slug: mobile-release-d-w6g
+          project-slug: aura-board-zp9-h
           env-slug: prod
-          secret-path: /aura-board
+          secret-path: /mobile
 
       - name: Setup Node 24
         uses: actions/setup-node@v6
@@ -399,9 +395,9 @@ jobs:
           method: oidc
           identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
           oidc-audience: https://github.com/coseung2
-          project-slug: mobile-release-d-w6g
+          project-slug: aura-board-zp9-h
           env-slug: prod
-          secret-path: /aura-board
+          secret-path: /mobile
 
       - name: Setup Node 24
         uses: actions/setup-node@v6
@@ -418,5 +414,5 @@ jobs:
             echo "## iOS review submission"
             echo "- Commit: $GITHUB_SHA"
             echo "- Version: ${{ inputs.expected_version }}"
-            echo "- Source: App Store Connect API (infisical mobile-release-d-w6g secrets)"
+            echo "- Source: App Store Connect API (Infisical aura-board-zp9-h /mobile secrets)"
           } >> "$GITHUB_STEP_SUMMARY"

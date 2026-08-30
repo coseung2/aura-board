@@ -29,7 +29,7 @@ function fail(message) {
     console.error(`Loaded Apple-related env var names: ${candidates.join(", ")}`);
   } else {
     console.error(
-      "No APPLE*/ASC_API* env vars are loaded. Check the Infisical secret names in project slug mobile-release-d-w6g (path /aura-board, env prod)."
+      "No APPLE*/ASC_API* env vars are loaded. Check the Infisical secret names in project aura-board-zp9-h (path /mobile, env prod)."
     );
   }
   process.exit(1);

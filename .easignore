@@ -3,6 +3,10 @@
 
 # Dependencies and generated build output
 node_modules/
+node_modules
+/node_modules/
+apps/mobile/node_modules/
+**/node_modules/
 .next/
 out/
 dist/
@@ -46,6 +50,8 @@ apps/mobile/android/
 
 # Repository-local tooling and artifacts
 .git/
+\.git
+/.git/
 .codegraph/
 .codex/
 .codex-remote-attachments/

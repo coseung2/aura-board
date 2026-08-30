@@ -76,6 +76,7 @@
 | 위치 | 이름 |
 | --- | --- |
 | Infisical `prod` `/` | `CRON_SECRET`, `AURA_BOARD_BASE_URL` |
+| Infisical `prod` `/mobile` | 모바일 release의 `EXPO_TOKEN`, Google Play service account, Firebase Android config, Apple release metadata |
 | GitHub Actions | Infisical OIDC identity와 project slug만 workflow에 기록하며 장기 secret은 저장하지 않음 |
 | Vercel/server | `CRON_SECRET`, `DATABASE_URL`, `DIRECT_URL` |
 | Supabase/client·server | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `AURA_STORAGE_BUCKET` |
@@ -87,6 +88,17 @@
 GitHub environment의 정확한 이름은 `Production`이며 environment 자체는 이미 존재한다. GitHub에 `CRON_SECRET`이나 앱 URL을 복제하지 않고, `id-token: write`로 발급된 단기 GitHub OIDC token을 Infisical 전용 identity와 교환해 `prod` `/`의 두 값을 실행 중에만 주입한다. identity는 `Production` environment, `main`, `cron-jobs.yml`, `coseung2/aura-board`에 한정하며 project role은 `viewer`, access token TTL은 900초다.
 
 `AURA_BOARD_BASE_URL`은 운영 HTTPS 앱 오리진이며 Infisical 기준값은 `https://aura-board.com`이다. `CRON_SECRET` 값 자체는 문서나 log에 기록하지 않는다. Oracle 앱과 Supabase Vault의 callback secret은 항상 동일하게 유지하고, 기존 credential 값을 문서에 복사하지 않는다.
+
+### 모바일 release compute
+
+- iOS release 우선순위는 Codemagic, EAS cloud build, GitHub Actions 순서다. 사용할 수 있는 local Mac은 없으며, 기본 iOS 경로는 Codemagic Mac에서 EAS CLI의 `eas build --local`을 실행하는 방식이다. 따라서 이 경로는 EAS cloud build quota를 사용하지 않는다.
+- 루트 [`codemagic.yaml`](../codemagic.yaml)의 `ios-verify`는 secret 없이 Node 22와 최신 Xcode에서 `apps/mobile`의 clean install, typecheck, design check, Expo iOS config 및 unsigned export를 검증한다.
+- `ios-testflight`는 동일 검증을 통과한 뒤 production EAS profile로 `com.auraboard.app` IPA를 `$CM_BUILD_DIR/artifacts/aura-board-ios.ipa`에 생성하고 EAS submit으로 TestFlight에 업로드한다. App Store 심사 제출은 이 workflow의 범위가 아니다.
+- Codemagic에는 environment group `aura_board_infisical`을 만들고 masked `INFISICAL_TOKEN` 하나만 등록한다. runtime/release 값은 Infisical project `b850cd45-d5d6-4211-b33e-7641f45f3d48`, env `prod`, path `/mobile`에 유지하며 build와 submit 명령은 각각 `infisical run`으로 감싼다. workflow와 log에서는 token 값을 출력하지 않고 필요한 변수 이름의 존재 여부만 검사한다.
+- `aura_board_infisical`의 bootstrap은 `prod:/mobile` read-only service token이며 2027-08-30 전에 회전한다. Codemagic에는 새 값을 masked variable로 교체하고 이전 token은 Infisical에서 폐기한다.
+- Android release는 기존 EAS cloud/local Windows 절차를 그대로 사용한다. Codemagic workflow는 Android build 또는 submit을 대체하지 않는다.
+
+새 모바일 프로젝트도 프로젝트별 Infisical project의 `dev /mobile`, `prod /mobile`을 먼저 만들고, Codemagic에는 해당 프로젝트만 읽는 app-scoped `INFISICAL_TOKEN` 하나만 둔다. `ios-verify`는 secret과 서명 없이 실행하고, `ios-testflight`만 production secret과 signing을 사용한다. Expo 앱은 Codemagic Mac의 local EAS build를 기본으로 하고 EAS cloud와 GitHub Actions를 차례로 대체 경로로 유지한다. Flutter처럼 EAS를 사용할 수 없는 앱은 Codemagic native build 다음 GitHub Actions를 대체 경로로 둔다.
 
 ## 단계별 실행 계획
 

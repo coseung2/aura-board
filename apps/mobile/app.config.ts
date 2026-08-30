@@ -12,7 +12,7 @@ const config: ExpoConfig = {
   name: "Aura-board",
   slug: "aura-board-mobile",
   scheme: "auraboard",
-  version: "1.0.9",
+  version: "1.0.10",
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",

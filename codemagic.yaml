@@ -1,0 +1,88 @@
+workflows:
+  ios-verify:
+    name: Aura Board iOS verification
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      node: "22"
+      xcode: latest
+    scripts:
+      - name: Install mobile dependencies
+        script: |
+          cd "$CM_BUILD_DIR/apps/mobile"
+          npm ci
+      - name: Run mobile checks
+        script: |
+          cd "$CM_BUILD_DIR/apps/mobile"
+          npm run typecheck
+          npm run design:check
+      - name: Validate unsigned iOS export
+        script: |
+          mkdir -p "$CM_BUILD_DIR/artifacts"
+          cd "$CM_BUILD_DIR/apps/mobile"
+          npx expo config --type public --json > "$CM_BUILD_DIR/artifacts/expo-ios-config.json"
+          node -e 'const config = require(process.argv[1]); if (config.ios?.bundleIdentifier !== "com.auraboard.app") throw new Error("Unexpected iOS bundle identifier");' "$CM_BUILD_DIR/artifacts/expo-ios-config.json"
+          npx expo export --platform ios --clear --output-dir "$CM_BUILD_DIR/artifacts/ios-export"
+    artifacts:
+      - artifacts/expo-ios-config.json
+      - artifacts/ios-export/**
+
+  ios-testflight:
+    name: Aura Board iOS TestFlight
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+    environment:
+      groups:
+        - aura_board_infisical
+      node: "22"
+      xcode: latest
+    scripts:
+      - name: Install mobile dependencies
+        script: |
+          cd "$CM_BUILD_DIR/apps/mobile"
+          npm ci
+      - name: Install release CLIs
+        script: |
+          brew install infisical/get-cli/infisical
+          npm install --global eas-cli@23.0.0
+      - name: Run mobile checks
+        script: |
+          cd "$CM_BUILD_DIR/apps/mobile"
+          npm run typecheck
+          npm run design:check
+      - name: Validate unsigned iOS export
+        script: |
+          mkdir -p "$CM_BUILD_DIR/artifacts"
+          cd "$CM_BUILD_DIR/apps/mobile"
+          npx expo config --type public --json > "$CM_BUILD_DIR/artifacts/expo-ios-config.json"
+          node -e 'const config = require(process.argv[1]); if (config.ios?.bundleIdentifier !== "com.auraboard.app") throw new Error("Unexpected iOS bundle identifier");' "$CM_BUILD_DIR/artifacts/expo-ios-config.json"
+          npx expo export --platform ios --clear --output-dir "$CM_BUILD_DIR/artifacts/ios-export"
+      - name: Validate release environment
+        script: |
+          if [ -z "${INFISICAL_TOKEN:-}" ]; then
+            echo "Missing required variable: INFISICAL_TOKEN" >&2
+            exit 1
+          fi
+          infisical run --projectId=b850cd45-d5d6-4211-b33e-7641f45f3d48 --env=prod --path=/mobile -- sh -c '
+            if [ -z "${EXPO_TOKEN:-}" ]; then
+              echo "Missing required variable: EXPO_TOKEN" >&2
+              exit 1
+            fi
+          '
+      - name: Build production IPA locally
+        script: |
+          cd "$CM_BUILD_DIR/apps/mobile"
+          infisical run --projectId=b850cd45-d5d6-4211-b33e-7641f45f3d48 --env=prod --path=/mobile -- \
+            eas build --platform ios --profile production --local --non-interactive \
+              --output "$CM_BUILD_DIR/artifacts/aura-board-ios.ipa"
+          test -s "$CM_BUILD_DIR/artifacts/aura-board-ios.ipa"
+      - name: Submit IPA to TestFlight
+        script: |
+          cd "$CM_BUILD_DIR/apps/mobile"
+          infisical run --projectId=b850cd45-d5d6-4211-b33e-7641f45f3d48 --env=prod --path=/mobile -- \
+            eas submit --platform ios --profile production \
+              --path "$CM_BUILD_DIR/artifacts/aura-board-ios.ipa" --wait --non-interactive
+    artifacts:
+      - artifacts/aura-board-ios.ipa
+      - artifacts/expo-ios-config.json
+      - artifacts/ios-export/**
