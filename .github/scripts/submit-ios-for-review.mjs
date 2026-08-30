@@ -209,7 +209,7 @@ console.log(`Build: ${build.attributes?.version ?? build.id} (state=${build.attr
 
 // 4. Avoid duplicating an existing review submission that is still open.
 const submissionsData = await asc(
-  `/v1/reviewSubmissions?limit=50&sort=-submittedDate`,
+  `/v1/reviewSubmissions?filter[app]=${app.id}&limit=50`,
   { method: "GET" },
   token
 );
