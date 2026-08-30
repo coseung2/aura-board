@@ -34,7 +34,7 @@
 
 ## 재발 방지
 
-- Bastion keeper가 compose config label, loopback `15433`, current v2 slot active 상태를 함께 검사한다.
+- Bastion keeper가 비특권으로 loopback `15433` listener/TCP를 검사하고, DR watchdog이 current v2 slot을 통한 heartbeat freshness를 검사한다.
 - migration `20260830113000_restore_dr_replication_contract`가 publication tables의 bounded replication-role `SELECT`를 다시 보장한다.
 - Supabase DR control-plane은 `npm run supabase:dr -- ...` wrapper와 Infisical `SUPABASE_ACCESS_TOKEN_DR`만 사용한다.
 

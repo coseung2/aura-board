@@ -58,16 +58,12 @@ jobs:
           OUTPUT_FILE: ${{ runner.temp }}/aura-bastion-session/session.json
         run: bash infra/oracle/renew-bastion-session.sh
 
-      - name: Verify DR replication runtime contract
+      - name: Verify DR replication listener contract
         shell: bash
         run: |
           set -euo pipefail
-          compose_files="$(sudo -n docker inspect --format '{{ index .Config.Labels "com.docker.compose.project.config_files" }}' supabase-db)"
-          [[ "$compose_files" == *"docker-compose.replication.yml"* ]]
-          sudo -n ss -ltnH 'sport = :15433' | grep -q '127.0.0.1:15433'
-          slot_state="$(sudo -n docker exec supabase-db psql -XAtq -U supabase_admin -d postgres \
-            -c "SELECT database || '|' || active FROM pg_replication_slots WHERE slot_name = 'aura_board_oracle_dr_slot_v2'")"
-          test "$slot_state" = 'postgres|true'
+          ss -ltnH 'sport = :15433' | grep -q '127.0.0.1:15433'
+          timeout 5 bash -c '</dev/tcp/127.0.0.1/15433'
 
       - name: Publish current session metadata
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

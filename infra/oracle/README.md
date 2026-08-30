@@ -65,8 +65,9 @@ other local TCP/5432 listener is rejected, and `/etc/iptables/rules.v4` is persi
 Keep `docker-compose.replication.yml` in the root-owned Supabase `.env` `COMPOSE_FILE`
 list after installation. Running the base compose file alone recreates `supabase-db`
 without `127.0.0.1:15433`, leaving nginx TLS healthy but closing subscriber sessions
-before PostgreSQL. The Bastion keeper verifies both the compose label and listener on
-every run; do not treat a successful TLS handshake alone as replication health.
+before PostgreSQL. The unprivileged Bastion keeper verifies the loopback listener and
+TCP acceptance on every run, while the DR watchdog verifies slot/heartbeat freshness;
+do not treat a successful TLS handshake alone as replication health.
 
 The checked-in `infra/oracle/nsg-replication-5432.json` is one explicit OCI `INGRESS`
 TCP/5432 rule. The host script never mutates the NSG. After approval, an operator adds
