@@ -153,7 +153,7 @@ console.log(`App: ${app.attributes.name ?? BUNDLE_ID} (${app.id})`);
 const versionsData = await asc(
   `/v1/apps/${app.id}/appStoreVersions?filter[platform]=IOS&filter[versionString]=${encodeURIComponent(
     VERSION
-  )}&limit=50&sort=-lastModified`,
+  )}&limit=50`,
   { method: "GET" },
   token
 );
