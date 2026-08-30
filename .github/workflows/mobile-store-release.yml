@@ -53,7 +53,7 @@ jobs:
         uses: Infisical/secrets-action@v1.0.9
         with:
           method: oidc
-          identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
+          identity-id: c45f8370-4f1b-4f7b-8851-0050eaf1df63
           oidc-audience: https://github.com/coseung2
           project-slug: aura-board-zp9-h
           env-slug: prod
@@ -161,7 +161,7 @@ jobs:
         uses: Infisical/secrets-action@v1.0.9
         with:
           method: oidc
-          identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
+          identity-id: c45f8370-4f1b-4f7b-8851-0050eaf1df63
           oidc-audience: https://github.com/coseung2
           project-slug: aura-board-zp9-h
           env-slug: prod
@@ -278,7 +278,7 @@ jobs:
         uses: Infisical/secrets-action@v1.0.9
         with:
           method: oidc
-          identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
+          identity-id: c45f8370-4f1b-4f7b-8851-0050eaf1df63
           oidc-audience: https://github.com/coseung2
           project-slug: aura-board-zp9-h
           env-slug: prod
@@ -319,7 +319,7 @@ jobs:
         uses: Infisical/secrets-action@v1.0.9
         with:
           method: oidc
-          identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
+          identity-id: c45f8370-4f1b-4f7b-8851-0050eaf1df63
           oidc-audience: https://github.com/coseung2
           project-slug: aura-board-zp9-h
           env-slug: prod
@@ -393,7 +393,7 @@ jobs:
         uses: Infisical/secrets-action@v1.0.9
         with:
           method: oidc
-          identity-id: 2655fa57-76cd-4dab-bbd2-597bb61051d5
+          identity-id: c45f8370-4f1b-4f7b-8851-0050eaf1df63
           oidc-audience: https://github.com/coseung2
           project-slug: aura-board-zp9-h
           env-slug: prod
