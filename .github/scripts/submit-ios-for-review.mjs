@@ -115,7 +115,9 @@ async function asc(pathname, options = {}, token, attempt = 1) {
       ...(options.headers ?? {}),
     },
   });
-  if (response.ok) return response.json();
+  if (response.ok) {
+    return response.status === 204 ? {} : response.json();
+  }
 
   const detail = await response.text().catch(() => "");
   // 429/5xx: retry with backoff a few times; any other error is terminal.
