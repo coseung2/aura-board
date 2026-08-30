@@ -207,6 +207,28 @@ if (!build) {
 }
 console.log(`Build: ${build.attributes?.version ?? build.id} (state=${build.attributes?.buildState ?? "UNKNOWN"})`);
 
+// App Store Connect requires version-localized release notes before review.
+const localizationsData = await asc(
+  `/v1/appStoreVersions/${version.id}/appStoreVersionLocalizations`,
+  { method: "GET" },
+  token,
+);
+for (const localization of localizationsData.data ?? []) {
+  if (localization.attributes?.whatsNew) continue;
+  await asc(`/v1/appStoreVersionLocalizations/${localization.id}`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      data: {
+        type: "appStoreVersionLocalizations",
+        id: localization.id,
+        attributes: {
+          whatsNew: "알림 전달 안정화와 펫 환불 기능을 개선했습니다.",
+        },
+      },
+    }),
+  }, token);
+}
+
 // 4. Avoid duplicating an existing review submission that is still open.
 const submissionsData = await asc(
   `/v1/reviewSubmissions?filter[app]=${app.id}&limit=50`,
