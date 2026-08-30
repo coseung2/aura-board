@@ -28,6 +28,7 @@
     "test:watch": "vitest",
     "db:push": "prisma db push",
     "db:reset": "prisma db push --force-reset",
+    "supabase:dr": "node scripts/supabase-dr.mjs",
     "ds:check": "bash scripts/ds-check.sh",
     "seed": "tsx prisma/seed.ts",
     "seed:plant": "tsx prisma/seed-plant-journal.ts",

@@ -77,6 +77,7 @@
 | --- | --- |
 | Infisical `prod` `/` | `CRON_SECRET`, `AURA_BOARD_BASE_URL` |
 | Infisical `prod` `/mobile` | 모바일 release의 `EXPO_TOKEN`, Google Play service account, Firebase Android config, Apple release metadata |
+| Infisical `dev`/`prod` `/` | Supabase DR control-plane read-only token `SUPABASE_ACCESS_TOKEN_DR`; use the repository wrapper rather than copying the token into a local CLI login |
 | GitHub Actions | Infisical OIDC identity와 project slug만 workflow에 기록하며 장기 secret은 저장하지 않음 |
 | Vercel/server | `CRON_SECRET`, `DATABASE_URL`, `DIRECT_URL` |
 | Supabase/client·server | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_STORAGE_BUCKET`, `AURA_STORAGE_BUCKET` |
@@ -84,6 +85,15 @@
 | Cloudflare Stream | `CF_ACCOUNT_ID`, `CF_STREAM_API_TOKEN` |
 | Oracle backup worker | `DATABASE_URL`, `OCI_NAMESPACE`, `OCI_BUCKET_NAME`, `OCI_OBJECT_PREFIX`, `OCI_REGION` |
 | Vercel Blob 잔여 이전 시에만 | `BLOB_READ_WRITE_TOKEN` |
+
+Supabase DR operator access is standardized through `npm run supabase:dr -- ...`.
+The wrapper loads `SUPABASE_ACCESS_TOKEN_DR` from Infisical at execution time,
+maps it in memory to the CLI's `SUPABASE_ACCESS_TOKEN`, and targets the
+`aura-board-dr` project (`ivfwgyapgnpwwzllpync`). Do not use `supabase login`
+with this token or copy it into a local file. The default Infisical scope is
+`prod:/`; use `SUPABASE_DR_INFISICAL_ENV=dev` only for explicitly dev-scoped
+operations. A read-only `npm run supabase:dr -- projects list` check confirmed
+the DR project is `ACTIVE_HEALTHY` on 2026-08-30.
 
 GitHub environment의 정확한 이름은 `Production`이며 environment 자체는 이미 존재한다. GitHub에 `CRON_SECRET`이나 앱 URL을 복제하지 않고, `id-token: write`로 발급된 단기 GitHub OIDC token을 Infisical 전용 identity와 교환해 `prod` `/`의 두 값을 실행 중에만 주입한다. identity는 `Production` environment, `main`, `cron-jobs.yml`, `coseung2/aura-board`에 한정하며 project role은 `viewer`, access token TTL은 900초다.
 

@@ -25,6 +25,14 @@ for bounded specialist tasks. The project source of truth is the current code,
 - Development secrets and environment variables are managed in Infisical.
   Do not expect a local `.env` file or start authenticated/database-backed
   development flows with plain `npm run dev`.
+- Supabase DR control-plane commands must use `npm run supabase:dr -- ...`.
+  The wrapper injects the read-only `SUPABASE_ACCESS_TOKEN_DR` from Infisical
+  project `b850cd45-d5d6-4211-b33e-7641f45f3d48`, environment `prod`, path `/`,
+  and maps it only in memory to the Supabase CLI's `SUPABASE_ACCESS_TOKEN`.
+  The target project is `aura-board-dr` (ref `ivfwgyapgnpwwzllpync`).
+  Never run `supabase login` with this token or copy the token into source,
+  shell history, logs, or chat. Use `SUPABASE_DR_INFISICAL_ENV=dev` only for an
+  explicitly dev-scoped operation.
 - Web development server: `infisical run --env=dev -- npm run dev`
 - Combined web and Expo development servers:
   `.codex\scripts\start-dev-servers.ps1` (injects the Infisical `dev`
