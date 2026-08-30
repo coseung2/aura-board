@@ -39,7 +39,7 @@ concurrency:
 jobs:
   validate:
     name: Validate release inputs
-    environment: production
+    environment: Production
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -145,7 +145,7 @@ jobs:
 
   android:
     name: Android AAB build and optional production submission
-    environment: production
+    environment: Production
     if: ${{ inputs.platform == 'all' || inputs.platform == 'android-build' || inputs.platform == 'android' }}
     needs: validate
     runs-on: ubuntu-latest
@@ -265,7 +265,7 @@ jobs:
 
   android-promote:
     name: Promote existing Android version to production
-    environment: production
+    environment: Production
     if: ${{ inputs.platform == 'android-promote' }}
     needs: validate
     runs-on: ubuntu-latest
@@ -303,7 +303,7 @@ jobs:
 
   ios:
     name: iOS IPA build and optional App Store Connect submission
-    environment: production
+    environment: Production
     if: ${{ inputs.platform == 'all' || inputs.platform == 'ios-build' || inputs.platform == 'ios' }}
     needs: validate
     runs-on: macos-26
@@ -380,7 +380,7 @@ jobs:
 
   ios-submit-review:
     name: iOS submit for review
-    environment: production
+    environment: Production
     if: ${{ inputs.platform == 'ios-submit' }}
     needs: validate
     runs-on: ubuntu-latest
