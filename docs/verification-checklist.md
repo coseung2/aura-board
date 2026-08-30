@@ -142,13 +142,13 @@ Do not mark any item below complete from a staging-only observation. Record the 
 
 ### Data and service parity
 
-- [x] Compare primary and Supabase Free migration history plus schema-only/catalog evidence: 167 tables, 625 indexes, public/private functions 8/7, trigger 9, RLS policy/table 18/167, Realtime publication 6, and 148,993 rows exact match. Share RLS allowed/denied probes retained in the 2026-08-20 handoff.
-- [x] Verify logical replication publisher/subscriber state: 167/167 tables replicating, `pgoutput` source slot active, apply/sync errors 0, one-minute heartbeat replicated, latest-end age approximately 1.15 seconds during acceptance.
+- [x] Compare primary and Supabase Free migration history plus current publication data: after applying four missing schema migrations on 2026-08-30, source/DR migration history was 146/146 and all 176 publication table row counts matched exactly with zero mismatches. The earlier catalog/RLS/Realtime evidence remains in the 2026-08-20 handoff.
+- [x] Verify logical replication publisher/subscriber state: current `postgres` slot `aura_board_oracle_dr_slot_v2` active, 176/176 subscription relations `ready`, apply errors 0, and the private heartbeat fresh. The single retained sync-error counter is the pre-recovery missing-grant failure recorded in the incident.
 - [x] Exercise DR PostgREST: service-role `200`/1 row; anonymous no token `200`/0; valid share token `200`/1; invalid token `200`/0.
 - [x] Join DR Realtime and verify Broadcast plus Oracle-origin `postgres_changes`; the canary update was received in 1.134 seconds.
 - [x] Create a dedicated `aura-board-dr` Vercel project in the approved team, apply the Next.js framework preset, and verify it has no production env or deployment before Supabase DR is connected.
-- [x] Verify Vercel DR deployment `dpl_5Hu4bGn2aBDEut8YJop2qUt2R3zo` is production `READY` in `icn1` for exact SHA `f35286e1`, with 42 production env names, `/api/health` returning `200`/database reachable/replication fresh, the global media-degraded notice present, unauthenticated upload remaining auth-first `401`, and no deployment error logs.
-- [ ] Enable `.github/workflows/dr-watchdog.yml` with `AURA_DR_HEALTH_URL` and, only for a protected endpoint, `VERCEL_DR_PROTECTION_BYPASS`. Require the DR Vercel production environment to set `AURA_DR_EXPECT_REPLICATION=true` and a valid `AURA_DR_MAX_HEARTBEAT_AGE_SECONDS`; verify a scheduled run every 15 minutes, failure on stale/paused replication, and no automatic promotion or provider mutation.
+- [x] Verify Vercel DR deployment `dpl_CiNbYJYtybN5GuCTef7FXYwVfAfv` is production `READY`; after database credential rotation and Sensitive env update, alias `/api/health` returned `200`, database reachable, replication fresh. Previous media-degraded and auth-first upload evidence remains valid.
+- [x] Enable `.github/workflows/dr-watchdog.yml` with `AURA_DR_HEALTH_URL` and, only for a protected endpoint, `VERCEL_DR_PROTECTION_BYPASS`. The 15-minute schedule remains fail-closed without automatic promotion or provider mutation; recovery runs `33288417948` and `33288982785` were green.
 
 ### Traffic switch and recovery rehearsal
 

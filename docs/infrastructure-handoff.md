@@ -12,9 +12,9 @@
 | Oracle Cloud | Next.js 앱 호스팅, private play engine, 앱 cron, 장기 FFmpeg 작업, 배치 메일, Supabase 논리 백업, self-hosted Supabase 운영 | managed Supabase 원본 데이터, 자동 DR promotion | `ap-osaka-1`의 `testauram-a1-osaka` A1을 4 OCPU/24 GB로 운영. 100 GB Block Volume의 Supabase OSS 11개 service와 OCI S3 Storage backend가 healthy이며 2026-08-21 production cutover 완료. 앱/play-engine/백업 timer 및 self-host API 운영 중 |
 | Cloudflare | 운영 DNS·HTTPS proxy, Stream 비디오 업로드·재생 및 상태 검증/삭제 수명주기 | 일반 파일·이미지 저장소, R2 | `aura-board.com` apex A와 `www` CNAME을 Oracle origin으로 proxied 운영. Stream UID·상태·ownership 검증과 best-effort 삭제 보강 완료. R2는 도입하지 않음 |
 | Supabase Pro (Seoul) | 2026-09-03까지 read-only 안정화 보존 (과거 Postgres/Auth/Realtime/Storage 원본) | 운영 트래픽, 신규 write, source of truth | cutover 시 read-only/pg_cron disabled/seal 상태로 전환. 운영 source는 Oracle self-hosted Supabase이며 2026-09-03까지 보존 후 폐기 여부 결정 |
-| Supabase Free (DR) | 논리 replica, DR용 Postgres·PostgREST·RLS·Realtime warm standby | Oracle primary write path, 자동 promotion, object payload | Seoul `aura-board-dr`에서 167 tables/148,993 rows exact logical replica, RLS 18, Realtime publication 6, PostgREST share RLS, Broadcast와 Oracle-origin `postgres_changes` 검증 완료. Storage는 Free 한계를 넘어 명시적 media degraded mode 사용 |
+| Supabase Free (DR) | 논리 replica, DR용 Postgres·PostgREST·RLS·Realtime warm standby | Oracle primary write path, 자동 promotion, object payload | Seoul `aura-board-dr`에서 2026-08-30 current Oracle `postgres` 기준 176-table full copy와 row-count exact parity, heartbeat fresh를 재검증. Storage는 Free 한계를 넘어 명시적 media degraded mode 사용 |
 | GitHub Actions | 운영 cron endpoint 수동 실행과 장애 시 대체 호출 | 앱 호스팅, 기본 스케줄러 | 8개 endpoint용 수동 workflow를 비상 운영 경로로 유지 |
-| Vercel | 전환 기간의 마지막 검증 가능한 배포본, Supabase Free warm standby용 DR runtime | Oracle primary의 신규 운영 트래픽, 기본 cron scheduler | `mallagaenge-1872's projects/aura-board-dr` 별도 project와 Next.js preset 생성 완료. production runtime env 구성 완료 기록을 유지하며 acceptance SHA `f35286e1e2e0d97ea79966a378f4d839d19c3302`의 Oracle Actions run `32389558184`가 성공했다. 같은 SHA의 Vercel deployment `dpl_5Hu4bGn2aBDEut8YJop2qUt2R3zo`는 target `production`, `READY`/`icn1`이며 `/api/health`는 `200`과 DB reachable·replication fresh를 반환했다. 평상시 운영 DNS와 scheduler에서는 제외 |
+| Vercel | 전환 기간의 마지막 검증 가능한 배포본, Supabase Free warm standby용 DR runtime | Oracle primary의 신규 운영 트래픽, 기본 cron scheduler | `mallagaenge-1872's projects/aura-board-dr` production deployment `dpl_CiNbYJYtybN5GuCTef7FXYwVfAfv`가 `READY`이며 alias `/api/health`는 `200`, DB reachable, replication fresh를 반환한다. 평상시 운영 DNS와 scheduler에서는 제외 |
 
 ### 개발 DB (`aura_dev`)
 
@@ -201,11 +201,11 @@ DB/API DR과 object payload 복제 또는 media degraded-mode는 별도 acceptan
 
 DR 프로젝트 이름은 `aura-board-dr`, 리전은 Seoul(`ap-northeast-2`)이다. `coseung-sk` 전용 CLI profile을 인증해 ACTIVE_HEALTHY 상태로 연결했고 secret은 Infisical의 DR 전용 scope에 저장한 뒤 로컬 평문 사본을 제거했다. Oracle publisher와 Supabase subscriber의 실제 initial copy 및 지속 추종, schema/RLS/PostgREST/Realtime 검증을 완료했다. Vercel에는 별도 `aura-board-dr` project를 `mallagaenge-1872's projects` 팀에 생성하고 framework preset을 Next.js로 적용했으며 production-only runtime env를 주입했다. exact-SHA production deployment와 외부 health 검증까지 완료했다.
 
-- [x] Schema/RLS parity: 167 tables, 625 indexes, public/private functions 8/7, trigger 9, RLS policy/table 18/167, Realtime publication 6 및 전체 148,993 row exact match.
-- [x] Logical replication lag/heartbeat: 167/167 table `replicating`, source `pgoutput` slot active, apply/sync error 0, private 1-minute heartbeat 및 latest-end age 약 1.15초 확인.
+- [x] Schema/data parity: 2026-08-30 missing Prisma migrations 4개를 적용하고 source publication 176 tables 모두 destination 존재를 확인. full initial copy 뒤 146/146 migration history와 176-table row counts exact, mismatch 0.
+- [x] Logical replication lag/heartbeat: current `postgres`의 `aura_board_oracle_dr_slot_v2` active, subscription 176/176 relation `ready`, apply error 0, private heartbeat fresh 확인. 과거 sync error 1은 missing table grant 복구 전 기록이다.
 - [x] PostgREST: service-role `200`/1 row, anonymous token 없음 `200`/0 row, 올바른 share token `200`/1 row, 잘못된 token `200`/0 row.
 - [x] Realtime: DR Broadcast self round trip과 Oracle `Card` update의 DR `postgres_changes` 수신 1.134초 확인.
-- [x] Vercel deployment health: deployment `dpl_5Hu4bGn2aBDEut8YJop2qUt2R3zo`가 SHA `f35286e1` metadata, production `READY`, runtime `icn1`로 배포됐다. production env 이름 42개를 값 비노출로 확인했고 `/api/health`는 `200`, database reachable, replication fresh를 반환했다. 전역 degraded notice가 표시되고 비인증 upload는 auth-first `401`, 최근 error log는 0건이다.
+- [x] Vercel deployment health: credential rotation 후 production deployment `dpl_CiNbYJYtybN5GuCTef7FXYwVfAfv`가 `READY`이며 alias `/api/health`는 `200`, database reachable, replication fresh를 반환했다. 이전 degraded notice와 auth-first upload `401` acceptance는 유지된다.
 - [ ] Cloudflare origin switch: 승인된 변경 기록과 before/after DNS·proxy·TTL, Vercel DR로의 외부 HTTPS 응답, Oracle origin으로의 rollback 응답을 저장하고 두 origin이 동시에 사용자 write를 받지 않음을 확인한다.
 - [ ] Failover smoke: primary write fence, promotion 시각, 마지막 LSN/heartbeat, Cloudflare 전환 시각을 기록한 뒤 로그인/공유·RLS/read-write/Realtime의 대표 사용자 흐름과 rollback 조건을 DR에서 검증한다.
 - [ ] Failback rehearsal: DR을 임시 source of truth로 선언하고 clean Oracle target에 DR 데이터를 재동기화한 뒤 write freeze와 final delta를 적용하고 Oracle로 origin을 되돌린다. parity, health, 대표 CRUD, Realtime 및 소요 시간을 기록하고 Supabase Free warm standby 재구성까지 확인한다.

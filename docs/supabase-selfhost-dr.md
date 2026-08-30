@@ -79,9 +79,9 @@ Storage 이관 및 검증:
 - Oracle publisher는 TLS 1.3, hostname 검증, PostgreSQL 17 direct TLS ALPN `postgresql`, 전용 SCRAM replication role을 사용한다.
 - managed Supabase outbound가 고정 IPv4가 아니며 실제 연결은 NAT64 IPv6를 사용하므로 source IP `/32` allowlist를 보안 경계로 삼지 않는다. Oracle Postgres는 Docker gateway에서 전용 replication role만 허용하고 나머지 역할을 먼저 거부한다.
 - `public` catalog parity: 167 tables, 625 indexes, public/private functions 8/7, trigger 9, RLS policy 18, RLS-enabled table 167, Realtime publication 6.
-- 167/167 table이 `replicating` 상태이며 source/DR 전체 count는 148,993 rows로 exact match했다.
-- subscription apply/sync error count는 0, source slot은 `pgoutput` logical active 상태다.
-- private heartbeat row를 1분마다 갱신해 DR로 복제한다. 수동 반복 측정에서 latest-end age 약 1.15초, Oracle `Card` no-op update의 DR `postgres_changes` 도착은 1.134초였다.
+- 2026-08-30 복구 기준 source publication 176/176 table이 `ready` 상태이며 source/DR table row-count mismatch는 0이다. migration history도 146/146으로 일치한다.
+- current source slot은 `postgres` DB의 `aura_board_oracle_dr_slot_v2`이고 active다. apply error는 0이며, sync error 1은 복구 중 새 table grant 누락을 발견하기 전 기록으로 이후 재발하지 않았다.
+- private heartbeat row를 1분마다 갱신해 DR로 복제한다. 복구 후 Vercel DR `/api/health`와 GitHub watchdog이 database reachable/replication fresh를 확인했다. 최초 acceptance의 Oracle `Card` no-op update DR `postgres_changes` 도착 1.134초 증거도 유지한다.
 - DR PostgREST service-role read `200`; anonymous token 없음 0 row, 올바른 share token 1 row, 잘못된 token 0 row를 확인했다.
 - DR Realtime Broadcast 실제 publish/subscribe와 Oracle-origin `postgres_changes` 실제 수신을 확인했다.
 - Storage payload는 1,226 objects / 1,040,594,444 bytes이고 78,591,142-byte object 1개가 있다. Supabase Free의 1 GB 총량 및 50 MB 단일 파일 제한을 동시에 넘으므로 payload 복제 대신 명시적 media degraded mode를 선택했다. 이 모드에서는 DB·텍스트·보드는 유지하고 upload/delete/private download를 Storage I/O 전에 `503 media_degraded_mode`로 차단한다.
@@ -494,7 +494,7 @@ restore rehearsal은 production write를 발생시키지 않는다.
 - [x] replication lag heartbeat 1분 갱신 및 DR health fail-closed 계약
 - [x] Vercel DR project 생성 및 Next.js framework preset 적용
 - [x] Vercel DR production env 42개를 production-only로 주입하고 DB/Supabase 값을 DR로 교체
-- [x] Vercel DR exact-SHA deployment 및 `/api/health` 검증 — `f35286e1`, production `READY`, `icn1`, DB reachable, replication fresh, degraded notice 확인
+- [x] Vercel DR production deployment 및 `/api/health` 검증 — `dpl_CiNbYJYtybN5GuCTef7FXYwVfAfv`, production `READY`, DB reachable, replication fresh. 초기 `f35286e1` degraded notice acceptance도 유지
 - [x] Osaka Object Storage 장애 시 media degraded-mode 구현·행동 테스트
 - [ ] Cloudflare 수동 failover runbook
 - [ ] failback rehearsal

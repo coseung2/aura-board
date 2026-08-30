@@ -62,6 +62,12 @@ is explicitly rejected for every other IPv4/IPv6 source before broad RFC1918 gra
 The host TCP/5432 allow is restricted to the selected private NIC destination, every
 other local TCP/5432 listener is rejected, and `/etc/iptables/rules.v4` is persisted.
 
+Keep `docker-compose.replication.yml` in the root-owned Supabase `.env` `COMPOSE_FILE`
+list after installation. Running the base compose file alone recreates `supabase-db`
+without `127.0.0.1:15433`, leaving nginx TLS healthy but closing subscriber sessions
+before PostgreSQL. The Bastion keeper verifies both the compose label and listener on
+every run; do not treat a successful TLS handshake alone as replication health.
+
 The checked-in `infra/oracle/nsg-replication-5432.json` is one explicit OCI `INGRESS`
 TCP/5432 rule. The host script never mutates the NSG. After approval, an operator adds
 it and records the returned rule id:

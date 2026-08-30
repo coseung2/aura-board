@@ -16,7 +16,7 @@
 
 | 문서 | 발생일 | severity | 상태 | 요약 |
 | --- | --- | --- | --- | --- |
-| [2026-08-29-supabase-dr-replication-stale.md](./2026-08-29-supabase-dr-replication-stale.md) | 2026-08-29 | high | 조사 중 | Supabase DR 복구 후 DB는 reachable이나 Oracle→Supabase heartbeat가 2026-08-20 이후 stale |
+| [2026-08-29-supabase-dr-replication-stale.md](./2026-08-29-supabase-dr-replication-stale.md) | 2026-08-29 | high | 해결 | 누락된 replication compose override·rollback DB slot·schema/grant drift를 복구하고 176-table parity와 watchdog green 확인 |
 | [2026-04-20-upload-payload-too-large.md](./2026-04-20-upload-payload-too-large.md) | 2026-04-20 | high | 해결 | Vercel 함수 본문 4.5MB 한도로 대용량 업로드 실패 → client-direct 업로드로 전환 |
 | [2026-08-12-parent-oauth-localhost-redirect.md](./2026-08-12-parent-oauth-localhost-redirect.md) | 2026-08-12 | high | 해결 | Next standalone `req.url`이 localhost 기준 → 학부모 OAuth 콜백/Origin 불일치 |
 | [2026-08-12-rls-public-tables-outage.md](./2026-08-12-rls-public-tables-outage.md) | 2026-08-12 | high | 해결 | 공개 테이블에 정책 없이 RLS 활성화 → 일시 장애, 정책/shim 보완 |
