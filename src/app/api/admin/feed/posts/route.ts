@@ -7,6 +7,7 @@ import {
   adminFeedPostInputSchema,
   normalizeFeedMedia,
 } from "@/lib/feed/validation";
+import { recordUsageEvent } from "@/lib/usage-events";
 
 export const runtime = "nodejs";
 
@@ -66,6 +67,12 @@ export async function POST(req: Request) {
       publishGlobal: parsed.data.publishGlobal,
     },
     req,
+  });
+  await recordUsageEvent({
+    eventName: "feed.post.create",
+    userId: user.id,
+    actorType: "admin",
+    source: "web",
   });
 
   return NextResponse.json(created, { status: 201 });

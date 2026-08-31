@@ -144,6 +144,9 @@ model User {
   feedCommentLikes          FeedCommentLike[] @relation("UserFeedCommentLikes")
   feedPublicationsPublished FeedPublication[]
   feedPoolEntriesCreated    FeedPoolEntry[]
+
+  // Product usage events used by the administrator usage analytics view.
+  usageEvents UsageEvent[]
 }
 
 // ???????? Audit Log (Seed 14 security, 2026-04-22) ????????
@@ -232,6 +235,37 @@ model BoardActivityEvent {
   @@index([createdAt])
   @@index([boardId, createdAt])
   @@index([actorType, createdAt])
+}
+
+// Product-level usage telemetry. Keep this intentionally small and free of
+// content/body data; metadata should contain only non-sensitive dimensions.
+model UsageEvent {
+  id String @id @default(cuid())
+
+  eventName String // e.g. "board.view", "card.create", "quiz.join"
+
+  userId String?
+
+  actorType String @default("user") // "user" | "student" | "system"
+
+  source String @default("web") // "web" | "mobile" | "api"
+
+  classroomId String?
+
+  boardId String?
+
+  metadata Json?
+
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([createdAt])
+  @@index([eventName, createdAt])
+  @@index([userId, createdAt])
+  @@index([source, createdAt])
+  @@index([classroomId, createdAt])
+  @@index([boardId, createdAt])
 }
 
 // ???????? Teacher LLM API Key (Seed 13 follow-up, 2026-04-22) ????????

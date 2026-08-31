@@ -6,6 +6,7 @@ import { OFFICIAL_GAME_KINDS } from "@/lib/game-platform/contracts";
 import { Dashboard } from "@/components/Dashboard";
 import { TopNav } from "@/components/TopNav";
 import { redirect } from "next/navigation";
+import { recordUsageEvent } from "@/lib/usage-events";
 
 export default async function DashboardPage() {
   let user;
@@ -53,6 +54,7 @@ export default async function DashboardPage() {
   ]);
 
   const isAdmin = isAdminEmail(user.email);
+  await recordUsageEvent({ eventName: "dashboard.view", userId: user.id, actorType: "teacher" });
 
   const classroomItems = classrooms.map((c) => ({
     id: c.id,
