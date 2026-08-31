@@ -44,6 +44,7 @@ vi.mock("@/lib/expo-push", () => ({
 
 import {
   assignmentDistributedPush,
+  afternoonTaskReminderPush,
   attendanceReminderPush,
   dispatchStudentNotificationPush,
   dispatchStudentNotificationPushBatch,
@@ -442,6 +443,44 @@ describe("student push event builders", () => {
     expect(push.body).toContain("과학 관찰 기록 과제의 마감이 오늘 오후 4시까지예요.");
     expect(push.body).toContain("독서 기록 과제의 마감이 오늘 오후 8시까지예요.");
     expect(push.body).not.toContain("·");
+  });
+
+  it("builds an afternoon attendance digest with optional assignment context", () => {
+    const push = afternoonTaskReminderPush({
+      studentId: "student-1",
+      day: "2026-08-01",
+      assignments: [{
+        boardTitle: "과학 관찰 기록",
+        boardSlug: "science",
+        dueAt: new Date("2026-08-01T07:00:00.000Z"),
+      }],
+    });
+
+    expect(push).toMatchObject({
+      eventKey: "afternoon-tasks:student-1:2026-08-01",
+      studentId: "student-1",
+      kind: "attendance",
+      href: "/student",
+      title: "오후 출석과 과제를 확인해 주세요",
+    });
+    expect(push.body).toContain("출석 보상을 받을 수 있어요.");
+    expect(push.body).toContain("과학 관찰 기록 과제의 마감이 오늘 오후 4시까지예요.");
+  });
+
+  it("keeps the attendance reward guidance when no assignment is missing", () => {
+    const push = afternoonTaskReminderPush({
+      studentId: "student-1",
+      day: "2026-08-01",
+    });
+
+    expect(push).toMatchObject({
+      eventKey: "afternoon-tasks:student-1:2026-08-01",
+      title: "오후 출석 보상을 확인해 주세요",
+      href: "/student",
+    });
+    expect(push.body).toContain("오늘 아직 출석하지 않았어요.");
+    expect(push.body).toContain("출석 보상을 받을 수 있어요.");
+    expect(push.body).not.toContain("아직 제출하지 않은 과제가");
   });
 
   it("uses the slot identity and assigned board link", () => {

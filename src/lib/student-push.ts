@@ -31,6 +31,9 @@ export type MorningAssignmentReminder = {
   dueAt: Date | null;
 };
 
+/** Assignment snapshot used by the afternoon attendance digest. */
+export type AfternoonAssignmentReminder = MorningAssignmentReminder;
+
 type DispatchOptions = { propagateFailure?: boolean };
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1_000;
@@ -93,6 +96,67 @@ export function morningTaskReminderPush(input: {
     boardTitle: "출석과 과제",
   };
 }
+
+/**
+ * Build the second daily attendance nudge. The afternoon job intentionally
+ * shares the same assignment snapshot semantics as the morning digest, but it
+ * has its own event key so a student can receive one reminder at each time of
+ * day. Opening `/student` records today's attendance and makes the reminder
+ * idempotent at the app boundary.
+ */
+export function afternoonTaskReminderPush(input: {
+  studentId: string;
+  day?: string;
+  assignments?: AfternoonAssignmentReminder[];
+}): StudentNotificationPush {
+  const day = input.day ?? studentPushKstDay();
+  const assignments = input.assignments ?? [];
+  const todayAssignments = assignments
+    .filter((assignment) => assignment.dueAt && studentPushKstDay(assignment.dueAt) === day)
+    .sort((left, right) => left.dueAt!.getTime() - right.dueAt!.getTime());
+
+  const sentences = [
+    "오늘 아직 출석하지 않았어요. 지금 출석하면 출석 보상을 받을 수 있어요.",
+  ];
+  for (const assignment of todayAssignments.slice(0, 2)) {
+    sentences.push(
+      `${assignmentLabel(assignment.boardTitle)}의 마감이 오늘 ${formatKstDeadlineTime(assignment.dueAt!)}까지예요.`,
+    );
+  }
+  if (todayAssignments.length > 2) {
+    sentences.push(
+      `오늘 마감인 과제가 ${todayAssignments.length - 2}개 더 있어요. 과제 목록에서 확인해 주세요.`,
+    );
+  } else if (todayAssignments.length === 0 && assignments.length === 1) {
+    sentences.push(
+      `아직 제출하지 않은 과제는 ${assignmentLabel(assignments[0].boardTitle)}예요.`,
+    );
+  } else if (todayAssignments.length === 0 && assignments.length > 1) {
+    sentences.push(
+      `아직 제출하지 않은 과제가 ${assignments.length}개 있어요. 과제 목록에서 확인해 주세요.`,
+    );
+  }
+
+  return {
+    eventKey: `afternoon-tasks:${input.studentId}:${day}`,
+    // Keep the notification-center source distinct from the morning digest;
+    // StudentNotification also enforces (studentId, kind, sourceId) uniqueness.
+    sourceId: `afternoon:${input.studentId}:${day}`,
+    studentId: input.studentId,
+    kind: "attendance",
+    title: assignments.length > 0
+      ? "오후 출석과 과제를 확인해 주세요"
+      : "오후 출석 보상을 확인해 주세요",
+    body: sentences.join(" "),
+    href: "/student",
+    actorLabel: "Aura Board",
+    cardTitle: "오늘 할 일",
+    boardTitle: "출석과 과제",
+  };
+}
+
+/** Descriptive alias for callers that prefer the attendance domain name. */
+export const afternoonAttendanceReminderPush = afternoonTaskReminderPush;
 
 /** Backward-compatible builder for callers that only need attendance. */
 export function attendanceReminderPush(

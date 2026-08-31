@@ -18,6 +18,7 @@ case "${job}:${method}" in
   notification-push:GET | \
   reading-feedback:POST | \
   attendance-reminder:GET | \
+  afternoon-attendance-reminder:GET | \
   role-salary-payout:GET | \
   play-outbox:POST) ;;
   *)
