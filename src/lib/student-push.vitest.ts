@@ -257,6 +257,9 @@ describe("dispatchStudentNotificationPush", () => {
 
     expect(mocks.createDispatch).toHaveBeenCalledOnce();
     expect(mocks.sendExpoPush).not.toHaveBeenCalled();
+    expect(mocks.deleteDispatch).toHaveBeenCalledWith({
+      where: { id: "dispatch-1" },
+    });
   });
 
   it("disables Expo tokens reported as unregistered", async () => {
@@ -381,6 +384,23 @@ describe("dispatchStudentNotificationPushBatch", () => {
         },
       },
     ]);
+  });
+
+  it("releases reservations when no student has a registered device", async () => {
+    mocks.findDevices.mockResolvedValue([]);
+    const pushes = ["student-1", "student-2"].map((studentId) =>
+      morningTaskReminderPush({ studentId, day: "2026-08-07" }),
+    );
+
+    await expect(dispatchStudentNotificationPushBatch(pushes)).resolves.toEqual({
+      attempted: 0,
+      skipped: 0,
+      reserved: 0,
+    });
+    expect(mocks.deleteManyDispatches).toHaveBeenCalledWith({
+      where: { id: { in: ["dispatch-1", "dispatch-2"] } },
+    });
+    expect(mocks.sendExpoPushMessages).not.toHaveBeenCalled();
   });
 });
 

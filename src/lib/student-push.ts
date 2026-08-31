@@ -168,7 +168,15 @@ export async function dispatchStudentNotificationPush(
       where: { studentId: input.studentId, disabledAt: null },
       select: { id: true, expoPushToken: true },
     });
-    if (devices.length === 0) return { attempted: 0, skipped: 0 };
+    // Keep the notification-center row, but release the push reservation when
+    // there is no registered device yet. Students commonly open the app after
+    // the morning cron has run; retaining this reservation would suppress the
+    // reminder for the rest of the day and prevent a later retry.
+    if (devices.length === 0) {
+      await releaseStudentPushReservation(dispatchId, input);
+      dispatchId = null;
+      return { attempted: 0, skipped: 0 };
+    }
 
     const result = await sendExpoPush(devices, pushMessage(canonicalInput));
     await disableInvalidDevices(result.invalidDeviceIds, canonicalInput);
@@ -278,10 +286,16 @@ export async function dispatchStudentNotificationPushBatch(
       }));
     });
     if (envelopes.length === 0) {
+      // As above, a reservation without a device must not permanently mark
+      // the event as delivered. Delete only the reservations created by this
+      // invocation; the notification-center rows remain available.
+      await db.studentPushDispatch.deleteMany({
+        where: { id: { in: reservations.map((row) => row.id) } },
+      });
       return {
         attempted: 0,
         skipped: unique.length - reservations.length,
-        reserved: reservations.length,
+        reserved: 0,
       };
     }
 
