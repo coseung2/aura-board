@@ -11,6 +11,7 @@ function migration(name: string): string {
 
 const structure = migration("20260806231500_structure_student_push_notifications");
 const schedule = migration("20260806232000_improve_student_push_notifications");
+const morning0750 = migration("20260901100000_move_student_morning_digest_to_0750_kst");
 
 describe("structured student notification migrations", () => {
   it("adds exact titles and the reply and wallet notification kinds", () => {
@@ -35,5 +36,13 @@ describe("structured student notification migrations", () => {
     expect(schedule).toContain("'student-morning-tasks-08-kst'");
     expect(schedule).toContain("'0 23 * * *'");
     expect(schedule).toContain("private.request_attendance_reminder_wakeup()");
+  });
+
+  it("moves the canonical morning digest to 07:50 KST without a duplicate job", () => {
+    expect(morning0750).toContain("student-morning-tasks-0750-kst");
+    expect(morning0750).toContain("'50 22 * * *'");
+    expect(morning0750).toContain("cron.unschedule('student-morning-digest')");
+    expect(morning0750).toContain("cron.unschedule('student-morning-tasks-08-kst')");
+    expect(morning0750).not.toContain("student-morning-tasks-08-kst',\n      '0 23");
   });
 });

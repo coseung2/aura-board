@@ -15,6 +15,9 @@ const structure = readMigration(
 const schedule = readMigration(
   "20260806232000_improve_student_push_notifications",
 );
+const morning0750 = readMigration(
+  "20260901100000_move_student_morning_digest_to_0750_kst",
+);
 
 describe("structured student notification migrations", () => {
   it("adds durable titles and the reply and wallet kinds", () => {
@@ -41,5 +44,12 @@ describe("structured student notification migrations", () => {
     expect(schedule).toContain("'0 23 * * *'");
     expect(schedule).toContain("attendance_reminder_worker_url");
     expect(schedule).toContain("notification_outbox_worker_secret");
+  });
+
+  it("moves the canonical morning digest to 07:50 KST and removes duplicates", () => {
+    expect(morning0750).toContain("student-morning-tasks-0750-kst");
+    expect(morning0750).toContain("'50 22 * * *'");
+    expect(morning0750).toContain("cron.unschedule('student-morning-digest')");
+    expect(morning0750).toContain("cron.unschedule('student-morning-tasks-08-kst')");
   });
 });
