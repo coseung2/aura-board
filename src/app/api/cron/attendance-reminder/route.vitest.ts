@@ -110,6 +110,32 @@ describe("GET /api/cron/attendance-reminder", () => {
     }));
   });
 
+  it("can force one authenticated test delivery past attendance filters", async () => {
+    const response = await GET(new Request(
+      "http://localhost/api/cron/attendance-reminder?studentCode=DCY366&testDelivery=1",
+      { headers: { authorization: "Bearer cron-test" } },
+    ));
+
+    expect(response.status).toBe(200);
+    const query = mocks.findStudents.mock.calls[0][0];
+    expect(query.where).toMatchObject({ textCode: "DCY366" });
+    expect(query.where).not.toHaveProperty("attendances");
+    expect(query.where).not.toHaveProperty("pushDispatches");
+    expect(mocks.dispatchBatch).toHaveBeenCalledWith(
+      [expect.objectContaining({ eventKey: expect.stringMatching(/^attendance-test:student-1:/) })],
+      { propagateFailure: true },
+    );
+  });
+
+  it("requires a student code for a forced test delivery", async () => {
+    const response = await GET(new Request(
+      "http://localhost/api/cron/attendance-reminder?testDelivery=1",
+      { headers: { authorization: "Bearer cron-test" } },
+    ));
+    expect(response.status).toBe(400);
+    expect(mocks.findStudents).not.toHaveBeenCalled();
+  });
+
   it("exhausts multiple keyset pages in 100-student push batches", async () => {
     const firstPage = Array.from({ length: 500 }, (_, index) => ({
       id: `student-${String(index + 1).padStart(4, "0")}`,

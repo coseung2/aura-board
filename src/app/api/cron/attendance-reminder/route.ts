@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 import {
@@ -21,7 +22,12 @@ async function consume(req: Request) {
   }
 
   const day = studentPushKstDay();
-  const studentCode = new URL(req.url).searchParams.get("studentCode")?.trim().toUpperCase() || null;
+  const requestUrl = new URL(req.url);
+  const studentCode = requestUrl.searchParams.get("studentCode")?.trim().toUpperCase() || null;
+  const testDelivery = requestUrl.searchParams.get("testDelivery") === "1";
+  if (testDelivery && !studentCode) {
+    return NextResponse.json({ error: "student_code_required" }, { status: 400 });
+  }
   const attendanceDate = new Date(`${day}T00:00:00.000Z`);
   let scanned = 0;
   let dispatched = 0;
@@ -34,10 +40,12 @@ async function consume(req: Request) {
       where: {
         ...(afterId ? { id: { gt: afterId } } : {}),
         ...(studentCode ? { textCode: studentCode } : {}),
-        attendances: { none: { day: attendanceDate } },
-        pushDispatches: {
-          none: { eventKey: { startsWith: "morning-tasks:", endsWith: `:${day}` } },
-        },
+        ...(testDelivery ? {} : {
+          attendances: { none: { day: attendanceDate } },
+          pushDispatches: {
+            none: { eventKey: { startsWith: "morning-tasks:", endsWith: `:${day}` } },
+          },
+        }),
       },
       orderBy: { id: "asc" },
       select: {
@@ -56,15 +64,20 @@ async function consume(req: Request) {
     if (students.length === 0) break;
 
     scanned += students.length;
-    const pushes = students.map((student) => morningTaskReminderPush({
-      studentId: student.id,
-      day,
-      assignments: student.assignmentSlots.map((slot) => ({
-        boardTitle: slot.board.title,
-        boardSlug: slot.board.slug,
-        dueAt: slot.dueAt,
-      })),
-    }));
+    const pushes = students.map((student) => {
+      const push = morningTaskReminderPush({
+        studentId: student.id,
+        day,
+        assignments: student.assignmentSlots.map((slot) => ({
+          boardTitle: slot.board.title,
+          boardSlug: slot.board.slug,
+          dueAt: slot.dueAt,
+        })),
+      });
+      return testDelivery
+        ? { ...push, eventKey: `attendance-test:${student.id}:${randomUUID()}` }
+        : push;
+    });
     for (let start = 0; start < pushes.length; start += PUSH_BATCH_SIZE) {
       const batch = pushes.slice(start, start + PUSH_BATCH_SIZE);
       try {
