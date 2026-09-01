@@ -21,6 +21,7 @@ async function consume(req: Request) {
   }
 
   const day = studentPushKstDay();
+  const studentCode = new URL(req.url).searchParams.get("studentCode")?.trim().toUpperCase() || null;
   const attendanceDate = new Date(`${day}T00:00:00.000Z`);
   let scanned = 0;
   let dispatched = 0;
@@ -32,6 +33,7 @@ async function consume(req: Request) {
     const students = await db.student.findMany({
       where: {
         ...(afterId ? { id: { gt: afterId } } : {}),
+        ...(studentCode ? { textCode: studentCode } : {}),
         attendances: { none: { day: attendanceDate } },
         pushDispatches: {
           none: { eventKey: { startsWith: "morning-tasks:", endsWith: `:${day}` } },

@@ -98,6 +98,18 @@ describe("GET /api/cron/attendance-reminder", () => {
     });
   });
 
+  it("can target one student for an authorized delivery check", async () => {
+    const response = await GET(new Request(
+      "http://localhost/api/cron/attendance-reminder?studentCode=DCY366",
+      { headers: { authorization: "Bearer cron-test" } },
+    ));
+
+    expect(response.status).toBe(200);
+    expect(mocks.findStudents).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ textCode: "DCY366" }),
+    }));
+  });
+
   it("exhausts multiple keyset pages in 100-student push batches", async () => {
     const firstPage = Array.from({ length: 500 }, (_, index) => ({
       id: `student-${String(index + 1).padStart(4, "0")}`,
