@@ -15,11 +15,7 @@ const ATTENDANCE_PAGE_SIZE = 500;
 const PUSH_BATCH_SIZE = 100;
 const MISSING_SUBMISSION_STATUSES = ["assigned", "returned", "orphaned"] as const;
 
-async function consume(req: Request) {
-  if (!isAuthorizedCronRequest(req)) {
-    return NextResponse.json({ error: "invalid_secret" }, { status: 401 });
-  }
-
+export async function runAfternoonAttendanceReminder() {
   const day = studentPushKstDay();
   const attendanceDate = new Date(`${day}T00:00:00.000Z`);
   let scanned = 0;
@@ -83,13 +79,20 @@ async function consume(req: Request) {
     if (students.length < ATTENDANCE_PAGE_SIZE) break;
   }
 
-  return NextResponse.json({
+  return {
     day,
     scanned,
     dispatched,
     attemptedDevices,
     failed,
-  });
+  };
+}
+
+async function consume(req: Request) {
+  if (!isAuthorizedCronRequest(req)) {
+    return NextResponse.json({ error: "invalid_secret" }, { status: 401 });
+  }
+  return NextResponse.json(await runAfternoonAttendanceReminder());
 }
 
 export const GET = consume;

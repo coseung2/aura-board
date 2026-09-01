@@ -16,18 +16,13 @@ const ATTENDANCE_PAGE_SIZE = 500;
 const PUSH_BATCH_SIZE = 100;
 const MISSING_SUBMISSION_STATUSES = ["assigned", "returned", "orphaned"] as const;
 
-async function consume(req: Request) {
-  if (!isAuthorizedCronRequest(req)) {
-    return NextResponse.json({ error: "invalid_secret" }, { status: 401 });
-  }
-
+export async function runMorningAttendanceReminder(options: {
+  studentCode?: string | null;
+  testDelivery?: boolean;
+} = {}) {
   const day = studentPushKstDay();
-  const requestUrl = new URL(req.url);
-  const studentCode = requestUrl.searchParams.get("studentCode")?.trim().toUpperCase() || null;
-  const testDelivery = requestUrl.searchParams.get("testDelivery") === "1";
-  if (testDelivery && !studentCode) {
-    return NextResponse.json({ error: "student_code_required" }, { status: 400 });
-  }
+  const studentCode = options.studentCode ?? null;
+  const testDelivery = options.testDelivery ?? false;
   const attendanceDate = new Date(`${day}T00:00:00.000Z`);
   let scanned = 0;
   let dispatched = 0;
@@ -96,13 +91,26 @@ async function consume(req: Request) {
     if (students.length < ATTENDANCE_PAGE_SIZE) break;
   }
 
-  return NextResponse.json({
+  return {
     day,
     scanned,
     dispatched,
     attemptedDevices,
     failed,
-  });
+  };
+}
+
+async function consume(req: Request) {
+  if (!isAuthorizedCronRequest(req)) {
+    return NextResponse.json({ error: "invalid_secret" }, { status: 401 });
+  }
+  const requestUrl = new URL(req.url);
+  const studentCode = requestUrl.searchParams.get("studentCode")?.trim().toUpperCase() || null;
+  const testDelivery = requestUrl.searchParams.get("testDelivery") === "1";
+  if (testDelivery && !studentCode) {
+    return NextResponse.json({ error: "student_code_required" }, { status: 400 });
+  }
+  return NextResponse.json(await runMorningAttendanceReminder({ studentCode, testDelivery }));
 }
 
 export const GET = consume;
