@@ -343,7 +343,22 @@ export async function dispatchStudentNotificationPushBatch(
       devicesByStudent.set(device.studentId, current);
     }
 
-    const envelopes = reservations.flatMap((reservation) => {
+    const reservationsWithDevices = reservations.filter((reservation) =>
+      (devicesByStudent.get(reservation.studentId) ?? []).length > 0,
+    );
+    const reservationsWithoutDevices = reservations.filter(
+      (reservation) => !reservationsWithDevices.includes(reservation),
+    );
+    if (reservationsWithoutDevices.length > 0) {
+      // A mixed batch must not mark students without a registered device as
+      // delivered. Release only those reservations so a later app open can
+      // register the token and the next reminder can retry.
+      await db.studentPushDispatch.deleteMany({
+        where: { id: { in: reservationsWithoutDevices.map((row) => row.id) } },
+      });
+    }
+
+    const envelopes = reservationsWithDevices.flatMap((reservation) => {
       const input = inputByKey.get(`${reservation.studentId}\u001f${reservation.eventKey}`);
       if (!input) return [];
       return (devicesByStudent.get(reservation.studentId) ?? []).map((device) => ({
@@ -375,7 +390,7 @@ export async function dispatchStudentNotificationPushBatch(
     return {
       attempted: result.attempted,
       skipped: unique.length - reservations.length,
-      reserved: reservations.length,
+      reserved: reservationsWithDevices.length,
     };
   } catch (error) {
     if (reservations.length > 0) {

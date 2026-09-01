@@ -403,6 +403,28 @@ describe("dispatchStudentNotificationPushBatch", () => {
     });
     expect(mocks.sendExpoPushMessages).not.toHaveBeenCalled();
   });
+
+  it("releases only no-device reservations in a mixed batch", async () => {
+    mocks.findDevices.mockResolvedValue([
+      { id: "device-1", studentId: "student-1", expoPushToken: "ExpoPushToken[token1]" },
+    ]);
+    mocks.sendExpoPushMessages.mockResolvedValue({ attempted: 1, invalidDeviceIds: [] });
+    const pushes = ["student-1", "student-2"].map((studentId) =>
+      morningTaskReminderPush({ studentId, day: "2026-08-07" }),
+    );
+
+    await expect(dispatchStudentNotificationPushBatch(pushes)).resolves.toEqual({
+      attempted: 1,
+      skipped: 0,
+      reserved: 1,
+    });
+    expect(mocks.deleteManyDispatches).toHaveBeenCalledWith({
+      where: { id: { in: ["dispatch-2"] } },
+    });
+    expect(mocks.sendExpoPushMessages).toHaveBeenCalledWith([
+      expect.objectContaining({ device: expect.objectContaining({ id: "device-1" }) }),
+    ]);
+  });
 });
 
 describe("student push event builders", () => {
