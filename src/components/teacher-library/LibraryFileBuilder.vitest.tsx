@@ -115,6 +115,32 @@ describe("LibraryFileBuilder", () => {
       .forEach((image) => expect(image).toHaveStyle({ objectFit: "contain" }));
   });
 
+  it("previews five evenly placed pages as a 2x2 page plus one fixed-size slot", () => {
+    render(
+      <LibraryFileBuilder
+        selectedItems={[{ ...item("canva", "canva"), pageCount: 5 }]}
+        filename="수업 자료"
+        layout="a4-auto"
+        busy={false}
+        canvaConnected={true}
+        error={null}
+        onFilename={vi.fn()}
+        onLayout={vi.fn()}
+        onMove={vi.fn()}
+        onRemove={vi.fn()}
+        onDownload={vi.fn()}
+        onReconnectCanva={vi.fn()}
+        onPageCount={vi.fn()}
+      />,
+    );
+
+    const pages = screen.getAllByLabelText(/PDF 미리보기 \d+페이지/);
+    expect(pages).toHaveLength(2);
+    expect(pages[0].querySelectorAll(".teacher-library-preview-item")).toHaveLength(4);
+    expect(pages[1].querySelectorAll(".teacher-library-preview-item")).toHaveLength(1);
+    expect(screen.getByText("2 / 2")).toBeInTheDocument();
+  });
+
   it("uses a different page thumbnail for each page of each Canva design", () => {
     const items = ["one", "two", "three"].map((id) => ({
       ...item(id, "canva"),

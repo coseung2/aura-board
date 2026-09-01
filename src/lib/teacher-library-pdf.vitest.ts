@@ -8,7 +8,7 @@ vi.mock("@/lib/canva", () => ({
   getAccessToken: vi.fn(async () => null),
 }));
 
-import { buildTeacherLibraryPdf } from "./teacher-library-pdf";
+import { buildTeacherLibraryPdf, planAutoA4GridPages } from "./teacher-library-pdf";
 
 let imageBytes: Buffer;
 
@@ -62,5 +62,15 @@ describe("buildTeacherLibraryPdf layouts", () => {
       layout: "a4-fit",
     });
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2);
+  });
+
+  it("keeps the first-page grid scale when the last A4 page has one item", () => {
+    const units = Array.from({ length: 5 }, () => ({ width: 900, height: 1600 }));
+    const pages = planAutoA4GridPages(units);
+
+    expect(pages).toHaveLength(2);
+    expect(pages.map((page) => page.count)).toEqual([4, 1]);
+    expect(pages[1].grid).toEqual(pages[0].grid);
+    expect(pages[0].grid).toMatchObject({ columns: 2, rows: 2, count: 4 });
   });
 });

@@ -297,7 +297,9 @@ function PdfLayoutPreview({
     return <div className="teacher-library-preview-empty">자료를 선택하면 배치를 볼 수 있습니다.</div>;
   }
 
-  const unitsPerPage = layout === "a4-auto" ? 6 : 1;
+  // A4 auto export keeps the initial 2x2 scale on overflow pages. Mirror that
+  // stable slot size here instead of previewing six items on a fictitious page.
+  const unitsPerPage = layout === "a4-auto" ? 4 : 1;
   const pages = Array.from(
     { length: Math.ceil(previewUnits.length / unitsPerPage) },
     (_, pageIndex) =>

@@ -159,16 +159,15 @@ function appendUnitsAsA4Pages(document: PDFDocument, units: RenderUnit[]) {
 }
 
 function appendUnitsAsAutoA4Grid(document: PDFDocument, units: RenderUnit[]) {
-  let index = 0;
-  while (index < units.length) {
-    const grid = pickAutoGrid(units.slice(index));
+  for (const plannedPage of planAutoA4GridPages(units)) {
+    const grid = plannedPage.grid;
     const page = document.addPage([A4.width, A4.height]);
     const contentWidth = A4.width - A4_MARGIN * 2;
     const contentHeight = A4.height - A4_MARGIN * 2;
     const cellWidth = (contentWidth - A4_GAP * (grid.columns - 1)) / grid.columns;
     const cellHeight = (contentHeight - A4_GAP * (grid.rows - 1)) / grid.rows;
-    for (let cellIndex = 0; cellIndex < grid.count; cellIndex += 1) {
-      const unit = units[index + cellIndex];
+    for (let cellIndex = 0; cellIndex < plannedPage.count; cellIndex += 1) {
+      const unit = units[plannedPage.start + cellIndex];
       const row = Math.floor(cellIndex / grid.columns);
       const column = cellIndex % grid.columns;
       unit.draw(page, fitIntoBox(unit.width, unit.height, {
@@ -178,11 +177,34 @@ function appendUnitsAsAutoA4Grid(document: PDFDocument, units: RenderUnit[]) {
         height: cellHeight,
       }));
     }
-    index += grid.count;
   }
 }
 
-function pickAutoGrid(units: RenderUnit[]): { columns: number; rows: number; count: number } {
+export function planAutoA4GridPages(
+  units: Array<{ width: number; height: number }>,
+): Array<{
+  start: number;
+  count: number;
+  grid: { columns: number; rows: number; count: number };
+}> {
+  if (units.length === 0) return [];
+  // Pick the visual scale once for the whole export. Recomputing from the
+  // remainder made a lone final item switch to a 1x1 grid and fill the page.
+  const grid = pickAutoGrid(units);
+  const pages = [];
+  for (let start = 0; start < units.length; start += grid.count) {
+    pages.push({
+      start,
+      count: Math.min(grid.count, units.length - start),
+      grid,
+    });
+  }
+  return pages;
+}
+
+function pickAutoGrid(
+  units: Array<{ width: number; height: number }>,
+): { columns: number; rows: number; count: number } {
   const maxCount = Math.min(units.length, AUTO_MAX_CELLS);
   let best = { columns: 1, rows: 1, count: 1, score: Number.NEGATIVE_INFINITY };
   const contentWidth = A4.width - A4_MARGIN * 2;
