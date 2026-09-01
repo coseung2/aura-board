@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { isAdminEmail } from "@/lib/admin";
 
 type TxLike = Prisma.TransactionClient | PrismaClient;
 
@@ -12,6 +13,12 @@ export type DefaultGroupStudent = {
   name: string;
   number: number | null;
 };
+
+export function canUseClassroomDefaultGroupFallback(
+  email: string | null | undefined,
+): boolean {
+  return isAdminEmail(email);
+}
 
 export function normalizeGroupDrafts(
   groups: DefaultGroupDraft[],

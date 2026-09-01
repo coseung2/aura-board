@@ -9,18 +9,24 @@ type SummaryCard = {
   title: string;
   metric: string;
   note: string;
+  badge?: string;
 };
 
 type Props = {
   classroomId: string;
   summary: ClassroomHomeSummary;
+  isAdmin?: boolean;
 };
 
 /**
  * Teacher-facing classroom overview. Role-execution tools stay in each
  * assigned student's "내 역할" portal instead of competing with teacher tasks.
  */
-export function ClassroomHomeFeatureGrid({ classroomId, summary }: Props) {
+export function ClassroomHomeFeatureGrid({
+  classroomId,
+  summary,
+  isAdmin = false,
+}: Props) {
   const classroomHref = (key: string) => `/classroom/${classroomId}/${key}`;
   const students = summary.students.total;
 
@@ -35,13 +41,16 @@ export function ClassroomHomeFeatureGrid({ classroomId, summary }: Props) {
           metric: `${students}명`,
           note: "명단 · QR · 학부모 현황",
         },
-        {
-          key: "groups",
-          href: classroomHref("groups"),
-          title: "자리·모둠",
-          metric: `모둠 ${summary.groups.groupCount}개`,
-          note: `자리 배정 ${summary.groups.seatedCount}/${students}명`,
-        },
+        ...(isAdmin
+          ? [{
+              key: "groups",
+              href: classroomHref("groups"),
+              title: "자리·모둠",
+              metric: `모둠 ${summary.groups.groupCount}개`,
+              note: `자리 배정 ${summary.groups.seatedCount}/${students}명`,
+              badge: "관리자",
+            }]
+          : []),
         {
           key: "boards",
           href: classroomHref("boards"),
@@ -140,12 +149,17 @@ export function ClassroomHomeFeatureGrid({ classroomId, summary }: Props) {
                 <Link
                   href={card.href}
                   className="classroom-home-summary-card"
-                  aria-label={`${card.title} · ${card.metric}`}
+                  aria-label={`${card.title} · ${card.metric}${
+                    card.badge ? ` · ${card.badge}` : ""
+                  }`}
                 >
                   <span className="classroom-home-summary-head">
                     <span className="classroom-home-summary-copy">
                       <span className="classroom-home-summary-meta">
                         <span className="classroom-home-summary-metric">{card.metric}</span>
+                        {card.badge ? (
+                          <span className="classroom-home-summary-badge">{card.badge}</span>
+                        ) : null}
                       </span>
                       <strong className="classroom-home-summary-title">{card.title}</strong>
                     </span>

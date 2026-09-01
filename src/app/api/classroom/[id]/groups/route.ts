@@ -7,6 +7,7 @@ import {
   saveClassroomDefaultGroups,
 } from "@/lib/default-groups";
 import { isSeatingExcludedStudent } from "@/lib/seating-exclusions";
+import { isAdminEmail } from "@/lib/admin";
 
 const SaveGroupsSchema = z.object({
   groups: z
@@ -33,7 +34,10 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser().catch(() => null);
+    if (!user || !isAdminEmail(user.email)) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
     const { id } = await params;
     const classroom = await requireClassroom(id, user.id);
     if (!classroom) {
@@ -61,7 +65,10 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getCurrentUser();
+    const user = await getCurrentUser().catch(() => null);
+    if (!user || !isAdminEmail(user.email)) {
+      return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
     const { id } = await params;
     const classroom = await requireClassroom(id, user.id);
     if (!classroom) {

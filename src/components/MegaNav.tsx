@@ -12,6 +12,7 @@ import {
 export type MegaNavLink = {
   href: string;
   label: string;
+  badge?: string;
   active?: boolean;
   emoji?: string | null;
   disabled?: boolean;
@@ -271,6 +272,9 @@ export function MegaNav({ items, ariaLabel }: Props) {
                               <span className="mega-nav-link-label">
                                 {link.label}
                               </span>
+                              {link.badge ? (
+                                <span className="mega-nav-link-badge">{link.badge}</span>
+                              ) : null}
                             </span>
                           </li>
                         );
@@ -301,6 +305,9 @@ export function MegaNav({ items, ariaLabel }: Props) {
                             <span className="mega-nav-link-label">
                               {link.label}
                             </span>
+                            {link.badge ? (
+                              <span className="mega-nav-link-badge">{link.badge}</span>
+                            ) : null}
                           </Link>
                         </li>
                       );

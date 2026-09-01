@@ -119,9 +119,9 @@ describe("TopNav classroom mega menu", () => {
     expect(groupLinks(panel, "햇살반 관리")).toEqual([
       { label: "학급 홈", href: "/classroom/class-1/dashboard" },
       { label: "학생 명단", href: "/classroom/class-1/students" },
-      { label: "자리·모둠", href: "/classroom/class-1/groups" },
       { label: "보드 연결", href: "/classroom/class-1/boards" },
     ]);
+    expect(within(panel).queryByText("자리·모둠")).toBeNull();
     expect(groupLinks(panel, "학급 운영")).toEqual([
       { label: "1인1역", href: "/classroom/class-1/roles" },
       { label: "과제 현황", href: "/classroom/class-1/assignments" },
@@ -137,6 +137,20 @@ describe("TopNav classroom mega menu", () => {
       { label: "걷기", href: "/classroom/class-1/walking" },
       { label: "일일 배너", href: "/classroom/class-1/daily-banners" },
     ]);
+  });
+
+  it("shows the admin-tagged seating link only to an administrator", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify(classroomNavData))),
+    );
+    render(<TopNav showAdmin />);
+
+    openClassroomMenu();
+    const panel = await screen.findByRole("region", { name: "학급 메뉴" });
+    const link = within(panel).getByRole("link", { name: /자리·모둠.*관리자/ });
+    expect(link).toHaveAttribute("href", "/classroom/class-1/groups");
+    expect(within(link).getByText("관리자")).toHaveClass("mega-nav-link-badge");
   });
 
   it("keeps classroom preview behavior and marks the current tab active", async () => {

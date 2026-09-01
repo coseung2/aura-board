@@ -4,6 +4,7 @@ import { ClassroomHomeFeatureGrid } from "@/components/classroom/ClassroomHomeFe
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getClassroomHomeSummary } from "@/lib/classroom-home-summary";
+import { isAdminEmail } from "@/lib/admin";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -32,6 +33,10 @@ export default async function ClassroomDashboardPage({ params }: Props) {
   }
 
   const summary = await getClassroomHomeSummary(classroom.id);
+  const isAdmin = isAdminEmail(user.email);
+  const visibleSummary = isAdmin
+    ? summary
+    : { ...summary, groups: { groupCount: 0, seatedCount: 0 } };
 
   return (
     <main className="classroom-page classroom-page-detail classroom-section-page">
@@ -52,7 +57,11 @@ export default async function ClassroomDashboardPage({ params }: Props) {
           { label: "학급 코드", value: classroom.code },
         ]}
       />
-      <ClassroomHomeFeatureGrid classroomId={classroom.id} summary={summary} />
+      <ClassroomHomeFeatureGrid
+        classroomId={classroom.id}
+        summary={visibleSummary}
+        isAdmin={isAdmin}
+      />
     </main>
   );
 }

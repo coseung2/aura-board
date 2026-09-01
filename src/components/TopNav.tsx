@@ -44,7 +44,7 @@ const EMPTY_NAV_DATA: TeacherNavData = {
 const CLASSROOM_MANAGEMENT_TABS = [
   { key: "dashboard", label: "학급 홈" },
   { key: "students", label: "학생 명단" },
-  { key: "groups", label: "자리·모둠" },
+  { key: "groups", label: "자리·모둠", badge: "관리자" },
   { key: "boards", label: "보드 연결" },
 ] as const;
 
@@ -277,12 +277,13 @@ export function TopNav({ showAdmin = false }: Props) {
         ];
 
   const classroomTabLinks = (
-    tabs: ReadonlyArray<{ key: string; label: string }>,
+    tabs: ReadonlyArray<{ key: string; label: string; badge?: string }>,
   ): MegaNavLink[] =>
     previewClassroom
       ? tabs.map((tab) => ({
         href: previewClassroomTabHref(tab.key),
         label: tab.label,
+        badge: tab.badge,
         active: isPreviewClassroomTabActive(tab.key),
       }))
       : [
@@ -294,7 +295,9 @@ export function TopNav({ showAdmin = false }: Props) {
         ];
 
   const selectedClassroomManagementLinks = classroomTabLinks(
-    CLASSROOM_MANAGEMENT_TABS,
+    showAdmin
+      ? CLASSROOM_MANAGEMENT_TABS
+      : CLASSROOM_MANAGEMENT_TABS.filter((tab) => tab.key !== "groups"),
   );
   const selectedClassroomOperationLinks = classroomTabLinks(
     CLASSROOM_OPERATION_TABS,

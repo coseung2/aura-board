@@ -96,6 +96,17 @@
   font-weight: 700;
 }
 
+.classroom-home-summary-badge {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
 .classroom-home-summary-title {
   min-width: 0;
   overflow: hidden;

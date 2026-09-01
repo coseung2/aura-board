@@ -145,6 +145,17 @@
   min-width: 0;
 }
 
+.mega-nav-link-badge {
+  flex: 0 0 auto;
+  padding: 2px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.4;
+}
+
 .ab-topnav,
 .student-topnav,
 .parent-topnav {

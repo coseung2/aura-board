@@ -217,7 +217,9 @@ export function ClassroomGroupsTab({
     <section className="classroom-boards-section">
       <div className="classroom-boards-header">
         <div>
-          <h2 className="classroom-boards-heading">자리 배치</h2>
+          <h2 className="classroom-boards-heading">
+            자리 배치 <span className="board-badge">관리자</span>
+          </h2>
           <p className="classroom-setting-hint">
             저장한 자리 배치는 학급 기본 모둠이 됩니다. 보드는 만들 때 이
             배치를 그대로 가져가며, 이미 만든 보드의 모둠은 바뀌지 않아요.

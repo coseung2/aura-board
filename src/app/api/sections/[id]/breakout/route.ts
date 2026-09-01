@@ -16,6 +16,7 @@ import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import {
   loadBoardDefaultGroups,
   loadClassroomDefaultGroups,
+  canUseClassroomDefaultGroupFallback,
   normalizeGroupDrafts,
   saveSectionBreakoutGroups,
   type DefaultGroupDraft,
@@ -152,11 +153,15 @@ export async function POST(
       : null;
 
     if (requestedJoinMode === "teacher_assign" && !groupDrafts) {
-      const boardGroups = await loadBoardDefaultGroups(db, section.boardId);
+      const canUseClassroomDefaults = canUseClassroomDefaultGroupFallback(user.email);
+      const boardGroups = canUseClassroomDefaults
+        ? await loadBoardDefaultGroups(db, section.boardId)
+        : [];
       groupDrafts =
         boardGroups.length > 0
           ? boardGroups
-          : section.board.classroomId
+          : section.board.classroomId &&
+              canUseClassroomDefaults
             ? await loadClassroomDefaultGroups(db, section.board.classroomId)
             : [];
     }

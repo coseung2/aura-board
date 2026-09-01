@@ -5,6 +5,7 @@ import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import {
   loadBoardDefaultGroups,
   loadClassroomDefaultGroups,
+  canUseClassroomDefaultGroupFallback,
 } from "@/lib/default-groups";
 
 export async function GET(
@@ -30,9 +31,14 @@ export async function GET(
           select: { id: true, name: true, number: true },
         })
       : [];
-    const boardGroups = await loadBoardDefaultGroups(db, board.id);
+    const canUseClassroomDefaults = canUseClassroomDefaultGroupFallback(user.email);
+    const boardGroups = canUseClassroomDefaults
+      ? await loadBoardDefaultGroups(db, board.id)
+      : [];
     const groups =
-      boardGroups.length > 0 || !board.classroomId
+      boardGroups.length > 0 ||
+      !board.classroomId ||
+      !canUseClassroomDefaults
         ? boardGroups
         : await loadClassroomDefaultGroups(db, board.classroomId);
 
