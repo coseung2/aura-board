@@ -283,7 +283,7 @@ Storage API가 읽는 prefix가 달라지는 것을 막기 위해 이 대조를 
 
 ### pg_cron / Vault cutover
 
-managed production에는 `notification-outbox-retry-sweep`, `student-morning-digest`, `student-morning-tasks-08-kst` pg_cron job과 notification worker URL/secret Vault 값이 남아 있다. staging에는 이 job/secret을 복제하지 않는다. Oracle은 이미 `notification-push`를 매분 실행하고 `attendance-reminder`를 매일 `23:00 UTC`에 실행하므로 self-host cutover에서는 Oracle cron을 단일 scheduler로 유지해 중복 callback을 피한다. DB에 복원된 Vault 참조 함수는 secret이 없으면 no-op이어야 한다.
+managed production에는 `notification-outbox-retry-sweep`, `student-morning-digest`, `student-morning-tasks-08-kst` pg_cron job과 notification worker URL/secret Vault 값이 남아 있다. staging에는 이 job/secret을 복제하지 않는다. Oracle은 `notification-push`를 매분 실행하고 `attendance-reminder`를 매일 `22:50 UTC`(KST 07:50)에 실행하므로 self-host cutover에서는 Oracle cron을 단일 scheduler로 유지해 중복 callback을 피한다. DB에 복원된 Vault 참조 함수는 secret이 없으면 no-op이어야 한다.
 
 ## 9. Public endpoint two-stage rollout
 

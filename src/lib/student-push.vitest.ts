@@ -418,8 +418,8 @@ describe("student push event builders", () => {
       kind: "attendance",
       href: "/student",
     });
-    expect(shouldSendAttendanceReminder(new Date("2026-07-25T22:59:59.999Z"))).toBe(false);
-    expect(shouldSendAttendanceReminder(new Date("2026-07-25T23:00:00.000Z"))).toBe(true);
+    expect(shouldSendAttendanceReminder(new Date("2026-07-25T22:49:59.999Z"))).toBe(false);
+    expect(shouldSendAttendanceReminder(new Date("2026-07-25T22:50:00.000Z"))).toBe(true);
   });
 
   it("writes each due-today assignment as a sentence without middle-dot separators", () => {

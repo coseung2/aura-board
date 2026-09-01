@@ -37,7 +37,8 @@ export type AfternoonAssignmentReminder = MorningAssignmentReminder;
 type DispatchOptions = { propagateFailure?: boolean };
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1_000;
-export const ATTENDANCE_REMINDER_KST_HOUR = 8;
+export const ATTENDANCE_REMINDER_KST_HOUR = 7;
+export const ATTENDANCE_REMINDER_KST_MINUTE = 50;
 
 export function studentPushKstDay(now: Date = new Date()): string {
   if (Number.isNaN(now.getTime())) throw new RangeError("invalid_date");
@@ -46,8 +47,9 @@ export function studentPushKstDay(now: Date = new Date()): string {
 
 export function shouldSendAttendanceReminder(now: Date = new Date()): boolean {
   if (Number.isNaN(now.getTime())) throw new RangeError("invalid_date");
-  return new Date(now.getTime() + KST_OFFSET_MS).getUTCHours()
-    >= ATTENDANCE_REMINDER_KST_HOUR;
+  const kst = new Date(now.getTime() + KST_OFFSET_MS);
+  const minuteOfDay = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+  return minuteOfDay >= ATTENDANCE_REMINDER_KST_HOUR * 60 + ATTENDANCE_REMINDER_KST_MINUTE;
 }
 
 export function morningTaskReminderPush(input: {

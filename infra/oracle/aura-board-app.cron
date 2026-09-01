@@ -13,4 +13,4 @@ CRON_TZ=UTC
 0 18 * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh billing-renew POST
 20 18 * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh blob-cleanup GET
 0 8 * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh afternoon-attendance-reminder GET
-0 23 * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh attendance-reminder GET
+50 22 * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh attendance-reminder GET

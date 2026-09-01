@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { ensureAccountFor } from "@/lib/bank";
+import { requestPublicAppOrigin } from "@/lib/public-app-origin";
 
 const Body = z.object({
   principal: z.number().int().positive(),
@@ -16,8 +17,16 @@ export async function POST(
 ) {
   const { id: classroomId } = await params;
   const origin = req.headers.get("origin");
-  if (origin && origin !== new URL(req.url).origin) {
-    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (origin) {
+    let normalizedOrigin: string | null = null;
+    try {
+      normalizedOrigin = new URL(origin).origin;
+    } catch {
+      normalizedOrigin = null;
+    }
+    if (!normalizedOrigin || normalizedOrigin !== requestPublicAppOrigin(req)) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
   }
 
   let body: unknown;

@@ -95,6 +95,25 @@ describe("POST fixed deposit", () => {
     expect((await POST(crossOriginRequest, context)).status).toBe(403);
   });
 
+  it("accepts the public origin when standalone req.url is loopback", async () => {
+    vi.stubEnv("AURA_BOARD_BASE_URL", "https://aura-board.com");
+    const requestWithPublicOrigin = new Request(
+      "http://localhost:3000/api/classrooms/class-1/bank/fixed-deposits",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://aura-board.com",
+        },
+        body: JSON.stringify({ principal: 300 }),
+      },
+    );
+
+    const response = await POST(requestWithPublicOrigin, context);
+
+    expect(response.status).toBe(200);
+  });
+
   it("does not overdraw when the balance changed concurrently", async () => {
     mocks.accountUpdateMany.mockResolvedValueOnce({ count: 0 });
     const response = await POST(request({ principal: 300 }), context);
