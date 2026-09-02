@@ -1,11 +1,14 @@
 import { Stack, useRouter, type Href } from "expo-router";
 import { useEffect } from "react";
-import { InteractionManager, StyleSheet, View } from "react-native";
+import { AppState, InteractionManager, StyleSheet, View } from "react-native";
 import { colors } from "../../theme/tokens";
 import { useParentSessionWatchdog } from "../../hooks/use-parent-session-watchdog";
 import { DailyBannerProvider } from "../../components/DailyBanner";
 import { WalkingPermissionOnboarding } from "../../components/WalkingPermissionOnboarding";
-import { subscribeParentPushNavigation } from "../../lib/parent-push-notifications";
+import {
+  registerParentPushNotifications,
+  subscribeParentPushNavigation,
+} from "../../lib/parent-push-notifications";
 import { prefetchParentTabs } from "../../lib/parent-data-prefetch";
 import { loadParentToken } from "../../lib/session";
 
@@ -13,6 +16,13 @@ import { loadParentToken } from "../../lib/session";
 export default function ParentLayout() {
   const router = useRouter();
   useParentSessionWatchdog();
+
+  useEffect(() => {
+    const appStateSubscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void registerParentPushNotifications();
+    });
+    return () => appStateSubscription.remove();
+  }, []);
 
   useEffect(() => {
     let unsubscribe: () => void = () => undefined;
