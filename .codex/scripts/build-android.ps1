@@ -313,6 +313,12 @@ $sdkPropertiesPath = Convert-ToGradlePropertiesPath -Path $AndroidSdkRoot
 Write-Utf8NoBom -Path (Join-Path $androidDir 'local.properties') -Text "sdk.dir=$sdkPropertiesPath`n"
 Patch-AndroidProject -BuildDir $BuildDir -Config $config
 
+$releaseVerifier = Join-Path $BuildDir 'scripts\check-android-release.mjs'
+if (Test-Path -LiteralPath $releaseVerifier) {
+  & node $releaseVerifier --build-dir $BuildDir --sdk-root $AndroidSdkRoot
+  if ($LASTEXITCODE -ne 0) { throw 'Android Play release source checks failed.' }
+}
+
 $credentialsPath = Join-Path $AppSource 'credentials.json'
 if (Test-Path -LiteralPath $credentialsPath) {
   $credentials = Get-Content -Raw -LiteralPath $credentialsPath | ConvertFrom-Json
@@ -376,6 +382,22 @@ foreach ($candidate in @($apk, $aab)) {
       LastWriteTime = $item.LastWriteTime
     }
   }
+}
+
+if ($Output -in @('Apk', 'Both') -and -not (Test-Path -LiteralPath $apk)) {
+  throw "Requested release APK was not generated: $apk"
+}
+if ($Output -in @('Aab', 'Both') -and -not (Test-Path -LiteralPath $aab)) {
+  throw "Requested release AAB was not generated: $aab"
+}
+
+if (Test-Path -LiteralPath $releaseVerifier) {
+  $releaseVerifierArgs = @($releaseVerifier, '--build-dir', $BuildDir, '--sdk-root', $AndroidSdkRoot)
+  foreach ($artifact in $artifacts) {
+    $releaseVerifierArgs += @('--artifact', $artifact.Path)
+  }
+  & node @releaseVerifierArgs
+  if ($LASTEXITCODE -ne 0) { throw 'Android Play release artifact checks failed.' }
 }
 
 if ($SubmitAndroid) {

@@ -59,7 +59,43 @@ The script:
 3. Creates or regenerates `android\` inside the build directory.
 4. Patches package name, version name, version code, signing, and SDK path.
 5. Builds APK and/or AAB with Gradle.
-6. Prints artifact paths, sizes, hashes, and version metadata.
+6. Runs an app-provided `scripts/check-android-release.mjs` gate when present.
+7. Prints artifact paths, sizes, hashes, and version metadata.
+
+Aura Board ships this release gate. A signed release build fails unless all of
+the following are true:
+
+- Expo prebuild generated `android.enableMinifyInReleaseBuilds=true` and
+  `android.enableShrinkResourcesInReleaseBuilds=true`.
+- The generated app manifest is resizable and contains no orientation or
+  min/max-aspect-ratio restrictions for large-screen devices.
+- R8 generated a non-empty release `mapping.txt`.
+- AAB `BundleConfig.pb` requests `PAGE_ALIGNMENT_16K` for uncompressed native
+  libraries.
+- every packaged native `.so` has ELF `PT_LOAD` alignment of at least 16 KB.
+- APK output, when requested, passes `zipalign -c -P 16 -v 4`.
+
+This makes the February 2027 Google Play DEX optimization requirement, the
+large-screen manifest recommendations, and Android's 16 KB page-size
+compatibility checks release-time failures instead of Play Console surprises.
+The Play Console remains the source of truth for the reported optimization,
+obfuscation, and shrinking percentages; R8 must reach at least 25% in all three
+for apps whose DEX code exceeds Google's enforcement threshold.
+
+### Play Console display recommendations
+
+Aura Board also removes generated orientation/aspect-ratio restrictions and
+sets the Android application as resizable through
+`plugins/with-android-large-screen-support.js`. Do not edit the generated
+`android/AndroidManifest.xml`; `-ForcePrebuild` must reproduce the same result.
+
+The Play Console recommendation about deprecated edge-to-edge APIs can be
+reported from compatibility code inside React Native or React Native Screens,
+even when Aura Board does not call status/navigation bar color APIs directly.
+Keep `edgeToEdgeEnabled: true`, stay on the Expo-recommended React Native/native
+dependency versions, and re-check the warning after each store upload. Do not
+patch generated framework sources solely to silence the static Play warning;
+take the upstream Expo/React Native patch when the SDK supports it.
 
 ## Generated Native Mode
 
@@ -182,3 +218,8 @@ Expected metadata:
 - Package: `com.auraboard.app`
 - Version: `0.1.0`
 - Version code: from `android.versionCode`, or `1` if omitted.
+
+For Aura Board, `-PrepareOnly` also runs the source/generation half of the Play
+release gate and confirms that Expo prebuild has actually enabled R8 minify and
+resource shrinking. Full APK/AAB alignment checks run after Gradle produces the
+release artifacts.
