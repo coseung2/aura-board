@@ -2,6 +2,7 @@
 // Pure sync predicates; no network. Embeds use react-native-webview in UI.
 
 import type { CardAttachment } from "./types";
+import { getApiUrl } from "./api";
 
 export const MOBILE_EMBED_ORIGIN = "https://aura-board.com";
 
@@ -129,6 +130,27 @@ export function isCanvaDesignUrl(raw: string): boolean {
   return (
     CANVA_DESIGN_HOSTS.has(host) && /\/design\/[A-Za-z0-9_-]+/.test(pathname)
   );
+}
+
+/**
+ * Canva thumbnails must go through the Aura Board origin in native apps.
+ * Web cards can render a relative `/api/canva/thumbnail` URL directly, but
+ * expo-image has no document origin to resolve it against. Using the design
+ * URL also refreshes legacy cards whose stored Canva CDN thumbnail has
+ * expired or was never populated.
+ */
+export function getCanvaThumbnailUrlFromLink(
+  raw: string | null | undefined,
+): string | null {
+  if (!raw || !isCanvaDesignUrl(raw)) return null;
+  return getApiUrl(
+    `/api/canva/thumbnail?design=${encodeURIComponent(raw)}&w=640`,
+  );
+}
+
+function resolveMobileAssetUrl(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  return raw.startsWith("/") ? getApiUrl(raw) : raw;
 }
 
 /** Extract design id from www.canva.com design URL (not canva.link). */
@@ -295,7 +317,9 @@ export function buildMediaItems({
       id: a.id,
       kind: a.kind,
       url: a.url,
-      previewUrl: a.previewUrl,
+      previewUrl:
+        (a.kind === "link" ? getCanvaThumbnailUrlFromLink(a.url) : null) ??
+        resolveMobileAssetUrl(a.previewUrl),
       fileName: a.fileName,
       fileSize: a.fileSize,
       mimeType: a.mimeType,
@@ -312,7 +336,7 @@ export function buildMediaItems({
       id: `legacy-image-${imageUrl}`,
       kind: "image",
       url: imageUrl,
-      previewUrl: thumbUrl ?? null,
+      previewUrl: resolveMobileAssetUrl(thumbUrl),
       fileName: null,
       fileSize: null,
       mimeType: null,
@@ -336,7 +360,10 @@ export function buildMediaItems({
       id: `legacy-link-${linkUrl}`,
       kind: "link",
       url: linkUrl,
-      previewUrl: linkImage ?? getYouTubeThumbnailUrlFromLink(linkUrl),
+      previewUrl:
+        getCanvaThumbnailUrlFromLink(linkUrl) ??
+        resolveMobileAssetUrl(linkImage) ??
+        getYouTubeThumbnailUrlFromLink(linkUrl),
       fileName: linkTitle ?? null,
       fileSize: null,
       mimeType: linkDesc ?? null,
@@ -383,11 +410,12 @@ export function mediaAttachments(items: MediaItem[]): MediaItem[] {
 export function mediaPreviewUrls(items: MediaItem[]): string[] {
   const urls = items.flatMap((item) => {
     if (item.kind === "image") {
-      return [item.previewUrl ?? item.url];
+      return [resolveMobileAssetUrl(item.previewUrl ?? item.url) ?? item.url];
     }
     if (item.kind === "video" || item.kind === "link") {
       const preview = item.previewUrl ?? getYouTubeThumbnailUrlFromLink(item.url);
-      return preview ? [preview] : [];
+      const resolved = resolveMobileAssetUrl(preview);
+      return resolved ? [resolved] : [];
     }
     return [];
   });

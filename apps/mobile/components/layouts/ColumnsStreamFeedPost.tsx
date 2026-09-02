@@ -1,7 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Linking, ScrollView, StyleSheet, Text, View } from "react-native";
 import { Image } from "expo-image";
-import { Heart, MessageCircle, MoreHorizontal, UserRound } from "lucide-react-native";
+import {
+  ExternalLink,
+  Heart,
+  Link2,
+  MessageCircle,
+  MoreHorizontal,
+  UserRound,
+} from "lucide-react-native";
 import {
   borders,
   colors,
@@ -69,6 +76,7 @@ export function StreamFeedPost({
   const content = (feedPost?.body ?? card?.content ?? "").trim();
   const mediaItems = feedPost ? feedPostImages(feedPost) : streamPostImages(card!);
   const mediaLabel = feedPost ? feedPostMediaLabel(feedPost) : streamPostMediaLabel(card!);
+  const linkTarget = feedPost ? null : streamPostLinkTarget(card!);
   const embedUrl = feedPost ? null : findPlayableMediaUrl(card!);
   const hasMediaSurface = Boolean(
     embedUrl || mediaItems.length > 0 || mediaLabel,
@@ -292,12 +300,43 @@ export function StreamFeedPost({
             </View>
           ) : null}
         </View>
-      ) : mediaLabel ? (
+      ) : mediaLabel && !linkTarget ? (
         <View style={styles.feedPostMediaFallback} accessible={false}>
           <Text style={styles.feedPostMediaFallbackText} numberOfLines={2}>
             {mediaLabel}
           </Text>
         </View>
+      ) : null}
+
+      {linkTarget && !embedUrl ? (
+        <ControlPressable
+          style={styles.feedPostLinkSurface}
+          onPress={() => void openExternalUrl(linkTarget.url)}
+          accessibilityRole="link"
+          accessibilityLabel={`${linkTarget.title} 링크 열기`}
+          accessibilityHint="외부 앱 또는 브라우저에서 엽니다"
+        >
+          <Link2
+            size={iconSizes.md}
+            color={colors.accentTintedText}
+            strokeWidth={1.75}
+            accessible={false}
+          />
+          <View style={styles.feedPostLinkCopy}>
+            <Text style={styles.feedPostLinkTitle} numberOfLines={1}>
+              {linkTarget.title}
+            </Text>
+            <Text style={styles.feedPostLinkHost} numberOfLines={1}>
+              {linkTarget.host}
+            </Text>
+          </View>
+          <ExternalLink
+            size={iconSizes.sm}
+            color={colors.textMuted}
+            strokeWidth={1.75}
+            accessible={false}
+          />
+        </ControlPressable>
       ) : null}
 
       {textActsAsMedia ? (
@@ -456,6 +495,32 @@ function streamPostMediaLabel(card: BoardCard): string | null {
   return null;
 }
 
+function streamPostLinkTarget(card: BoardCard): {
+  url: string;
+  title: string;
+  host: string;
+} | null {
+  const linkAttachment = card.attachments?.find(
+    (attachment) => attachment.kind === "link",
+  );
+  const url = card.linkUrl ?? linkAttachment?.url ?? null;
+  if (!url) return null;
+  return {
+    url,
+    title: card.linkTitle ?? linkAttachment?.fileName ?? safeStreamPostHost(url),
+    host: safeStreamPostHost(url),
+  };
+}
+
+async function openExternalUrl(url: string) {
+  try {
+    const canOpen = await Linking.canOpenURL(url);
+    if (canOpen) await Linking.openURL(url);
+  } catch {
+    // Ignore malformed or unsupported external targets from legacy cards.
+  }
+}
+
 function formatStreamPostDate(
   value: string | Date | null | undefined,
 ): string | null {
@@ -571,6 +636,31 @@ const styles = StyleSheet.create({
     ...typography.label,
     color: colors.accentTintedText,
     textAlign: "center",
+  },
+  feedPostLinkSurface: {
+    minHeight: tapMin + spacing.sm,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderWidth: borders.none,
+    borderColor: colors.transparent,
+    borderRadius: radii.none,
+    backgroundColor: colors.surfaceAlt,
+  },
+  feedPostLinkCopy: {
+    flex: 1,
+    minWidth: 0,
+    gap: spacing.xxs,
+  },
+  feedPostLinkTitle: {
+    ...typography.label,
+    color: colors.text,
+  },
+  feedPostLinkHost: {
+    ...typography.micro,
+    color: colors.textMuted,
   },
   feedPostEngagement: {
     flexDirection: "row",
