@@ -16,6 +16,7 @@
 
 | 문서 | 발생일 | severity | 상태 | 요약 |
 | --- | --- | --- | --- | --- |
+| [2026-09-02-mobile-canva-thumbnail-native-origin.md](./2026-09-02-mobile-canva-thumbnail-native-origin.md) | 2026-09-02 | medium | 수정 중 | 웹 상대 Canva thumbnail URL과 레거시 `linkImage=null`을 네이티브에서 정규화하지 않아 보드 진입 시 썸네일 프리페치/표시 실패 |
 | [2026-08-29-supabase-dr-replication-stale.md](./2026-08-29-supabase-dr-replication-stale.md) | 2026-08-29 | high | 해결 | 누락된 replication compose override·rollback DB slot·schema/grant drift를 복구하고 176-table parity와 watchdog green 확인 |
 | [2026-04-20-upload-payload-too-large.md](./2026-04-20-upload-payload-too-large.md) | 2026-04-20 | high | 해결 | Vercel 함수 본문 4.5MB 한도로 대용량 업로드 실패 → client-direct 업로드로 전환 |
 | [2026-08-12-parent-oauth-localhost-redirect.md](./2026-08-12-parent-oauth-localhost-redirect.md) | 2026-08-12 | high | 해결 | Next standalone `req.url`이 localhost 기준 → 학부모 OAuth 콜백/Origin 불일치 |

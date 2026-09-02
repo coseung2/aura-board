@@ -78,6 +78,19 @@ creating overlapping testing-notes documents.
   The wrapper must not depend on a public-origin self-fetch; Oracle standalone
   loopback, nginx, Cloudflare, and Vercel can otherwise produce different
   results for identical application code.
+- On native mobile, never pass a web-relative preview URL such as
+  `/api/canva/thumbnail?...` directly to `expo-image` or `Image.prefetch`.
+  Confirm the shared media normalizer resolves Aura Board-owned paths against
+  the mobile API base, and that prefetch and render receive the same absolute
+  URL.
+- On a physical mobile device with an empty image cache, open a board that has
+  a Canva design and confirm its thumbnail is visible before opening the Canva
+  WebView. Then open the design, navigate back, and confirm the thumbnail is
+  still immediately visible from the normal image path.
+- Repeat the mobile check with a legacy Canva card whose `linkImage` is null and
+  with a link attachment whose `previewUrl` is relative. A valid Canva design
+  URL must be sufficient to derive the stable Aura Board thumbnail proxy URL;
+  repairing or re-saving the card must not be required.
 
 ### Teacher content library and Canva PDF export
 
