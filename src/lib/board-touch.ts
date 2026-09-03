@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { invalidateBoardSnapshotCache } from "@/lib/board-snapshot-cache";
+import { resolveIdentities } from "@/lib/identity";
 
 type BoardActivityDetails = {
   action?: string;
@@ -22,6 +23,22 @@ export async function touchBoardUpdatedAt(
   try {
     const now = new Date();
     const coalesceMs = Math.max(0, Math.floor(activity.coalesceMs ?? 0));
+    const resolvedActor =
+      activity.actorType === undefined || activity.actorId === undefined
+        ? await resolveIdentities().catch(() => null)
+        : null;
+    const actorType =
+      activity.actorType ??
+      (resolvedActor?.teacher
+        ? "teacher"
+        : resolvedActor?.student
+          ? "student"
+          : "system");
+    const actorId =
+      activity.actorId ??
+      resolvedActor?.teacher?.userId ??
+      resolvedActor?.student?.studentId ??
+      null;
     await db.$transaction(async (tx) => {
       // Append first so the shared Board row is locked for the shortest
       // possible tail of the transaction. Every action remains observable.
@@ -29,8 +46,8 @@ export async function touchBoardUpdatedAt(
         data: {
           boardId,
           action: activity.action ?? "board.updated",
-          actorType: activity.actorType ?? "system",
-          actorId: activity.actorId ?? null,
+          actorType,
+          actorId,
           metadata: (activity.metadata as never) ?? null,
           createdAt: now,
         },

@@ -13,9 +13,11 @@ type ErrorLogInput = {
 
 export async function logError(input: ErrorLogInput): Promise<void> {
   // The administrator error log is for incidents experienced by users on the
-  // deployed service. Local development may use the same database, so never
-  // write its failures into this production-only signal.
-  if (process.env.VERCEL_ENV !== "production") return;
+  // deployed service. VERCEL_ENV is only present on Vercel; Oracle runs the
+  // same production build under systemd with NODE_ENV=production.
+  if (process.env.NODE_ENV !== "production" && process.env.VERCEL_ENV !== "production") {
+    return;
+  }
 
   try {
     const error =

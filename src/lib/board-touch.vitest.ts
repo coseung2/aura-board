@@ -13,6 +13,13 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("@/lib/identity", () => ({
+  resolveIdentities: vi.fn().mockResolvedValue({
+    teacher: { userId: "teacher-1" },
+    student: null,
+  }),
+}));
+
 import { touchBoardUpdatedAt } from "./board-touch";
 
 describe("touchBoardUpdatedAt", () => {
@@ -70,5 +77,16 @@ describe("touchBoardUpdatedAt", () => {
     expect(mocks.createEvent.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.updateMany.mock.invocationCallOrder[0],
     );
+  });
+
+  it("fills the actor from the request identity when callers omit it", async () => {
+    await touchBoardUpdatedAt("board-1", { action: "card.moved" });
+
+    expect(mocks.createEvent).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        actorType: "teacher",
+        actorId: "teacher-1",
+      }),
+    });
   });
 });
