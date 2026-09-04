@@ -1,6 +1,6 @@
 /**
  * Plain runner (no Jest/Vitest) — `npx tsx src/lib/__tests__/dj-request-limit.test.ts`.
- * Covers the DJ queue per-person hourly request limit helpers.
+ * Covers the DJ queue per-person request-window limit helpers.
  */
 import {
   DJ_REQUEST_LIMIT_ERROR,
@@ -26,21 +26,21 @@ function check(label: string, actual: unknown, expected: unknown) {
 }
 
 const NOW = new Date("2026-05-20T08:30:00.000Z");
-const WINDOW_START = new Date("2026-05-20T07:30:00.000Z");
+const WINDOW_START = new Date("2026-05-20T07:50:00.000Z");
 
-check("limit constant — one hour max 3", DJ_REQUEST_LIMIT_PER_HOUR, 3);
+check("limit constant — one hour max 5", DJ_REQUEST_LIMIT_PER_HOUR, 5);
 check(
-  "window constant — 60 minutes",
+  "window constant — 40 minutes",
   DJ_REQUEST_LIMIT_WINDOW_MS,
-  60 * 60 * 1000,
+  40 * 60 * 1000,
 );
 check(
   "error message — user-facing Korean",
   DJ_REQUEST_LIMIT_ERROR,
-  "1시간에 신청곡은 3곡까지만 신청할 수 있어요.",
+  "40분에 신청곡은 5곡까지만 신청할 수 있어요.",
 );
 check(
-  "window start — now minus one hour",
+  "window start — now minus 40 minutes",
   getDjRequestWindowStart(NOW),
   WINDOW_START,
 );

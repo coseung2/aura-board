@@ -1,7 +1,7 @@
-export const DJ_REQUEST_LIMIT_PER_HOUR = 3;
-export const DJ_REQUEST_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+export const DJ_REQUEST_LIMIT_PER_HOUR = 5;
+export const DJ_REQUEST_LIMIT_WINDOW_MS = 40 * 60 * 1000;
 export const DJ_REQUEST_LIMIT_ERROR =
-  "1시간에 신청곡은 3곡까지만 신청할 수 있어요.";
+  "40분에 신청곡은 5곡까지만 신청할 수 있어요.";
 
 type DjRequestLimitWhere = {
   boardId: string;
