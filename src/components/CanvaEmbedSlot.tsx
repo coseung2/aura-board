@@ -43,8 +43,7 @@ type Props = {
   linkTitle: string | null;
   linkImage: string | null;
   linkDesc: string | null;
-  /** Detail modals use the resolved thumbnail so the Canva iframe chrome
-   *  cannot obscure the content with third-party attribution controls. */
+  /** Allows callers to keep a thumbnail-only presentation when needed. */
   allowLive?: boolean;
 };
 

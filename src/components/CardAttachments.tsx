@@ -392,7 +392,6 @@ export const CardAttachments = memo(function CardAttachments({ cardId, imageUrl,
             linkTitle={a.fileName ?? null}
             linkImage={a.previewUrl ?? null}
             linkDesc={a.mimeType ?? null}
-            allowLive={variant !== "detail"}
           />
         );
       }
@@ -600,7 +599,6 @@ export const CardAttachments = memo(function CardAttachments({ cardId, imageUrl,
           linkTitle={linkTitle ?? null}
           linkImage={linkImage ?? null}
           linkDesc={linkDesc ?? null}
-          allowLive={variant !== "detail"}
         />
       ) : shouldRenderDetailLinkPreview && linkUrl && !allSorted.some((a) => a.kind === "link" && a.url === linkUrl) ? (
         <a
@@ -643,7 +641,6 @@ export const CardAttachments = memo(function CardAttachments({ cardId, imageUrl,
           linkTitle={linkTitle ?? null}
           linkImage={linkImage ?? null}
           linkDesc={linkDesc ?? null}
-          allowLive={variant !== "detail"}
         />
       ) : shouldRenderThumbnailLinkPreview && linkUrl ? (
         <a
