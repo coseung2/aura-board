@@ -210,7 +210,7 @@ export function CardComposer({
       <ScrollView
         style={styles.formScroll}
         contentContainerStyle={styles.formBody}
-        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >

@@ -233,7 +233,12 @@ export function AppModal({
 }: AppModalProps) {
   const sheet = (
     <View
-      onStartShouldSetResponder={() => true}
+      // Only claim the responder when the backdrop itself is pressable. For
+      // ordinary modals, allowing this wrapper to become the responder can
+      // prevent nested TextInput controls from receiving focus on Android.
+      onStartShouldSetResponder={
+        closeOnBackdropPress ? () => true : undefined
+      }
       style={
         align === "right" ? styles.modalSideSheetWrap : styles.modalSheetWrap
       }

@@ -104,7 +104,7 @@ export function CardEditModal({ card, visible, onClose, onSaved }: Props) {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.body}
-        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+        keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
         keyboardShouldPersistTaps="handled"
         automaticallyAdjustKeyboardInsets
       >

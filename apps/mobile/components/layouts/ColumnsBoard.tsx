@@ -1,10 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
-import { FlatList, StyleSheet, Text, View } from "react-native";
+import {
+  FlatList,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+} from "react-native";
 import {
   borders,
   colors,
   controls,
   iconSizes,
+  layout,
   pageChrome,
   spacing,
   tapMin,
@@ -31,6 +38,7 @@ import {
 import { ControlPressable, Fab, SurfaceCard } from "../ui";
 import { SectionNav, SectionNavItem } from "../NavigationTabs";
 import { useBoardRealtime } from "../../lib/use-board-realtime";
+import { isPortraitTabletViewport } from "../../lib/responsive";
 import { StreamFeedPost } from "./ColumnsStreamFeedPost";
 
 export { StreamFeedPost } from "./ColumnsStreamFeedPost";
@@ -57,6 +65,8 @@ export function ColumnsBoard({
   selectedSectionKey?: string | null;
   onSelectedSectionKeyChange?: (key: string | null) => void;
 }) {
+  const { width, height } = useWindowDimensions();
+  const usePortraitTabletLayout = isPortraitTabletViewport(width, height);
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(data.cards, data.board),
   );
@@ -181,7 +191,10 @@ export function ColumnsBoard({
         <FlatList
           data={selectedCards}
           keyExtractor={(card) => card.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[
+            styles.listContent,
+            usePortraitTabletLayout && styles.portraitTabletContent,
+          ]}
           renderItem={({ item, index }) => (
             <StreamFeedPost
               card={item}
@@ -214,7 +227,10 @@ export function ColumnsBoard({
           data={visibleSummaries}
           key="section-overview"
           keyExtractor={(summary) => sectionKey(summary.id)}
-          contentContainerStyle={styles.overviewContent}
+          contentContainerStyle={[
+            styles.overviewContent,
+            usePortraitTabletLayout && styles.portraitTabletContent,
+          ]}
           ListHeaderComponent={
             <View style={styles.topicFilterHeader}>
               <Text style={styles.topicFilterTitle} accessibilityRole="header">
@@ -442,6 +458,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: pageChrome.directContentStartGap,
     paddingBottom: spacing.xxxl,
+  },
+  portraitTabletContent: {
+    width: "100%",
+    maxWidth: layout.readableMaxWidth,
+    alignSelf: "center",
+    paddingHorizontal: spacing.xxl,
   },
   topicFilterHeader: {
     minHeight: tapMin + spacing.xs,

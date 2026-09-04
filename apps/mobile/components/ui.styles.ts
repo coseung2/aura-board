@@ -62,9 +62,9 @@ export const styles = StyleSheet.create({
     height: "100%",
   },
   modalKeyboardWrap: {
+    flex: 1,
     width: "100%",
     maxWidth: composer.sheetMaxWidth,
-    height: composer.sheetMaxHeight,
     justifyContent: "center",
   },
   modalSheet: {

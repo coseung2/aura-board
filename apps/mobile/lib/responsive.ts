@@ -3,7 +3,7 @@ import {
   type DimensionValue,
   type ViewStyle,
 } from "react-native";
-import { responsive } from "../theme/tokens";
+import { layout, responsive } from "../theme/tokens";
 
 type WebSafeWidthOptions = {
   enabled?: boolean;
@@ -26,4 +26,8 @@ export function webSafeWidthStyle(
     : Math.min(maxWidth, availableWidth);
 
   return { width: width as DimensionValue } as ViewStyle;
+}
+
+export function isPortraitTabletViewport(width: number, height: number) {
+  return width >= layout.mobileBreakpoint && height >= width;
 }
