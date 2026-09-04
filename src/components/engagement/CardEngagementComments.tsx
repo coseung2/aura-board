@@ -578,7 +578,7 @@ export function CommentsBlock({
             onClick={() => selectAudience("public")}
             onKeyDown={handleTabKeyDown}
           >
-            공개 대화
+            학급 댓글
           </button>
           <button
             id={`${tabsId}-guardian`}
@@ -593,7 +593,7 @@ export function CommentsBlock({
             onClick={() => selectAudience("guardian")}
             onKeyDown={handleTabKeyDown}
           >
-            보호자 대화
+            보호자 댓글
           </button>
         </div>
       )}

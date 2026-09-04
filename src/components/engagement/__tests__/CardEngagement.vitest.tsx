@@ -302,8 +302,8 @@ describe("CardEngagement comment realtime", () => {
     );
 
     await screen.findByText("공개 댓글");
-    const publicTab = screen.getByRole("tab", { name: "공개 대화" });
-    const guardianTab = screen.getByRole("tab", { name: "보호자 대화" });
+    const publicTab = screen.getByRole("tab", { name: "학급 댓글" });
+    const guardianTab = screen.getByRole("tab", { name: "보호자 댓글" });
     expect(publicTab.getAttribute("aria-selected")).toBe("true");
 
     fireEvent.keyDown(publicTab, { key: "ArrowRight" });
@@ -492,11 +492,11 @@ describe("CardEngagement comment realtime", () => {
       />,
     );
 
-    const guardianTab = await screen.findByRole("tab", { name: "보호자 대화" });
+    const guardianTab = await screen.findByRole("tab", { name: "보호자 댓글" });
     expect(guardianTab.getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("textbox")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("tab", { name: "공개 대화" }));
+    fireEvent.click(screen.getByRole("tab", { name: "학급 댓글" }));
     await screen.findByText("읽기 전용이라 댓글을 달 수 없어요");
     expect(screen.queryByRole("textbox")).toBeNull();
   });
@@ -536,7 +536,7 @@ describe("CardEngagement comment realtime", () => {
       />,
     );
 
-    const publicTab = await screen.findByRole("tab", { name: "공개 대화" });
+    const publicTab = await screen.findByRole("tab", { name: "학급 댓글" });
     expect(publicTab.getAttribute("aria-selected")).toBe("true");
     expect(screen.getByRole("textbox")).toBeTruthy();
     expect(
@@ -601,7 +601,7 @@ describe("CardEngagement comment realtime", () => {
       expect(JSON.parse(String(likeCall?.[1]?.body))).toEqual({ liked: true });
     });
 
-    fireEvent.click(screen.getByRole("tab", { name: "공개 대화" }));
+    fireEvent.click(screen.getByRole("tab", { name: "학급 댓글" }));
     await screen.findByText("읽기 전용이라 댓글을 달 수 없어요");
     expect(screen.queryByRole("textbox")).toBeNull();
   });

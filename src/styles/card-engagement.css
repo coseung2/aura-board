@@ -154,24 +154,23 @@
 .card-engagement-comment-tabs {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px;
-  padding: 4px;
-  margin-bottom: 2px;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  background: var(--color-surface-alt);
+  gap: 0;
+  margin: 2px 0 6px;
+  border-bottom: 1px solid var(--color-border);
 }
 .card-engagement-comment-tab {
-  min-height: 40px;
-  padding: 8px 12px;
+  position: relative;
+  min-height: 44px;
+  padding: 10px 12px 11px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 0;
   background: transparent;
   color: var(--color-text-muted);
   font: inherit;
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+  transition: color 160ms ease;
 }
 .card-engagement-comment-tab:hover {
   color: var(--color-text);
@@ -180,9 +179,17 @@
   cursor: wait;
 }
 .card-engagement-comment-tab.is-active {
-  background: var(--color-surface);
   color: var(--color-text);
-  box-shadow: var(--shadow-sm);
+}
+.card-engagement-comment-tab.is-active::after {
+  position: absolute;
+  right: 12px;
+  bottom: -1px;
+  left: 12px;
+  height: 2px;
+  border-radius: 2px 2px 0 0;
+  background: var(--color-accent);
+  content: "";
 }
 .card-engagement-comment-tab:focus-visible {
   outline: 2px solid var(--color-accent);
