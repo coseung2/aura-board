@@ -3,7 +3,7 @@
 
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentAgentStudent as getCurrentStudent } from "@/lib/agent/access";
 
 const SaveSchema = z.object({
   boardId: z.string().min(1),
@@ -77,6 +77,13 @@ export async function POST(
   }
 
   const { boardId, title, description, tags } = parsed.data;
+  const board = await db.board.findFirst({
+    where: { id: boardId, classroomId: student.classroomId },
+    select: { id: true },
+  });
+  if (!board || session.classroomId !== student.classroomId) {
+    return Response.json({ error: "forbidden" }, { status: 403 });
+  }
 
   // Extract HTML code from latest assistant message
   const lastMsg = session.messages[0];

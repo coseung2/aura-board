@@ -2,7 +2,7 @@
 // 세션 상세 + 메시지 목록 반환
 
 import { db } from "@/lib/db";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentAgentStudent as getCurrentStudent } from "@/lib/agent/access";
 import type { AgentSessionDTO, AgentMessageDTO, AgentMode } from "@/lib/agent/types";
 
 export async function GET(

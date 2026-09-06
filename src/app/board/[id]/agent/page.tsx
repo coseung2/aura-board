@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentAgentStudent as getCurrentStudent } from "@/lib/agent/access";
 import { AgentPageClient } from "@/components/agent/AgentPageClient";
 
 export default async function AgentPage({

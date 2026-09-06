@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentAgentStudent as getCurrentStudent } from "@/lib/agent/access";
 import { DEFAULT_AGENT_SYSTEM_PROMPT } from "@/lib/agent/stream-deepseek";
 import { AGENT_MODES, type AgentMode } from "@/lib/agent/types";
 import { getTeacherKeyForClassroom } from "@/lib/llm/teacher-key";

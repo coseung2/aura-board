@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { loadAuthorizedVibeProject } from "@/lib/vibe-arcade/project-access";
 import { notFound } from "next/navigation";
 import { PlayClient } from "@/components/agent/PlayClient";
 
@@ -9,18 +9,9 @@ interface Props {
 export default async function PlayPage({ params }: Props) {
   const { id, projectId } = await params;
 
-  const project = await db.vibeProject.findUnique({
-    where: { id: projectId },
-    select: {
-      id: true,
-      title: true,
-      htmlContent: true,
-      cssContent: true,
-      jsContent: true,
-    },
-  });
-
-  if (!project) notFound();
+  const access = await loadAuthorizedVibeProject(id, projectId);
+  if (!access) notFound();
+  const { project } = access;
 
   return (
     <PlayClient

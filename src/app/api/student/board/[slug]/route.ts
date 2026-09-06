@@ -11,6 +11,7 @@ import { loadGameSnapshot } from "@/lib/speed-game/runtime";
 import { sanitizeGameSnapshotForStudent } from "@/lib/speed-game/student-snapshot";
 import { parseObservationPoints } from "@/lib/plant-schemas";
 import { isOfficialPlayLayout } from "@/lib/game-platform/catalog";
+import { loadStudentAssignmentSlots } from "@/lib/student-assignment-payload";
 
 const ANONYMOUS_AUTHOR_LABEL = "익명";
 
@@ -161,49 +162,8 @@ export async function GET(
     }
 
     if (board.layout === "assignment") {
-      const slots = await db.assignmentSlot.findMany({
-        where: { boardId: board.id },
-        orderBy: { slotNumber: "asc" },
-        include: {
-          submission: {
-            select: {
-              id: true,
-              content: true,
-              fileUrl: true,
-              linkUrl: true,
-              createdAt: true,
-            },
-          },
-          card: {
-            select: {
-              id: true,
-              title: true,
-              content: true,
-              imageUrl: true,
-              linkUrl: true,
-              fileUrl: true,
-            },
-          },
-          student: { select: { id: true, name: true, number: true } },
-        },
-      });
       layoutData.assignment = {
-        slots: slots.map((slot) => ({
-          ...slot,
-          submission: slot.submission
-            ? {
-                id: slot.submission.id,
-                content: slot.submission.content,
-                // Assignment submissions persist images on the materialized
-                // slot card; expose that value through the submission-shaped
-                // mobile DTO so previews survive a reload.
-                imageUrl: slot.card.imageUrl,
-                fileUrl: slot.submission.fileUrl,
-                linkUrl: slot.submission.linkUrl,
-                submittedAt: slot.submission.createdAt.toISOString(),
-              }
-            : null,
-        })),
+        slots: await loadStudentAssignmentSlots(board.id, student.id),
       };
     }
 
@@ -383,7 +343,9 @@ export async function GET(
       queueGrant?.grantedRole === "owner" ||
       queueGrant?.grantedRole === "editor";
     const layoutVisibleCards =
-      board.layout === "dj-queue"
+      board.layout === "assignment"
+        ? []
+        : board.layout === "dj-queue"
         ? board.cards.filter((card) => {
             if (!card.queueStatus) return false;
             if (canControlQueue) return true;

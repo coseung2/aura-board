@@ -3,7 +3,7 @@
 
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentAgentStudent as getCurrentStudent } from "@/lib/agent/access";
 import type { AgentSessionDTO, AgentMode } from "@/lib/agent/types";
 import { AGENT_MODES } from "@/lib/agent/types";
 

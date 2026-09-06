@@ -7,7 +7,7 @@
 // assistant messages, and the client navigates here to preview it.
 
 import { db } from "@/lib/db";
-import { getCurrentStudent } from "@/lib/student-auth";
+import { getCurrentAgentStudent as getCurrentStudent } from "@/lib/agent/access";
 
 const ALLOWED_LANGUAGES = new Set(["html", "htm"]);
 
