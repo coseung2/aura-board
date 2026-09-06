@@ -129,6 +129,8 @@ export function EditCardModal({
     }),
   );
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const submitting = useRef(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -158,23 +160,22 @@ export function EditCardModal({
 
   return (
     <>
-      <div className="modal-backdrop" onClick={onClose} />
+      <div className="modal-backdrop" onClick={busy ? undefined : onClose} />
       <div className="add-card-modal">
         <div className="modal-header">
           <h2 className="modal-title">카드 수정</h2>
-          <button type="button" className="modal-close" onClick={onClose}>×</button>
+          <button type="button" className="modal-close" onClick={onClose} disabled={busy}>×</button>
         </div>
 
         <form
           className="modal-body"
           onSubmit={async (e) => {
             e.preventDefault();
-            if (isUploading) return;
+            if (isUploading || submitting.current) return;
             if (attachments.length > MAX_ATTACHMENTS_PER_CARD) {
               alert(`첨부는 카드당 최대 ${MAX_ATTACHMENTS_PER_CARD}개까지 가능합니다.`);
               return;
             }
-            setBusy(true);
             const payloadAttachments = attachments.map((a) => ({
               kind: a.kind,
               url: a.url,
@@ -192,6 +193,9 @@ export function EditCardModal({
               Boolean(linkUrl) ||
               payloadAttachments.length > 0;
             if (!hasCardBody) return;
+            submitting.current = true;
+            setBusy(true);
+            setSaveError(null);
             // meta-download-zone (2026-06-13): linkTitle/linkDesc를 본문에
             // Notion 스타일로 합쳐 저장. AddCardModal과 동일 헬퍼 사용.
             const linkTextBlock = buildLinkTextBlock(
@@ -201,6 +205,7 @@ export function EditCardModal({
             const mergedContent = linkTextBlock
               ? linkTextBlock + (content.trim() ? "\n\n" + content.trim() : "")
               : content.trim();
+            try {
             await onSave({
               title: title.trim(),
               content: mergedContent,
@@ -222,10 +227,16 @@ export function EditCardModal({
                   }
                 : {}),
             });
-            setBusy(false);
             onClose();
+            } catch {
+              setSaveError("수정 내용을 저장하지 못했어요. 입력 내용은 유지됩니다. 다시 시도해 주세요.");
+            } finally {
+              submitting.current = false;
+              setBusy(false);
+            }
           }}
         >
+          {saveError && <p role="alert">{saveError}</p>}
           <label className="modal-field-label">제목</label>
           <input
             autoFocus

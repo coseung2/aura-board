@@ -66,6 +66,7 @@ export function CreateBoardModal({
 }: Props) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
   const [step, setStep] = useState<"layout" | "classroom" | "breakout">(
     "layout",
   );
@@ -74,7 +75,9 @@ export function CreateBoardModal({
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
   async function createBoard(layoutId: LayoutKey, classroomId?: string) {
+    if (busy) return;
     setBusy(true);
+    setCreateError(null);
     try {
       const res = await fetch("/api/boards", {
         method: "POST",
@@ -94,15 +97,14 @@ export function CreateBoardModal({
       });
 
       if (!res.ok) {
-        alert(`보드 생성 실패: ${await res.text()}`);
-        setBusy(false);
-        return;
+        throw new Error("board_create_failed");
       }
 
       const { board } = await res.json();
       router.push(`/board/${board.slug}`);
     } catch (err) {
       console.error(err);
+      setCreateError("보드 생성 결과를 확인하지 못했습니다. 대시보드를 확인한 뒤 다시 시도해 주세요.");
       setBusy(false);
     }
   }
@@ -195,23 +197,24 @@ export function CreateBoardModal({
 
   return (
     <>
-      <div className="modal-backdrop" onClick={onClose} />
+      <div className="modal-backdrop" onClick={busy ? undefined : onClose} />
       <div className="add-card-modal create-board-modal">
         <div className="modal-header">
           <h2 className="modal-title">
             {step === "layout" ? "새 보드 만들기" : "학급 선택"}
           </h2>
-          <button type="button" className="modal-close" onClick={onClose}>
+          <button type="button" className="modal-close" onClick={onClose} disabled={busy}>
             닫기
           </button>
         </div>
 
         <div className="modal-body">
+          {createError && <p role="alert">{createError}</p>}
           {step === "layout" && (
             <>
               <p className="create-board-hint">
-                수업 보드 유형을 선택하세요. 공식 게임은 교사와 학생의 놀이 탭에서
-                학급별 상시 방으로 자동 제공됩니다.
+                수업 보드 유형을 선택하세요.
+                {isAdmin && " 개발중 게임은 관리자와 테스트 학급의 놀이 탭에서 확인할 수 있습니다."}
               </p>
               {renderLayoutGrid(visibleLayoutsForCategory)}
             </>
@@ -237,6 +240,9 @@ export function CreateBoardModal({
               <p className="create-board-hint">
                 보드를 어느 학급에 연결할지 선택하세요.
               </p>
+              {requiresClassroom && classrooms.length === 0 && (
+                <p role="status">DJ 보드를 만들려면 먼저 학급을 만들어야 합니다. <a href="/classroom">학급 만들기</a></p>
+              )}
               <div className="layout-picker">
                 <button
                   type="button"

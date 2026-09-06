@@ -187,6 +187,7 @@ export function BoardSettingsPanel({
         style={{ margin: "-16px -20px 16px" }}
       >
         {(Object.keys(TAB_LABELS) as BoardSettingsTab[]).filter((key) => {
+          if (key === "canva") return false;
           // breakout 탭은 관리자 계정이고 feature flag가 켜져 있을 때만 노출한다.
           if (key === "breakout" && (!isAdmin || !isFeatureEnabled("breakoutSettings"))) {
             return false;

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -16,6 +16,7 @@ import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type { MeResponse } from "../../lib/types";
 import { visibleProductTargets } from "../../lib/product-access";
+import { commitPreferenceChange } from "../../lib/preference-transaction";
 import {
   readBoardCache,
   STUDENT_HOME_CACHE_KEY,
@@ -63,10 +64,14 @@ export default function StudentMoreScreen() {
   const [error, setError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [preferencesReady, setPreferencesReady] = useState(false);
+  const savingRef = useRef(false);
+  const savedIdsRef = useRef<string[]>([]);
 
   const isLandscapeLayout = width > height && width >= dashboard.columns.one;
 
   const load = useCallback(async () => {
+    if (savingRef.current) return;
     const cached = readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, {
       kind: "boards",
     });
@@ -78,13 +83,13 @@ export default function StudentMoreScreen() {
     }
     setError(null);
     try {
-      const [response, savedIds] = await Promise.all([
-        apiFetch<MeResponse>("/api/student/me"),
-        loadStudentNavPreferences(),
-      ]);
+      const savedIds = normalizeStudentNavIds(await loadStudentNavPreferences());
+      savedIdsRef.current = savedIds;
+      setEnabledIds(savedIds);
+      setPreferencesReady(true);
+      const response = await apiFetch<MeResponse>("/api/student/me");
       setMe(response);
       writeBoardCache(STUDENT_HOME_CACHE_KEY, response, { kind: "boards" });
-      setEnabledIds(normalizeStudentNavIds(savedIds));
     } catch (nextError) {
       if (nextError instanceof ApiError && nextError.status === 401) {
         await clearSessionToken();
@@ -125,18 +130,24 @@ export default function StudentMoreScreen() {
   }, [enabledIds, targets]);
 
   const persist = useCallback(async (ids: string[]) => {
+    if (savingRef.current || !preferencesReady) return;
+    savingRef.current = true;
+    const previousIds = savedIdsRef.current;
     const normalizedIds = normalizeStudentNavIds(ids);
-    setEnabledIds(normalizedIds);
     setSaveError(null);
     setSaving(true);
     try {
-      await saveStudentNavPreferences(normalizedIds);
-    } catch {
-      setSaveError("메뉴 설정을 저장하지 못했어요. 다시 시도해 주세요.");
+      const saved = await commitPreferenceChange({
+        previous: previousIds, next: normalizedIds,
+        save: saveStudentNavPreferences, apply: setEnabledIds,
+      });
+      if (saved) savedIdsRef.current = normalizedIds;
+      else setSaveError("메뉴 설정을 저장하지 못해 이전 설정으로 되돌렸어요. 다시 시도해 주세요.");
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
-  }, []);
+  }, [preferencesReady]);
 
   function toggle(targetId: string, enabled: boolean) {
     const next = enabled
@@ -260,7 +271,7 @@ export default function StudentMoreScreen() {
                       <View style={styles.orderButtons}>
                         <ControlPressable
                           style={styles.orderButton}
-                          disabled={!enabled || isMore || enabledIndex === 0}
+                          disabled={saving || !preferencesReady || !enabled || isMore || enabledIndex === 0}
                           onPress={() => move(target.id, -1)}
                           accessibilityLabel={`${target.label} 위로 이동`}
                         >
@@ -273,7 +284,7 @@ export default function StudentMoreScreen() {
                         <ControlPressable
                           style={styles.orderButton}
                           disabled={
-                            !enabled ||
+                            saving || !preferencesReady || !enabled ||
                             isMore ||
                             enabledIndex === enabledIds.length - 1 ||
                             enabledIds[enabledIndex + 1] === "more"
@@ -290,7 +301,7 @@ export default function StudentMoreScreen() {
                       </View>
                       <Switch
                         value={isMore ? true : enabled}
-                        disabled={isMore}
+                        disabled={isMore || saving || !preferencesReady}
                         onValueChange={(value) => toggle(target.id, value)}
                         trackColor={{
                           false: colors.border,

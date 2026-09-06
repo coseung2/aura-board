@@ -74,6 +74,8 @@ export function AddCardModal({
   );
   const { preview, loading: previewLoading, fetchPreview } = useLinkPreview();
   const [busy, setBusy] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const submitting = useRef(false);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -137,11 +139,11 @@ export function AddCardModal({
 
   return createPortal(
     <>
-      <div className="modal-backdrop" onClick={onClose} />
+      <div className="modal-backdrop" onClick={busy ? undefined : onClose} />
       <div className="add-card-modal">
         <div className="modal-header">
           <h2 className="modal-title">새 카드 만들기</h2>
-          <button type="button" className="modal-close" onClick={onClose}>
+          <button type="button" className="modal-close" onClick={onClose} disabled={busy}>
             ×
           </button>
         </div>
@@ -150,6 +152,7 @@ export function AddCardModal({
           className="modal-body"
           onSubmit={async (e) => {
             e.preventDefault();
+            if (submitting.current || uploading) return;
             // codex H3: 제출 전 authoritative 상한 검증.
             if (attachments.length > MAX_ATTACHMENTS_PER_CARD) {
               alert(
@@ -157,7 +160,6 @@ export function AddCardModal({
               );
               return;
             }
-            setBusy(true);
             // attachments는 서버에 전달할 때 tempId 제거한 순수 payload로 변환.
             const payloadAttachments = attachments.map((a) => ({
               kind: a.kind,
@@ -173,6 +175,9 @@ export function AddCardModal({
               Boolean(linkUrl) ||
               payloadAttachments.length > 0;
             if (!hasCardBody) return;
+            submitting.current = true;
+            setBusy(true);
+            setSaveError(null);
             // meta-download-zone (2026-06-13): linkTitle/linkDesc를 본문
             // (content)에 Notion 스타일로 합쳐 저장 - 굵은 제목 / 한 줄 빈
             // 줄 / 설명. 카드 상세 모달은 이제 이걸 그대로 본문 영역에 표시.
@@ -189,6 +194,7 @@ export function AddCardModal({
                 displayName: a.displayName.trim(),
               }))
               .filter((a) => a.displayName.length > 0);
+            try {
             await onAdd({
               title: title.trim(),
               content: mergedContent,
@@ -210,10 +216,13 @@ export function AddCardModal({
                   }
                 : {}),
             });
-            setBusy(false);
             onClose();
+            } catch {
+              setSaveError("카드를 저장하지 못했어요. 입력 내용은 유지됩니다. 다시 시도해 주세요.");
+            } finally { submitting.current = false; setBusy(false); }
           }}
         >
+          {saveError && <p role="alert">{saveError}</p>}
           {sections && sections.length > 0 && (
             <>
               <label className="modal-field-label">섹션</label>

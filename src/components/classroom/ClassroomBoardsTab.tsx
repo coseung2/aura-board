@@ -3,7 +3,7 @@
 // /classroom/[id]/boards 전용 — 학급에 연결된 보드 목록 + 연결/해제.
 // 기존 ClassroomDetail 안에 묻혀있던 "공유된 보드" 섹션을 독립 컴포넌트로 추출.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { layoutEmoji, layoutLabel } from "@/lib/layout-meta";
 
@@ -27,6 +27,8 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
     new Set(linkedBoards.map((b) => b.id)),
   );
   const [busy, setBusy] = useState<string | null>(null);
+  const mutationLock = useRef(false);
+  const [error, setError] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
   const [lastVisited, setLastVisited] = useState<Record<string, string>>({});
 
@@ -40,6 +42,9 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
   }, []);
 
   async function link(boardId: string) {
+    if (mutationLock.current) return;
+    mutationLock.current = true;
+    setError(null);
     setBusy(boardId);
     try {
       const res = await fetch(`/api/boards/${boardId}`, {
@@ -50,15 +55,21 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
       if (res.ok) {
         setLinkedIds((prev) => new Set(prev).add(boardId));
       } else {
-        alert("보드 연결에 실패했습니다.");
+        throw new Error("board_link_failed");
       }
+    } catch {
+      setError("보드 연결 결과를 확인하지 못했습니다. 새로고침 후 다시 확인해 주세요.");
     } finally {
+      mutationLock.current = false;
       setBusy(null);
     }
   }
 
   async function unlink(boardId: string) {
+    if (mutationLock.current) return;
     if (!confirm("이 보드를 학급에서 연결 해제할까요? 보드 자체는 삭제되지 않습니다.")) return;
+    mutationLock.current = true;
+    setError(null);
     setBusy(boardId);
     try {
       const res = await fetch(`/api/boards/${boardId}`, {
@@ -73,9 +84,12 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
           return next;
         });
       } else {
-        alert("연결 해제에 실패했습니다.");
+        throw new Error("board_unlink_failed");
       }
+    } catch {
+      setError("연결 해제 결과를 확인하지 못했습니다. 새로고침 후 다시 확인해 주세요.");
     } finally {
+      mutationLock.current = false;
       setBusy(null);
     }
   }
@@ -96,6 +110,7 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
         </button>
       </div>
 
+      {error && <p role="alert">{error}</p>}
       {showPicker && (
         <div className="classroom-board-picker">
           {available.length === 0 ? (

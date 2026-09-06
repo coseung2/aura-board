@@ -3,7 +3,7 @@
 // 결제 UI — 현재 구독 상태 + Pro 업그레이드 + 취소 + 결제 내역(준비중) 표시.
 // Toss SDK는 CDN으로 동적 로드 (npm 의존성 추가 회피).
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 type StatusResponse = {
   tier: "free" | "pro";
@@ -56,15 +56,34 @@ export function BillingClient() {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const statusRequest = useRef(0);
 
-  async function loadStatus() {
-    const res = await fetch("/api/billing/status", { cache: "no-store" });
-    if (res.ok) setStatus(await res.json());
-  }
+  const loadStatus = useCallback(async () => {
+    const request = ++statusRequest.current;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await fetch("/api/billing/status", { cache: "no-store" });
+      if (!res.ok) throw new Error("billing_status_failed");
+      const next: StatusResponse = await res.json();
+      if (!next?.catalog || !["free", "pro"].includes(next.tier)) throw new Error("invalid_billing_status");
+      if (request === statusRequest.current) setStatus(next);
+    } catch {
+      if (request === statusRequest.current) setLoadError("구독 정보를 불러오지 못했습니다. 다시 시도해 주세요.");
+    } finally {
+      if (request === statusRequest.current) setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    loadStatus();
-  }, []);
+    if (new URLSearchParams(window.location.search).has("failed")) {
+      setMsg("결제가 완료되지 않았습니다. 결제 수단을 확인한 뒤 다시 시도해 주세요.");
+    }
+    void loadStatus();
+    return () => { statusRequest.current += 1; };
+  }, [loadStatus]);
 
   async function upgrade(planKey: "pro_monthly" | "pro_yearly") {
     if (!status?.tossClientKey) {
@@ -123,23 +142,33 @@ export function BillingClient() {
       const res = await fetch("/api/billing/cancel", { method: "POST" });
       if (res.ok) {
         setMsg("구독 취소가 예약되었습니다.");
+        setStatus((current) => current ? { ...current, canceledAt: new Date().toISOString() } : current);
         await loadStatus();
       } else {
-        setMsg("취소 실패");
+        setMsg("구독을 취소하지 못했습니다. 다시 시도해 주세요.");
       }
+    } catch {
+      setMsg("구독 취소 요청에 실패했습니다. 연결을 확인한 뒤 다시 시도해 주세요.");
     } finally {
       setBusy(false);
     }
   }
 
   if (!status) {
-    return <div className="billing-panel">불러오는 중…</div>;
+    return <div className="billing-panel" aria-busy={loading}>
+      {loadError ? <div role="alert"><p>{loadError}</p>
+        <button type="button" onClick={() => void loadStatus()} disabled={loading}>다시 시도</button>
+      </div> : <p role="status">불러오는 중…</p>}
+    </div>;
   }
 
   const tossReady = !!status.tossClientKey;
 
   return (
     <div className="billing-panel">
+      {loadError && <div role="alert"><p>{loadError}</p>
+        <button type="button" onClick={() => void loadStatus()} disabled={loading}>다시 시도</button>
+      </div>}
       <div className="billing-current">
         <span className={`billing-badge ${status.tier === "pro" ? "is-pro" : "is-free"}`}>
           {status.tier === "pro" ? "Pro" : "Free"}
@@ -148,7 +177,7 @@ export function BillingClient() {
           <div>플랜: <strong>{status.plan}</strong></div>
           {status.currentPeriodEnd && (
             <div>
-              다음 결제일:{" "}
+              {status.canceledAt ? "이용 종료일:" : "다음 결제일:"}{" "}
               <strong>{new Date(status.currentPeriodEnd).toLocaleDateString("ko-KR")}</strong>
               {status.canceledAt && <span className="billing-muted"> (취소 예약됨)</span>}
             </div>
@@ -194,13 +223,11 @@ export function BillingClient() {
 
       {!tossReady && (
         <p className="billing-muted">
-          * 이 배포에는 아직 Toss Payments 키가 연결되지 않았습니다. 실제 결제는
-          관리자가 환경 변수(<code>TOSS_CLIENT_KEY</code>, <code>TOSS_SECRET_KEY</code>)를
-          설정한 뒤 가능합니다.
+          현재 결제를 사용할 수 없습니다. 서비스 운영자에게 문의해 주세요.
         </p>
       )}
 
-      {msg && <p className="billing-msg">{msg}</p>}
+      {msg && <p className="billing-msg" role="status">{msg}</p>}
     </div>
   );
 }

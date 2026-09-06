@@ -15,6 +15,7 @@ import { CardAuthorEditor, type SavedAuthor } from "./cards/CardAuthorEditor";
 import { ContextMenu } from "./ContextMenu";
 import { EditCardModal, type EditCardUpdates } from "./EditCardModal";
 import type { CardData } from "./DraggableCard";
+import { saveCardEdit } from "./cards/save-card-edit";
 import { useBoardAnonymityChange } from "@/hooks/useBoardAnonymityChange";
 import { useCardRealtime } from "@/hooks/useCardRealtime";
 import { formatAuthorList } from "@/lib/card-author";
@@ -172,10 +173,11 @@ export function BoardCanvas({
       } else {
         const msg = await res.text();
         console.error("Failed to add card:", msg);
-        alert(`카드 추가 실패: ${msg}`);
+        throw new Error("card_create_failed");
       }
     } catch (err) {
       console.error(err);
+      throw err;
     }
   }
 
@@ -207,66 +209,11 @@ export function BoardCanvas({
     updates: EditCardUpdates,
   ) {
     if (!editingCard) return;
-    const prevCards = cards;
-    const cardId = editingCard.id;
-    const { attachments: updateAttachments, ...restUpdates } = updates;
-    const optimisticUpdates: Partial<CardData> = { ...restUpdates };
-
-    if (updateAttachments) {
-      optimisticUpdates.attachments = updateAttachments.map((a, idx) => ({
-        id:
-          a.tempId &&
-          !a.tempId.startsWith("legacy-") &&
-          !a.tempId.startsWith("tmp-")
-            ? a.tempId
-            : `opt-${idx}-${a.kind}`,
-        kind: a.kind,
-        url: a.url,
-        previewUrl: a.previewUrl ?? null,
-        fileName: a.fileName ?? null,
-        fileSize: a.fileSize ?? null,
-        mimeType: a.mimeType ?? null,
-        order: idx,
-      }));
-    }
-
-    setCards((list) =>
-      list.map((c) => (c.id === cardId ? { ...c, ...optimisticUpdates } : c)),
-    );
-    setOpenCard((card) =>
-      card?.id === cardId ? { ...card, ...optimisticUpdates } : card,
-    );
-
-    try {
-      const res = await fetch(`/api/cards/${cardId}`, {
-        method: "PATCH",
-        headers: {
-          "content-type": "application/json",
-          ...studentViewerHeaders,
-        },
-        body: JSON.stringify(updates),
-      });
-      if (!res.ok) {
-        setCards(prevCards);
-        return;
-      }
-
-      const refreshed = await fetch(`/api/cards/${cardId}`, {
-        headers: studentViewerHeaders,
-      }).catch(() => null);
-      if (refreshed?.ok) {
-        const data = await refreshed.json();
-        if (data.card) {
-          setCards((list) =>
-            list.map((c) => (c.id === cardId ? data.card : c)),
-          );
-          setOpenCard((card) => (card?.id === cardId ? data.card : card));
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      setCards(prevCards);
-    }
+    return saveCardEdit({
+      card: cards.find((card) => card.id === editingCard.id) ?? editingCard,
+      updates, headers: studentViewerHeaders, setCards, setOpenCard,
+      normalizeCard: (card) => withBoardAnonymousAuthor(card, anonymousAuthor),
+    });
   }
 
   async function handleDuplicate(card: CardData) {

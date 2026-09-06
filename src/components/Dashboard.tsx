@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CreateBoardModal } from "./CreateBoardModal";
@@ -283,43 +283,38 @@ export function Dashboard({
   const [editingBoard, setEditingBoard] = useState<BoardItem | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
-  async function handleDelete(boardId: string) {
-    if (!confirm("이 보드를 삭제하시겠습니까? 모든 카드가 함께 삭제됩니다.")) {
-      return;
-    }
-    try {
-      const response = await fetch(`/api/boards/${boardId}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        router.refresh();
-      } else {
-        alert(`삭제 실패: ${await response.text()}`);
-      }
-    } catch (error) {
-      console.error(error);
-    }
-    setMenuOpen(null);
-  }
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionBusy, setActionBusy] = useState(false);
+  const actionLock = useRef(false);
 
-  async function handleDuplicate(boardId: string) {
+  async function runBoardAction(boardId: string, action: "delete" | "duplicate") {
+    if (actionLock.current) return;
+    if (action === "delete" && !confirm("이 보드를 삭제하시겠습니까? 모든 카드가 함께 삭제됩니다.")) return;
+    actionLock.current = true;
+    setActionBusy(true);
+    setActionError(null);
     try {
-      const response = await fetch(`/api/boards/${boardId}/duplicate`, {
-        method: "POST",
+      const response = await fetch(`/api/boards/${boardId}${action === "duplicate" ? "/duplicate" : ""}`, {
+        method: action === "delete" ? "DELETE" : "POST",
       });
-      if (response.ok) {
-        router.refresh();
-      } else {
-        alert(`복제 실패: ${await response.text()}`);
-      }
+      if (!response.ok) throw new Error("board_action_failed");
+      router.refresh();
     } catch (error) {
       console.error(error);
+      setActionError("작업 결과를 확인하지 못했습니다. 새로고침 후 다시 확인해 주세요.");
+    } finally {
+      actionLock.current = false;
+      setActionBusy(false);
+      setMenuOpen(null);
     }
-    setMenuOpen(null);
   }
+  const handleDelete = (boardId: string) => runBoardAction(boardId, "delete");
+  const handleDuplicate = (boardId: string) => runBoardAction(boardId, "duplicate");
 
   return (
     <>
+      {actionError && <p role="alert">{actionError}</p>}
+      {actionBusy && <p role="status">보드 작업 처리 중…</p>}
       <BoardSectionTabs
         boards={boards}
         classrooms={classrooms}

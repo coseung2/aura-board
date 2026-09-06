@@ -9,7 +9,7 @@
 import { db } from "@/lib/db";
 import { getCurrentAgentStudent as getCurrentStudent } from "@/lib/agent/access";
 
-const ALLOWED_LANGUAGES = new Set(["html", "htm"]);
+import { extractAgentHtml } from "@/lib/agent/code-content";
 
 const CSP_HEADERS = [
   "sandbox allow-scripts",
@@ -28,6 +28,7 @@ const RESPONSE_HEADERS: Record<string, string> = {
   "Content-Security-Policy": CSP_HEADERS.join("; "),
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "no-referrer",
+  "Cache-Control": "private, no-store",
   "X-Frame-Options": "SAMEORIGIN",
 };
 
@@ -42,13 +43,8 @@ async function getLatestCode(sessionId: string): Promise<string | null> {
 
   // Find the first message that looks like complete HTML
   for (const msg of messages) {
-    const trimmed = msg.content.trim();
-    if (trimmed.startsWith("<!") || trimmed.startsWith("<html") || trimmed.startsWith("<div") || trimmed.startsWith("<h")) {
-      return trimmed;
-    }
-    // Also check for embedded code blocks
-    const codeMatch = trimmed.match(/```html?\n([\s\S]*?)```/);
-    if (codeMatch) return codeMatch[1].trim();
+    const code = extractAgentHtml(msg.content);
+    if (code) return code;
   }
 
   return null;
@@ -73,10 +69,17 @@ export async function GET(
     return new Response("unauthorized", { status: 401 });
   }
 
+  const board = await db.board.findFirst({
+    where: { OR: [{ id: boardId }, { slug: boardId }], classroomId: student.classroomId },
+    select: { id: true },
+  });
+  if (!board) return new Response("not_found", { status: 404 });
+
   const session = await db.agentSession.findFirst({
     where: {
       id: sessionId,
       studentId: student.id,
+      classroomId: student.classroomId,
     },
     select: { id: true, mode: true, messageCount: true },
   });
@@ -88,19 +91,18 @@ export async function GET(
   // Get the latest code from the session messages
   const code = await getLatestCode(sessionId);
   if (!code) {
-    return new Response("no_content", { status: 204 });
+    return new Response(null, { status: 204, headers: RESPONSE_HEADERS });
   }
 
   // Serve raw content (for AJAX fetch by MonacoEditor/chat panel)
   if (raw === "1") {
     return new Response(code, {
       status: 200,
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
+      headers: { ...RESPONSE_HEADERS, "Content-Type": "text/plain; charset=utf-8" },
     });
   }
 
   // Wrap in a proper sandboxed HTML page with a bridge for postMessage
-  const escapedCode = code.replace(/<\/script>/gi, "<\\/script>");
   const html = `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -112,7 +114,7 @@ export async function GET(
   </style>
 </head>
 <body>
-${escapedCode}
+${code}
 </body>
 </html>`;
 

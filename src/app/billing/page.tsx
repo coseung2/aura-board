@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { TopNav } from "@/components/TopNav";
 import { getCurrentUser } from "@/lib/auth";
 import { BillingClient } from "./BillingClient";
@@ -11,6 +12,7 @@ export const metadata = {
 
 export default async function BillingPage() {
   const user = await getCurrentUser().catch(() => null);
+  if (!user) redirect("/login?callbackUrl=/billing");
 
   return (
     <>
@@ -20,7 +22,8 @@ export default async function BillingPage() {
         <Link href="/dashboard" className="docs-back">← 대시보드로</Link>
         <h1 className="docs-title">결제·구독</h1>
         <p className="docs-subtitle">
-          Aura-board Pro는 모둠 학습·코딩 교실 등 부가 기능을 풀 해제합니다.
+          현재 구독 상태를 확인하고 구독을 관리할 수 있습니다.
+          개발중 기능의 공개 여부는 구독과 별도로 관리됩니다.
           카드 정보는 Toss Payments에 직접 보관되며 Aura-board 서버에는 빌링키만
           저장됩니다.
         </p>
