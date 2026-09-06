@@ -5,7 +5,10 @@ import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 
-export async function POST(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {

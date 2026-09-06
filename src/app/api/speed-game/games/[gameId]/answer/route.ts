@@ -58,7 +58,10 @@ function commandErrorResponse(error: unknown) {
   return null;
 }
 
-export async function POST(req: Request, { params }: Params) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("play", POSTHandler);
+async function POSTHandler(req: Request, { params }: Params) {
   const receivedAt = new Date();
   const { gameId } = await params;
   const boardId = await boardIdForGame(gameId);
@@ -107,7 +110,8 @@ export async function POST(req: Request, { params }: Params) {
   }
 }
 
-export async function PATCH(req: Request, { params }: Params) {
+export const PATCH = withProductFeature("play", PATCHHandler);
+async function PATCHHandler(req: Request, { params }: Params) {
   const { gameId } = await params;
   const boardId = await boardIdForGame(gameId);
   if (!boardId) {

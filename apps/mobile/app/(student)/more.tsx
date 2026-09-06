@@ -15,6 +15,7 @@ import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { apiFetch, ApiError } from "../../lib/api";
 import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import type { MeResponse } from "../../lib/types";
+import { visibleProductTargets } from "../../lib/product-access";
 import {
   readBoardCache,
   STUDENT_HOME_CACHE_KEY,
@@ -103,12 +104,12 @@ export default function StudentMoreScreen() {
   const targets = useMemo(
     () => [
       ...studentBaseNavTargets,
-      ...studentOptionalNavTargets,
+      ...visibleProductTargets(studentOptionalNavTargets, me),
       ...(me?.duties ?? [])
         .map(studentDutyTarget)
         .filter((target): target is StudentNavTarget => target !== null),
     ],
-    [me?.duties],
+    [me],
   );
 
   const orderedTargets = useMemo(() => {

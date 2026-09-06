@@ -11,7 +11,10 @@ import { scheduleRealtimePublish } from "@/lib/realtime-server";
 import { VibeProjectCreateSchema } from "@/lib/vibe-arcade/types";
 import { scanHtml } from "@/lib/vibe-arcade/moderation-filter";
 
-export async function GET(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(req: Request) {
   const url = new URL(req.url);
   const boardId = url.searchParams.get("boardId");
   if (!boardId) return NextResponse.json({ error: "boardId required" }, { status: 400 });
@@ -74,7 +77,8 @@ export async function GET(req: Request) {
   return NextResponse.json({ items });
 }
 
-export async function POST(req: Request) {
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(req: Request) {
   const student = await getCurrentStudent();
   if (!student) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

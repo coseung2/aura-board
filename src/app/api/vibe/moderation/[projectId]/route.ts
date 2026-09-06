@@ -9,7 +9,10 @@ import { scheduleRealtimePublish } from "@/lib/realtime-server";
 import { VibeModerationActionSchema } from "@/lib/vibe-arcade/types";
 import { logAudit } from "@/lib/audit";
 
-export async function POST(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(
   req: Request,
   { params }: { params: Promise<{ projectId: string }> },
 ) {

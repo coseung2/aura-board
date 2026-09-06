@@ -8,7 +8,10 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 
-export async function GET() {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler() {
   try {
     const user = await getCurrentUser().catch(() => null);
 

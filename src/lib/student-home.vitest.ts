@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   accountFindUnique: vi.fn(),
@@ -32,12 +32,15 @@ const student = {
   id: "student-1",
   name: "학생",
   classroomId: "classroom-1",
-  classroom: { id: "classroom-1", name: "1반" },
+  classroom: { id: "classroom-1", name: "1반", teacher: { email: "normal@example.com" } },
 };
+
+afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
 
 describe("getStudentHomePayload daily rewards", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("AURA_ADMIN_EMAILS", "pilot@example.com");
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-07-30T03:00:00.000Z"));
     mocks.policyFindUnique.mockResolvedValue({
@@ -59,6 +62,14 @@ describe("getStudentHomePayload daily rewards", () => {
   it("returns KST daily deposit counts with effective policy caps", async () => {
     const payload = await getStudentHomePayload(student);
 
+    expect(payload.productCapabilities?.play).toBe(false);
+    expect(payload.productCapabilities?.feed).toBe(false);
+    expect(payload.availableLayouts).toContain("columns");
+    expect(payload.availableLayouts).not.toContain("assignment");
+    expect(mocks.assignmentSlotFindMany).not.toHaveBeenCalled();
+    expect(mocks.boardFindMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ layout: { in: payload.availableLayouts } }),
+    }));
     expect(payload.dailyRewards).toEqual({
       comment: { earnedCount: 10, dailyCap: 10, complete: true, enabled: true },
     });

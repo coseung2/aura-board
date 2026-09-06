@@ -15,7 +15,10 @@ const PatchBody = z.object({
 });
 
 // PATCH: 주제 또는 시각화 모드 변경. owner/editor 만 가능.
-export async function PATCH(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const PATCH = withProductFeature("developmentLayouts", PATCHHandler);
+async function PATCHHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {

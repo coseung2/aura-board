@@ -76,7 +76,7 @@ export type StudentNotificationPayload = {
   items: StudentNotificationItem[];
 };
 
-export type MeResponse = {
+export type MeResponse = import("./product-access").ProductAccess & {
   student: {
     id: string;
     name: string;

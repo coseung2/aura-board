@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Protocol/Rust authority tests isolate rollout authorization; its real
+// request matrix is covered by product-release-server.vitest.ts.
+vi.mock("@/lib/product-release-server", () => ({
+  withProductFeature: (_feature: string, handler: (...args: never[]) => unknown) => handler,
+}));
 import { NextResponse } from "next/server";
 import type { ShadowAllianceSnapshot } from "@/lib/shadow-alliance/contracts";
 

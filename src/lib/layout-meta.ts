@@ -1,4 +1,5 @@
 import { OFFICIAL_GAME_CATALOG } from "@/lib/game-platform/catalog";
+import { layoutReleaseBadge } from "./product-release";
 
 export type LayoutKey =
   | "freeform"
@@ -75,7 +76,8 @@ export function layoutEmoji(layout: string): string {
 }
 
 export function layoutLabel(layout: string): string {
-  return (LAYOUT_META as Record<string, LayoutMeta>)[layout]?.label ?? layout;
+  const label = (LAYOUT_META as Record<string, LayoutMeta>)[layout]?.label ?? layout;
+  return layoutReleaseBadge(layout) ? `${label} (개발중)` : label;
 }
 
 export function layoutThumbnail(layout: string): string | null {

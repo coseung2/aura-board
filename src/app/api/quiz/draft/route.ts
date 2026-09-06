@@ -13,7 +13,10 @@ function clampCount(n: number): number {
   return Math.min(20, Math.max(1, Math.floor(n)));
 }
 
-export async function POST(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(req: Request) {
   try {
     const ids = await resolveIdentities();
     const formData = await req.formData();

@@ -43,7 +43,10 @@ function safeBigInt(value: bigint | null): number | null {
   return number;
 }
 
-export async function GET(request: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("play", GETHandler);
+async function GETHandler(request: Request) {
   const student = await getCurrentStudentRaw();
   if (!student) return json({ error: "unauthorized" }, 401);
 

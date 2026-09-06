@@ -19,7 +19,10 @@ async function resolveBoard(boardIdOrSlug: string) {
 }
 
 // POST: 학생 또는 교사가 응답 1건 생성.
-export async function POST(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -79,7 +82,8 @@ export async function POST(
 }
 
 // GET: 응답 목록 반환 (시간 내림차순, 최대 200).
-export async function GET(
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {

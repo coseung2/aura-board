@@ -4,6 +4,9 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudentRaw } from "@/lib/student-auth";
 
 import type { LiveQuizViewerKind } from "./contracts";
+import { isAdminEmail } from "../admin";
+import { canUseProductFeature } from "../product-release";
+import { studentReleaseAudience } from "../product-release-server";
 
 export type LiveQuizViewer = {
   kind: LiveQuizViewerKind;
@@ -66,6 +69,9 @@ export function normalizeQuestionIds(value: unknown): string[] {
 export async function getLiveQuizViewer(): Promise<LiveQuizViewer | null> {
   const user = await getCurrentUser().catch(() => null);
   if (user) {
+    if (!canUseProductFeature("liveQuiz", { isAdmin: isAdminEmail(user.email) })) {
+      throw new LiveQuizError("feature_unavailable", 403);
+    }
     return {
       kind: "teacher",
       id: user.id,
@@ -76,6 +82,9 @@ export async function getLiveQuizViewer(): Promise<LiveQuizViewer | null> {
 
   const student = await getCurrentStudentRaw();
   if (!student) return null;
+  if (!canUseProductFeature("liveQuiz", await studentReleaseAudience(student))) {
+    throw new LiveQuizError("feature_unavailable", 403);
+  }
   return {
     kind: "student",
     id: student.id,

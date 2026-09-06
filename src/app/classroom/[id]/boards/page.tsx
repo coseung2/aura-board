@@ -1,5 +1,7 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin";
+import { availableLayoutKeys } from "@/lib/product-release";
 import { notFound } from "next/navigation";
 import { ClassroomBoardsTab } from "@/components/classroom/ClassroomBoardsTab";
 
@@ -8,6 +10,7 @@ type Props = { params: Promise<{ id: string }> };
 export default async function ClassroomBoardsPage({ params }: Props) {
   const { id } = await params;
   const user = await getCurrentUser();
+  const layouts = availableLayoutKeys({ isAdmin: isAdminEmail(user.email) });
   const classroom = await db.classroom.findUnique({
     where: { id },
     select: {
@@ -15,6 +18,7 @@ export default async function ClassroomBoardsPage({ params }: Props) {
       name: true,
       teacherId: true,
       boards: {
+        where: { layout: { in: layouts }, systemGameKind: null },
         select: { id: true, slug: true, title: true, layout: true, createdAt: true, updatedAt: true },
         orderBy: { createdAt: "desc" },
       },
@@ -25,6 +29,8 @@ export default async function ClassroomBoardsPage({ params }: Props) {
   // 교사가 소유(owner membership) 또는 학급 연결된 모든 보드 — 연결 picker용.
   const allBoardRows = await db.board.findMany({
     where: {
+      layout: { in: layouts },
+      systemGameKind: null,
       OR: [
         { members: { some: { userId: user.id, role: "owner" } } },
         { classroomId: id },

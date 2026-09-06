@@ -22,6 +22,7 @@ import { POST as saveAgent } from "@/app/api/agent/sessions/[id]/save/route";
 
 beforeEach(() => {
   vi.resetAllMocks();
+  vi.stubEnv("AURA_ADMIN_EMAILS", "normal@example.com");
   mocks.user.mockResolvedValue(null);
   mocks.student.mockResolvedValue({ id: "me", classroomId: "class", classroom: { teacher: { email: "normal@example.com" } } });
   mocks.board.mockResolvedValue({ id: "board", classroomId: "class", anonymousAuthor: false });
@@ -55,7 +56,7 @@ describe("project detail/play scope", () => {
     expect(mocks.project).not.toHaveBeenCalled();
   });
   it("denies foreign classroom students", async () => {
-    mocks.student.mockResolvedValue({ id: "foreign", classroomId: "other" });
+    mocks.student.mockResolvedValue({ id: "foreign", classroomId: "other", classroom: { teacher: { email: "normal@example.com" } } });
     expect(await loadAuthorizedVibeProject("board", "project")).toBeNull();
     expect(mocks.project).not.toHaveBeenCalled();
   });
@@ -78,7 +79,8 @@ describe("project detail/play scope", () => {
     expect(access?.canReview).toBe(false);
   });
   it("allows a board manager to inspect drafts", async () => {
-    mocks.user.mockResolvedValue({ id: "teacher" });
+    mocks.user.mockResolvedValue({ id: "teacher", email: "normal@example.com" });
+    mocks.student.mockResolvedValue(null);
     mocks.member.mockResolvedValue({ role: "owner" });
     mocks.project.mockResolvedValue({ authorStudentId: "peer", moderationStatus: "draft", author: { name: "학생" }, reviews: [] });
     expect(await loadAuthorizedVibeProject("board", "project")).not.toBeNull();

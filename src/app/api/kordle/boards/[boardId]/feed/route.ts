@@ -6,7 +6,10 @@ import { kordleCorrectCount } from "@/features/kordle/realtime";
 
 type Params = { params: Promise<{ boardId: string }> };
 
-export async function GET(req: Request, { params }: Params) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("play", GETHandler);
+async function GETHandler(req: Request, { params }: Params) {
   const { boardId: boardIdOrSlug } = await params;
   const url = new URL(req.url);
   const sinceParam = url.searchParams.get("since");

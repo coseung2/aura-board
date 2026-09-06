@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
@@ -22,6 +22,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { POST } from "./route";
+afterEach(() => vi.unstubAllEnvs());
 
 function request(classroomId = "classroom-1") {
   return new Request("http://localhost/api/teacher/share/boards/board-1/clone", {
@@ -34,7 +35,8 @@ function request(classroomId = "classroom-1") {
 describe("POST /api/teacher/share/boards/:id/clone", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCurrentUser.mockResolvedValue({ id: "teacher-1" });
+    vi.stubEnv("AURA_ADMIN_EMAILS", "pilot@example.com");
+    mocks.getCurrentUser.mockResolvedValue({ id: "teacher-1", email: "pilot@example.com" });
     mocks.classroomFindFirst.mockResolvedValue({ id: "classroom-1" });
     mocks.boardFindFirst.mockResolvedValue({
       id: "board-1",

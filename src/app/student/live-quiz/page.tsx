@@ -15,6 +15,7 @@ export const dynamic = "force-dynamic";
 export default async function StudentLiveQuizPage() {
   const student = await getCurrentStudent();
   if (!student) redirect("/login?from=/student/live-quiz");
+  if (!isAdminEmail(student.classroom.teacher.email)) redirect("/student");
 
   const duties = await getStudentDuties(student.id);
   return (

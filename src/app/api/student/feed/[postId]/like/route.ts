@@ -10,7 +10,10 @@ export const runtime = "nodejs";
 
 const LikeSchema = z.object({ liked: z.boolean().optional() }).passthrough();
 
-export async function POST(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("feed", POSTHandler);
+async function POSTHandler(
   req: Request,
   { params }: { params: Promise<{ postId: string }> },
 ) {

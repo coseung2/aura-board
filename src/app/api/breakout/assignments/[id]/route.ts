@@ -24,7 +24,10 @@ const Body = z.object({
   status: z.enum(["active", "archived"]).optional(),
 });
 
-export async function PATCH(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const PATCH = withProductFeature("developmentLayouts", PATCHHandler);
+async function PATCHHandler(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {

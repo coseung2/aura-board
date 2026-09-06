@@ -9,6 +9,8 @@ export const metadata = {
   title: "피드 · Aura-board",
 };
 
+import { FeaturePreviewNotice } from "@/components/FeaturePreviewNotice";
+
 export default async function StudentFeedPage() {
   const student = await getCurrentStudent();
   if (!student) redirect("/login?from=/student/feed");
@@ -25,7 +27,8 @@ export default async function StudentFeedPage() {
         isAdminClassroom={isAdminClassroom}
       />
       <main className="student-page ab-feed-page">
-        <StudentFeedClient />
+        <FeaturePreviewNotice />
+      <StudentFeedClient />
       </main>
     </>
   );

@@ -9,7 +9,10 @@ export const runtime = "nodejs";
  * room code and the payload intentionally excludes correct answers, student
  * identities, and private board data.
  */
-export async function GET(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {

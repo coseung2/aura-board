@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
@@ -7,7 +7,11 @@ const mocks = vi.hoisted(() => ({
   boardMemberFindFirst: vi.fn(),
 }));
 
-vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/auth", () => ({ getCurrentUser: async () => {
+  const user = await mocks.getCurrentUser();
+  return user ? { email: "pilot@example.com", ...user } : null;
+} }));
+afterEach(() => vi.unstubAllEnvs());
 vi.mock("@/lib/student-auth", () => ({
   getCurrentStudentIdentityRaw: mocks.getCurrentStudentIdentityRaw,
 }));
@@ -27,6 +31,7 @@ import {
 describe("song-guess board ownership", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv("AURA_ADMIN_EMAILS", "pilot@example.com");
     mocks.getCurrentStudentIdentityRaw.mockResolvedValue(null);
     mocks.boardFindUnique.mockResolvedValue({
       id: "board-1",
@@ -35,6 +40,12 @@ describe("song-guess board ownership", () => {
       classroom: { teacherId: "teacher-1" },
     });
     mocks.boardMemberFindFirst.mockResolvedValue(null);
+  });
+
+  it("rejects a non-admin host before resource lookup", async () => {
+    mocks.getCurrentUser.mockResolvedValue({ id: "normal", email: "normal@example.com" });
+    await expect(resolvePlayActorForBoard("board-1")).rejects.toMatchObject({ status: 403, code: "feature_unavailable" });
+    expect(mocks.boardFindUnique).not.toHaveBeenCalled();
   });
 
   it("allows the classroom teacher without relying on a public board URL", async () => {
@@ -63,6 +74,7 @@ describe("song-guess board ownership", () => {
       id: "student-1",
       name: "학생",
       classroomId: "other-class",
+      classroom: { teacher: { email: "pilot@example.com" } },
     });
     await expect(resolveSongGuessActorForBoard("board-1")).rejects.toMatchObject({
       status: 403,

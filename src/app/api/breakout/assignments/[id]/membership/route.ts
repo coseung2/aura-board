@@ -23,7 +23,10 @@ const Body = z.object({
   force: z.boolean().optional(),
 });
 
-export async function POST(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {

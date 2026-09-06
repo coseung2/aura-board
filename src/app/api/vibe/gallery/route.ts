@@ -7,7 +7,10 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 
-export async function GET(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(req: Request) {
   const url = new URL(req.url);
   const classroomId = url.searchParams.get("classroomId");
   if (!classroomId) {

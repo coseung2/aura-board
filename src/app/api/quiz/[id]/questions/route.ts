@@ -5,7 +5,10 @@ import { canManageQuiz } from "@/lib/quiz-permissions";
 import { publishQuizRealtimeSnapshot } from "@/lib/quiz-realtime-snapshot";
 import type { QuizDraftQuestion } from "@/types/quiz";
 
-export async function PUT(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const PUT = withProductFeature("developmentLayouts", PUTHandler);
+async function PUTHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {

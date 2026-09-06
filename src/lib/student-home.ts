@@ -1,4 +1,6 @@
 import "server-only";
+import { availableLayoutKeys, canReadLayout, productCapabilities } from "./product-release";
+import { studentReleaseAudience } from "./product-release-server";
 
 import { cloneStructure } from "./breakout";
 import { db } from "./db";
@@ -16,18 +18,20 @@ type StudentIdentity = {
   id: string;
   name: string;
   classroomId: string;
-  classroom: { id: string; name: string };
+  classroom: { id: string; name: string; teacher?: { email: string | null } };
 };
 
 export async function getStudentHomePayload(
   student: StudentIdentity,
 ): Promise<StudentHomePayload> {
+  const audience = await studentReleaseAudience(student);
   const [boards, duties, assignmentSections, checkTasks, assignmentBoardSlots, dailyRewards] =
     await Promise.all([
       db.board.findMany({
         where: {
           classroomId: student.classroomId,
           systemGameKind: null,
+          layout: { in: availableLayoutKeys(audience) },
         },
         include: {
           quizzes: {
@@ -93,7 +97,7 @@ export async function getStudentHomePayload(
           },
         },
       }),
-      db.assignmentSlot.findMany({
+      canReadLayout("assignment", audience) ? db.assignmentSlot.findMany({
         where: {
           studentId: student.id,
           board: { classroomId: student.classroomId, layout: "assignment" },
@@ -113,7 +117,7 @@ export async function getStudentHomePayload(
           card: { select: { id: true, createdAt: true, updatedAt: true } },
           board: { select: { id: true, slug: true, title: true } },
         },
-      }),
+      }) : Promise.resolve([]),
       loadStudentDailyRewards(student),
     ]);
 
@@ -279,6 +283,8 @@ export async function getStudentHomePayload(
       name: student.name,
       classroom: { id: student.classroom.id, name: student.classroom.name },
     },
+    productCapabilities: productCapabilities(audience),
+    availableLayouts: availableLayoutKeys(audience),
     boards: homeBoards,
     duties,
     assignments: [...columnTodos, ...assignmentTodos, ...checkTodos],

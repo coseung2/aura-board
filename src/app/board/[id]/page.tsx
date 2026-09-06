@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { isAdminEmail } from "@/lib/admin";
+import { canReadLayout } from "@/lib/product-release";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
@@ -78,7 +79,7 @@ export default async function BoardPage({
         student.classroomId === board.classroomId &&
         isAdminEmail(student.classroom.teacher.email),
     );
-  if (board.category === "PLAY" && !canSeeAdminOnlyPlay) {
+  if (!canReadLayout(board.layout, { isAdmin: canSeeAdminOnlyPlay })) {
     redirect(student ? "/student" : "/dashboard");
   }
   const studentViewRequested = viewParam === "student";

@@ -256,7 +256,10 @@ async function verifySessionBoard(
   return null;
 }
 
-export async function GET(_request: Request, { params }: Params) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("play", GETHandler);
+async function GETHandler(_request: Request, { params }: Params) {
   const { boardId: boardIdOrSlug } = await params;
   const board = await resolveBoard(boardIdOrSlug);
   if (!board) {
@@ -294,7 +297,8 @@ export async function GET(_request: Request, { params }: Params) {
   }
 }
 
-export async function PATCH(request: Request, { params }: Params) {
+export const PATCH = withProductFeature("play", PATCHHandler);
+async function PATCHHandler(request: Request, { params }: Params) {
   const { boardId: boardIdOrSlug } = await params;
   const board = await resolveBoard(boardIdOrSlug);
   if (!board) {

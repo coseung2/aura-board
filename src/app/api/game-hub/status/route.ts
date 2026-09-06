@@ -65,7 +65,10 @@ function chooseStatus(current: HubStatus, candidate: HubStatus): HubStatus {
   return current;
 }
 
-export async function GET() {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("play", GETHandler);
+async function GETHandler() {
   const student = await getCurrentStudent();
   let classroomIds: string[];
   if (student) {

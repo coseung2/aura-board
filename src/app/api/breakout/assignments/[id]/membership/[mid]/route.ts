@@ -24,7 +24,10 @@ async function requireOwner(assignmentId: string, userId: string) {
   return assignment;
 }
 
-export async function PATCH(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const PATCH = withProductFeature("developmentLayouts", PATCHHandler);
+async function PATCHHandler(
   req: Request,
   ctx: { params: Promise<{ id: string; mid: string }> }
 ) {
@@ -74,7 +77,8 @@ export async function PATCH(
   }
 }
 
-export async function DELETE(
+export const DELETE = withProductFeature("developmentLayouts", DELETEHandler);
+async function DELETEHandler(
   _req: Request,
   ctx: { params: Promise<{ id: string; mid: string }> }
 ) {

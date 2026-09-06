@@ -9,7 +9,10 @@ import { issuePlayToken } from "@/lib/vibe-arcade/play-token";
 
 const CreateSchema = z.object({ projectId: z.string().min(1) });
 
-export async function POST(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(req: Request) {
   const student = await getCurrentStudent();
   if (!student) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 

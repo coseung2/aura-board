@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { AppState, StyleSheet, View } from "react-native";
-import { Stack, usePathname, useRouter } from "expo-router";
+import { ActivityIndicator, AppState, StyleSheet, Text, View } from "react-native";
+import { AppButton } from "../../components/ui";
+import { Redirect, Stack, usePathname, useRouter } from "expo-router";
+import { restrictedStudentPath } from "../../lib/product-access";
+import { ProductAccessContext } from "../../lib/product-access-context";
 import { colors } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import {
@@ -33,6 +36,7 @@ export default function StudentLayout() {
     pathname.endsWith("/login") ||
     pathname.includes("/feed/compose");
   const [cacheReady, setCacheReady] = useState(false);
+  const [accessError, setAccessError] = useState(false);
   const [me, setMe] = useState<MeResponse | null>(
     () =>
       readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, { kind: "boards" })
@@ -56,27 +60,33 @@ export default function StudentLayout() {
 
   const loadMe = useCallback(async () => {
     if (!cacheReady) return;
-    if (hideNav) {
-      setMe(null);
-      return;
-    }
+    setAccessError(false);
     try {
       const res = await revalidateBoardCache<MeResponse>(
         STUDENT_HOME_CACHE_KEY,
         async () => {
           const response = await apiFetch<MeResponse>("/api/student/me");
-          writeBoardCache(BOARD_LIST_CACHE_KEY, response.boards, {
+          writeBoardCache(BOARD_LIST_CACHE_KEY, {
+            boards: response.boards,
+            classroomName: response.student.classroom?.name ?? null,
+            productCapabilities: response.productCapabilities,
+            availableLayouts: response.availableLayouts,
+          }, {
             kind: "boards",
           });
           return response;
         },
-        { kind: "boards" },
+        { kind: "boards", force: !readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY)?.data.productCapabilities },
       );
+      if (!res.productCapabilities || !res.availableLayouts) {
+        throw new Error("product_policy_missing");
+      }
       setMe(res);
       void recordStudentAttendanceVisit().catch(() => undefined);
     } catch (e) {
-      setMe(null);
+      setAccessError(true);
       if (e instanceof ApiError && e.status === 401) {
+        setMe(null);
         await clearSessionToken();
         router.replace(getUnifiedLoginRoute("student"));
       }
@@ -114,9 +124,21 @@ export default function StudentLayout() {
   if (!cacheReady) {
     return <View style={styles.shell} />;
   }
+  if (!me?.productCapabilities || !me.availableLayouts) {
+    return <View style={styles.accessGate}>
+      {accessError ? <>
+        <Text accessibilityRole="alert">계정 정보를 확인하지 못했어요.</Text>
+        <AppButton onPress={() => void loadMe()}>다시 시도</AppButton>
+      </> : <ActivityIndicator accessibilityLabel="계정 정보 확인 중" />}
+    </View>;
+  }
+  if (restrictedStudentPath(pathname, me)) {
+    return <Redirect href="/(student)" />;
+  }
 
   return (
     <View style={styles.shell}>
+      <ProductAccessContext.Provider value={me}>
       <DailyBannerProvider role="student">
         <View style={styles.stack}>
           <Stack
@@ -128,8 +150,9 @@ export default function StudentLayout() {
           />
         </View>
       </DailyBannerProvider>
+      </ProductAccessContext.Provider>
       {!hideNav ? (
-        <StudentBottomNav duties={me?.duties} />
+        <StudentBottomNav duties={me?.duties} access={me} />
       ) : null}
       {!hideNav && me ? (
         <WalkingPermissionOnboarding accountKey={me.student.id} role="student" />
@@ -146,4 +169,5 @@ const styles = StyleSheet.create({
   stack: {
     flex: 1,
   },
+  accessGate: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.bg },
 });

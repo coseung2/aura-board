@@ -66,7 +66,9 @@ import { GameRecordsPanel } from "../../components/game-platform/GameRecordsPane
 const FALLBACK_THUMBNAIL = "/board-type-thumbnails/card-board.png";
 const BOARD_TILE_WIDE_BREAKPOINT = 700;
 const BOARD_TILE_GAP = spacing.sm;
-type StudentBoardsResponse = {
+import { canReadMobileLayout, hasProductAccess, type ProductAccess } from "../../lib/product-access";
+
+type StudentBoardsResponse = ProductAccess & {
   boards: MeResponse["boards"];
   classroomName: string | null;
 };
@@ -117,12 +119,13 @@ export default function StudentBoardsScreen() {
   const [classroomName, setClassroomName] = useState<string | null>(
     () => initialResponse?.classroomName ?? null,
   );
+  const [access, setAccess] = useState<ProductAccess | null>(() => initialResponse);
+  const canPlay = hasProductAccess(access, "play");
   const [loading, setLoading] = useState(() => !initialCache);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<MobileBoardFilter>(() =>
-    parseFilter(routeFilter),
-  );
+  const [requestedFilter, setFilter] = useState<MobileBoardFilter>(() => parseFilter(routeFilter));
+  const filter: MobileBoardFilter = requestedFilter === "play" && !canPlay ? "lesson" : requestedFilter;
   const [playTab, setPlayTab] = useState<PlayTab>(() =>
     parsePlayTab(routePlayTab),
   );
@@ -144,8 +147,8 @@ export default function StudentBoardsScreen() {
     ),
   );
   const contentBoards = useMemo(
-    () => boards.filter((board) => !isMobileOfficialGameKind(board.layout)),
-    [boards],
+    () => boards.filter((board) => !isMobileOfficialGameKind(board.layout) && canReadMobileLayout(access, board.layout)),
+    [boards, access],
   );
   const overview = useMemo(
     () => buildMobileBoardOverview(contentBoards),
@@ -186,6 +189,7 @@ export default function StudentBoardsScreen() {
         ? normalizeStudentBoardsResponse(cached.data)
         : null;
       if (cached) {
+        setAccess(cachedResponse);
         setBoards(cachedResponse!.boards);
         setClassroomName(cachedResponse!.classroomName);
         setLoading(false);
@@ -214,12 +218,15 @@ export default function StudentBoardsScreen() {
               return {
                 boards: legacy.boards,
                 classroomName: legacy.student.classroom?.name ?? null,
+                productCapabilities: legacy.productCapabilities,
+                availableLayouts: legacy.availableLayouts,
               };
             }
           },
           { force: refresh || Array.isArray(cached?.data), kind: "boards" },
         );
         const response = normalizeStudentBoardsResponse(nextResponse);
+        setAccess(response);
         setBoards(response.boards);
         setClassroomName(response.classroomName);
       } catch (nextError) {
@@ -280,13 +287,13 @@ export default function StudentBoardsScreen() {
           >
             {`수업 ${overview.summary.lesson}`}
           </SectionNavItem>
-          <SectionNavItem
+          {canPlay ? <SectionNavItem
             selected={filter === "play"}
             onPress={() => chooseFilter("play")}
             accessibilityLabel={`놀이 게임 ${MOBILE_GAME_HUB_ORDER.length}개`}
           >
-            {`놀이 ${MOBILE_GAME_HUB_ORDER.length}`}
-          </SectionNavItem>
+            {`놀이 ${MOBILE_GAME_HUB_ORDER.length} · 개발중`}
+          </SectionNavItem> : null}
         </SectionNav>
       </View>
       {filter === "play" ? (
@@ -364,12 +371,10 @@ export default function StudentBoardsScreen() {
           <View style={styles.emptyWrap}>
             <EmptyState
               title="아직 참여할 수 있는 수업 보드가 없어요."
-              description="놀이 탭의 다섯 게임은 보드와 관계없이 언제든 확인할 수 있어요."
-              action={
-                <AppButton onPress={() => chooseFilter("play")}>
-                  놀이 게임 보기
-                </AppButton>
-              }
+              description={canPlay ? "놀이 탭에서 개발중 게임을 확인할 수 있어요." : "선생님이 수업 보드를 연결하면 여기에 표시돼요."}
+              action={canPlay ? (
+                <AppButton onPress={() => chooseFilter("play")}>놀이 게임 보기</AppButton>
+              ) : undefined}
             />
           </View>
         </View>
@@ -411,7 +416,7 @@ export default function StudentBoardsScreen() {
           ListEmptyComponent={
             <EmptyState
               title="이 조건의 수업 보드가 없어요"
-              description="전체 탭에서 다른 수업 자료를 확인하거나 놀이 탭에서 게임을 시작해 보세요."
+              description="전체 탭에서 다른 수업 자료를 확인해 보세요."
               action={
                 <AppButton
                   variant="secondary"

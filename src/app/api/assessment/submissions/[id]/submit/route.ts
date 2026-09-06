@@ -10,7 +10,10 @@ import type {
   ShortQuestionPayload,
 } from "@/types/assessment";
 
-export async function POST(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {

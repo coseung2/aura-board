@@ -84,7 +84,7 @@ describe("student board hidden card serialization", () => {
       id: "board-1",
       slug: "board-1",
       title: "보드",
-      layout: "cards",
+      layout: "freeform",
       systemGameKind: null,
       description: null,
       classroomId: "classroom-1",
@@ -135,7 +135,7 @@ describe("student board hidden card serialization", () => {
     expect(body.cards[0].fileName).toBeNull();
     expect(body.cards[0].canvaDesignId).toBeNull();
     expect(body.cards[0].commentVoteOptionLabels).toBeNull();
-    expect(mocks.boardFindFirst).toHaveBeenCalledTimes(1);
+    expect(mocks.boardFindFirst).toHaveBeenCalledTimes(2);
     expect(mocks.boardFindUnique).not.toHaveBeenCalled();
   });
 });

@@ -58,6 +58,8 @@ export type StudentDailyRewardProgress = {
 };
 
 export type StudentHomePayload = {
+  availableLayouts?: string[];
+  productCapabilities?: import("./product-release").ProductCapabilities;
   student: {
     id: string;
     name: string;

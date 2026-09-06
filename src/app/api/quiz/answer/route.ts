@@ -24,7 +24,10 @@ class AnswerSubmissionError extends Error {
   }
 }
 
-export async function POST(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(req: Request) {
   try {
     const student = await getCurrentStudent();
     const { questionId, playerId, playerToken, selected, timeMs } = await req.json();

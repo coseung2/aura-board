@@ -5,7 +5,10 @@ import { deleteFeedComment } from "@/lib/feed/engagement";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function DELETE(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const DELETE = withProductFeature("feed", DELETEHandler);
+async function DELETEHandler(
   _req: Request,
   { params }: { params: Promise<{ commentId: string }> },
 ) {

@@ -13,7 +13,10 @@ import type {
   TeacherQuestionDTO,
 } from "@/types/assessment";
 
-export async function GET(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {

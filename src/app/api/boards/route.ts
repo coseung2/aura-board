@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin";
+import { canCreateLayout } from "@/lib/product-release";
 import { getCurrentTierAsync, canUseTemplate } from "@/lib/tier";
 import {
   BreakoutConfigSchema,
@@ -118,6 +120,10 @@ export async function POST(req: Request) {
         { error: "category_layout_mismatch" },
         { status: 400 },
       );
+    }
+
+    if (!canCreateLayout(input.layout, { isAdmin: isAdminEmail(user.email) })) {
+      return NextResponse.json({ error: "feature_unavailable" }, { status: 403 });
     }
 
     // BC-1 fix: validate classroom ownership up-front so every layout branch

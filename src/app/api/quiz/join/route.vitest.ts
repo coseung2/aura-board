@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Identity binding is tested independently of the pilot rollout gate. Public
+// requests are denied by the real gate in product-release-server.vitest.ts.
+vi.mock("@/lib/product-release-server", () => ({
+  withProductFeature: (_feature: string, handler: (...args: never[]) => unknown) => handler,
+}));
+
 const mocks = vi.hoisted(() => ({
   getCurrentStudent: vi.fn(),
   quizFindUnique: vi.fn(),

@@ -14,6 +14,7 @@ import {
   OFFICIAL_GAME_CATALOG,
 } from "@/lib/game-platform/catalog";
 import styles from "./game-hub.module.css";
+import { FeaturePreviewNotice } from "../FeaturePreviewNotice";
 
 type EntryResponse = {
   gameKind: OfficialGameKind;
@@ -168,6 +169,7 @@ export function GameHubCatalog({
 
   return (
     <section className={styles.hub} aria-label="게임">
+      <FeaturePreviewNotice />
       {teacherMode && classrooms.length === 0 ? (
         <div className={styles.emptyState} role="status">
           공식 게임방을 열려면 먼저 학급을 만들어 주세요. 잼라이브는 학급 없이도

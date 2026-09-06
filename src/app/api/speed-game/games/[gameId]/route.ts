@@ -22,7 +22,10 @@ const PatchSchema = z
   })
   .strict();
 
-export async function GET(_req: Request, { params }: Params) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("play", GETHandler);
+async function GETHandler(_req: Request, { params }: Params) {
   const { gameId } = await params;
   const game = await db.speedGame.findUnique({
     where: { id: gameId },
@@ -47,7 +50,8 @@ export async function GET(_req: Request, { params }: Params) {
   });
 }
 
-export async function PATCH(req: Request, { params }: Params) {
+export const PATCH = withProductFeature("play", PATCHHandler);
+async function PATCHHandler(req: Request, { params }: Params) {
   const { gameId } = await params;
   const game = await db.speedGame.findUnique({
     where: { id: gameId },

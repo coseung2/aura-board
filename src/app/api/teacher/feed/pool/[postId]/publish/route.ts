@@ -7,7 +7,10 @@ import { publishPoolPostInputSchema } from "@/lib/feed/validation";
 
 export const runtime = "nodejs";
 
-export async function POST(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("feed", POSTHandler);
+async function POSTHandler(
   req: Request,
   { params }: { params: Promise<{ postId: string }> },
 ) {

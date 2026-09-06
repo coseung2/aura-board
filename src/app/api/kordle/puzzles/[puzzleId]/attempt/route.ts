@@ -5,7 +5,10 @@ import { ensureAttempt, getPublicState } from "@/features/kordle/server/kordleSe
 
 type Params = { params: Promise<{ puzzleId: string }> };
 
-export async function POST(_req: Request, { params }: Params) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("play", POSTHandler);
+async function POSTHandler(_req: Request, { params }: Params) {
   const { puzzleId } = await params;
   const student = await getCurrentStudent();
   if (!student) {

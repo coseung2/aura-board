@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
@@ -7,12 +7,15 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/student-auth", () => ({ getCurrentStudentIdentityRaw: vi.fn(async () => null) }));
+afterEach(() => vi.unstubAllEnvs());
 vi.mock("@/lib/db", () => ({ db: { classroom: { findFirst: mocks.findClassroom } } }));
 vi.mock("@/lib/feed/repository", () => ({ listPublishedFeed: mocks.listPublishedFeed }));
 
 import { GET } from "./route";
 
 beforeEach(() => {
+  vi.stubEnv("AURA_ADMIN_EMAILS", "teacher@example.com");
   mocks.getCurrentUser.mockReset();
   mocks.findClassroom.mockReset();
   mocks.listPublishedFeed.mockReset();
@@ -21,6 +24,12 @@ beforeEach(() => {
 });
 
 describe("GET /api/teacher/feed", () => {
+  it("rejects normal teachers before feed queries", async () => {
+    mocks.getCurrentUser.mockResolvedValue({ id: "normal", email: "normal@example.com" });
+    expect((await GET(new Request("http://localhost/api/teacher/feed?scope=global"))).status).toBe(403);
+    expect(mocks.listPublishedFeed).not.toHaveBeenCalled();
+  });
+
   it("rejects unauthenticated requests", async () => {
     mocks.getCurrentUser.mockResolvedValue(null);
     const response = await GET(new Request("http://localhost/api/teacher/feed?scope=global"));
@@ -53,7 +62,7 @@ describe("GET /api/teacher/feed", () => {
     expect(mocks.listPublishedFeed).not.toHaveBeenCalled();
   });
 
-  it("allows authenticated teachers to preview the global feed without a classroom lookup", async () => {
+  it("allows pilot teachers to preview the global feed without a classroom lookup", async () => {
     const response = await GET(new Request("http://localhost/api/teacher/feed?scope=global"));
 
     expect(response.status).toBe(200);

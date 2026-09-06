@@ -29,7 +29,10 @@ const CreateSchema = z.object({
   keywords: z.array(z.string()).min(1).max(200),
 });
 
-export async function GET() {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("play", GETHandler);
+async function GETHandler() {
   let user;
   try {
     user = await getCurrentUser();
@@ -80,7 +83,8 @@ export async function GET() {
   });
 }
 
-export async function POST(req: Request) {
+export const POST = withProductFeature("play", POSTHandler);
+async function POSTHandler(req: Request) {
   let user;
   try {
     user = await getCurrentUser();

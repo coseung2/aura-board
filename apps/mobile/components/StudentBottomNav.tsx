@@ -32,13 +32,16 @@ import {
 import { studentNavIcon } from "../lib/student-navigation-icons";
 import { ControlPressable } from "./ui";
 
+import { visibleProductTargets, type ProductAccess } from "../lib/product-access";
+
 type Props = {
   duties?: StudentDuty[];
+  access?: ProductAccess | null;
 };
 
 const SOLID_ACTIVE_ICON_IDS = new Set(["boards", "walking", "more", "slime"]);
 
-export function StudentBottomNav({ duties = [] }: Props) {
+export function StudentBottomNav({ duties = [], access }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
@@ -52,7 +55,7 @@ export function StudentBottomNav({ duties = [] }: Props) {
   );
   const allTargets = [
     ...studentBaseNavTargets,
-    ...studentOptionalNavTargets,
+    ...visibleProductTargets(studentOptionalNavTargets, access),
     ...duties.map(studentDutyTarget).filter((target): target is StudentNavTarget => target !== null),
   ];
   const targets = targetIds

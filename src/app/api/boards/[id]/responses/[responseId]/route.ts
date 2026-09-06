@@ -7,7 +7,10 @@ import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { announceQuestionChange } from "@/lib/realtime-broadcast";
 
 // DELETE: 응답 삭제. 교사(owner/editor) 만 가능. 학생은 자기 것도 삭제 불가 (MVP).
-export async function DELETE(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const DELETE = withProductFeature("developmentLayouts", DELETEHandler);
+async function DELETEHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string; responseId: string }> }
 ) {

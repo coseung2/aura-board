@@ -6,7 +6,10 @@ import { SUPPORTED_CLONE_LAYOUTS } from "@/lib/boards/clone";
 
 const PublishSchema = z.object({ published: z.boolean() });
 
-export async function PATCH(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const PATCH = withProductFeature("community", PATCHHandler);
+async function PATCHHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {

@@ -18,7 +18,10 @@ async function auth() {
   return viewer;
 }
 
-export async function GET(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("feed", GETHandler);
+async function GETHandler(
   _req: Request,
   { params }: { params: Promise<{ postId: string }> },
 ) {
@@ -30,7 +33,8 @@ export async function GET(
   return NextResponse.json(result);
 }
 
-export async function POST(
+export const POST = withProductFeature("feed", POSTHandler);
+async function POSTHandler(
   req: Request,
   { params }: { params: Promise<{ postId: string }> },
 ) {

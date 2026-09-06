@@ -139,7 +139,10 @@ async function closeOtherPlayablePuzzles(
   }
 }
 
-export async function GET(_req: Request, { params }: Params) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("play", GETHandler);
+async function GETHandler(_req: Request, { params }: Params) {
   const { boardId: boardIdOrSlug } = await params;
   const student = await getCurrentStudent();
   if (!student) {
@@ -211,7 +214,8 @@ export async function GET(_req: Request, { params }: Params) {
   });
 }
 
-export async function POST(req: Request, { params }: Params) {
+export const POST = withProductFeature("play", POSTHandler);
+async function POSTHandler(req: Request, { params }: Params) {
   const { boardId: boardIdOrSlug } = await params;
   const user = await getCurrentUser().catch(() => null);
   if (!user) {
@@ -392,7 +396,8 @@ export async function POST(req: Request, { params }: Params) {
   }
 }
 
-export async function PATCH(req: Request, { params }: Params) {
+export const PATCH = withProductFeature("play", PATCHHandler);
+async function PATCHHandler(req: Request, { params }: Params) {
   const { boardId: boardIdOrSlug } = await params;
   const user = await getCurrentUser().catch(() => null);
   if (!user) {

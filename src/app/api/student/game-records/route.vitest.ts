@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Record ownership and pagination are tested after pilot authorization;
+// actual product gating is covered by product-release-server.vitest.ts.
+vi.mock("@/lib/product-release-server", () => ({
+  withProductFeature: (_feature: string, handler: (...args: never[]) => unknown) => handler,
+}));
+
 const mocks = vi.hoisted(() => ({
   getCurrentStudentRaw: vi.fn(),
   findMany: vi.fn(),

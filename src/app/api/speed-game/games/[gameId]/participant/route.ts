@@ -21,7 +21,10 @@ const BodySchema = z
   })
   .strict();
 
-export async function POST(req: Request, { params }: Params) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("play", POSTHandler);
+async function POSTHandler(req: Request, { params }: Params) {
   const { gameId } = await params;
   const game = await db.speedGame.findUnique({
     where: { id: gameId },

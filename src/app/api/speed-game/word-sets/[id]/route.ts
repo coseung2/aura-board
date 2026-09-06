@@ -42,7 +42,10 @@ async function loadOwnedSet(userId: string, id: string) {
   return { set };
 }
 
-export async function PUT(req: Request, { params }: Params) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const PUT = withProductFeature("play", PUTHandler);
+async function PUTHandler(req: Request, { params }: Params) {
   const { id } = await params;
   let user;
   try {
@@ -126,7 +129,8 @@ export async function PUT(req: Request, { params }: Params) {
   });
 }
 
-export async function DELETE(_req: Request, { params }: Params) {
+export const DELETE = withProductFeature("play", DELETEHandler);
+async function DELETEHandler(_req: Request, { params }: Params) {
   const { id } = await params;
   let user;
   try {

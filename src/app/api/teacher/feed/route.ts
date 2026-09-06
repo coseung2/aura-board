@@ -6,7 +6,10 @@ import { decodeFeedCursor, feedListQuerySchema } from "@/lib/feed/validation";
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("feed", GETHandler);
+async function GETHandler(req: Request) {
   const user = await getCurrentUser().catch(() => null);
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

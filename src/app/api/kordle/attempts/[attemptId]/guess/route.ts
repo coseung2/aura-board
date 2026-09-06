@@ -19,7 +19,10 @@ const BodySchema = z
 
 type Params = { params: Promise<{ attemptId: string }> };
 
-export async function POST(req: Request, { params }: Params) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("play", POSTHandler);
+async function POSTHandler(req: Request, { params }: Params) {
   const { attemptId } = await params;
   const student = await getCurrentStudent();
   const user = student ? null : await getCurrentUser().catch(() => null);

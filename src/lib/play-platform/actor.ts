@@ -5,6 +5,9 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudentIdentityRaw } from "@/lib/student-auth";
 import type { PlayActorRole } from "./contracts";
+import { isAdminEmail } from "../admin";
+import { canUseProductFeature } from "../product-release";
+import { studentReleaseAudience } from "../product-release-server";
 
 export type PlayActor = {
   subject: string;
@@ -28,6 +31,9 @@ export class PlayAccessError extends Error {
 export async function resolvePlayActor(): Promise<PlayActor> {
   const user = await getCurrentUser().catch(() => null);
   if (user) {
+    if (!canUseProductFeature("play", { isAdmin: isAdminEmail(user.email) })) {
+      throw new PlayAccessError(403, "feature_unavailable");
+    }
     return {
       subject: `teacher:${user.id}`,
       role: "host",
@@ -38,6 +44,9 @@ export async function resolvePlayActor(): Promise<PlayActor> {
   }
   const student = await getCurrentStudentIdentityRaw();
   if (student) {
+    if (!canUseProductFeature("play", await studentReleaseAudience(student))) {
+      throw new PlayAccessError(403, "feature_unavailable");
+    }
     return {
       subject: `student:${student.id}`,
       role: "participant",

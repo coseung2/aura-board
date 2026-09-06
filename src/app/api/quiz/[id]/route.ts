@@ -4,7 +4,10 @@ import { resolveIdentities } from "@/lib/identity";
 import { canManageQuiz } from "@/lib/quiz-permissions";
 import { publishQuizRealtimeSnapshot } from "@/lib/quiz-realtime-snapshot";
 
-export async function GET(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -53,7 +56,8 @@ export async function GET(
   });
 }
 
-export async function PATCH(
+export const PATCH = withProductFeature("developmentLayouts", PATCHHandler);
+async function PATCHHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {

@@ -13,7 +13,10 @@ import {
 
 export const runtime = "nodejs";
 
-export async function GET(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("feed", GETHandler);
+async function GETHandler(req: Request) {
   const student = await getCurrentStudent().catch(() => null);
   if (!student) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -46,7 +49,8 @@ export async function GET(req: Request) {
   return NextResponse.json(page);
 }
 
-export async function POST(req: Request) {
+export const POST = withProductFeature("feed", POSTHandler);
+async function POSTHandler(req: Request) {
   const student = await getCurrentStudent().catch(() => null);
   if (!student) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

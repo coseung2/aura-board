@@ -9,7 +9,10 @@ import { canAccessSubmission } from "@/lib/assessment-permissions";
  * Sets AssessmentAnswer.manualScore to maxScore (correct) or 0 (wrong)
  * for the MANUAL question identified by questionId under this submission.
  */
-export async function PATCH(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const PATCH = withProductFeature("developmentLayouts", PATCHHandler);
+async function PATCHHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {

@@ -9,7 +9,10 @@ import { scheduleRealtimePublish } from "@/lib/realtime-server";
 import { VibeReviewCreateSchema } from "@/lib/vibe-arcade/types";
 import { scanText } from "@/lib/vibe-arcade/moderation-filter";
 
-export async function POST(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(req: Request) {
   const url = new URL(req.url);
   const projectId = url.searchParams.get("projectId");
   if (!projectId) return NextResponse.json({ error: "projectId required" }, { status: 400 });

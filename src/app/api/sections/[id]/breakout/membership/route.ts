@@ -24,7 +24,10 @@ const Body = z.object({
   groupId: z.string().min(1),
 });
 
-export async function POST(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
@@ -148,7 +151,8 @@ export async function POST(
   }
 }
 
-export async function DELETE(
+export const DELETE = withProductFeature("developmentLayouts", DELETEHandler);
+async function DELETEHandler(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {

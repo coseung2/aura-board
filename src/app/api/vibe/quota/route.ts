@@ -7,7 +7,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { getBoardRole } from "@/lib/rbac";
 import { getClassroomQuotaToday } from "@/lib/vibe-arcade/quota-ledger";
 
-export async function GET(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(req: Request) {
   const url = new URL(req.url);
   const boardId = url.searchParams.get("boardId");
   if (!boardId) return NextResponse.json({ error: "boardId required" }, { status: 400 });

@@ -1,4 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// Score/receipt integrity remains independent of rollout. The real route
+// rollout boundary is exercised in product-release-server.vitest.ts.
+vi.mock("@/lib/product-release-server", () => ({
+  withProductFeature: (_feature: string, handler: (...args: never[]) => unknown) => handler,
+}));
 import { NextResponse } from "next/server";
 import type { SpeedGameWire } from "@/components/speed-game/types";
 

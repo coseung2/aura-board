@@ -9,6 +9,8 @@ export const metadata = {
   title: "학급 피드 · Aura-board",
 };
 
+import { FeaturePreviewNotice } from "@/components/FeaturePreviewNotice";
+
 export default async function TeacherFeedPage({
   searchParams,
 }: {
@@ -33,6 +35,7 @@ export default async function TeacherFeedPage({
     <>
       <TopNav showAdmin={isAdmin} />
       <main className="ab-feed-page">
+        <FeaturePreviewNotice />
         <TeacherFeedHub classrooms={classrooms} initialView={initialView} />
       </main>
     </>

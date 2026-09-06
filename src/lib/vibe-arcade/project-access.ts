@@ -2,6 +2,8 @@ import "server-only";
 import { db } from "../db";
 import { getCurrentUser } from "../auth";
 import { getCurrentStudent } from "../student-auth";
+import { isAdminEmail } from "../admin";
+import { canUseProductFeature } from "../product-release";
 
 /** Shared by detail and play: an opaque project id is never a public grant. */
 export async function loadAuthorizedVibeProject(boardKey: string, projectId: string) {
@@ -10,6 +12,10 @@ export async function loadAuthorizedVibeProject(boardKey: string, projectId: str
     getCurrentStudent().catch(() => null),
   ]);
   if (!user && !student) return null;
+  if (!canUseProductFeature("developmentLayouts", {
+    isAdmin: isAdminEmail(user?.email),
+    isAdminClassroom: isAdminEmail(student?.classroom?.teacher?.email),
+  })) return null;
 
   const board = await db.board.findFirst({
     where: { OR: [{ id: boardKey }, { slug: boardKey }] },

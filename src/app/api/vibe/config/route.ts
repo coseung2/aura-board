@@ -24,7 +24,10 @@ async function ensureConfig(boardId: string) {
   return db.vibeArcadeConfig.create({ data: { boardId } });
 }
 
-export async function GET(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(req: Request) {
   const boardId = boardIdFromReq(req);
   if (!boardId) return NextResponse.json({ error: "boardId required" }, { status: 400 });
 
@@ -56,7 +59,8 @@ export async function GET(req: Request) {
   return NextResponse.json(cfg);
 }
 
-export async function PATCH(req: Request) {
+export const PATCH = withProductFeature("developmentLayouts", PATCHHandler);
+async function PATCHHandler(req: Request) {
   const boardId = boardIdFromReq(req);
   if (!boardId) return NextResponse.json({ error: "boardId required" }, { status: 400 });
 

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { availableLayoutKeys, productCapabilities } from "@/lib/product-release";
+import { studentReleaseAudience } from "@/lib/product-release-server";
 
 /**
  * 학생 보드 탭 전용 목록.
@@ -17,10 +19,12 @@ export async function GET() {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
+    const audience = await studentReleaseAudience(student);
     const boards = await db.board.findMany({
       where: {
         classroomId: student.classroomId,
         systemGameKind: null,
+        layout: { in: availableLayoutKeys(audience) },
       },
       select: {
         id: true,
@@ -56,6 +60,8 @@ export async function GET() {
 
     return NextResponse.json({
       classroomName: student.classroom?.name ?? null,
+      productCapabilities: productCapabilities(audience),
+      availableLayouts: availableLayoutKeys(audience),
       boards: boards.map((board) => ({
         id: board.id,
         slug: board.slug,

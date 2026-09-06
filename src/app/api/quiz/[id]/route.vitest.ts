@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Exercise quiz ACLs after rollout authorization. Real route-level rollout
+// denials and fail-closed behavior are tested in product-release-server.vitest.ts.
+vi.mock("@/lib/product-release-server", () => ({
+  withProductFeature: (_feature: string, handler: (...args: never[]) => unknown) => handler,
+}));
+
 const mocks = vi.hoisted(() => ({
   resolveIdentities: vi.fn(),
   canManageQuiz: vi.fn(),

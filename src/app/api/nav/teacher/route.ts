@@ -1,4 +1,6 @@
 import { getCurrentUser } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin";
+import { availableLayoutKeys, canUseProductFeature } from "@/lib/product-release";
 import { db } from "@/lib/db";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { OFFICIAL_GAME_CATALOG, GAME_HUB_ORDER } from "@/lib/game-platform/catalog";
@@ -85,6 +87,9 @@ function officialPlaySummaries(
 export async function GET() {
   try {
     const user = await getCurrentUser();
+    const audience = { isAdmin: isAdminEmail(user.email) };
+    const layouts = availableLayoutKeys(audience).filter((key) => !(OFFICIAL_GAME_KINDS as readonly string[]).includes(key));
+    const canPlay = canUseProductFeature("play", audience);
 
     const [classrooms, memberships] = await Promise.all([
       db.classroom.findMany({
@@ -93,7 +98,7 @@ export async function GET() {
           id: true,
           name: true,
           boards: {
-            where: { layout: { notIn: [...OFFICIAL_GAME_KINDS] } },
+            where: { layout: { in: layouts } },
             select: BOARD_SELECT,
             orderBy: { updatedAt: "desc" },
             take: 12,
@@ -104,7 +109,7 @@ export async function GET() {
       db.boardMember.findMany({
         where: {
           userId: user.id,
-          board: { layout: { notIn: [...OFFICIAL_GAME_KINDS] } },
+          board: { layout: { in: layouts } },
         },
         select: { board: { select: BOARD_SELECT } },
         orderBy: { board: { updatedAt: "desc" } },
@@ -122,7 +127,7 @@ export async function GET() {
     }
 
     const classroomIds = classrooms.map((classroom) => classroom.id);
-    const officialRooms = classroomIds.length
+    const officialRooms = canPlay && classroomIds.length
       ? await db.board.findMany({
           where: {
             classroomId: { in: classroomIds },
@@ -151,10 +156,10 @@ export async function GET() {
         boardsById.set(summary.id, summary);
         return summary;
       });
-      const playBoards = officialPlaySummaries(
+      const playBoards = canPlay ? officialPlaySummaries(
         classroom.id,
         officialByClassroom.get(classroom.id) ?? [],
-      );
+      ) : [];
       for (const board of playBoards) {
         if (!board.id.startsWith("pending-")) {
           boardsById.set(board.id, board);

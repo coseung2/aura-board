@@ -10,7 +10,10 @@ function badRequest(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
-export async function POST(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(req: Request) {
   try {
     const ids = await resolveIdentities();
     if (!ids.teacher) {

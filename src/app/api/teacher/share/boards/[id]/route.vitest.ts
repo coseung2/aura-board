@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
@@ -17,6 +17,7 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { PATCH } from "./route";
+afterEach(() => vi.unstubAllEnvs());
 
 function request(published: boolean) {
   return new Request("http://localhost/api/teacher/share/boards/board-1", {
@@ -29,7 +30,8 @@ function request(published: boolean) {
 describe("PATCH /api/teacher/share/boards/:id", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCurrentUser.mockResolvedValue({ id: "teacher-1" });
+    vi.stubEnv("AURA_ADMIN_EMAILS", "pilot@example.com");
+    mocks.getCurrentUser.mockResolvedValue({ id: "teacher-1", email: "pilot@example.com" });
     mocks.boardFindFirst.mockResolvedValue({ id: "board-1", layout: "columns" });
     mocks.boardUpdate.mockResolvedValue({
       id: "board-1",

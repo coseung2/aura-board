@@ -16,6 +16,7 @@ export default async function LiveQuizPage() {
   if (!user) redirect("/login?callbackUrl=/live-quiz");
 
   const isAdmin = isAdminEmail(user.email);
+  if (!isAdmin) redirect("/dashboard");
   return (
     <>
       <TopNav showAdmin={isAdmin} />

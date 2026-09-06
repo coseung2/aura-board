@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Quiz capability/integrity tests run after rollout authorization. The real
+// route gate is covered separately by product-release-server.vitest.ts.
+vi.mock("@/lib/product-release-server", () => ({
+  withProductFeature: (_feature: string, handler: (...args: never[]) => unknown) => handler,
+}));
+
 const mocks = vi.hoisted(() => ({
   getCurrentStudent: vi.fn(),
   publish: vi.fn(),

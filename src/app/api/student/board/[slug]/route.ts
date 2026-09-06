@@ -12,6 +12,9 @@ import { sanitizeGameSnapshotForStudent } from "@/lib/speed-game/student-snapsho
 import { parseObservationPoints } from "@/lib/plant-schemas";
 import { isOfficialPlayLayout } from "@/lib/game-platform/catalog";
 import { loadStudentAssignmentSlots } from "@/lib/student-assignment-payload";
+import { loadStudentBoardBase } from "@/lib/student-board-loader";
+import { canReadLayout } from "@/lib/product-release";
+import { isAdminEmail } from "@/lib/admin";
 
 const ANONYMOUS_AUTHOR_LABEL = "익명";
 
@@ -39,38 +42,13 @@ export async function GET(
     const board = await loadStudentBoardBaseCached(
       student.classroomId,
       slug,
-      () =>
-        db.board.findFirst({
-          where: {
-            OR: [{ id: slug }, { slug }],
-            classroomId: student.classroomId,
-          },
-          include: {
-            classroom: { select: { teacherId: true } },
-            cards: {
-              // web 의 order 기반 정렬과 동일하게 유지하되 createdAt 으로 안정 정렬.
-              orderBy: [{ order: "asc" }, { createdAt: "asc" }],
-              include: {
-                author: { select: { name: true } },
-                studentAuthor: { select: { name: true } },
-                attachments: { orderBy: { order: "asc" } },
-                authors: { orderBy: { displayName: "asc" } },
-                _count: {
-                  select: {
-                    likes: true,
-                    comments: {
-                      where: { audience: "public", deletedAt: null },
-                    },
-                  },
-                },
-              },
-            },
-            sections: { orderBy: { order: "asc" } },
-          },
-        }),
+      () => loadStudentBoardBase(student.classroomId, slug),
     );
     if (!board) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
+    }
+    if (!canReadLayout(board.layout, { isAdminClassroom: isAdminEmail(board.classroom?.teacher?.email) })) {
+      return NextResponse.json({ error: "feature_unavailable" }, { status: 403 });
     }
     primeBoardAccessCache({
       id: board.id,

@@ -4,6 +4,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { scanText } from "@/lib/vibe-arcade/moderation-filter";
+import { withProductFeature } from "@/lib/product-release-server";
+import { loadAuthorizedVibeProject } from "@/lib/vibe-arcade/project-access";
 
 const ReviewCreateSchema = z.object({
   studentId: z.string().min(1),
@@ -27,7 +29,8 @@ async function recomputeProjectReviewStats(projectId: string) {
   });
 }
 
-export async function GET(
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(
   _req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -35,28 +38,17 @@ export async function GET(
 
   const project = await db.vibeProject.findUnique({
     where: { id },
-    select: { id: true },
+    select: { id: true, boardId: true },
   });
   if (!project) return NextResponse.json({ error: "not_found" }, { status: 404 });
 
-  const reviews = await db.vibeReview.findMany({
-    where: { projectId: id, moderationStatus: "visible" },
-    orderBy: { createdAt: "desc" },
-    include: { reviewer: { select: { name: true } } },
-  });
-
-  return NextResponse.json({
-    reviews: reviews.map((review) => ({
-      id: review.id,
-      reviewerName: review.reviewer.name,
-      rating: review.rating,
-      content: review.comment,
-      createdAt: review.createdAt.toISOString(),
-    })),
-  });
+  const access = await loadAuthorizedVibeProject(project.boardId, id);
+  if (!access) return NextResponse.json({ error: "not_found" }, { status: 404 });
+  return NextResponse.json({ reviews: access.reviews });
 }
 
-export async function POST(
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -81,6 +73,9 @@ export async function POST(
   if (project.authorStudentId === student.id) {
     return NextResponse.json({ error: "self_review_forbidden" }, { status: 400 });
   }
+
+  const access = await loadAuthorizedVibeProject(project.boardId, id);
+  if (!access?.canReview) return NextResponse.json({ error: "not_playable" }, { status: 403 });
 
   const trimmedContent = content.trim();
   const scan = scanText(trimmedContent);

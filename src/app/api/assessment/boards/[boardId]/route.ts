@@ -11,7 +11,10 @@ import { resolveIdentities } from "@/lib/identity";
  * MVP-0 assumes a single template per board (the first one wins). The
  * multi-template picker is MVP-1.
  */
-export async function GET(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(
   _req: Request,
   { params }: { params: Promise<{ boardId: string }> }
 ) {

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
@@ -19,6 +19,8 @@ vi.mock("@/lib/db", () => ({
 }));
 
 import { GET } from "./route";
+import { availableLayoutKeys } from "@/lib/product-release";
+afterEach(() => vi.unstubAllEnvs());
 
 const officialKinds = [
   "kordle",
@@ -31,10 +33,21 @@ const officialKinds = [
 describe("GET /api/nav/teacher", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCurrentUser.mockResolvedValue({ id: "teacher-1" });
+    vi.stubEnv("AURA_ADMIN_EMAILS", "pilot@example.com");
+    mocks.getCurrentUser.mockResolvedValue({ id: "teacher-1", email: "pilot@example.com" });
     mocks.classroomFindMany.mockResolvedValue([]);
     mocks.boardMemberFindMany.mockResolvedValue([]);
     mocks.boardFindMany.mockResolvedValue([]);
+  });
+
+  it("does not load official game rooms for a normal teacher", async () => {
+    mocks.getCurrentUser.mockResolvedValue({ id: "normal", email: "normal@example.com" });
+    mocks.classroomFindMany.mockResolvedValue([{ id: "class", name: "반", boards: [] }]);
+    const response = await GET();
+    expect(response.status).toBe(200);
+    expect((await response.json()).classrooms[0].boards).toEqual([]);
+    expect(mocks.boardFindMany).not.toHaveBeenCalled();
+    expect(mocks.classroomFindMany.mock.calls[0][0].select.boards.where.layout.in).not.toContain("stream");
   });
 
   it("keeps lesson boards excluding official rooms while listing the five play-hub games", async () => {
@@ -74,7 +87,7 @@ describe("GET /api/nav/teacher", () => {
       expect.objectContaining({
         select: expect.objectContaining({
           boards: expect.objectContaining({
-            where: { layout: { notIn: officialKinds } },
+            where: { layout: { in: availableLayoutKeys({ isAdmin: true }).filter((key) => !officialKinds.includes(key)) } },
           }),
         }),
       }),

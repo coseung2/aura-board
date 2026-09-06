@@ -16,6 +16,8 @@ export const metadata = {
 
 const SUPPORTED_LAYOUTS = [...SUPPORTED_CLONE_LAYOUTS];
 
+import { FeaturePreviewNotice } from "@/components/FeaturePreviewNotice";
+
 export default async function TeacherSharePage({
   searchParams,
 }: {
@@ -130,6 +132,7 @@ export default async function TeacherSharePage({
             <span>게시물 · 댓글 · 좋아요 · 평가 · 학생 결과물</span>
           </div>
         </header>
+        <FeaturePreviewNotice />
         <CommunityShareHub
           publishedBoards={publishedBoards}
           ownedBoards={ownedBoards}

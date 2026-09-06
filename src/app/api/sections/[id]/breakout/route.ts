@@ -41,7 +41,10 @@ export type SectionBreakoutSnapshot = {
   canManage: boolean;
 };
 
-export async function GET(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(
   _req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
@@ -109,7 +112,8 @@ const PostBody = z.object({
   groups: z.array(GroupDraftBody).optional(),
 });
 
-export async function POST(
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(
   req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {
@@ -263,7 +267,8 @@ export async function POST(
   }
 }
 
-export async function DELETE(
+export const DELETE = withProductFeature("developmentLayouts", DELETEHandler);
+async function DELETEHandler(
   _req: Request,
   ctx: { params: Promise<{ id: string }> }
 ) {

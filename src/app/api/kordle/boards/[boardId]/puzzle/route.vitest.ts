@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+// Version and race semantics are isolated from rollout authorization, whose
+// real allow/deny matrix is covered in product-release-server.vitest.ts.
+vi.mock("@/lib/product-release-server", () => ({
+  withProductFeature: (_feature: string, handler: (...args: never[]) => unknown) => handler,
+}));
+
 const mocks = vi.hoisted(() => ({
   currentGuessIndex: 1,
   version: BigInt(3),

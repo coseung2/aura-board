@@ -7,7 +7,10 @@ import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { VibePlaySessionCompleteSchema } from "@/lib/vibe-arcade/types";
 
-export async function PATCH(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const PATCH = withProductFeature("developmentLayouts", PATCHHandler);
+async function PATCHHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {

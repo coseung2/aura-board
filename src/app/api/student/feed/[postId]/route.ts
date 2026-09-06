@@ -5,7 +5,10 @@ import { feedPostInputSchema, normalizeFeedMedia } from "@/lib/feed/validation";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function DELETE(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const DELETE = withProductFeature("feed", DELETEHandler);
+async function DELETEHandler(
   _req: Request,
   { params }: { params: Promise<{ postId: string }> },
 ) {
@@ -18,7 +21,8 @@ export async function DELETE(
   return NextResponse.json({ ok: true, status: result });
 }
 
-export async function PATCH(
+export const PATCH = withProductFeature("feed", PATCHHandler);
+async function PATCHHandler(
   req: Request,
   { params }: { params: Promise<{ postId: string }> },
 ) {

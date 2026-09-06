@@ -55,7 +55,10 @@ function getRoundSnapshot(
   };
 }
 
-export async function GET(req: Request, { params }: Params) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("play", GETHandler);
+async function GETHandler(req: Request, { params }: Params) {
   const { boardId: boardIdOrSlug } = await params;
   const user = await getCurrentUser().catch(() => null);
   if (!user) {

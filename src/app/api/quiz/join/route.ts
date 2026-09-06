@@ -4,7 +4,10 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { issueQuizPlayerToken } from "@/lib/quiz-player-token";
 import { publishQuizRealtimeSnapshot } from "@/lib/quiz-realtime-snapshot";
 
-export async function POST(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(req: Request) {
   try {
     const student = await getCurrentStudent();
     const { roomCode, nickname, studentId } = await req.json();

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin";
+import { canCreateLayout } from "@/lib/product-release";
 import { authorizeShareAccess } from "@/lib/share/share-auth";
 import {
   cloneTeacherBoard,
@@ -64,6 +66,9 @@ export async function POST(
       return NextResponse.json({ error: "share_not_found" }, { status: 404 });
     }
 
+    if (!canCreateLayout(source.layout, { isAdmin: isAdminEmail(user.email) })) {
+      return NextResponse.json({ error: "feature_unavailable" }, { status: 403 });
+    }
     if (!SUPPORTED_CLONE_LAYOUTS.has(source.layout)) {
       return NextResponse.json({ error: "unsupported_layout" }, { status: 400 });
     }

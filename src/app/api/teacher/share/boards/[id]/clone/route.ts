@@ -9,7 +9,10 @@ import {
 
 const CloneSchema = z.object({ classroomId: z.string().min(1) });
 
-export async function POST(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("community", POSTHandler);
+async function POSTHandler(
   req: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {

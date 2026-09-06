@@ -9,7 +9,10 @@ import {
 
 export const runtime = "nodejs";
 
-export async function POST(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("feed", POSTHandler);
+async function POSTHandler(req: Request) {
   const user = await getCurrentUser().catch(() => null);
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });

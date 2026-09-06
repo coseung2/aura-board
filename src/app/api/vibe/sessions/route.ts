@@ -25,7 +25,10 @@ const StartSchema = z.object({
   category: z.enum(["game", "quiz", "art", "sim"]).nullable().optional(),
 });
 
-export async function POST(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("developmentLayouts", POSTHandler);
+async function POSTHandler(req: Request) {
   const student = await getCurrentStudent();
   if (!student) {
     return new Response(JSON.stringify({ error: "unauthorized" }), {

@@ -10,7 +10,10 @@ const entrySchema = z
   })
   .strict();
 
-export async function POST(request: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const POST = withProductFeature("play", POSTHandler);
+async function POSTHandler(request: Request) {
   const student = await getCurrentStudent();
   if (!student) {
     return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });

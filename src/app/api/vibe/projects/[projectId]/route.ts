@@ -8,7 +8,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
 import { getBoardRole } from "@/lib/rbac";
 
-export async function GET(
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(
   _req: Request,
   { params }: { params: Promise<{ projectId: string }> },
 ) {

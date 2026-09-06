@@ -72,7 +72,11 @@ import {
 // 학생 앱 보드 상세 dispatcher. /api/student/board/:slug 한 번 fetch 후
 // board.layout 에 따라 맞는 레이아웃 컴포넌트 렌더.
 
+import { canReadMobileLayout } from "../../../lib/product-access";
+import { useProductAccess } from "../../../lib/product-access-context";
+
 export default function BoardDetail() {
+  const access = useProductAccess();
   const { slug: rawSlug, section: rawSection } = useLocalSearchParams<{
     slug?: string | string[];
     section?: string | string[];
@@ -217,11 +221,11 @@ export default function BoardDetail() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace("/(student)/boards?filter=play" as Href);
+      router.replace("/(student)/boards" as Href);
     }
   }, [router, selectedColumnSectionKey]);
 
-  if (loading) {
+  if (loading || (data && !access?.availableLayouts)) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <BoardHeader title="보드" layout="stream" onBack={handleBoardBack} />
@@ -235,7 +239,7 @@ export default function BoardDetail() {
     );
   }
 
-  if (!data) {
+  if (!data || !canReadMobileLayout(access, data.board.layout)) {
     return (
       <SafeAreaView style={styles.container} edges={["top"]}>
         <View style={styles.center}>
@@ -245,7 +249,7 @@ export default function BoardDetail() {
             strokeWidth={2}
             accessibilityLabel="오류"
           />
-          <Text style={styles.errorTitle}>{error ?? "알 수 없는 오류"}</Text>
+          <Text style={styles.errorTitle}>{data ? "현재 계정에서 사용할 수 없는 보드예요." : error ?? "보드를 불러오지 못했어요."}</Text>
           <AppButton
             loading={retrying}
             disabled={retrying}

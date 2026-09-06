@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   getCurrentUser: vi.fn(),
@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("@/lib/auth", () => ({ getCurrentUser: mocks.getCurrentUser }));
+vi.mock("@/lib/student-auth", () => ({ getCurrentStudentIdentityRaw: vi.fn(async () => null) }));
+afterEach(() => vi.unstubAllEnvs());
 vi.mock("@/lib/db", () => ({
   db: {
     classroom: { findFirst: mocks.classroomFindFirst },
@@ -29,7 +31,8 @@ function request(body: unknown) {
 describe("POST /api/teacher/game-hub/entry", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.getCurrentUser.mockResolvedValue({ id: "teacher-1" });
+    vi.stubEnv("AURA_ADMIN_EMAILS", "pilot@example.com");
+    mocks.getCurrentUser.mockResolvedValue({ id: "teacher-1", email: "pilot@example.com" });
     mocks.classroomFindFirst.mockResolvedValue({ id: "classroom-1" });
     mocks.resolveOrCreateCanonicalGameRoom.mockResolvedValue({
       id: "room-1",
@@ -38,6 +41,13 @@ describe("POST /api/teacher/game-hub/entry", () => {
       classroomId: "classroom-1",
       systemGameKind: "omok",
     });
+  });
+
+  it("rejects a normal teacher before room lookup", async () => {
+    mocks.getCurrentUser.mockResolvedValue({ id: "normal", email: "normal@example.com" });
+    expect((await POST(request({ gameKind: "omok", classroomId: "classroom-1" }))).status).toBe(403);
+    expect(mocks.classroomFindFirst).not.toHaveBeenCalled();
+    expect(mocks.resolveOrCreateCanonicalGameRoom).not.toHaveBeenCalled();
   });
 
   it("requires an authenticated teacher", async () => {

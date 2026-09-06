@@ -6,7 +6,10 @@ import type { QuizLibraryItem } from "@/types/quiz";
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
 
-export async function GET(req: Request) {
+import { withProductFeature } from "@/lib/product-release-server";
+
+export const GET = withProductFeature("developmentLayouts", GETHandler);
+async function GETHandler(req: Request) {
   const ids = await resolveIdentities();
   if (!ids.teacher) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });

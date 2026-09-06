@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin";
+import { availableLayoutKeys } from "@/lib/product-release";
 import { getCurrentTierAsync } from "@/lib/tier";
 import { OFFICIAL_GAME_KINDS } from "@/lib/game-platform/contracts";
 import { Dashboard } from "@/components/Dashboard";
@@ -16,11 +17,13 @@ export default async function DashboardPage() {
     redirect("/login?callbackUrl=/dashboard");
   }
 
+  const isAdmin = isAdminEmail(user.email);
+  const layouts = availableLayoutKeys({ isAdmin }).filter((key) => !(OFFICIAL_GAME_KINDS as readonly string[]).includes(key));
   const [memberships, classrooms, tier] = await Promise.all([
     db.boardMember.findMany({
       where: {
         userId: user.id,
-        board: { layout: { notIn: [...OFFICIAL_GAME_KINDS] } },
+        board: { layout: { in: layouts } },
       },
       select: {
         role: true,
@@ -53,7 +56,6 @@ export default async function DashboardPage() {
     getCurrentTierAsync(user.id),
   ]);
 
-  const isAdmin = isAdminEmail(user.email);
   await recordUsageEvent({ eventName: "dashboard.view", userId: user.id, actorType: "teacher" });
 
   const classroomItems = classrooms.map((c) => ({
