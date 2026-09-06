@@ -12,6 +12,9 @@ import {
 // product surface. Remove or lock behind a dev flag before go-live.
 
 export async function GET(req: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
   const url = new URL(req.url);
   const studentId = url.searchParams.get("studentId");
   const linkId = url.searchParams.get("linkId");

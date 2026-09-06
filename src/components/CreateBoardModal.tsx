@@ -6,21 +6,21 @@ import { CreateBreakoutBoardModal } from "./CreateBreakoutBoardModal";
 import { BoardThumbnailPicker, type ThumbnailMode } from "./BoardThumbnailPicker";
 import { LAYOUT_META, layoutThumbnail, type LayoutKey } from "@/lib/layout-meta";
 import { deriveBoardCategory } from "@/lib/game-platform/catalog";
+import { canCreateLayout, canReadLayout, layoutRelease } from "@/lib/product-release";
 
 type PickerRow = {
   id: LayoutKey;
   desc: string;
-  hidden?: true;
 };
 
 const PICKER_ROWS: PickerRow[] = [
   { id: "freeform", desc: "담벼락처럼 카드를 모아 보기" },
-  { id: "grid", desc: "격자 형태로 카드를 정렬", hidden: true },
+  { id: "grid", desc: "격자 형태로 카드를 정렬" },
   { id: "stream", desc: "SNS처럼 글과 댓글이 아래로 흐르는 피드" },
   { id: "columns", desc: "주제별로 게시물을 나눠 정리" },
   { id: "assignment", desc: "학생별 과제 제출 및 확인" },
   { id: "quiz", desc: "실시간 퀴즈 게임" },
-  { id: "breakout", desc: "템플릿 기반 모둠 협력 보드", hidden: true },
+  { id: "breakout", desc: "템플릿 기반 모둠 협력 보드" },
   { id: "assessment", desc: "교사가 입력한 문항 기반 OMR 채점" },
   { id: "dj-queue", desc: "학생 YouTube 곡 신청 및 재생 순서 관리" },
   { id: "plant-roadmap", desc: "성장 단계별 관찰 사진과 기록 관리" },
@@ -29,26 +29,17 @@ const PICKER_ROWS: PickerRow[] = [
   { id: "question-board", desc: "학생 응답을 다양한 시각화로 표시" },
 ];
 
-const READY_LAYOUT_IDS = new Set<LayoutKey>([
-  "freeform",
-  "columns",
-  "dj-queue",
-  "plant-roadmap",
-]);
-
-const UNLOCKED_DEV_LAYOUT_IDS = new Set<LayoutKey>(["stream"]);
-
 const LAYOUTS = PICKER_ROWS.map((row) => ({
   id: row.id,
   emoji: LAYOUT_META[row.id].emoji,
-  label: READY_LAYOUT_IDS.has(row.id)
-    ? LAYOUT_META[row.id].label
-    : `${LAYOUT_META[row.id].label} (개발중)`,
+  label: layoutRelease(row.id)?.stage === "development"
+    ? `${LAYOUT_META[row.id].label} (개발중)`
+    : LAYOUT_META[row.id].label,
   desc: row.desc,
-  ready: READY_LAYOUT_IDS.has(row.id),
-  selectable: READY_LAYOUT_IDS.has(row.id) || UNLOCKED_DEV_LAYOUT_IDS.has(row.id),
+  ready: layoutRelease(row.id)?.stage === "stable",
+  selectable: layoutRelease(row.id)?.picker === "enabled",
   thumbnail: layoutThumbnail(row.id),
-  hidden: row.hidden,
+  hidden: layoutRelease(row.id)?.picker === "hidden",
 }));
 
 const VISIBLE_LAYOUTS = LAYOUTS.filter((layout) => !layout.hidden).sort(
@@ -118,8 +109,8 @@ export function CreateBoardModal({
 
   function handleSelect(layoutId: LayoutKey) {
     if (
-      !READY_LAYOUT_IDS.has(layoutId) &&
-      !UNLOCKED_DEV_LAYOUT_IDS.has(layoutId)
+      !canCreateLayout(layoutId, { isAdmin }) ||
+      layoutRelease(layoutId)?.picker !== "enabled"
     ) {
       return;
     }
@@ -158,7 +149,7 @@ export function CreateBoardModal({
     : null;
   const requiresClassroom = selectedLayout === "dj-queue";
   const visibleLayoutsForCategory = VISIBLE_LAYOUTS.filter(
-    (layout) => layout.ready || isAdmin,
+    (layout) => canReadLayout(layout.id, { isAdmin }),
   );
 
   const renderLayoutGrid = (layouts: typeof VISIBLE_LAYOUTS) => (

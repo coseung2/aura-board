@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { TopNav } from "@/components/TopNav";
 import { getCurrentUser } from "@/lib/auth";
 
-export const ADMIN_EMAIL = "mallagaenge@gmail.com";
+import { isAdminEmail } from "./admin";
 
 export async function requireAdminUser(callbackUrl: string) {
   let currentUser;
@@ -14,7 +14,7 @@ export async function requireAdminUser(callbackUrl: string) {
     redirect(`/login?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   }
 
-  if (currentUser.email.toLowerCase() !== ADMIN_EMAIL) {
+  if (!isAdminEmail(currentUser.email)) {
     return { currentUser, authorized: false as const };
   }
 

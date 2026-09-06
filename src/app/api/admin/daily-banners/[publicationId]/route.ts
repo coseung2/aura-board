@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ADMIN_EMAIL } from "@/lib/admin-auth";
+import { isAdminEmail } from "@/lib/admin";
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { logAudit } from "@/lib/audit";
@@ -15,7 +15,7 @@ export async function DELETE(
 ) {
   const user = await getCurrentUser().catch(() => null);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  if (user.email.toLowerCase() !== ADMIN_EMAIL) {
+  if (!isAdminEmail(user.email)) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

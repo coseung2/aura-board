@@ -8,6 +8,9 @@ import { withParentScope } from "@/lib/parent-scope";
 // endpoint in PV-6 that joins through to Student name/classroom.
 
 export async function GET(req: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "not_found" }, { status: 404 });
+  }
   const result = await withParentScope(req, async (ctx) => {
     return NextResponse.json({
       parentId: ctx.parent.id,

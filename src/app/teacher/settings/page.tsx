@@ -7,7 +7,7 @@ import { TeacherWithdrawalSection } from "@/components/teacher/TeacherWithdrawal
 import { getCurrentUser } from "@/lib/auth";
 import { isCanvaConnected } from "@/lib/canva";
 
-const ADMIN_EMAIL = "mallagaenge@gmail.com";
+import { isAdminEmail } from "@/lib/admin";
 
 export const metadata = {
   title: "교사 설정 · Aura-board",
@@ -20,7 +20,7 @@ export default async function TeacherSettingsPage() {
 
   return (
     <>
-      <TopNav showAdmin={user.email.toLowerCase() === ADMIN_EMAIL} />
+      <TopNav showAdmin={isAdminEmail(user.email)} />
       <main className="teacher-settings-page">
         <div className="teacher-settings-shell">
           <SettingsContentTabs
