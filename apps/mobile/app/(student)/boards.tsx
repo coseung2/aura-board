@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useFocusedRefresh } from "../../hooks/use-focused-refresh";
 import {
   FlatList,
   InteractionManager,
@@ -12,7 +13,6 @@ import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions"
 import { Image } from "expo-image";
 import {
   type Href,
-  useFocusEffect,
   useLocalSearchParams,
   useRouter,
 } from "expo-router";
@@ -180,8 +180,11 @@ export default function StudentBoardsScreen() {
     };
   }, [filter, visibleRows]);
 
+  const requestVersion = useRef(0);
+  useEffect(() => () => { requestVersion.current += 1; }, []);
   const load = useCallback(
     async (refresh = false) => {
+      const version = ++requestVersion.current;
       const cached = readBoardCache<
         StudentBoardsResponse | LegacyStudentBoardsResponse
       >(BOARD_LIST_CACHE_KEY);
@@ -225,11 +228,13 @@ export default function StudentBoardsScreen() {
           },
           { force: refresh || Array.isArray(cached?.data), kind: "boards" },
         );
+        if (version !== requestVersion.current) return;
         const response = normalizeStudentBoardsResponse(nextResponse);
         setAccess(response);
         setBoards(response.boards);
         setClassroomName(response.classroomName);
       } catch (nextError) {
+        if (version !== requestVersion.current) return;
         if (nextError instanceof ApiError && nextError.status === 401) {
           await clearSessionToken();
           router.replace(getUnifiedLoginRoute("student"));
@@ -237,18 +242,13 @@ export default function StudentBoardsScreen() {
         }
         setError("보드 목록을 불러오지 못했어요.");
       } finally {
-        setLoading(false);
-        setRefreshing(false);
+        if (version === requestVersion.current) { setLoading(false); setRefreshing(false); }
       }
     },
     [router],
   );
 
-  useFocusEffect(
-    useCallback(() => {
-      void load();
-    }, [load]),
-  );
+  useFocusedRefresh(() => load(true));
 
   function chooseFilter(next: MobileBoardFilter) {
     setFilter(next);

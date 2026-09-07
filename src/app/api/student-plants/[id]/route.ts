@@ -5,6 +5,7 @@
  *                                  Student owner or teacher of classroom (v2).
  */
 import { NextResponse } from "next/server";
+import { scheduleCardChangeBroadcast } from "@/lib/card-broadcast-queue";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { resolvePlantActor, canAccessStudentPlant } from "@/lib/plant-auth";
@@ -125,6 +126,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     });
     if (!plant) return NextResponse.json({ error: "not found" }, { status: 404 });
 
+    scheduleCardChangeBroadcast(plant.boardId, "update");
     return NextResponse.json({
       studentPlant: {
         id: plant.id,

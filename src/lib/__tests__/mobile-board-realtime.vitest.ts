@@ -9,6 +9,7 @@ vi.mock("../../../apps/mobile/lib/api", () => ({
 
 const realtime = await import("../../../apps/mobile/lib/use-board-realtime");
 const liveSnapshot = await import("../../../apps/mobile/lib/use-live-snapshot");
+const mobileApi = await import("../../../apps/mobile/lib/api");
 
 type BoardRealtimeChannel = {
   on: (
@@ -49,8 +50,32 @@ function fakeClient() {
 }
 
 describe("mobile board realtime", () => {
+  beforeEach(() => {
+    realtime.resetBoardRealtimeForTests();
+    vi.mocked(mobileApi.apiFetch).mockReset();
+  });
+
   afterEach(() => {
     vi.useRealTimers();
+    vi.unstubAllEnvs();
+  });
+
+  it("loads authenticated runtime Realtime config when store build env values are absent", async () => {
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "");
+    vi.mocked(mobileApi.apiFetch).mockResolvedValueOnce({
+      configured: true,
+      url: "https://runtime.example.supabase.co",
+      key: "public-key",
+    });
+
+    const client = await realtime.ensureMobileRealtimeClient();
+
+    expect(client).not.toBeNull();
+    expect(mobileApi.apiFetch).toHaveBeenCalledWith(
+      "/api/student/realtime-config",
+      { retry: 0 },
+    );
   });
 
   it("shares one board channel and removes it once after the final subscriber", async () => {
@@ -81,6 +106,23 @@ describe("mobile board realtime", () => {
     secondSubscription.unsubscribe();
     expect(fake.client.removeChannel).toHaveBeenCalledTimes(1);
     expect(registry.getEntryCount()).toBe(0);
+  });
+
+  it("uses the API-origin configuration even when a store bundle embeds an older broker", async () => {
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_URL", "https://obsolete.example.supabase.co");
+    vi.stubEnv("EXPO_PUBLIC_SUPABASE_ANON_KEY", "old-public-key");
+    vi.mocked(mobileApi.apiFetch).mockResolvedValueOnce({ configured: true, url: "https://current.example.supabase.co", key: "current-public-key" });
+    expect(await realtime.ensureMobileRealtimeClient()).not.toBeNull();
+    expect(mobileApi.apiFetch).toHaveBeenCalledOnce();
+  });
+
+  it("does not cache unconfigured or rejected initialization permanently", async () => {
+    vi.mocked(mobileApi.apiFetch).mockResolvedValueOnce({ configured: false }).mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValueOnce({ configured: true, url: "https://current.example.supabase.co", key: "public-key" });
+    expect(await realtime.ensureMobileRealtimeClient()).toBeNull();
+    await expect(realtime.ensureMobileRealtimeClient()).rejects.toThrow("offline");
+    expect(await realtime.ensureMobileRealtimeClient()).not.toBeNull();
+    expect(mobileApi.apiFetch).toHaveBeenCalledTimes(3);
   });
 
   it("coalesces bursts with a trailing debounce and queues one refresh behind an in-flight request", async () => {

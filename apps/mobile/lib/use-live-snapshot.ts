@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { AppState } from "react-native";
 import {
+  ensureMobileRealtimeClient,
   getMobileRealtimeClient,
   type BoardRealtimeChannel,
+  type BoardRealtimeClient,
   type BoardRealtimeStatus,
 } from "./use-board-realtime";
 
@@ -70,7 +72,8 @@ export function useLiveSnapshot({
     let inFlight: Promise<void> | null = null;
     let queued = false;
     let channel: BoardRealtimeChannel | null = null;
-    const client = getMobileRealtimeClient();
+    let client: BoardRealtimeClient | null = getMobileRealtimeClient();
+    let connectingClient = false;
 
     const clearFallback = () => {
       if (!fallbackTimer) return;
@@ -98,6 +101,7 @@ export function useLiveSnapshot({
       }
       fallbackTimer = setTimeout(() => {
         fallbackTimer = null;
+        if (!channel) void connectRealtime();
         void runRefresh();
       }, liveSnapshotFallbackDelay(failures));
     };
@@ -133,10 +137,19 @@ export function useLiveSnapshot({
       return request;
     };
 
-    updateStatus(client ? "connecting" : "unavailable");
-
-    if (client) {
+    const connectRealtime = async () => {
+      if (stopped || channel || connectingClient) return;
+      connectingClient = true;
       try {
+        client = client ?? (await ensureMobileRealtimeClient());
+        if (stopped) return;
+        if (!client) {
+          updateStatus("unavailable");
+          scheduleFallback();
+          return;
+        }
+
+        updateStatus("connecting");
         channel = client.channel(channelName);
         for (const event of JSON.parse(eventsKey) as string[]) {
           channel.on("broadcast", { event }, () => {
@@ -169,9 +182,16 @@ export function useLiveSnapshot({
           }
         });
       } catch {
+        channel = null;
         updateStatus("error");
+        scheduleFallback();
+      } finally {
+        connectingClient = false;
       }
-    }
+    };
+
+    updateStatus("connecting");
+    void connectRealtime();
 
     const appStateSubscription = AppState.addEventListener("change", (nextState) => {
       if (stopped) return;
@@ -180,6 +200,7 @@ export function useLiveSnapshot({
       if (!active) {
         clearFallback();
       } else if (!wasActive) {
+        if (!channel) void connectRealtime();
         void runRefresh();
       }
     });

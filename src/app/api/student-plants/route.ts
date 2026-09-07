@@ -4,6 +4,7 @@
  * Student only. One plant per (board, student).
  */
 import { NextResponse } from "next/server";
+import { scheduleCardChangeBroadcast } from "@/lib/card-broadcast-queue";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentStudent } from "@/lib/student-auth";
@@ -64,6 +65,7 @@ export async function POST(req: Request) {
         },
         include: { species: true, currentStage: true },
       });
+      scheduleCardChangeBroadcast(input.boardId, "update");
       return NextResponse.json({ studentPlant: plant }, { status: 201 });
     } catch (err) {
       const existing = await db.studentPlant.findUnique({

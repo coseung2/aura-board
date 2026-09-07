@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
+import { useFocusedRefresh } from "../../hooks/use-focused-refresh";
 import {
   ActivityIndicator,
   Alert,
@@ -79,7 +80,7 @@ export default function StudentWalletScreen() {
           { method: "POST" },
         );
         // 통장/FD 다시 로드.
-        const res = await apiFetch<WalletSummary>("/api/my/wallet");
+        const res = await fetchWalletSnapshot();
         setWallet(res);
       } catch (e) {
         Alert.alert(
@@ -104,7 +105,7 @@ export default function StudentWalletScreen() {
         `/api/classrooms/${encodeURIComponent(wallet.classroomId)}/bank/fixed-deposits`,
         { method: "POST", json: { principal } },
       );
-      const res = await apiFetch<WalletSummary>("/api/my/wallet");
+      const res = await fetchWalletSnapshot();
       setWallet(res);
       setFdPrincipal("");
       Alert.alert("가입 완료", "적금에 가입했어요.");
@@ -119,11 +120,9 @@ export default function StudentWalletScreen() {
     }
   }, [fdBusy, fdPrincipal, handleAuthError, wallet?.classroomId]);
 
-  useEffect(() => {
-    (async () => {
+  const refreshWallet = useCallback(async () => {
       try {
-        setLoading(true);
-        const res = await apiFetch<WalletSummary>("/api/my/wallet");
+        const res = await fetchWalletSnapshot();
         setWallet(res);
         setError(null);
         await loadQr();
@@ -133,8 +132,8 @@ export default function StudentWalletScreen() {
       } finally {
         setLoading(false);
       }
-    })();
   }, [handleAuthError, loadQr]);
+  useFocusedRefresh(refreshWallet);
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -148,6 +147,7 @@ export default function StudentWalletScreen() {
       ) : error || !wallet ? (
         <View style={styles.center}>
           <Text style={styles.error}>{error ?? "통장 정보를 불러올 수 없어요."}</Text>
+          <AppButton onPress={() => void refreshWallet()}>다시 시도</AppButton>
         </View>
       ) : (
         <ScrollView
@@ -286,6 +286,12 @@ export default function StudentWalletScreen() {
       )}
     </SafeAreaView>
   );
+}
+
+function fetchWalletSnapshot() {
+  // All focus and post-mutation reads share a trailing refresh. An older GET
+  // cannot satisfy the fresh read after opening/cancelling a deposit.
+  return apiFetch<WalletSummary>("/api/my/wallet", { cacheTtlMs: 5_000, forceRefresh: true });
 }
 
 function formatShortDate(value: string): string {

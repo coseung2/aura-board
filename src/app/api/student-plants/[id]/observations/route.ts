@@ -3,6 +3,7 @@
  * POST /api/student-plants/[id]/observations — create observation.
  */
 import { NextResponse } from "next/server";
+import { scheduleCardChangeBroadcast } from "@/lib/card-broadcast-queue";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { resolvePlantActor, canAccessStudentPlant } from "@/lib/plant-auth";
@@ -94,8 +95,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       include: { images: { orderBy: { order: "asc" } } },
     });
 
+    scheduleCardChangeBroadcast(gate.boardId, "update");
     return NextResponse.json(
-      {
+        {
         observation: {
           id: created.id,
           stageId: created.stageId,

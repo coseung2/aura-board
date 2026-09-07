@@ -37,7 +37,10 @@ import {
 } from "../../lib/card-privacy";
 import { ControlPressable, Fab, SurfaceCard } from "../ui";
 import { SectionNav, SectionNavItem } from "../NavigationTabs";
-import { useBoardRealtime } from "../../lib/use-board-realtime";
+import {
+  BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+  useBoardRealtime,
+} from "../../lib/use-board-realtime";
 import { isWideViewport } from "../../lib/responsive";
 import { StreamFeedPost } from "./ColumnsStreamFeedPost";
 
@@ -53,6 +56,7 @@ function sectionKey(sectionId: string | null): string {
 export function ColumnsBoard({
   data,
   onMutate,
+  realtimeManaged = false,
   writableSectionIds,
   onSectionTitleChange,
   selectedSectionKey: selectedSectionKeyProp,
@@ -60,6 +64,7 @@ export function ColumnsBoard({
 }: {
   data: BoardDetailResponse;
   onMutate: () => void;
+  realtimeManaged?: boolean;
   writableSectionIds?: string[];
   onSectionTitleChange?: (title: string | null) => void;
   selectedSectionKey?: string | null;
@@ -99,6 +104,11 @@ export function ColumnsBoard({
   );
 
   useEffect(() => {
+    const ids = new Set(data.cards.map((card) => card.id));
+    setCommentCard((card) => card && !ids.has(card.id) ? null : card);
+    setAuthorCard((card) => card && !ids.has(card.id) ? null : card);
+    setEditingCard((card) => card && !ids.has(card.id) ? null : card);
+    setModerationTarget((target) => target && !ids.has(target.card.id) ? null : target);
     setCards(
       withBoardAnonymousAuthors(
         [...data.cards].sort((a, b) => {
@@ -178,7 +188,7 @@ export function ColumnsBoard({
     setSelectedSectionKey(sectionKey(sectionId));
   }
 
-  useBoardRealtime({ slug: data.board.id, onReload: onMutate });
+  useBoardRealtime({ slug: data.board.id, onReload: onMutate, enabled: !realtimeManaged, fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS });
 
   const canWriteSelected =
     selectedSummary?.id !== null &&
@@ -301,6 +311,7 @@ export function ColumnsBoard({
       />
       <CommentBottomSheet
         cardId={commentCard?.id ?? null}
+        boardId={data.board.id}
         visible={commentCard !== null}
         onClose={() => setCommentCard(null)}
         onCommentCountChange={(change) => {

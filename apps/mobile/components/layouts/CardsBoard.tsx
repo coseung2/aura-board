@@ -29,7 +29,10 @@ import {
   withBoardAnonymousAuthors,
 } from "../../lib/card-privacy";
 import { Fab } from "../ui";
-import { useBoardRealtime } from "../../lib/use-board-realtime";
+import {
+  BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+  useBoardRealtime,
+} from "../../lib/use-board-realtime";
 import { isWideViewport } from "../../lib/responsive";
 import { StreamFeedPost } from "./ColumnsBoard";
 import {
@@ -43,9 +46,11 @@ import {
 export function CardsBoard({
   data,
   onMutate,
+  realtimeManaged = false,
 }: {
   data: BoardDetailResponse;
   onMutate: () => void;
+  realtimeManaged?: boolean;
 }) {
   const { width } = useSafeWindowDimensions();
   const useReadableLayout = isWideViewport(width);
@@ -64,6 +69,11 @@ export function CardsBoard({
   );
   useEffect(() => {
     setCards(withBoardAnonymousAuthors(sortCards(data.cards), data.board));
+    const ids = new Set(data.cards.map((card) => card.id));
+    setCommentCard((card) => card && !ids.has(card.id) ? null : card);
+    setAuthorCard((card) => card && !ids.has(card.id) ? null : card);
+    setEditingCard((card) => card && !ids.has(card.id) ? null : card);
+    setModerationTarget((target) => target && !ids.has(target.card.id) ? null : target);
   }, [data.cards, data.board]);
 
   function handleCreated(card: BoardCard) {
@@ -75,7 +85,7 @@ export function CardsBoard({
 
   // realtime: broadcast 가 도착하면 부모에서 board 데이터를 다시 받게 한다.
   // 서버 broadcast channel key 가 board.id 기준이므로 id 로 구독한다.
-  useBoardRealtime({ slug: data.board.id, onReload: onMutate });
+  useBoardRealtime({ slug: data.board.id, onReload: onMutate, enabled: !realtimeManaged, fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS });
 
   const emptyState = (
     <View style={styles.empty}>
@@ -140,6 +150,7 @@ export function CardsBoard({
       />
       <CommentBottomSheet
         cardId={commentCard?.id ?? null}
+        boardId={data.board.id}
         visible={commentCard !== null}
         onClose={() => setCommentCard(null)}
         onCommentCountChange={(change) => {

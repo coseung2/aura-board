@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { useFocusedRefresh } from "../hooks/use-focused-refresh";
 import {
   ActivityIndicator,
   Image,
@@ -85,6 +86,9 @@ export function StudentInspectionScreen({ mode }: { mode: Mode }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const dirtyIds = useRef(new Set<string>());
+  const requestVersion = useRef(0);
+  const scopeRef = useRef(`${mode}:${routeClassroomId}`);
 
   const handleAuthError = useCallback(async (nextError: unknown) => {
     if (nextError instanceof ApiError && nextError.status === 401) {
@@ -102,22 +106,28 @@ export function StudentInspectionScreen({ mode }: { mode: Mode }) {
     return me.duties?.find((duty) => duty.roleKey === roleKey)?.classroomId ?? null;
   }, [mode, routeClassroomId]);
 
-  const load = useCallback(async (refresh = false) => {
+  const load = useCallback(async (refresh = false, preserveDraft = false) => {
+    const version = ++requestVersion.current;
+    const scope = `${mode}:${routeClassroomId}`;
+    if (scopeRef.current !== scope) { scopeRef.current = scope; dirtyIds.current.clear(); }
     if (refresh) setRefreshing(true);
     else setLoading(true);
     setError(null);
     try {
       const resolved = await resolveClassroomId();
+      if (version !== requestVersion.current) return;
       if (!resolved) {
+        setPayload(null);
         setError("검사할 학급 정보를 찾을 수 없어요.");
         return;
       }
       const next = await apiFetch<Payload>(
         `/api/classrooms/${encodeURIComponent(resolved)}/inspections/${mode}`,
       );
+      if (version !== requestVersion.current) return;
       setClassroomId(resolved);
       setPayload(next);
-      setDraft(Object.fromEntries(next.roster.map((entry) => [
+      const incoming = Object.fromEntries(next.roster.map((entry) => [
         entry.student.id,
         {
           flagged: mode === "cleaning"
@@ -126,21 +136,24 @@ export function StudentInspectionScreen({ mode }: { mode: Mode }) {
           note: entry.finding?.note ?? "",
           photoUrl: entry.finding?.photoUrl ?? null,
           localPhotoUri: null,
-          photoStatus: "idle",
+          photoStatus: "idle" as const,
           photoError: null,
         },
+      ]));
+      setDraft((current) => Object.fromEntries(Object.entries(incoming).map(([id, value]) => [
+        id, preserveDraft && dirtyIds.current.has(id) && current[id] ? current[id] : value,
       ])));
+      if (!preserveDraft) dirtyIds.current.clear();
     } catch (nextError) {
+      if (version !== requestVersion.current) return;
+      if (nextError instanceof ApiError && [403, 404].includes(nextError.status)) { setPayload(null); setDraft({}); dirtyIds.current.clear(); }
       if (!(await handleAuthError(nextError))) setError("검사 명단을 불러오지 못했어요.");
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (version === requestVersion.current) { setLoading(false); setRefreshing(false); }
     }
-  }, [handleAuthError, mode, resolveClassroomId]);
+  }, [handleAuthError, mode, resolveClassroomId, routeClassroomId]);
 
-  useEffect(() => {
-    void load();
-  }, [load]);
+  useFocusedRefresh(() => load(true, true), `${mode}:${routeClassroomId}`);
 
   const flaggedCount = useMemo(
     () => Object.values(draft).filter((entry) => entry.flagged).length,
@@ -152,6 +165,7 @@ export function StudentInspectionScreen({ mode }: { mode: Mode }) {
   );
 
   function update(studentId: string, patch: Partial<Draft>) {
+    dirtyIds.current.add(studentId);
     setDraft((current) => ({
       ...current,
       [studentId]: {

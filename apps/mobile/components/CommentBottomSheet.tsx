@@ -23,6 +23,7 @@ import {
 } from "./CommentModerationOverlay";
 import { ContentTab, ContentTabs } from "./NavigationTabs";
 import { apiFetch, ApiError, parentApiFetch } from "../lib/api";
+import { useBoardRealtime, BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS } from "../lib/use-board-realtime";
 import {
   hiddenPlaceholderText,
   hideContent,
@@ -66,6 +67,7 @@ type CommentItem = MobileCommentItem;
 
 type Props = {
   cardId: string | null;
+  boardId?: string;
   visible: boolean;
   onClose: () => void;
   onCommentCountChange?: (change: number) => void;
@@ -85,6 +87,7 @@ function commentsResourcePath(
 
 export function CommentBottomSheet({
   cardId,
+  boardId,
   visible,
   onClose,
   onCommentCountChange,
@@ -92,6 +95,8 @@ export function CommentBottomSheet({
   resourceKind = "card",
 }: Props) {
   const router = useRouter();
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
   const [items, setItems] = useState<CommentItem[]>([]);
   const [commentText, setCommentText] = useState("");
   const [loading, setLoading] = useState(false);
@@ -124,18 +129,18 @@ export function CommentBottomSheet({
       }
       if (viewer === "parent") await clearParentSession();
       else await clearSessionToken();
-      onClose();
+      closeRef.current();
       router.replace(getUnifiedLoginRoute(viewer));
       return true;
     },
-    [onClose, router, viewer],
+    [router, viewer],
   );
 
   const loadComments = useCallback(
-    async (nextAudience: CommentAudience) => {
+    async (nextAudience: CommentAudience, quiet = false) => {
       if (!cardId) return;
       const version = ++requestVersion.current;
-      setLoading(true);
+      if (!quiet) setLoading(true);
       try {
         setError(null);
         const request = viewer === "parent" ? parentApiFetch : apiFetch;
@@ -161,6 +166,7 @@ export function CommentBottomSheet({
       } catch (nextError) {
         if (version !== requestVersion.current) return;
         if (await handleAuthError(nextError)) return;
+        if (nextError instanceof ApiError && [403, 404].includes(nextError.status)) setItems([]);
         setError(
           viewer === "student" &&
             nextAudience === "guardian" &&
@@ -169,6 +175,7 @@ export function CommentBottomSheet({
             ? FAMILY_THREAD_PRIVATE_MESSAGE
             : "댓글을 불러오지 못했어요.",
         );
+        if (quiet && !(nextError instanceof ApiError && [403, 404].includes(nextError.status))) throw nextError;
       } finally {
         if (version === requestVersion.current) setLoading(false);
       }
@@ -188,6 +195,13 @@ export function CommentBottomSheet({
       requestVersion.current += 1;
     };
   }, [cardId, loadComments, visible]);
+
+  useBoardRealtime({
+    slug: boardId ?? "",
+    enabled: visible && Boolean(cardId) && viewer === "student" && resourceKind === "card",
+    fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+    onReload: () => loadComments(audience, true),
+  });
 
   function selectAudience(nextAudience: CommentAudience) {
     setModerationTarget(null);

@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import type { PlantJournalResponse, StudentPlantDTO } from "@/types/plant";
 import { PlantSelectStep } from "./plant/PlantSelectStep";
 import { RoadmapView } from "./plant/RoadmapView";
@@ -13,19 +14,29 @@ interface Props {
 export function PlantRoadmapBoard({ initial }: Props) {
   const [state, setState] = useState<PlantJournalResponse | null>(initial);
   const [loading, setLoading] = useState(false);
+  const boardId = initial.board.id;
+  const sequenceRef = useRef(0);
+  useEffect(() => {
+    setState(initial);
+    sequenceRef.current += 1;
+    return () => { sequenceRef.current += 1; };
+  }, [initial]);
 
   const refetch = useCallback(async () => {
-    if (!state) return;
-    setLoading(true);
+    const sequence = ++sequenceRef.current;
     try {
-      const res = await fetch(`/api/boards/${state.board.id}/plant-journal`);
-      if (!res.ok) return;
+      const res = await fetch(`/api/boards/${boardId}/plant-journal`, { cache: "no-store" });
+      if (sequence !== sequenceRef.current) return;
+      if ([401, 403, 404].includes(res.status)) { setState(null); return; }
+      if (!res.ok) throw new Error(`plant journal failed: ${res.status}`);
       const j = (await res.json()) as PlantJournalResponse;
-      setState(j);
+      if (sequence === sequenceRef.current) setState(j);
     } finally {
       setLoading(false);
     }
-  }, [state]);
+  }, [boardId]);
+
+  useRealtimeInvalidation({ channelName: `board:${boardId}`, event: "card_changed", refresh: refetch });
 
   const handleStarted = useCallback((plant: StudentPlantDTO) => {
     setState((prev) => (prev ? { ...prev, myPlant: plant } : prev));
@@ -35,7 +46,8 @@ export function PlantRoadmapBoard({ initial }: Props) {
     setState((prev) => (prev ? { ...prev, myPlant: next } : prev));
   }, []);
 
-  if (loading || !state) {
+  if (!state) return <p role="alert">이 식물 보드에 접근할 수 없어요.</p>;
+  if (loading) {
     return (
       <div className="plant-roadmap">
         <div className="plant-skeleton-head">

@@ -5,6 +5,7 @@
  *                                                      Student owner OR classroom teacher (v2).
  */
 import { NextResponse } from "next/server";
+import { scheduleCardChangeBroadcast } from "@/lib/card-broadcast-queue";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { resolvePlantActor, canAccessStudentPlant } from "@/lib/plant-auth";
@@ -21,7 +22,7 @@ async function gateOwnership(plantId: string, oid: string) {
   }
   const obs = await db.plantObservation.findUnique({ where: { id: oid } });
   if (!obs || obs.studentPlantId !== plantId) return { ok: false as const, status: 404 as const };
-  return { ok: true as const, observation: obs };
+  return { ok: true as const, observation: obs, boardId: gate.boardId };
 }
 
 export async function PATCH(
@@ -62,6 +63,7 @@ export async function PATCH(
       }
     });
 
+    scheduleCardChangeBroadcast(gate.boardId, "update");
     const updated = await db.plantObservation.findUnique({
       where: { id: oid },
       include: { images: { orderBy: { order: "asc" } } },
@@ -104,6 +106,7 @@ export async function DELETE(
       );
     }
     await db.plantObservation.delete({ where: { id: oid } });
+    scheduleCardChangeBroadcast(gate.boardId, "update");
     return new NextResponse(null, { status: 204 });
   } catch (e) {
     console.error("[DELETE observation]", e);

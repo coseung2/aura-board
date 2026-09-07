@@ -74,6 +74,8 @@ import {
 
 import { canReadMobileLayout } from "../../../lib/product-access";
 import { useProductAccess } from "../../../lib/product-access-context";
+import { useBoardRealtime, BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS } from "../../../lib/use-board-realtime";
+import { isPublicSyncLayout } from "../../../lib/public-sync-layouts";
 
 export default function BoardDetail() {
   const access = useProductAccess();
@@ -95,6 +97,7 @@ export default function BoardDetail() {
   );
   const [loading, setLoading] = useState(() => !initialCache);
   const [retrying, setRetrying] = useState(false);
+  const [focused, setFocused] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeSectionTitle, setActiveSectionTitle] = useState<string | null>(
     null,
@@ -117,13 +120,13 @@ export default function BoardDetail() {
   }, [cacheKey]);
 
   const load = useCallback(
-    async (force = false) => {
+    async (force = false, propagateError = false) => {
       const sequence = ++sequenceRef.current;
       const cached = readBoardCache<BoardDetailResponse>(cacheKey, {
         kind: "detail",
       });
       if (cached) {
-        setData(cached.data);
+        if (!force) setData(cached.data);
         setLoading(false);
       } else if (!force) {
         setLoading(true);
@@ -141,6 +144,7 @@ export default function BoardDetail() {
           () =>
             apiFetch<BoardDetailResponse>(
               `/api/student/board/${encodeURIComponent(slug)}`,
+              { headers: force ? { "x-aura-revalidate": "1" } : {} },
             ),
           { force, kind: "detail" },
         );
@@ -156,21 +160,25 @@ export default function BoardDetail() {
           invalidateBoardCache(STUDENT_HOME_CACHE_KEY);
         }
       } catch (e) {
+        if (sequence !== sequenceRef.current) return;
         if (e instanceof ApiError && e.status === 401) {
           await clearSessionToken();
           router.replace(getUnifiedLoginRoute("student"));
           return;
         }
-        if (sequence !== sequenceRef.current) return;
-        if (e instanceof ApiError && e.status === 404) {
+        if (e instanceof ApiError && (e.status === 403 || e.status === 404)) {
           // A stale detail snapshot must not remain visible after the server
           // revokes access or the board is disconnected from the classroom.
           removeBoardCache(cacheKey);
           setData(null);
           setError("이 보드에 접근할 수 없어요.");
+          invalidateBoardCache(BOARD_LIST_CACHE_KEY);
+          invalidateBoardCache(STUDENT_HOME_CACHE_KEY);
+          return;
         } else if (!cached) {
           setError(e instanceof Error ? e.message : "불러올 수 없어요");
         }
+        if (propagateError) throw e;
       } finally {
         if (sequence === sequenceRef.current) setLoading(false);
       }
@@ -192,14 +200,24 @@ export default function BoardDetail() {
 
   useFocusEffect(
     useCallback(() => {
-      void load(false);
+      setFocused(true);
+      void load(true);
       return () => {
+        setFocused(false);
         // Invalidate a response that belongs to a previous slug/focus. The
         // cache itself remains useful for the next visit.
         sequenceRef.current += 1;
       };
     }, [load]),
   );
+
+  const publicSync = Boolean(data && isPublicSyncLayout(data.board.layout));
+  useBoardRealtime({
+    slug: data?.board.id ?? "",
+    enabled: focused && publicSync && Boolean(data && canReadMobileLayout(access, data.board.layout)),
+    fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+    onReload: () => load(true, true),
+  });
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener(
@@ -318,6 +336,7 @@ export default function BoardDetail() {
           setActiveSectionTitle,
           selectedColumnSectionKey,
           (key) => router.setParams({ section: key ?? undefined }),
+          publicSync,
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -358,6 +377,7 @@ function renderLayout(
   onSectionTitleChange: (title: string | null) => void,
   selectedColumnSectionKey: string | null,
   onSelectedColumnSectionKeyChange: (key: string | null) => void,
+  realtimeManaged: boolean,
 ) {
   switch (data.board.layout) {
     case "columns":
@@ -365,6 +385,7 @@ function renderLayout(
         <ColumnsBoard
           data={data}
           onMutate={reload}
+          realtimeManaged={realtimeManaged}
           onSectionTitleChange={onSectionTitleChange}
           selectedSectionKey={selectedColumnSectionKey}
           onSelectedSectionKeyChange={onSelectedColumnSectionKeyChange}
@@ -379,7 +400,7 @@ function renderLayout(
     case "plant-roadmap":
       return <PlantRoadmapBoard data={data} onMutate={reload} />;
     case "dj-queue":
-      return <DJQueueBoard data={data} onMutate={reload} />;
+      return <DJQueueBoard data={data} onMutate={reload} realtimeManaged={realtimeManaged} />;
     case "question-board":
       return <QuestionBoard data={data} />;
     case "assessment":
@@ -403,7 +424,7 @@ function renderLayout(
     case "freeform":
     case "grid":
     case "stream":
-      return <CardsBoard data={data} onMutate={reload} />;
+      return <CardsBoard data={data} onMutate={reload} realtimeManaged={realtimeManaged} />;
     // 카드 기반 read-heavy 레이아웃들 — 작성은 제한하고 읽기 + 본인 카드 추가만.
     default:
       return <ReadOnlyCardsBoard data={data} />;

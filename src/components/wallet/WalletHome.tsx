@@ -94,13 +94,16 @@ export function WalletHome() {
   const [fdNotice, setFdNotice] = useState<string | null>(null);
   const [transactionPage, setTransactionPage] = useState(1);
   const loadInFlightRef = useRef<Promise<void> | null>(null);
+  const loadQueuedRef = useRef(false);
   const lastLoadedAtRef = useRef(0);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (force = false) => {
     const existing = loadInFlightRef.current;
-    if (existing) return existing;
+    if (existing) { if (force) loadQueuedRef.current = true; return existing; }
 
     const request = (async () => {
+    do {
+    loadQueuedRef.current = false;
     try {
       const res = await fetch("/api/my/wallet", { cache: "no-store" });
       if (!res.ok) {
@@ -108,12 +111,14 @@ export function WalletHome() {
         return;
       }
       const payload = (await res.json()) as WalletData;
+      if (loadQueuedRef.current) continue;
       setData(payload);
       setError(null);
       lastLoadedAtRef.current = Date.now();
     } catch {
       setError("네트워크 오류");
     }
+    } while (loadQueuedRef.current);
     })();
 
     loadInFlightRef.current = request;
@@ -171,7 +176,7 @@ export function WalletHome() {
         setFdError(typeof msg === "string" ? msg : "해지에 실패했어요");
         return;
       }
-      await load();
+      await load(true);
     } finally {
       setCancellingFD(null);
     }
@@ -203,7 +208,7 @@ export function WalletHome() {
       }
       setFdPrincipal("");
       setFdNotice("적금에 가입했어요.");
-      await load();
+      await load(true);
     } finally {
       setOpeningFD(false);
     }

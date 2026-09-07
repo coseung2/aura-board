@@ -224,9 +224,13 @@ export async function POST(req: Request) {
     // cookie from prior testing must NOT hijack a teacher-initiated POST.
     const preferStudentSession =
       req.headers.get("x-aura-student-viewer") === "1";
+    // ShareSessionProvider explicitly selects a guest identity, even when a
+    // different classroom's student/teacher cookie exists in this browser.
+    // The share branch below still validates token, board and guest key.
+    const preferShareSession = Boolean(req.headers.get("x-share-token"));
     let teacherUser: Awaited<ReturnType<typeof getCurrentUser>> | null = null;
     try {
-      teacherUser = preferStudentSession ? null : await getCurrentUser();
+      teacherUser = preferStudentSession || preferShareSession ? null : await getCurrentUser();
     } catch {
       teacherUser = null;
     }
@@ -250,7 +254,7 @@ export async function POST(req: Request) {
       boardAnonymousAuthor = board?.anonymousAuthor ?? false;
       boardLayout = board?.layout ?? null;
     } else {
-      student = preferStudentSession
+      student = preferShareSession ? null : preferStudentSession
         ? await getCurrentStudentIdentityRaw()
         : await getCurrentStudentIdentity();
       if (student) {

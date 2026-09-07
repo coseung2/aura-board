@@ -9,6 +9,7 @@
  *   - Moves currentStageId to next order.
  */
 import { NextResponse } from "next/server";
+import { scheduleCardChangeBroadcast } from "@/lib/card-broadcast-queue";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { resolvePlantActor, canAccessStudentPlant } from "@/lib/plant-auth";
@@ -99,6 +100,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       data: { currentStageId: nextStage.id },
     });
 
+    scheduleCardChangeBroadcast(gate.boardId, "update");
     return NextResponse.json({
       currentStageId: updated.currentStageId,
       advancedTo: { id: nextStage.id, order: nextStage.order, nameKo: nextStage.nameKo },

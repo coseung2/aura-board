@@ -19,7 +19,6 @@ import {
 import { apiFetch, ApiError } from "../../lib/api";
 import {
   BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
-  shouldUseBoardFallbackPolling,
   useBoardRealtime,
 } from "../../lib/use-board-realtime";
 import type { BoardDetailResponse, BoardCard } from "../../lib/types";
@@ -86,9 +85,11 @@ function isInMonth(value: string, month: string): boolean {
 export function DJQueueBoard({
   data,
   onMutate,
+  realtimeManaged = false,
 }: {
   data: BoardDetailResponse;
   onMutate: () => void;
+  realtimeManaged?: boolean;
 }) {
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(data.cards, data.board),
@@ -211,29 +212,12 @@ export function DJQueueBoard({
 
   // 실시간: queue_changed/card_changed broadcast 가 오면 부모 refetch.
   // 서버 channel key 가 board.id 기준이므로 id 로 구독해야 한다.
-  const { status: realtimeStatus } = useBoardRealtime({
+  useBoardRealtime({
     slug: data.board.id,
     onReload: onMutate,
+    enabled: !realtimeManaged,
+    fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
   });
-
-  // Realtime이 불가능할 때만 15초 스냅샷으로 교사의 승인/재생 완료를 보정한다.
-  useEffect(() => {
-    if (!shouldUseBoardFallbackPolling(realtimeStatus)) return;
-    const handle = setInterval(async () => {
-      try {
-        const res = await apiFetch<BoardDetailResponse>(
-          `/api/student/board/${encodeURIComponent(data.board.slug)}`,
-        );
-        const incoming = withBoardAnonymousAuthors(res.cards, res.board);
-        setCards((prev) =>
-          mergeQueueSnapshot(incoming, prev, pendingIds.current),
-        );
-      } catch {
-        // swallow — next tick.
-      }
-    }, BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS);
-    return () => clearInterval(handle);
-  }, [data.board.slug, realtimeStatus]);
 
   const {
     activeQueue,
