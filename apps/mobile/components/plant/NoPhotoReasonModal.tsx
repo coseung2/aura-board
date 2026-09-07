@@ -53,6 +53,17 @@ export function NoPhotoReasonModal({ visible, onCancel, onSubmit, busy }: Props)
       sheetStyle={styles.modal}
       backdropStyle={styles.backdrop}
       accessibilityLabel="사진 없이 넘어가기 사유 선택"
+      scrollable
+      footer={
+        <View style={styles.btnRow}>
+          <AppButton variant="secondary" style={styles.actionBtn} textStyle={styles.cancelText} onPress={onCancel} disabled={busy}>
+            취소
+          </AppButton>
+          <AppButton variant="success" style={styles.actionBtn} onPress={handleSubmit} disabled={!canSubmit} loading={busy}>
+            계속
+          </AppButton>
+        </View>
+      }
     >
       <Text style={styles.title}>사진 없이 넘어갈까요?</Text>
       <Text style={styles.subtitle}>
@@ -83,26 +94,6 @@ export function NoPhotoReasonModal({ visible, onCancel, onSubmit, busy }: Props)
         />
       )}
 
-      <View style={styles.btnRow}>
-        <AppButton
-          variant="secondary"
-          style={styles.actionBtn}
-          textStyle={styles.cancelText}
-          onPress={onCancel}
-          disabled={busy}
-        >
-          취소
-        </AppButton>
-        <AppButton
-          variant="success"
-          style={styles.actionBtn}
-          onPress={handleSubmit}
-          disabled={!canSubmit}
-          loading={busy}
-        >
-          계속
-        </AppButton>
-      </View>
     </AppModal>
   );
 }
@@ -112,9 +103,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   modal: {
-    padding: spacing.xl,
     maxWidth: plant.noPhotoReasonMaxWidth,
-    gap: spacing.md,
   },
   title: {
     ...typography.title,

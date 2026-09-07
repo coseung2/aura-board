@@ -767,7 +767,6 @@ const styles = StyleSheet.create({
   queueSheet: {
     height: "89%",
     maxHeight: "89%",
-    minHeight: tapMin * 6,
     paddingBottom: spacing.md,
   },
   queueSheetScroll: { flex: 1 },

@@ -123,8 +123,19 @@ export function SlimePurchaseConfirmModal({
       onClose={onCancel}
       animationType="fade"
       accessibilityLabel={`${item.labelKo} 구매 확인`}
-      sheetStyle={styles.sheet}
       closeOnBackdropPress
+      scrollable
+      contentContainerStyle={styles.body}
+      footer={
+        <View style={styles.footer}>
+          <AppButton variant="quiet" style={styles.footerButton} disabled={busy} onPress={onCancel}>
+            취소
+          </AppButton>
+          <AppButton style={styles.footerButton} loading={busy} onPress={() => onConfirm(quantity)}>
+            구매하기
+          </AppButton>
+        </View>
+      }
     >
       <View style={styles.header}>
         <Text style={styles.title}>{item.labelKo}</Text>
@@ -271,32 +282,12 @@ export function SlimePurchaseConfirmModal({
         </Text>
       ) : null}
 
-      <View style={styles.footer}>
-        <AppButton
-          variant="quiet"
-          style={styles.footerButton}
-          disabled={busy}
-          onPress={onCancel}
-        >
-          취소
-        </AppButton>
-        <AppButton
-          style={styles.footerButton}
-          loading={busy}
-          onPress={() => onConfirm(quantity)}
-        >
-          구매하기
-        </AppButton>
-      </View>
     </AppModal>
   );
 }
 
 const styles = StyleSheet.create({
-  sheet: {
-    padding: spacing.xl,
-    gap: spacing.lg,
-  },
+  body: { gap: spacing.lg },
   header: {
     gap: spacing.xs,
   },

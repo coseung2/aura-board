@@ -68,9 +68,12 @@ export function RoadmapStagePicker({ stages, currentStage }: Props) {
         onClose={() => setSelectedStage(null)}
         closeOnBackdropPress
         accessibilityLabel="단계별 주요 관찰 포인트"
+        scrollable
+        contentContainerStyle={styles.detailModal}
+        footer={<AppButton onPress={() => setSelectedStage(null)}>닫기</AppButton>}
       >
         {selectedStage ? (
-          <View style={styles.detailModal}>
+          <>
             <Text style={styles.detailTitle}>
               {selectedStage.icon} {selectedStage.order}단계 · {selectedStage.nameKo}
             </Text>
@@ -87,8 +90,7 @@ export function RoadmapStagePicker({ stages, currentStage }: Props) {
             ) : (
               <Text style={styles.detailEmpty}>등록된 주요 관찰 포인트가 없어요.</Text>
             )}
-            <AppButton onPress={() => setSelectedStage(null)}>닫기</AppButton>
-          </View>
+          </>
         ) : null}
       </AppModal>
     </>

@@ -32,8 +32,9 @@ vi.mock("../components/DailyBanner", () => ({
 import { AppModal } from "../components/ui";
 
 type ElementLike = {
+  type?: unknown;
   props: {
-    children?: ElementLike;
+    children?: ElementLike | ElementLike[] | string | null;
     onStartShouldSetResponder?: () => boolean;
   };
 };
@@ -46,6 +47,23 @@ function sheetElement(modal: ElementLike): ElementLike {
 }
 
 describe("AppModal touch routing", () => {
+  it("keeps the action footer outside the scrolling dialog body", () => {
+    const modal = AppModal({ visible: true, onClose: vi.fn(), children: "long body", scrollable: true, footer: "submit" }) as unknown as ElementLike;
+    const surface = sheetElement(modal).props.children as ElementLike;
+    const fragment = surface.props.children as ElementLike;
+    const [body, footer] = fragment.props.children as ElementLike[];
+    expect(body.type).toBe("ScrollView");
+    expect(body.props.children).toBe("long body");
+    expect(footer.type).toBe("View");
+    expect(footer.props.children).toBe("submit");
+  });
+
+  it("unmounts hidden native inputs and actions without owning the caller draft", () => {
+    const modal = AppModal({ visible: false, onClose: vi.fn(), children: "draft", scrollable: true, footer: "submit" }) as unknown as ElementLike;
+    const surface = sheetElement(modal).props.children as ElementLike;
+    expect(surface.props.children).toBeNull();
+  });
+
   it("leaves nested controls as responders for ordinary modals", () => {
     const modal = AppModal({
       visible: true,

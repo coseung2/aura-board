@@ -161,7 +161,8 @@ export function WalkingPermissionOnboarding({ accountKey, role }: Props) {
       onClose={() => void dismiss()}
       closeOnBackdropPress
       accessibilityLabel="걸음 수 권한 안내"
-      sheetStyle={styles.sheet}
+      scrollable
+      contentContainerStyle={styles.sheet}
     >
       <Text style={styles.title}>
         {needsUpdate ? "Health Connect 업데이트" : "걸음 수 연결"}

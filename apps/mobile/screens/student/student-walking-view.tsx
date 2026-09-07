@@ -357,7 +357,8 @@ export function StudentWalkingScreenView({
         onClose={() => setSettingsVisible(false)}
         closeOnBackdropPress
         accessibilityLabel="걷기 연동 설정"
-        sheetStyle={styles.settingsSheet}
+        scrollable
+        contentContainerStyle={styles.settingsSheet}
       >
         <Text style={styles.settingsTitle}>걷기 연동</Text>
         <Text style={styles.settingsHelp}>상태: {connectionLabel}</Text>

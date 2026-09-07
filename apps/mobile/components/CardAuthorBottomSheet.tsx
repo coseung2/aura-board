@@ -233,7 +233,6 @@ export function CardAuthorBottomSheet({
 const styles = StyleSheet.create({
   sheet: {
     maxHeight: "89%",
-    minHeight: tapMin * 6,
     paddingBottom: spacing.lg,
   },
   header: {
@@ -251,7 +250,8 @@ const styles = StyleSheet.create({
   },
   closeButton: { minWidth: tapMin, paddingHorizontal: spacing.sm },
   state: {
-    minHeight: tapMin * 4,
+    flexShrink: 1,
+    paddingVertical: spacing.lg,
     alignItems: "center",
     justifyContent: "center",
     gap: spacing.sm,

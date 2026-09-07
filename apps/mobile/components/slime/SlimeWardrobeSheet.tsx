@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
   noticeErrorText: { color: colors.danger },
   nav: { width: "100%" },
   navItem: { flex: 1 },
-  list: { maxHeight: iconSizes.empty * 6 },
+  list: { flexShrink: 1, minHeight: spacing.none },
   listContent: {
     flexDirection: "row",
     flexWrap: "wrap",

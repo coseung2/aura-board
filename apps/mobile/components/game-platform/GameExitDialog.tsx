@@ -40,25 +40,23 @@ export function GameExitDialog({
         if (!busy) onCancel();
       }}
       sheetStyle={styles.card}
+      scrollable
+      footer={
+        <View style={styles.actions}>
+          <AppButton disabled={busy} onPress={onCancel} variant="secondary">
+            {cancelLabel}
+          </AppButton>
+          <AppButton disabled={Boolean(disabledReason)} loading={busy} onPress={() => void onConfirm()} variant="danger">
+            {confirmLabel}
+          </AppButton>
+        </View>
+      }
     >
       <Text selectable style={styles.title}>{title}</Text>
       <Text selectable style={styles.description}>{description}</Text>
       {disabledReason ? (
         <Text selectable style={styles.disabledReason}>{disabledReason}</Text>
       ) : null}
-      <View style={styles.actions}>
-        <AppButton disabled={busy} onPress={onCancel} variant="secondary">
-          {cancelLabel}
-        </AppButton>
-        <AppButton
-          disabled={Boolean(disabledReason)}
-          loading={busy}
-          onPress={() => void onConfirm()}
-          variant="danger"
-        >
-          {confirmLabel}
-        </AppButton>
-      </View>
     </AppModal>
   );
 }
@@ -67,8 +65,6 @@ const styles = StyleSheet.create({
   card: {
     width: "100%",
     maxWidth: gamePlatform.modalMaxWidth,
-    gap: spacing.md,
-    padding: spacing.xl,
   },
   title: { ...typography.title, color: colors.text },
   description: { ...typography.body, color: colors.textMuted },
