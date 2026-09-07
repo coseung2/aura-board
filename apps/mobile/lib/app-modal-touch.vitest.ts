@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+vi.mock("react", async (importOriginal) => ({
+  ...await importOriginal<typeof import("react")>(),
+  useState: () => [null, vi.fn()],
+}));
 vi.mock("react-native", () => ({
   ActivityIndicator: "ActivityIndicator",
   Animated: {},
@@ -9,7 +13,9 @@ vi.mock("react-native", () => ({
   PanResponder: {},
   Platform: { OS: "android" },
   Pressable: "Pressable",
-  StyleSheet: { create: (value: unknown) => value },
+  ScrollView: "ScrollView",
+  useWindowDimensions: () => ({ width: 1280, height: 800 }),
+  StyleSheet: { create: (value: unknown) => value, flatten: (value: unknown) => value },
   Text: "Text",
   TextInput: "TextInput",
   View: "View",
@@ -35,7 +41,8 @@ type ElementLike = {
 function sheetElement(modal: ElementLike): ElementLike {
   const backdrop = modal.props.children as ElementLike;
   const keyboardWrap = backdrop.props.children as ElementLike;
-  return keyboardWrap.props.children as ElementLike;
+  const frame = keyboardWrap.props.children as ElementLike;
+  return frame.props.children as ElementLike;
 }
 
 describe("AppModal touch routing", () => {

@@ -57,9 +57,9 @@ export const styles = StyleSheet.create({
     width: "100%",
     maxWidth: composer.sheetMaxWidth,
     maxHeight: "100%",
-  },
-  modalSideSheetWrap: {
-    height: "100%",
+    minHeight: spacing.none,
+    flexShrink: 1,
+    alignItems: "center",
   },
   modalKeyboardWrap: {
     flex: 1,
@@ -67,6 +67,11 @@ export const styles = StyleSheet.create({
     maxWidth: composer.sheetMaxWidth,
     justifyContent: "center",
   },
+  modalFrame: { flex: 1, minHeight: spacing.none, justifyContent: "center", alignItems: "center" },
+  modalFrameRight: { alignItems: "flex-end" },
+  modalScrollBody: { flexShrink: 1, minHeight: spacing.none },
+  modalScrollContent: { padding: spacing.xl, gap: spacing.md },
+  modalFooter: { flexShrink: 0, padding: spacing.xl, paddingTop: spacing.md },
   modalSheet: {
     width: "100%",
     maxWidth: composer.sheetMaxWidth,
@@ -86,14 +91,18 @@ export const styles = StyleSheet.create({
     width: "100%",
     justifyContent: "flex-end",
   },
+  bottomSheetFrame: { flex: 1, minHeight: spacing.none, justifyContent: "flex-end", alignItems: "center" },
   bottomSheet: {
     maxHeight: "90%",
+    minHeight: spacing.none,
+    flexShrink: 1,
     backgroundColor: colors.surface,
     borderTopLeftRadius: radii.card,
     borderTopRightRadius: radii.card,
     overflow: "hidden",
   },
   bottomSheetHandleArea: {
+    flexShrink: 0,
     minHeight: tapMin,
     alignItems: "center",
     justifyContent: "center",

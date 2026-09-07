@@ -1,4 +1,4 @@
-import { forwardRef, useEffect, useRef, type ReactNode } from "react";
+import { forwardRef, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -8,10 +8,13 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
+  useWindowDimensions,
   Text,
   TextInput,
   View,
+  type LayoutChangeEvent,
   type ModalProps,
   type PressableProps,
   type StyleProp,
@@ -23,6 +26,32 @@ import {
 import { ArrowLeft } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { DailyBanner, useDailyBannerScope } from "./DailyBanner";
+import {
+  fitOverlaySurface, MODAL_ORIENTATIONS, overlayFrameInsets,
+  type OverlayAlignment, type OverlayFrame,
+} from "../lib/overlay-layout";
+
+/** Measure inside keyboard avoidance, so percentages use the visible frame. */
+function useOverlayFrame(alignment: OverlayAlignment) {
+  const window = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const padding = overlayFrameInsets(window, insets, alignment);
+  const available = {
+    width: Math.max(0, window.width - padding.paddingLeft - padding.paddingRight),
+    height: Math.max(0, window.height - padding.paddingTop - padding.paddingBottom),
+  };
+  const key = `${available.width}:${available.height}`;
+  const [measured, setMeasured] = useState<(OverlayFrame & { key: string }) | null>(null);
+  const frame = measured?.key === key ? {
+    width: Math.min(available.width, measured.width),
+    height: Math.min(available.height, measured.height),
+  } : available;
+  const onLayout = ({ nativeEvent: { layout } }: LayoutChangeEvent) => {
+    setMeasured((current) => current?.key === key && current.width === layout.width && current.height === layout.height
+      ? current : { key, width: layout.width, height: layout.height });
+  };
+  return { frame, padding, insets, onLayout };
+}
 import {
   colors,
   borders,
@@ -155,6 +184,8 @@ export function AppOverlayModal({
       transparent
       animationType={animationType}
       statusBarTranslucent={statusBarTranslucent}
+      navigationBarTranslucent={statusBarTranslucent}
+      supportedOrientations={MODAL_ORIENTATIONS}
       onRequestClose={onClose}
     >
       {children}
@@ -216,6 +247,10 @@ type AppModalProps = {
   onShow?: ModalProps["onShow"];
   align?: "center" | "right";
   closeOnBackdropPress?: boolean;
+  /** Opt in for dialogs without an existing scroll/list owner. */
+  scrollable?: boolean;
+  contentContainerStyle?: StyleProp<ViewStyle>;
+  footer?: ReactNode;
 };
 
 export function AppModal({
@@ -230,7 +265,14 @@ export function AppModal({
   onShow,
   align = "center",
   closeOnBackdropPress,
+  scrollable = false,
+  contentContainerStyle,
+  footer,
 }: AppModalProps) {
+  const { frame, padding, onLayout } = useOverlayFrame(align);
+  const flattened = StyleSheet.flatten(sheetStyle) ?? {};
+  const fitted = fitOverlaySurface(frame, flattened);
+  const stretch = align === "right" || flattened.flex === 1;
   const sheet = (
     <View
       // Only claim the responder when the backdrop itself is pressable. For
@@ -239,22 +281,38 @@ export function AppModal({
       onStartShouldSetResponder={
         closeOnBackdropPress ? () => true : undefined
       }
-      style={
-        align === "right" ? styles.modalSideSheetWrap : styles.modalSheetWrap
-      }
+      style={[
+        styles.modalSheetWrap,
+        { width: fitted.width, maxHeight: frame.height },
+        stretch && { height: frame.height },
+      ]}
     >
       <SurfaceCard
         accessibilityLabel={accessibilityLabel}
         accessibilityViewIsModal={visible}
         importantForAccessibility="yes"
-        style={[styles.modalSheet, sheetStyle]}
+        style={[styles.modalSheet, sheetStyle, fitted]}
       >
         {/*
           React Native can retain a hidden Modal's native TextInput state on
           Android. Unmount the content while closed so each open gets fresh
           native inputs, while the caller-owned React draft state is preserved.
         */}
-        {visible ? children : null}
+        {visible ? (
+          <>
+            {scrollable ? (
+              <ScrollView
+                style={styles.modalScrollBody}
+                contentContainerStyle={[styles.modalScrollContent, contentContainerStyle]}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+              >
+                {children}
+              </ScrollView>
+            ) : children}
+            {footer ? <View style={styles.modalFooter}>{footer}</View> : null}
+          </>
+        ) : null}
       </SurfaceCard>
     </View>
   );
@@ -265,6 +323,9 @@ export function AppModal({
       visible={visible}
       animationType={animationType}
       transparent
+      statusBarTranslucent
+      navigationBarTranslucent
+      supportedOrientations={MODAL_ORIENTATIONS}
       onRequestClose={onClose}
       onShow={onShow}
     >
@@ -274,18 +335,21 @@ export function AppModal({
           styles.modalBackdrop,
           align === "right" && styles.modalBackdropRight,
           backdropStyle,
+          padding,
         ]}
       >
-        {keyboardAvoiding ? (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.modalKeyboardWrap}
+        <KeyboardAvoidingView
+          enabled={keyboardAvoiding ?? false}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalKeyboardWrap}
+        >
+          <View
+            onLayout={onLayout}
+            style={[styles.modalFrame, align === "right" && styles.modalFrameRight]}
           >
             {sheet}
-          </KeyboardAvoidingView>
-        ) : (
-          sheet
-        )}
+          </View>
+        </KeyboardAvoidingView>
       </BackdropComponent>
     </Modal>
   );
@@ -314,7 +378,7 @@ export function AppBottomSheet({
   keyboardAvoiding,
   overlay,
 }: AppBottomSheetProps) {
-  const insets = useSafeAreaInsets();
+  const { frame, padding, insets, onLayout } = useOverlayFrame("bottom");
   const translateY = useRef(new Animated.Value(0)).current;
   const onCloseRef = useRef(onClose);
   const dismissRef = useRef<() => void>(() => undefined);
@@ -388,6 +452,7 @@ export function AppBottomSheet({
       style={[
         styles.bottomSheet,
         sheetStyle,
+        fitOverlaySurface(frame, { ...styles.bottomSheet, ...flattenedSheetStyle }),
         { paddingBottom: safePaddingBottom, transform: [{ translateY }] },
       ]}
     >
@@ -414,8 +479,10 @@ export function AppBottomSheet({
       transparent
       onRequestClose={() => dismissRef.current()}
       statusBarTranslucent
+      navigationBarTranslucent
+      supportedOrientations={MODAL_ORIENTATIONS}
     >
-      <View style={styles.bottomSheetRoot}>
+      <View style={[styles.bottomSheetRoot, padding]}>
         <Pressable
           style={[styles.bottomSheetBackdrop, backdropStyle]}
           onPress={() => dismissRef.current()}
@@ -424,16 +491,16 @@ export function AppBottomSheet({
             accessibilityLabel ? `${accessibilityLabel} 닫기` : "시트 닫기"
           }
         />
-        {keyboardAvoiding ? (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-            style={styles.bottomSheetKeyboardWrap}
-          >
+        <KeyboardAvoidingView
+          enabled={keyboardAvoiding ?? false}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.bottomSheetKeyboardWrap}
+          pointerEvents="box-none"
+        >
+          <View onLayout={onLayout} style={styles.bottomSheetFrame} pointerEvents="box-none">
             {sheet}
-          </KeyboardAvoidingView>
-        ) : (
-          sheet
-        )}
+          </View>
+        </KeyboardAvoidingView>
         {visible ? overlay : null}
       </View>
     </Modal>

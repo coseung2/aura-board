@@ -330,6 +330,7 @@ export const layout = {
   roleCardNarrowMaxWidth: 320,
   roleCardMinHeight: 320,
   mobileBreakpoint: 640,
+  compactHeightBreakpoint: 600,
   authTwoPaneBreakpoint: 720,
   boardGridPadding: spacing.xl,
   boardGridGap: spacing.md,
