@@ -34,3 +34,28 @@ Update the single verification source of truth at [verification-checklist.md](ve
 - A source audit, a mocked race test, an HTTP/DB integration test, and a real two-device test are different evidence levels; report them separately.
 - Realtime is an invalidation transport, not data authority. A healthy socket alone does not prove an event was delivered or a snapshot was fresh.
 - No blanket removal of polling: keep bounded job-status polling, local clocks, and explicit connection-recovery polling.
+
+## Implementation record
+
+1. `3ff842c2` — fixed client/server cache races, stale alias-pending reuse, unrelated-key invalidation, incomplete liked-card sets and explicit process-local snapshot bypass. The five new key-isolation tests failed before the fixes and passed afterwards.
+2. `8ca04f21` — routed share mutations through canonical HTTP authorization and post-commit delivery; retained share headers on asynchronous fall-through; added missing author/move/settings/deletion signals; restored column/share/comment recovery and independent HTTP retry.
+3. `ae242411` — centralized public native board refresh ownership; resolved Realtime from the API origin; added short-background and focus recovery, bounded event coalescing and deleted-overlay cleanup; preserved comment/inspection drafts; connected plant writes and both plant readers; reconciled wallet reads. Extracted the existing overlay frame hook unchanged to bring the previously over-limit public UI module below 800 lines.
+4. Final regression pass — corrected the classroom bank refresh effect discovered by the full suite: entering an interest rate must not trigger a GET, old scope responses must not replace the current view, and network errors must be handled. Added the public two-client matrix to the verification checklist.
+
+### Local verification evidence
+
+- Full Vitest JSON report: **409 files, 2,264 tests passed, success=true, exit 0**. An earlier full run had one unhandled classroom-bank rejection despite passing assertions; it was fixed and the full suite rerun successfully.
+- Root and mobile TypeScript checks passed.
+- Mobile design-system check passed.
+- Source line gate passed: **2,497 files**, all at most 800 physical lines.
+- Production `npm run build` passed, including TypeScript and generation of 158 static pages.
+- Encoding and whitespace checks passed. Build-generated `next-env.d.ts` changes are not included.
+
+These are local working-tree checks, not a production latency measurement. Six
+pre-existing development-only edits are intentionally retained unstaged
+(AssignmentBoard, OmokBoard, ShadowAllianceBoard, SpeedGameBoard, GameHubCatalog
+and their realtime transport source-contract additions). They are not part of
+this public-feature delivery. The exact pushed source is separately checked by
+the documented Windows workflow; its run status must be reported, not inferred
+from local checks or a previous successful run. No signed store release or
+physical two-client acceptance is claimed here.

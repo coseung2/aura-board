@@ -1,10 +1,11 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClassroomBankTab } from "./ClassroomBankTab";
 
 const fetchMock = vi.fn();
 
 afterEach(() => {
+  cleanup();
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
@@ -40,5 +41,16 @@ describe("ClassroomBankTab", () => {
     expect(screen.getByText("125,000 원")).toBeTruthy();
     expect(screen.getByText("적금 (1건)")).toBeTruthy();
     expect(screen.getByLabelText("월 이자율")).toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    fireEvent.change(screen.getByLabelText("월 이자율"), { target: { value: "2.5" } });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("handles a failed initial read without an unhandled rejection and offers recovery", async () => {
+    fetchMock.mockRejectedValue(new Error("offline"));
+    vi.stubGlobal("fetch", fetchMock);
+    render(<ClassroomBankTab classroomId="classroom-1" />);
+    await screen.findByRole("alert");
+    expect(screen.getByRole("button", { name: "다시 시도" })).toBeTruthy();
   });
 });

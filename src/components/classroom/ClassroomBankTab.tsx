@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { isCreditTransactionType, isCorrectionTransaction } from "@/lib/bank-transactions";
 
 type Student = {
@@ -79,22 +79,49 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [transactionPage, setTransactionPage] = useState(1);
+  const requestVersion = useRef(0);
+  const mountedRef = useRef(true);
+  const scope = `${classroomId}:${view}:${transactionPage}`;
+  const scopeRef = useRef(scope);
+  scopeRef.current = scope;
 
   const refresh = useCallback(async () => {
+    if (!mountedRef.current || scopeRef.current !== scope) return;
+    const version = ++requestVersion.current;
     const query = view === "history" ? `?page=${transactionPage}` : "";
+    try {
     const res = await fetch(`/api/classrooms/${classroomId}/bank/overview${query}`, {
       cache: "no-store",
     });
-    if (!res.ok) return;
+    if (version !== requestVersion.current || scopeRef.current !== scope || !mountedRef.current) return;
+    if ([401, 403, 404].includes(res.status)) { setData(null); setError("이 은행 정보에 접근할 수 없어요."); return; }
+    if (!res.ok) throw new Error("bank_snapshot_failed");
     const payload = (await res.json()) as Overview;
+    if (version !== requestVersion.current || scopeRef.current !== scope || !mountedRef.current) return;
     setData(payload);
-    if (payload.currency.monthlyInterestRate !== null && rateInput === "") {
-      setRateInput(String(payload.currency.monthlyInterestRate));
+    setError(null);
+    if (payload.currency.monthlyInterestRate !== null) {
+      setRateInput((current) => current === "" ? String(payload.currency.monthlyInterestRate) : current);
     }
-  }, [classroomId, rateInput, transactionPage, view]);
+    } catch {
+      if (version === requestVersion.current && scopeRef.current === scope && mountedRef.current) setError("은행 정보를 불러오지 못했어요. 연결을 확인해 주세요.");
+    }
+  }, [classroomId, transactionPage, view, scope]);
 
   useEffect(() => {
-    refresh();
+    mountedRef.current = true;
+    void refresh();
+    const recover = () => { if (!document.hidden) void refresh(); };
+    window.addEventListener("focus", recover);
+    window.addEventListener("online", recover);
+    document.addEventListener("visibilitychange", recover);
+    return () => {
+      mountedRef.current = false;
+      requestVersion.current += 1;
+      window.removeEventListener("focus", recover);
+      window.removeEventListener("online", recover);
+      document.removeEventListener("visibilitychange", recover);
+    };
   }, [refresh]);
 
   /**
@@ -137,6 +164,8 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
           : "출금 완료"
       );
       await refresh();
+    } catch {
+      setError("응답을 확인하지 못했어요. 거래 내역을 확인해 주세요.");
     } finally {
       setBusy(false);
     }
@@ -168,6 +197,8 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
       }
       setToast("거래를 정정하고 감사 기록을 남겼습니다");
       await refresh();
+    } catch {
+      setError("응답을 확인하지 못했어요. 거래 내역을 확인해 주세요.");
     } finally {
       setBusy(false);
     }
@@ -192,12 +223,14 @@ export function ClassroomBankTab({ classroomId, view = "actions" }: Props) {
       }
       setToast("이자율 저장됨");
       await refresh();
+    } catch {
+      setError("이자율 저장 응답을 확인하지 못했어요.");
     } finally {
       setBusy(false);
     }
   }
 
-  if (!data) return <p className="bank-loading">은행 정보 불러오는 중…</p>;
+  if (!data) return error ? <div role="alert"><p>{error}</p><button type="button" onClick={() => void refresh()}>다시 시도</button></div> : <p className="bank-loading">은행 정보 불러오는 중…</p>;
   const unit = data.currency.unitLabel;
   const isTeacher = data.viewerKind === "teacher";
   /**

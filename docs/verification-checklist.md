@@ -368,6 +368,74 @@ Implementation plan: [mobile-tablet-ux-plan.md](mobile-tablet-ux-plan.md).
   tablet and iPad checks above remain required before claiming device UX
   acceptance. No physical-device acceptance was performed in this code pass.
 
+## Public web/mobile consistency
+
+Plan and scope: [web-mobile-consistency-plan.md](web-mobile-consistency-plan.md).
+The ordinary-user layout allowlist, not the presence of a route file, controls
+scope. Administrator/development-only feature implementations remain excluded.
+
+### Automated regression gates
+
+- Run `npm run test -- cache reward-service snapshot-revalidation` and
+  `npm run test -- public-mobile mobile-board-realtime mobile-focused-refresh`.
+  Verify invalidation during an in-flight read, unrelated-key invalidation,
+  expired pending entries, cold viewer-like caches, parent prefix invalidation,
+  and board removal. A completed old promise must not become an immortal cache
+  entry or restore inaccessible data. Explicit `x-aura-revalidate: 1` reads must
+  bypass a settled process-local snapshot while retaining single-flight work.
+- Run `npm run test -- share-api ShareSessionContext SupabaseShareBoardClient
+  useBoardStream useRealtimeInvalidation useBoardSnapshotRealtime CardEngagement`.
+  Share writes must fall through to the canonical HTTP API with token and guest
+  headers intact. A display name is not ownership proof. Old-link responses
+  cannot replace the current link, and forbidden/deleted content is cleared.
+- Run card/board mutation and plant-observation route tests. Confirm successful
+  create/edit/delete, author changes, section moves, board settings/deletion,
+  DJ queue changes and plant journal writes reach their invalidation publisher
+  after commit. Cleanup reservation failure must not suppress a committed
+  deletion's signal or return a misleading mutation failure.
+- Mobile lifecycle tests must prove: one ref-counted board channel; one public
+  detail refresh owner; no snapshot polling while inactive; a foreground
+  reconciliation even after less than 15 seconds; initial/reconnect catch-up;
+  retryable missing runtime configuration; HTTP retry even with a healthy
+  socket; bounded event coalescing; and cleanup of a late subscription.
+- Run root and mobile type checks, mobile design checks, full root tests,
+  `npm run check:lines`, `npm run check:encoding`, and the production web build.
+  Native hook tests use `.vitest.ts` so React Native global DOM declarations
+  are not accidentally imported into the web TypeScript program.
+
+### Real two-client acceptance matrix (not covered by mocks)
+
+| Public surface | Change to exercise | Expected recovery |
+| --- | --- | --- |
+| Freeform, columns, existing grid | Web/mobile/share create, edit, delete, author change and section move | Safe board broadcast followed by an authorized fresh snapshot; no resurrected cards, stale section counts or orphaned edit/comment overlays |
+| Shared link | Delete from an ordinary board; edit from a guest link; revoke the token | HTTP mutation path and guest ownership preserved; initial/reconnect/focus recovery; revoked content disappears |
+| DJ queue | Submit, approve, move, play and remove from the other client | Queue signal uses the same parent snapshot owner; optimistic pending rows are reconciled without a competing interval |
+| Plant journal | Teacher/student observation create/edit/delete, nickname and stage change | Both teacher summary and the student's own authorized journal refresh; no journal content in public broadcast payloads |
+| Comments | Keep a thread open; create/delete/reply from another client; background briefly | Refresh without clearing the unsent draft or exposing a guardian-only thread; closing/deleting the card clears its overlay |
+| Bank | Mutate while an older wallet GET is pending; switch away and return | A forced post-mutation read runs after the older GET; focus/foreground refreshes balances; no permanent short-interval balance poll |
+| Cleaning/shoe inspection | Update the server, return to the route while local edits exist | Latest roster is loaded, edited draft rows survive automatic refresh, denied access clears old roster |
+| Existing event-signup | Refresh event metadata and enter its existing secure web form | Public detail recovery remains active; native/web form differences are intentional, not an alternate write authority |
+
+For every relevant row, interrupt Realtime, modify from the other client, then
+restore it. Verify fallback polling stops after subscription recovery. Also
+hold one HTTP snapshot open, perform the mutation, and release the old response
+last. Check the response/body and subsequent reload rather than treating an
+optimistic screen as persistence proof. Record the installed mobile build,
+server commit, client identities, status codes and actual measured delay.
+
+Keep bounded reading-feedback job polling, local display clocks, and native
+walking-health foreground synchronization. These are not interchangeable with
+board Broadcast polling. Do not auto-replace unsaved inspection/comment drafts
+merely to make a screen appear fresh.
+
+A source push is not mobile rollout or device acceptance. Rebuild/install the
+mobile application for native-source changes; refresh already-open legacy share
+pages to use the canonical HTTP bridge. Run the documented
+[Windows Android validation](mobile-android-build.md#github-actions-windows-validation)
+for the exact pushed SHA. Production multi-process/load testing and physical
+Android/iPad two-client verification remain separate acceptance gates; this
+change's unit tests do not measure production propagation latency.
+
 ## Test Fixtures
 
 ### Canva reviewer credentials
