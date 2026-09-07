@@ -131,7 +131,7 @@ jobs:
           VERSION_OUTPUT=$(eas build:version:get --platform ios --profile production --non-interactive)
           CURRENT_BUILD=$(printf '%s\n' "$VERSION_OUTPUT" | sed -n 's/^iOS buildNumber - //p' | tail -n 1)
           test -n "$CURRENT_BUILD"
-          NEXT_BUILD=$(node -e 'const p=process.argv[1].split("."); const i=p.length-1; if (!/^\\d+$/.test(p[i])) process.exit(2); p[i]=String(Number(p[i])+1); process.stdout.write(p.join("."));' "$CURRENT_BUILD")
+          NEXT_BUILD=$(node -e 'const p=process.argv[1].split("."); const i=p.length-1; if (!/^\d+$/.test(p[i])) process.exit(2); p[i]=String(Number(p[i])+1); process.stdout.write(p.join("."));' "$CURRENT_BUILD")
           node ../../.github/scripts/submit-ios-for-review.mjs \
             --preflight \
             --version "${{ inputs.expected_version }}" \
