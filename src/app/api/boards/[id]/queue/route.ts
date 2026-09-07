@@ -183,7 +183,7 @@ export async function POST(
 
   // classroom-boards-tab "🟢 새 활동" 배지 — DJ 큐 신청도 카드 생성 → board touch.
   await touchBoardUpdatedAt(board.id);
-  void announceQueueChange(board.id, result.card.id, "submit");
+  await announceQueueChange(board.id, result.card.id, "submit");
   const authorLabels = await resolveCardAuthorLabels(result.card);
 
   return NextResponse.json({

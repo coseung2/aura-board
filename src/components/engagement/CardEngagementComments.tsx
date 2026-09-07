@@ -6,6 +6,7 @@ import { formatRelativeTime } from "@/lib/card-engagement-format";
 import type { ShareSession } from "@/components/share/ShareSessionContext";
 import { createPublicSupabaseClient } from "@/lib/supabase/client";
 import { useBoardEngagement } from "@/hooks/useBoardEngagementRealtime";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { HiddenContentPlaceholder, StudentContentModerationControls, type HiddenReason } from "@/components/moderation/StudentContentModeration";
 import { appendThreadReply, removeThreadComment, studentViewerHeaders, updateThreadComments, type CommentAudience, type CommentItem } from "./card-engagement-comments-model";
 import { CommentsPoll } from "./CardEngagementPoll";
@@ -265,6 +266,20 @@ export function CommentsBlock({
     // comment change for backwards compatibility. Likes never fetch comments.
     if (event.changeType === "like") return;
     requestLoad(60);
+  });
+
+  // The filtered engagement listener above owns live comment events. A
+  // status-only subscriber catches missed events on reconnect/focus and while
+  // disconnected without fetching comments for unrelated likes on the board.
+  useRealtimeInvalidation({
+    channelName: `board:${boardId}`,
+    event: [],
+    enabled: Boolean(boardId),
+    initialRefresh: false,
+    refresh: async () => {
+      requestLoad();
+      await loadInFlightRef.current;
+    },
   });
 
   const selectAudience = (nextAudience: CommentAudience) => {

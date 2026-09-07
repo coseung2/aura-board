@@ -234,6 +234,7 @@ export async function POST(req: Request) {
     let authorId: string | null;
     let studentAuthorId: string | null = null;
     let externalAuthorName: string | null = null;
+    let externalAuthorKey: string | null = null;
     let currentUserName: string | null = null;
     let student: Awaited<ReturnType<typeof getCurrentStudentIdentity>> = null;
     let boardClassroomId: string | null = null;
@@ -271,6 +272,7 @@ export async function POST(req: Request) {
         // Share visitor path: unified student permission.
         const shareToken = req.headers.get("x-share-token");
         const shareAuthorName = decodeShareHeader(req.headers.get("x-share-author-name"));
+        const guestId = req.headers.get("x-share-guest-id")?.trim();
         if (!shareToken) {
           return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
         }
@@ -282,6 +284,10 @@ export async function POST(req: Request) {
         if (shareResult.identity.boardId !== input.boardId) {
           return NextResponse.json({ error: "board_mismatch" }, { status: 403 });
         }
+        if (!guestId) {
+          return NextResponse.json({ error: "share_guest_required" }, { status: 400 });
+        }
+        externalAuthorKey = guestId;
         const board = await loadCardCreateBoard(input.boardId);
         boardAnonymousAuthor = board?.anonymousAuthor ?? false;
         authorId = null;
@@ -580,6 +586,7 @@ export async function POST(req: Request) {
           authorId,
           studentAuthorId,
           externalAuthorName,
+          externalAuthorKey,
           title: input.title,
           content: input.content,
           color: input.color ?? null,

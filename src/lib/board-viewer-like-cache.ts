@@ -1,4 +1,5 @@
 import "server-only";
+import { revalidateSnapshot } from "./snapshot-revalidation";
 
 export type BoardViewerLikeIdentity =
   | { kind: "teacher"; id: string }
@@ -44,8 +45,15 @@ export async function loadBoardViewerLikedCardsCached(
   boardId: string,
   viewer: BoardViewerLikeIdentity,
   loader: () => Promise<readonly string[]>,
+  options: { force?: boolean } = {},
 ): Promise<Set<string>> {
   const key = keyFor(boardId, viewer);
+  if (options.force) {
+    return revalidateSnapshot(`viewer-likes:${key}`, () => {
+      entries.delete(key);
+      return loadBoardViewerLikedCardsCached(boardId, viewer, loader);
+    });
+  }
   const now = Date.now();
   const existing = entries.get(key);
   if (existing) {

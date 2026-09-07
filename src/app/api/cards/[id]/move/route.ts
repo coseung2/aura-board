@@ -5,6 +5,7 @@ import { ForbiddenError } from "@/lib/rbac";
 import { resolveIdentities } from "@/lib/identity";
 import { canEditCard, type BoardLike, type CardLike } from "@/lib/card-permissions";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
+import { scheduleCardChangeBroadcast } from "@/lib/card-broadcast-queue";
 import { requireShareAuth } from "@/lib/share/with-share";
 
 const MoveCardSchema = z.object({
@@ -89,6 +90,7 @@ export async function PATCH(
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 이동도 활동 신호로 간주.
     await touchBoardUpdatedAt(card.boardId, { action: "card.moved" });
+    scheduleCardChangeBroadcast(card.boardId, "update");
 
     return NextResponse.json({ card: updated });
   } catch (e) {

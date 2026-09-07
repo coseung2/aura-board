@@ -59,6 +59,23 @@ function renderBoardStream(
 }
 
 describe("useBoardStream Broadcast lifecycle", () => {
+  it("continues visible fallback reads after channel failure even when HTTP succeeds", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn(async () => ({ status: 304, ok: false }));
+    vi.stubGlobal("fetch", fetchMock);
+    const realtime = createRealtimeHarness();
+    const hook = renderBoardStream();
+    await act(async () => undefined);
+    await act(async () => realtime.subscription.onStatus("CHANNEL_ERROR"));
+    const before = fetchMock.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(30_000); });
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(before);
+    await act(async () => realtime.subscription.onStatus("SUBSCRIBED"));
+    const healthy = fetchMock.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+    expect(fetchMock).toHaveBeenCalledTimes(healthy);
+    hook.unmount();
+  });
   beforeEach(() => {
     subscribeMock.mockReset();
   });
@@ -169,8 +186,8 @@ describe("useBoardStream Broadcast lifecycle", () => {
       json: async () => ({ cards: [{ id: "stale" }], sections: [] }),
     });
     await waitFor(() => expect(realtime.unsubscribe).toHaveBeenCalledTimes(1));
-    expect(setCards).not.toHaveBeenCalled();
-    expect(setSections).not.toHaveBeenCalled();
+    expect(setCards).toHaveBeenCalledWith([]);
+    expect(setSections).toHaveBeenCalledWith([]);
 
     hook.unmount();
     await act(async () => undefined);

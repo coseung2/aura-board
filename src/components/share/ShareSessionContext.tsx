@@ -153,11 +153,6 @@ function ShareFetchBridge({ session }: { session: ShareSession }) {
         return originalFetch.call(window, input, init);
       }
 
-      const handled = handleShareApiFetch(session, input, init);
-      if (handled) {
-        return handled.then((response) => response ?? originalFetch.call(window, input, init));
-      }
-
       const headers = new Headers(
         init?.headers ?? (input instanceof Request ? input.headers : undefined),
       );
@@ -165,10 +160,13 @@ function ShareFetchBridge({ session }: { session: ShareSession }) {
       headers.set("x-share-guest-id", session.guestId);
       headers.set("x-share-author-name", encodeURIComponent(session.authorName));
 
-      return originalFetch.call(window, input, {
+      const requestInit = {
         ...init,
         headers,
-      });
+      };
+      return handleShareApiFetch(session, input, requestInit).then(
+        (response) => response ?? originalFetch.call(window, input, requestInit),
+      );
     };
 
     window.fetch = patchedFetch;

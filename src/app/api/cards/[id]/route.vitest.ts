@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   enqueueBlobDeletion: vi.fn(),
   remove: vi.fn(),
   touch: vi.fn(),
+  postCommit: vi.fn(),
 }));
 
 const card = {
@@ -118,6 +119,13 @@ vi.mock("@/lib/realtime-broadcast", () => ({
   announceCardChange: vi.fn(),
   announcePollChange: vi.fn(),
 }));
+vi.mock("@/lib/post-commit", () => ({
+  schedulePostCommit: mocks.postCommit.mockImplementation(
+    (_label: string, task: () => Promise<void>) => {
+    void task();
+    },
+  ),
+}));
 vi.mock("@/lib/blob", () => ({
   extractVideoThumbnail: vi.fn(),
   resizeRemoteImageToWebPPreviewUrl: vi.fn(),
@@ -168,6 +176,7 @@ describe("card route integrity", () => {
     mocks.remove.mockReset();
     mocks.remove.mockResolvedValue(card);
     mocks.touch.mockReset();
+    mocks.postCommit.mockClear();
   });
 
   it("rejects a section from another board inside the mutation transaction", async () => {
@@ -392,6 +401,10 @@ describe("card route integrity", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true });
     expect(mocks.remove).toHaveBeenCalledWith({ where: { id: "card-1" } });
+    expect(mocks.postCommit).toHaveBeenCalledWith(
+      "realtime.card.deleted",
+      expect.any(Function),
+    );
   });
 
   it("denies another share guest even when the board displays authors anonymously", async () => {

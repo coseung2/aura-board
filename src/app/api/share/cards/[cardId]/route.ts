@@ -1,118 +1,37 @@
-/**
- * PATCH /api/share/cards/[cardId] — Update card via share link (student permission).
- * DELETE /api/share/cards/[cardId] — Delete card via share link (student permission).
- *
- * Body (PATCH): { shareToken, title?, content?, color? }
- * Body (DELETE): { shareToken }
- *
- * Only allows editing cards created by the same authorName (externalAuthorName match).
- */
+/** Compatibility endpoint: share writes use the canonical card authorization
+ * and post-commit delivery path. A display name is never ownership proof. */
 import { NextResponse } from "next/server";
-import { z } from "zod";
-import { db } from "@/lib/db";
-import { authorizeShareAccess } from "@/lib/share/share-auth";
-import { touchBoardUpdatedAt } from "@/lib/board-touch";
-import { invalidateCardAccessCache } from "@/lib/card-access-cache";
+import { PATCH as patchCard, DELETE as deleteCard } from "@/app/api/cards/[id]/route";
 
-const PatchSchema = z.object({
-  shareToken: z.string().min(1),
-  authorName: z.string().min(1).max(60),
-  title: z.string().min(1).max(200).optional(),
-  content: z.string().max(5000).optional(),
-  color: z.string().nullable().optional(),
-});
+type Context = { params: Promise<{ cardId: string }> };
 
-const DeleteSchema = z.object({
-  shareToken: z.string().min(1),
-  authorName: z.string().min(1).max(60),
-});
-
-export async function PATCH(
-  req: Request,
-  { params }: { params: Promise<{ cardId: string }> }
-) {
-  const { cardId } = await params;
-
-  let parsed: z.infer<typeof PatchSchema>;
+async function forward(req: Request, context: Context, method: "PATCH" | "DELETE") {
+  let body: Record<string, unknown>;
   try {
-    const raw = await req.json();
-    parsed = PatchSchema.parse(raw);
+    const value: unknown = await req.json();
+    if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("invalid_input");
+    body = value as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: "invalid_input" }, { status: 400 });
   }
+  const shareToken = typeof body.shareToken === "string" ? body.shareToken.trim() : req.headers.get("x-share-token")?.trim();
+  const guestId = req.headers.get("x-share-guest-id")?.trim() || (typeof body.guestId === "string" ? body.guestId.trim() : "");
+  if (!shareToken) return NextResponse.json({ error: "invalid_input" }, { status: 400 });
+  if (!guestId) return NextResponse.json({ error: "share_guest_required" }, { status: 403 });
 
-  const card = await db.card.findUnique({
-    where: { id: cardId },
-    select: { id: true, boardId: true, externalAuthorName: true },
+  const { cardId } = await context.params;
+  const headers = new Headers(req.headers);
+  headers.set("x-share-token", shareToken);
+  headers.set("x-share-guest-id", guestId);
+  headers.set("content-type", "application/json");
+  const forwarded = new Request(req.url, {
+    method,
+    headers,
+    ...(method === "PATCH" ? { body: JSON.stringify(body) } : {}),
   });
-  if (!card) {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
-  }
-
-  // Verify share access.
-  const auth = await authorizeShareAccess(parsed.shareToken, "student");
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.reason }, { status: auth.reason === "not_found" ? 404 : 403 });
-  }
-  if (auth.boardId !== card.boardId) {
-    return NextResponse.json({ error: "board_mismatch" }, { status: 403 });
-  }
-
-  // Only the original author can edit
-  if (card.externalAuthorName !== parsed.authorName) {
-    return NextResponse.json({ error: "not_your_card" }, { status: 403 });
-  }
-
-  const data: Record<string, unknown> = {};
-  if (parsed.title !== undefined) data.title = parsed.title;
-  if (parsed.content !== undefined) data.content = parsed.content;
-  if (parsed.color !== undefined) data.color = parsed.color;
-
-  const updated = await db.card.update({ where: { id: cardId }, data });
-  invalidateCardAccessCache(cardId);
-  await touchBoardUpdatedAt(card.boardId);
-
-  return NextResponse.json({ ok: true, card: updated });
+  const handler = method === "PATCH" ? patchCard : deleteCard;
+  return handler(forwarded, { params: Promise.resolve({ id: cardId }) });
 }
 
-export async function DELETE(
-  req: Request,
-  { params }: { params: Promise<{ cardId: string }> }
-) {
-  const { cardId } = await params;
-
-  let parsed: z.infer<typeof DeleteSchema>;
-  try {
-    const raw = await req.json();
-    parsed = DeleteSchema.parse(raw);
-  } catch {
-    return NextResponse.json({ error: "invalid_input" }, { status: 400 });
-  }
-
-  const card = await db.card.findUnique({
-    where: { id: cardId },
-    select: { id: true, boardId: true, externalAuthorName: true },
-  });
-  if (!card) {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
-  }
-
-  const auth = await authorizeShareAccess(parsed.shareToken, "student");
-  if (!auth.ok) {
-    return NextResponse.json({ error: auth.reason }, { status: auth.reason === "not_found" ? 404 : 403 });
-  }
-  if (auth.boardId !== card.boardId) {
-    return NextResponse.json({ error: "board_mismatch" }, { status: 403 });
-  }
-
-  // Only the original author can delete
-  if (card.externalAuthorName !== parsed.authorName) {
-    return NextResponse.json({ error: "not_your_card" }, { status: 403 });
-  }
-
-  await db.card.delete({ where: { id: cardId } });
-  invalidateCardAccessCache(cardId);
-  await touchBoardUpdatedAt(card.boardId);
-
-  return NextResponse.json({ ok: true });
-}
+export function PATCH(req: Request, context: Context) { return forward(req, context, "PATCH"); }
+export function DELETE(req: Request, context: Context) { return forward(req, context, "DELETE"); }

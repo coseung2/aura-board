@@ -9,6 +9,9 @@ import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { snapshotClassroomGroupsToBoard } from "@/lib/default-groups";
 import { invalidateBoardAccessCache } from "@/lib/board-access-cache";
+import { invalidateBoardSnapshotCache } from "@/lib/board-snapshot-cache";
+import { invalidateBoardViewerLikeCache } from "@/lib/board-viewer-like-cache";
+import { scheduleCardChangeBroadcast } from "@/lib/card-broadcast-queue";
 
 const PatchBoardSchema = z.object({
   title: z.string().max(200).optional(),
@@ -26,7 +29,7 @@ const PatchBoardSchema = z.object({
     .max(2000)
     .nullable()
     .optional()
-    .transform((v) => (v == null || v === "" ? null : v)),
+    .transform((v) => (v === "" ? null : v)),
   // card-comments-likes (2026-04-26)
   anonymousAuthor: z.boolean().optional(),
   boardTheme: z
@@ -127,7 +130,14 @@ export async function DELETE(
 
     await db.board.delete({ where: { id: board.id } });
     invalidateBoardAccessCache(board.id);
-    await enqueueBlobDeletion(blobUrls, "board.delete", "Board", board.id);
+    invalidateBoardSnapshotCache(board.id);
+    invalidateBoardViewerLikeCache(board.id);
+    scheduleCardChangeBroadcast(board.id, "delete");
+    try {
+      await enqueueBlobDeletion(blobUrls, "board.delete", "Board", board.id);
+    } catch (error) {
+      console.error("[board.delete] blob cleanup reservation failed", error);
+    }
 
     return new NextResponse(null, { status: 204 });
   } catch (e) {
@@ -207,6 +217,7 @@ export async function PATCH(
       actorType: "teacher",
       actorId: user.id,
     });
+    scheduleCardChangeBroadcast(board.id, "update");
     if (
       Object.prototype.hasOwnProperty.call(input, "thumbnailUrl") &&
       board.thumbnailUrl &&

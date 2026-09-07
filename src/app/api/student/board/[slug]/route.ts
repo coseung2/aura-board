@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { db } from "@/lib/db";
 import { getCurrentStudentIdentityRaw } from "@/lib/student-auth";
 import { loadStudentBoardBaseCached } from "@/lib/student-board-cache";
@@ -43,6 +44,7 @@ export async function GET(
       student.classroomId,
       slug,
       () => loadStudentBoardBase(student.classroomId, slug),
+      { force: _req.headers.get("x-aura-revalidate") === "1" },
     );
     if (!board) {
       return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -93,7 +95,7 @@ export async function GET(
             : null,
         };
       }
-      return NextResponse.json({
+      return jsonPrivateNoStore({
         board: {
           ...boardMeta,
           assignmentDeadline:
@@ -436,7 +438,7 @@ export async function GET(
         };
       });
 
-    return NextResponse.json({
+    return jsonPrivateNoStore({
       board: {
         id: board.id,
         slug: board.slug,

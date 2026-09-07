@@ -16,6 +16,7 @@ import {
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { normalizeStudentAuthorInputs } from "@/lib/student-card-authors";
 import { invalidateCardAccessCache } from "@/lib/card-access-cache";
+import { scheduleCardChangeBroadcast } from "@/lib/card-broadcast-queue";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -129,6 +130,7 @@ export async function PUT(
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 작성자 재지정도 카드 mutation.
     await touchBoardUpdatedAt(card.boardId);
+    scheduleCardChangeBroadcast(card.boardId, "update");
 
     return NextResponse.json({
       authors: savedAuthors,

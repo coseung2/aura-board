@@ -84,7 +84,7 @@ describe("useBoardSnapshotRealtime ownership", () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/boards/board-a/snapshot",
-      { cache: "no-store" },
+      { cache: "no-store", headers: { "x-aura-revalidate": "1" } },
     );
     expect(apply).toHaveBeenCalledWith(snapshot);
 

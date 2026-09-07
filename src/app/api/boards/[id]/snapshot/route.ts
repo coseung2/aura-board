@@ -98,6 +98,7 @@ export async function GET(
     const { id: boardIdOrSlug } = await params;
     const url = new URL(req.url);
     const clientHash = url.searchParams.get("hash");
+    const refreshOptions = { force: req.headers.get("x-aura-revalidate") === "1" };
 
     const preferStudent = req.headers.get("x-aura-student-viewer") === "1";
     const user = preferStudent
@@ -123,6 +124,7 @@ export async function GET(
             questionVizMode: true,
           },
         }),
+      refreshOptions,
     );
     if (!board) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -342,6 +344,7 @@ export async function GET(
 
         return { cards, sections, question };
       },
+      refreshOptions,
     );
 
     const canInteract = Boolean(user || student);
@@ -371,6 +374,7 @@ export async function GET(
               });
               return likedRows.map((row) => row.cardId);
             },
+            refreshOptions,
           )
         : new Set<string>();
     const payload = {

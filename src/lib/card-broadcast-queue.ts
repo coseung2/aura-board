@@ -10,7 +10,9 @@ type PendingCardChange = {
   resolve: () => void;
 };
 
-const CARD_BROADCAST_BATCH_DELAY_MS = 500;
+// Keep a small coalescing window for classroom bursts without making an
+// isolated create feel delayed on another connected client.
+export const CARD_BROADCAST_BATCH_DELAY_MS = 150;
 const pending = new Map<string, PendingCardChange[]>();
 let timer: ReturnType<typeof setTimeout> | null = null;
 let flushing = false;

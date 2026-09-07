@@ -16,6 +16,7 @@ import { resolveCanvaEmbedUrlCached } from "@/lib/canva-preview-cache";
 import { isAllowedFileUrl, isAllowedStoredMime, MAX_ATTACHMENTS_PER_CARD } from "@/lib/file-attachment";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
 import { announceCardChange, announcePollChange } from "@/lib/realtime-broadcast";
+import { schedulePostCommit } from "@/lib/post-commit";
 import {
   extractVideoThumbnail,
   resizeRemoteImageToWebPPreviewUrl,
@@ -480,7 +481,9 @@ export async function PATCH(
       actorType: identity.teacher ? "teacher" : identity.student ? "student" : "guest",
       actorId: identity.teacher?.userId ?? identity.student?.studentId ?? null,
     });
-    void announceCardChange(card.boardId, "update");
+    schedulePostCommit("realtime.card.updated", () =>
+      announceCardChange(card.boardId, "update"),
+    );
     if (pollConfigChanged) {
       await announcePollChange(card.boardId, id);
     }
@@ -582,7 +585,8 @@ export async function DELETE(
 
     await db.card.delete({ where: { id } });
     invalidateCardAccessCache(id);
-    await enqueueBlobDeletion(
+    try {
+      await enqueueBlobDeletion(
       [
         card.imageUrl,
         card.thumbUrl,
@@ -594,7 +598,12 @@ export async function DELETE(
       "card.delete",
       "Card",
       id
-    );
+      );
+    } catch (error) {
+      // Deletion is already committed; cleanup failure must not suppress the
+      // invalidation or misreport a successful delete as a retryable failure.
+      console.error("[card.delete] blob cleanup reservation failed", error);
+    }
 
     // classroom-boards-tab "🟢 새 활동" 배지 — 카드 삭제도 활동으로 간주.
     // Board row 자체는 카드 cascade의 부모라 여전히 존재하므로 정상 touch.
@@ -603,7 +612,9 @@ export async function DELETE(
       actorType: identity.teacher ? "teacher" : identity.student ? "student" : "guest",
       actorId: identity.teacher?.userId ?? identity.student?.studentId ?? null,
     });
-    void announceCardChange(card.boardId, "delete");
+    schedulePostCommit("realtime.card.deleted", () =>
+      announceCardChange(card.boardId, "delete"),
+    );
 
     return NextResponse.json({ ok: true });
   } catch (e) {

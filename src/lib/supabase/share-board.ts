@@ -97,6 +97,13 @@ type AuthorRow = {
   order: number;
 };
 
+export class ShareBoardUnavailableError extends Error {
+  constructor() {
+    super("공유 보드를 찾을 수 없거나 접근 권한이 변경되었어요.");
+    this.name = "ShareBoardUnavailableError";
+  }
+}
+
 export async function fetchShareBoard(
   lookup: ShareLookup,
 ): Promise<ShareBoardPayload> {
@@ -116,7 +123,7 @@ export async function fetchShareBoard(
     .maybeSingle<BoardRow>();
 
   if (boardError) throw boardError;
-  if (!board?.shareToken) throw new Error("공유 보드를 찾을 수 없어요.");
+  if (!board?.shareToken) throw new ShareBoardUnavailableError();
 
   const [{ data: cards, error: cardsError }, { data: sections, error: sectionsError }] =
     await Promise.all([

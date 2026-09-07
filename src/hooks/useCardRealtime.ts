@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { CardData } from "@/components/DraggableCard";
 import { sortSections } from "@/lib/sort-sections";
 import { boardChannelKey } from "@/lib/realtime";
@@ -27,18 +27,30 @@ export function useCardRealtime<
   isStudentViewer = false,
 ) {
   const lastHashRef = useRef("");
+  const generationRef = useRef(0);
+  useEffect(() => {
+    lastHashRef.current = "";
+    generationRef.current += 1;
+    return () => { generationRef.current += 1; };
+  }, [boardId, isStudentViewer]);
 
   const refetch = useCallback(async () => {
+    const generation = generationRef.current;
     const qs = lastHashRef.current
       ? `?hash=${encodeURIComponent(lastHashRef.current)}`
       : "";
     const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
       cache: "no-store",
-      headers: isStudentViewer ? { "x-aura-student-viewer": "1" } : {},
+      headers: { "x-aura-revalidate": "1", ...(isStudentViewer ? { "x-aura-student-viewer": "1" } : {}) },
     });
 
-    if (res.status === 304) return;
-    if (res.status === 401 || res.status === 403) return;
+    if (generation !== generationRef.current || res.status === 304) return;
+    if ([401, 403, 404].includes(res.status)) {
+      setCards([]);
+      setSections?.([]);
+      lastHashRef.current = "";
+      return;
+    }
     if (!res.ok) {
       throw new Error(`board snapshot failed: ${res.status}`);
     }
@@ -48,6 +60,7 @@ export function useCardRealtime<
       sections?: TSection[];
       hash?: string;
     };
+    if (generation !== generationRef.current) return;
     lastHashRef.current = data.hash ?? "";
 
     setCards(

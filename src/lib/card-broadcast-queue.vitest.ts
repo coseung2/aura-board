@@ -13,6 +13,7 @@ vi.mock("next/server", () => ({
 vi.mock("./realtime-broadcast", () => ({ announceCardChange: announce }));
 
 import {
+  CARD_BROADCAST_BATCH_DELAY_MS,
   clearCardBroadcastQueueForTests,
   scheduleCardChangeBroadcast,
 } from "./card-broadcast-queue";
@@ -44,7 +45,7 @@ describe("card broadcast queue", () => {
     scheduleCardChangeBroadcast("board-2", "insert");
     const completions = startAfterCallbacks();
 
-    await vi.advanceTimersByTimeAsync(500);
+    await vi.advanceTimersByTimeAsync(CARD_BROADCAST_BATCH_DELAY_MS);
     await Promise.all(completions);
 
     expect(announce).toHaveBeenCalledTimes(2);

@@ -32,6 +32,20 @@ function createSubscriptionHarness() {
 }
 
 describe("useRealtimeInvalidation", () => {
+  it("retries a failed snapshot even while Broadcast remains subscribed", async () => {
+    vi.useFakeTimers();
+    const realtime = createSubscriptionHarness();
+    const refresh = vi.fn(async () => undefined);
+    const hook = renderHook(() => useRealtimeInvalidation({ channelName: "board:a", event: "card_changed", refresh }));
+    await act(async () => undefined);
+    await act(async () => realtime.subscription.onStatus("SUBSCRIBED"));
+    refresh.mockRejectedValueOnce(new Error("snapshot unavailable"));
+    await act(async () => { realtime.subscription.onMessage({ event: "card_changed" }); await vi.advanceTimersByTimeAsync(80); });
+    const failedCount = refresh.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(1_000); });
+    expect(refresh).toHaveBeenCalledTimes(failedCount + 1);
+    hook.unmount();
+  });
   afterEach(() => {
     subscribeMock.mockReset();
     vi.useRealTimers();

@@ -76,6 +76,7 @@ vi.mock("@/lib/share/with-share", () => ({
   })),
 }));
 vi.mock("@/lib/board-touch", () => ({ touchBoardUpdatedAt: mocks.touch }));
+vi.mock("@/lib/card-broadcast-queue", () => ({ scheduleCardChangeBroadcast: vi.fn() }));
 
 import { PATCH } from "./route";
 

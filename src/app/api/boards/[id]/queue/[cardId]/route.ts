@@ -163,7 +163,7 @@ export async function PATCH(
 
   // classroom-boards-tab "🟢 새 활동" 배지 — 큐 상태 변경도 활동 신호.
   await touchBoardUpdatedAt(board.id);
-  void announceQueueChange(board.id, cardId, "status");
+  await announceQueueChange(board.id, cardId, "status");
   const authorLabels = await resolveCardAuthorLabels(updated);
 
   return NextResponse.json({
@@ -239,7 +239,7 @@ export async function DELETE(
 
   // classroom-boards-tab "🟢 새 활동" 배지 — 큐 카드 삭제도 활동 신호.
   await touchBoardUpdatedAt(board.id);
-  void announceQueueChange(board.id, cardId, "delete");
+  await announceQueueChange(board.id, cardId, "delete");
 
   return NextResponse.json({ ok: true });
 }

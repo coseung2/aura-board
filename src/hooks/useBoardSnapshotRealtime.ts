@@ -55,19 +55,21 @@ export function useBoardSnapshotRealtime(
           : "";
         const res = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
           cache: "no-store",
+          headers: { "x-aura-revalidate": "1" },
         });
-        if (res.status === 401 || res.status === 403) {
+        if ([401, 403, 404].includes(res.status)) {
           // Auth lost: stop refetching so broadcasts don't hammer a 401.
           if (
             boardIdRef.current === boardId &&
             generationRef.current === requestGeneration
           ) {
             stoppedRef.current = true;
+            applyRef.current({ cards: [], sections: [], question: null });
           }
           return;
         }
         if (res.status === 304) return;
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`board snapshot failed: ${res.status}`);
         const data = (await res.json()) as BoardSnapshot;
         if (
           stoppedRef.current ||
@@ -78,8 +80,10 @@ export function useBoardSnapshotRealtime(
         }
         lastHashRef.current = data.hash ?? "";
         applyRef.current(data);
-      } catch {
-        // Transient; next broadcast retries.
+      } catch (error) {
+        // Let the transport's bounded HTTP recovery retry even when the
+        // socket stays healthy and no further event arrives.
+        throw error;
       }
     })().finally(() => {
       if (inflightRef.current === request) inflightRef.current = null;

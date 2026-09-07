@@ -62,6 +62,8 @@ export function useBoardStream({
 }: Options): UseBoardStreamResult {
   useEffect(() => {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    let subscribed = false;
     let broadcastTimer: ReturnType<typeof setTimeout> | null = null;
     let stopped = false;
     let retryCount = 0;
@@ -77,11 +79,24 @@ export function useBoardStream({
       retryTimer = null;
     }
 
+    function stopFallback() {
+      if (fallbackTimer) clearInterval(fallbackTimer);
+      fallbackTimer = null;
+    }
+
+    function startFallback() {
+      if (stopped || subscribed || fallbackTimer) return;
+      fallbackTimer = setInterval(() => {
+        if (!document.hidden) requestRefresh();
+      }, 30_000);
+    }
+
     function shutdownRealtime(): Promise<void> {
       if (shutdownPromise) return shutdownPromise;
       stopped = true;
       refreshQueued = false;
       clearRetryTimer();
+      stopFallback();
       if (broadcastTimer) {
         clearTimeout(broadcastTimer);
         broadcastTimer = null;
@@ -139,7 +154,7 @@ export function useBoardStream({
           const qs = lastHash ? `?hash=${encodeURIComponent(lastHash)}` : "";
           const response = await fetch(`/api/boards/${boardId}/snapshot${qs}`, {
             cache: "no-store",
-            headers: isStudentViewer ? { "x-aura-student-viewer": "1" } : {},
+            headers: { "x-aura-revalidate": "1", ...(isStudentViewer ? { "x-aura-student-viewer": "1" } : {}) },
           });
           if (stopped) return;
           if (response.status === 304) {
@@ -147,7 +162,9 @@ export function useBoardStream({
             clearRetryTimer();
             return;
           }
-          if (response.status === 401 || response.status === 403) {
+          if ([401, 403, 404].includes(response.status)) {
+            setCards([]);
+            setSections([]);
             void shutdownRealtime();
             return;
           }
@@ -213,12 +230,22 @@ export function useBoardStream({
       });
     }
 
+    startFallback();
     unsubscribeRealtime = subscribePublicBroadcast({
       channelName: boardChannelKey(boardId),
       events: ["card_changed"],
       onMessage: () => requestRefresh(80),
       onStatus: (status) => {
-        if (!stopped && status === "SUBSCRIBED") requestRefresh();
+        if (stopped) return;
+        if (status === "SUBSCRIBED") {
+          subscribed = true;
+          stopFallback();
+          requestRefresh();
+        } else if (["CHANNEL_ERROR", "TIMED_OUT", "CLOSED"].includes(status)) {
+          subscribed = false;
+          startFallback();
+          requestRefresh();
+        }
       },
     });
 

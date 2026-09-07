@@ -9,6 +9,8 @@ type Options = {
   event: string | string[];
   refresh: () => Promise<void>;
   enabled?: boolean;
+  /** False when the caller already owns the initial authoritative request. */
+  initialRefresh?: boolean;
   debounceMs?: number;
   /**
    * Used only while the realtime channel is unavailable. A successful
@@ -34,6 +36,7 @@ export function useRealtimeInvalidation({
   event,
   refresh,
   enabled = true,
+  initialRefresh = true,
   debounceMs = 80,
   fallbackPollMs = 30_000,
 }: Options) {
@@ -53,11 +56,29 @@ export function useRealtimeInvalidation({
     let subscribed = false;
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let fallbackTimer: ReturnType<typeof setInterval> | null = null;
+    let recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+    let refreshFailures = 0;
     let unsubscribeRealtime: (() => void) | null = null;
 
     const runner = createTrailingRefreshRunner(async () => {
       if (stopped) return;
-      await refreshRef.current();
+      try {
+        await refreshRef.current();
+        refreshFailures = 0;
+        if (recoveryTimer) clearTimeout(recoveryTimer);
+        recoveryTimer = null;
+      } catch (error) {
+        // A healthy socket must not suppress recovery of a failed HTTP read.
+        // No further broadcast is guaranteed after the failed reconciliation.
+        if (!stopped && !recoveryTimer) {
+          const delay = Math.min(30_000, 1_000 * 2 ** Math.min(refreshFailures++, 5));
+          recoveryTimer = setTimeout(() => {
+            recoveryTimer = null;
+            if (!document.hidden) requestRefresh();
+          }, delay);
+        }
+        throw error;
+      }
     });
 
     function stopFallbackPolling() {
@@ -129,12 +150,13 @@ export function useRealtimeInvalidation({
     document.addEventListener("visibilitychange", catchUpWhenVisible);
     // Reconcile immediately on mount. Realtime is only an invalidation
     // transport; initial board correctness must not wait for its 10s timeout.
-    requestRefresh();
+    if (initialRefresh) requestRefresh();
 
     return () => {
       stopped = true;
       subscribed = false;
       if (debounceTimer) clearTimeout(debounceTimer);
+      if (recoveryTimer) clearTimeout(recoveryTimer);
       stopFallbackPolling();
       window.removeEventListener("online", catchUpOnNetworkRestore);
       window.removeEventListener("focus", catchUpWhenVisible);
@@ -142,5 +164,5 @@ export function useRealtimeInvalidation({
       unsubscribeRealtime?.();
       unsubscribeRealtime = null;
     };
-  }, [channelName, debounceMs, enabled, eventsKey, fallbackPollMs]);
+  }, [channelName, debounceMs, enabled, eventsKey, fallbackPollMs, initialRefresh]);
 }
