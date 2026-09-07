@@ -5,77 +5,14 @@ import { Archive, CalendarDays, ChevronsDown, UserRoundX } from "lucide-react";
 import { useClassroomMorningDashboard } from "./useClassroomMorningDashboard";
 import { ToastProvider, useToast } from "@/components/ui/Toast";
 
-export const CLASSROOM_ASSIGNMENTS_CHANGED_EVENT =
-  "aura:classroom-assignments-changed";
+import {
+  CLASSROOM_ASSIGNMENTS_CHANGED_EVENT, KIND_LABELS,
+  dateInputToIso, formatDueDate, toDateInputValue,
+  type ArchivedItem, type BoardItem, type CheckTask, type CheckTaskDetailResponse, type CheckTaskListResponse,
+} from "./classroom-assignments-model";
+export { CLASSROOM_ASSIGNMENTS_CHANGED_EVENT } from "./classroom-assignments-model";
 
-const KIND_LABELS = {
-  check: "제출 과제",
-  board: "보드 과제",
-} as const;
-
-type CheckTask = {
-  id: string;
-  title: string;
-  description: string | null;
-  dueDate: string | null;
-  isActive: boolean;
-  submittedCount: number;
-  totalStudents: number;
-};
-
-type CheckTaskListResponse = { tasks: CheckTask[] };
-
-type CheckTaskDetailResponse = {
-  task: {
-    id: string;
-    title: string;
-    description: string | null;
-    dueDate: string | null;
-    isActive: boolean;
-    createdAt: string;
-    updatedAt: string;
-  };
-  roster: Array<{
-    student: { id: string; name: string; number: number | null };
-    submission: { submitted: boolean } | null;
-  }>;
-};
-
-type BoardItem = {
-  id: string;
-  kind: "board" | "section";
-  title: string;
-  /** 원본 제목 (섹션 과제의 "제목 (보드명)" 전체) — 호버 툴팁용. */
-  fullTitle: string;
-  /** 섹션 과제가 속한 보드 이름 — 파란 라벨로 표시. */
-  boardName: string | null;
-  dueDate: string | null;
-  students: Array<{ id: string; name: string; number: number | null }>;
-};
-
-type Props = {
-  classroomId: string;
-};
-
-function formatDueDate(value: string): string {
-  return new Date(value).toLocaleDateString("ko-KR");
-}
-
-function toDateInputValue(iso: string | null): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  const pad = (part: number) => String(part).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-}
-
-function dateInputToIso(value: string): string | null {
-  const trimmed = value.trim();
-  if (!trimmed) return null;
-  const d = new Date(`${trimmed}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toISOString();
-}
+type Props = { classroomId: string };
 
 /**
  * Full-width assignments page (2026-08-12): a flat 3-column store-style grid
@@ -665,16 +602,6 @@ function DistributeAssignmentForm({
     </div>
   );
 }
-
-type ArchivedItem = {
-  id: string;
-  kind: "check" | "board" | "section";
-  title: string;
-  dueDate: string | null;
-  archivedAt: string;
-  boardName: string | null;
-  missingCount: number;
-};
 
 /**
  * 헤더의 보관함 버튼 + 드로어. 마감(아카이빙)된 과제를 보고, 복원할 수 있다.

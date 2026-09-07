@@ -22,6 +22,35 @@ creating overlapping testing-notes documents.
 - For frontend visual changes, clear `.next` and restart `npm run dev` before
   browser checks when practical.
 
+## Product Rollout And Private Payloads
+
+- Test ordinary teachers, administrators, ordinary classrooms, pilot classrooms,
+  anonymous requests, missing/legacy mobile capability caches and unknown layouts.
+  A badge or a hidden menu never substitutes for a server guard and resource RBAC.
+- Run `src/lib/product-release*.vitest.ts` and the actual game-hub/feed route
+  tests. Protocol-only unit tests may isolate rollout, but real route allow/deny
+  and policy-lookup failure tests must remain active (no global authorization mock).
+- Verify both `/api/parent/signup` and `/parent/auth/callback` return 410 without
+  database writes, cookies, session creation or login URLs, including with
+  `PARENT_EMAIL_ENABLED=true`. Production QA test routes must return 404.
+- Verify assignment peers have no submission text, attachments, feedback or
+  duplicate private payload in `cards`; own data is outside shared board caches.
+- Verify anonymous, foreign-classroom, wrong-board and peer draft/rejected Vibe
+  access is denied. Authors/board managers may still inspect drafts.
+- Exercise direct URLs, stored mobile feed tabs, push/deep-link entry and a
+  normal account after logging out of a pilot account on a physical device.
+- Deploy the server capability contract before the matching app update. Old
+  installed apps may retain visible menus while the server correctly denies them.
+- Run Android validation in GitHub Actions on the Windows runner, following
+  [the Android build pipeline](mobile-android-build.md#github-actions-windows-validation).
+  Confirm the workflow's `headSha`, Windows/x64 runner, Hermes bytecode step and
+  APK/AAB verification all match. A `--no-bytecode` export checks JavaScript/assets
+  only. Disposable CI signing is not production signing, an OTA publication, or
+  physical-device validation.
+- Retiring the magic-link endpoints does not revoke already-issued parent
+  sessions. Investigate historical URL logs/session misuse operationally before
+  deciding on targeted revocation; do not silently revoke all users.
+
 ## Save And Publish Flows
 
 - Do not treat optimistic UI as proof that a save worked.

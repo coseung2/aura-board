@@ -1,4 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// Media parsing is platform-independent; do not load React Native's Flow
+// runtime through the native API/session adapters in this Node test suite.
+vi.mock("../../../apps/mobile/lib/api", () => ({
+  getApiUrl: (path: string) => new URL(path, "https://aura-board.com").toString(),
+}));
 import {
   buildCanvaEmbedUrl,
   buildMediaItems,

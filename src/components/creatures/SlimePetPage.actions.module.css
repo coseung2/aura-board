@@ -1,0 +1,44 @@
+.spriteSlot {
+  --sprite-size: 1.1em;
+  display: inline-grid;
+  width: var(--sprite-size);
+  height: var(--sprite-size);
+  flex: 0 0 auto;
+  place-items: center;
+  line-height: 1;
+}
+
+.buttonLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wardrobeButton {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  width: auto;
+  padding: 5px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-btn);
+  color: var(--color-text);
+  background: var(--color-surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.slimeActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 4px;
+  margin-top: -2px;
+  flex-wrap: wrap;
+  min-height: 44px;
+}

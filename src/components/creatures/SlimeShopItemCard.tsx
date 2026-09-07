@@ -332,7 +332,7 @@ export function SlimeShopItemCard({
         .filter(Boolean)
         .join(" ")}
       {...(refundable
-        ? {}
+        ? { "aria-label": `${item.labelKo} 보유 중` }
         : {
             role: "button",
             tabIndex: busy ? -1 : 0,

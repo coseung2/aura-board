@@ -284,7 +284,7 @@ $config = Read-AppConfig -SourceDir $AppSource -SchemeOverride $DeepLinkScheme
 if (-not $config.Package) { throw 'android.package is required in app.json/app.config.ts.' }
 if (-not $config.VersionName) { throw 'version is required in app.json/app.config.ts.' }
 
-foreach ($dir in @('app', 'assets', 'components', 'constants', 'hooks', 'lib', 'modules', 'plugins', 'providers', 'scripts', 'theme')) {
+foreach ($dir in @('app', 'assets', 'components', 'constants', 'hooks', 'lib', 'modules', 'plugins', 'providers', 'screens', 'scripts', 'theme')) {
   Mirror-Directory -Source (Join-Path $AppSource $dir) -Destination (Join-Path $BuildDir $dir) -BuildRoot $BuildRoot
 }
 foreach ($file in @('app.json', 'app.config.ts', 'package.json', 'package-lock.json', 'tsconfig.json', 'eas.json', 'google-services.json', 'credentials.json', '.npmrc', 'expo-env.d.ts')) {
@@ -300,13 +300,19 @@ if ($ForcePrebuild) {
 
 if (-not $SkipNpmInstall) {
   Push-Location $BuildDir
-  try { npm ci } finally { Pop-Location }
+  try {
+    npm ci
+    if ($LASTEXITCODE -ne 0) { throw 'Mobile dependency installation failed.' }
+  } finally { Pop-Location }
 }
 
 $androidDir = Join-Path $BuildDir 'android'
 if (-not (Test-Path -LiteralPath $androidDir)) {
   Push-Location $BuildDir
-  try { npx expo prebuild --platform android --no-install --clean } finally { Pop-Location }
+  try {
+    npx expo prebuild --platform android --no-install --clean
+    if ($LASTEXITCODE -ne 0) { throw 'Expo Android prebuild failed.' }
+  } finally { Pop-Location }
 }
 
 $sdkPropertiesPath = Convert-ToGradlePropertiesPath -Path $AndroidSdkRoot
@@ -404,7 +410,10 @@ if ($SubmitAndroid) {
   $aabArtifact = $artifacts | Where-Object { $_.Path -like '*.aab' } | Select-Object -First 1
   if (-not $aabArtifact) { throw 'SubmitAndroid requires Output Aab or Both.' }
   Push-Location $AppSource
-  try { npx eas-cli@latest submit -p android --profile production --path $aabArtifact.Path --non-interactive } finally { Pop-Location }
+  try {
+    npx eas-cli@latest submit -p android --profile production --path $aabArtifact.Path --non-interactive
+    if ($LASTEXITCODE -ne 0) { throw 'Android submission failed.' }
+  } finally { Pop-Location }
 }
 
 [pscustomobject]@{

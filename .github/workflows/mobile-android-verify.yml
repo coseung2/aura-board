@@ -1,0 +1,141 @@
+name: Android Verify (Windows)
+
+# Validation only: no EAS queue, production credentials, or store submission.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-verify-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  android-verify:
+    name: Windows Hermes and native release validation
+    runs-on: windows-2022
+    timeout-minutes: 75
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      CI: "1"
+      EXPO_NO_TELEMETRY: "1"
+      BUILD_DIR: C:\build-aura-board-android
+
+    steps:
+      - name: Checkout exact validation commit
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            apps/mobile/package-lock.json
+
+      - name: Setup Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Install repository dependencies
+        run: npm ci
+
+      - name: Install mobile dependencies
+        working-directory: apps/mobile
+        run: npm ci --legacy-peer-deps
+
+      - name: Mobile typecheck
+        working-directory: apps/mobile
+        run: npm run typecheck
+
+      - name: Mobile design checks
+        working-directory: apps/mobile
+        run: npm run design:check
+
+      - name: Mobile asset checks
+        working-directory: apps/mobile
+        run: npm run assets:check
+
+      - name: Mobile unit tests
+        working-directory: apps/mobile
+        run: ../../node_modules/.bin/vitest.cmd run
+
+      - name: Mobile web contract tests
+        run: >-
+          npm run test --
+          src/lib/__tests__/mobile-board-overview.vitest.ts
+          src/lib/__tests__/mobile-board-cache.vitest.ts
+          src/lib/__tests__/mobile-board-realtime.vitest.ts
+          src/lib/__tests__/mobile-media.vitest.ts
+          src/lib/__tests__/mobile-slime-shop-preview-performance.vitest.ts
+
+      - name: Export Android with Hermes bytecode
+        working-directory: apps/mobile
+        run: |
+          npx expo export --platform android --clear --max-workers 2 --output-dir "$env:RUNNER_TEMP\android-hermes-export"
+          if ($LASTEXITCODE -ne 0) { throw 'Android Hermes export failed.' }
+          $bundles = @(Get-ChildItem "$env:RUNNER_TEMP\android-hermes-export\_expo\static\js\android" -Filter *.hbc)
+          if ($bundles.Count -eq 0) { throw 'Hermes bytecode output was not generated.' }
+          foreach ($bundle in $bundles) {
+            $bytes = [System.IO.File]::ReadAllBytes($bundle.FullName)
+            if ($bytes.Length -lt 8 -or [BitConverter]::ToString($bytes, 0, 8) -ne 'C6-1F-BC-03-C1-03-19-1F') {
+              throw 'Invalid Hermes bytecode header.'
+            }
+          }
+          "Hermes bytecode verified for $env:GITHUB_SHA" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Prepare native project in ASCII build directory
+        run: |
+          & ./.codex/scripts/build-android.ps1 -AppSource apps/mobile -BuildDir $env:BUILD_DIR -ForcePrebuild -PrepareOnly
+          if ($LASTEXITCODE -ne 0) { throw 'Native preparation failed.' }
+
+      - name: Create disposable validation signing key
+        run: |
+          # Never import the app's production upload key. This key is discarded.
+          & "$env:JAVA_HOME\bin\keytool.exe" -genkeypair -noprompt -storetype JKS -keystore "$env:BUILD_DIR\android\app\release.keystore" -storepass validation-only -keypass validation-only -alias validation -keyalg RSA -keysize 2048 -validity 2 -dname "CN=Aura Board CI Validation"
+          if ($LASTEXITCODE -ne 0) { throw 'Disposable signing key generation failed.' }
+
+      - name: Build and validate APK and AAB
+        id: native
+        env:
+          ORG_GRADLE_PROJECT_AURA_UPLOAD_STORE_FILE: release.keystore
+          ORG_GRADLE_PROJECT_AURA_UPLOAD_STORE_PASSWORD: validation-only
+          ORG_GRADLE_PROJECT_AURA_UPLOAD_KEY_ALIAS: validation
+          ORG_GRADLE_PROJECT_AURA_UPLOAD_KEY_PASSWORD: validation-only
+        run: |
+          & ./.codex/scripts/build-android.ps1 -AppSource apps/mobile -BuildDir $env:BUILD_DIR -SkipNpmInstall -SkipClean -Output Both
+          if ($LASTEXITCODE -ne 0) { throw 'Native release validation failed.' }
+          @(
+            '## Android validation',
+            "- Commit: $env:GITHUB_SHA",
+            '- Runner: windows-2022 / x64',
+            '- Hermes export: bytecode enabled and header checked',
+            '- Native: APK + AAB, R8, resources, manifest, ELF and ZIP alignment gates',
+            '- Signing: disposable validation key; NOT suitable for store upload',
+            '- Store submission: not performed',
+            '- Physical-device and production FCM checks: not performed'
+          ) >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload validation artifacts
+        if: ${{ steps.native.outcome == 'success' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-validation-${{ github.sha }}
+          path: |
+            C:/build-aura-board-android/android/app/build/outputs/apk/release/app-release.apk
+            C:/build-aura-board-android/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 3
+
+      - name: Remove disposable signing key
+        if: always()
+        run: |
+          Remove-Item "$env:BUILD_DIR\android\app\release.keystore" -Force -ErrorAction SilentlyContinue

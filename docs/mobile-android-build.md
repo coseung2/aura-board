@@ -1,10 +1,40 @@
 # Mobile Android Build Pipeline
 
-Updated: 2026-06-27
+Updated: 2026-09-07
 
 Aura Board 모바일 앱의 Android APK/AAB 빌드는 Expo 소스를 직접 네이티브
 프로젝트처럼 관리하지 않고, 전용 ASCII 빌드 디렉터리에서 재현 가능하게
 생성한다.
+
+## GitHub Actions Windows validation
+
+Android verification runs through **Android Verify (Windows)** in
+`.github/workflows/mobile-android-verify.yml`, manually on `windows-2022` (x64).
+Use this workflow for refactor validation; do not replace the Hermes step with
+`--no-bytecode` or enqueue an EAS build and count queue acceptance as success.
+
+After pushing the intended commit to `main`:
+
+```sh
+gh workflow run mobile-android-verify.yml --ref main
+gh run list --workflow mobile-android-verify.yml --limit 5
+gh run view <run-id> --json headSha,status,conclusion,jobs
+```
+
+Confirm the run's `headSha` equals the intended commit, not merely the latest run.
+The workflow checks mobile types/design/assets and unit/contract tests, exports
+Android with Hermes enabled and validates its binary header, then uses the
+existing PowerShell build script in `C:\\build-aura-board-android` to build APK and
+AAB. R8/resource shrinking, manifest, ELF, AAB and APK alignment checks remain on.
+The build script must copy `screens/` along with the app's other source folders,
+and failed dependency/prebuild commands must stop the job.
+
+The validation workflow has read-only repository permissions, does not load
+production secrets, and uses a disposable signing key created inside the runner.
+Artifacts are explicitly **validation-only**, retained for three days, and must
+not be submitted to Google Play. Production signing, Firebase delivery, store
+submission and physical-device UX are separate acceptance checks. The existing
+store-release workflow is not invoked by this validation job.
 
 ## Core Rule
 
@@ -216,8 +246,9 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".codex\scripts\build-androi
 Expected metadata:
 
 - Package: `com.auraboard.app`
-- Version: `0.1.0`
-- Version code: from `android.versionCode`, or `1` if omitted.
+- Version: the version declared by the checked-out `app.config.ts`.
+- Version code: from `android.versionCode`, or `1` if omitted. The fallback is
+  suitable only for validation, not a new store upload.
 
 For Aura Board, `-PrepareOnly` also runs the source/generation half of the Play
 release gate and confirms that Expo prebuild has actually enabled R8 minify and

@@ -2,8 +2,10 @@
 
 Baseline: `e101dd01` on `main`, clean checkout, aligned with `origin/main`.
 Scope: release-policy drift, development surfaces, authorization/data minimization,
-recoverable UX, and avoidable reads. No production database changes or deployment.
-Each stage is committed separately; push only after final verification.
+recoverable UX, and avoidable reads. No manual production database/environment
+changes or store submission. The requested `main` push retains the repository's
+existing Oracle deployment trigger. Each stage is committed separately; push
+after local final verification, then verify the exact pushed SHA in Actions.
 
 ## Stage 1 — Contain authentication and data exposure
 
@@ -56,11 +58,40 @@ Each stage is committed separately; push only after final verification.
 ## Stage 5 — Regression and documentation
 
 - Run targeted tests and complete web/mobile suites, web/mobile typechecks,
-  check:lines, mobile design checks, and production/export builds when supported.
+  check:lines, mobile design checks, CSS cascade parity and the final web build.
+- Per the 2026-09-07 user instruction, Android verification uses GitHub Actions
+  Windows/x64, real Hermes bytecode and APK/AAB builds with disposable signing;
+  see [the Android pipeline](mobile-android-build.md#github-actions-windows-validation).
+  Do not substitute a Linux ARM `--no-bytecode` export or a queued EAS build.
 - Record exact commands/results and remaining runtime/device checks in the final
   report; use verification-checklist.md as the only verification checklist.
 - Update current feature/API documentation for retired and gated surfaces.
 - Review the final diff, verify clean commits and remote ancestry, then push main.
+- Run `Android Verify (Windows)` against that exact SHA and report its final
+  conclusion separately from local checks and production/device acceptance.
+
+## Implementation log
+
+- Stage 1: `2a69ba70` — auth retirement, private payloads and project scope.
+- Stage 2: `c8d66323` — release registry and administrator policy.
+- Stage 3: `2c98855f` — web/mobile/API agreement and metadata-first reads.
+- Stage 4: `dbc998d1` — draft preservation and recoverable user actions.
+- Stage 5: final source/test/documentation cleanup plus Windows verification
+  workflow. The obsolete CSS path is replaced by actual CSS-module imports;
+  comparison recursively preserves rules/declaration ordering and has dedicated
+  regression tests. The Windows source mirror now includes `screens/`, and
+  failed install/prebuild commands terminate instead of proceeding.
+
+Local final verification (2026-09-07): web Vitest 396 files / 2,203 tests,
+mobile Vitest 18 files / 81 tests, both TypeScript checks, mobile design checks,
+2,470-file line limit, encoding check, five CSS-checker unit tests, 21 CSS cascade
+comparisons, actionlint 1.7.12 on the Windows workflow, and the final Next.js
+production build passed. The web suite was rerun with the dot reporter and
+returned exit code 0 after a prior JSON-report invocation had a nonzero command
+exit despite all assertions passing.
+
+The Actions run SHA/conclusion is reported separately at handoff. An unexecuted
+workflow or a test-signed artifact is not a production release.
 
 ## Constraints and audit corrections
 

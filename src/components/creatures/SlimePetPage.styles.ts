@@ -1,4 +1,5 @@
 import coreStyles from "./SlimePetPage.core.module.css";
+import actionStyles from "./SlimePetPage.actions.module.css";
 import dialogStyles from "./SlimePetPage.dialogs.module.css";
 import shopStyles from "./SlimePetPage.shop.module.css";
 import wardrobeStyles from "./SlimePetPage.wardrobe.module.css";
@@ -7,6 +8,7 @@ type CssModule = Record<string, string>;
 
 const modules: CssModule[] = [
   coreStyles,
+  actionStyles,
   shopStyles,
   dialogStyles,
   wardrobeStyles,

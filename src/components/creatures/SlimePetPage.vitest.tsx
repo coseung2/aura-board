@@ -260,11 +260,12 @@ it("renders deterministic stage growth percentages as accessible progress bars",
     const shop = await screen.findByRole("region", { name: "슬라임 상점" });
     fireEvent.click(within(shop).getByRole("tab", { name: "바닥" }));
 
-    const ownedCard = within(shop).getByRole("button", {
+    const ownedCard = within(shop).getByRole("listitem", {
       name: `${grass!.labelKo} 보유 중`,
     });
     expect(ownedCard.className).toMatch(/shopItemOwned/);
-    expect(ownedCard.getAttribute("aria-disabled")).toBe("true");
+    expect(within(shop).queryByRole("button", { name: `${grass!.labelKo} 구매 미리보기` })).toBeNull();
+    expect((within(ownedCard).getByRole("button", { name: `${grass!.labelKo} 환불` }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByRole("dialog", { name: "슬라임 상점" })).toBeNull();
   });
 
@@ -570,11 +571,8 @@ it("renders deterministic stage growth percentages as accessible progress bars",
 
     await screen.findByText("잔디 바닥 구매를 완료했어요.");
     expect(within(drawer).getByText("잔디 바닥")).toBeTruthy();
-    expect(
-      within(drawer)
-        .getByRole("button", { name: "잔디 바닥 보유 중" })
-        .getAttribute("aria-disabled"),
-    ).toBe("true");
+    expect(within(drawer).getByRole("listitem", { name: "잔디 바닥 보유 중" }).className).toMatch(/shopItemOwned/);
+    expect(within(drawer).queryByRole("button", { name: "잔디 바닥 구매 미리보기" })).toBeNull();
     expect(fetchMock.mock.calls[1][0]).toBe(
       "/api/student/slimes/items/purchase",
     );
@@ -602,11 +600,8 @@ it("renders deterministic stage growth percentages as accessible progress bars",
 
     const drawer = await screen.findByRole("region", { name: "슬라임 상점" });
     fireEvent.click(within(drawer).getByRole("tab", { name: "바닥" }));
-    expect(
-      within(drawer)
-        .getByRole("button", { name: "잔디 바닥 보유 중" })
-        .getAttribute("aria-disabled"),
-    ).toBe("true");
+    expect(within(drawer).getByRole("listitem", { name: "잔디 바닥 보유 중" }).className).toMatch(/shopItemOwned/);
+    expect(within(drawer).queryByRole("button", { name: "잔디 바닥 구매 미리보기" })).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

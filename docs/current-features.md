@@ -2,6 +2,37 @@
 
 Live feature inventory. Update when merging feature tasks.
 
+## Production rollout policy — 2026-09-07
+
+현재 공개 범위의 기준은 `src/lib/product-release.ts`이다. 아래 날짜별 기능 설명은
+구현 이력이며, 구현되어 있다는 이유만으로 일반 사용자에게 공개되는 것은 아니다.
+일반 교사 신규 보드는 카드(`freeform`), 주제별(`columns`), DJ(`dj-queue`),
+식물 관찰일지(`plant-roadmap`) 4종이다. 기존 `grid`·`event-signup` 읽기는 보존한다.
+스트림·과제배부·퀴즈·수행평가·모둠·코딩·질문 보드와 공식 게임은 개발중이다.
+
+관리자/관리자 학급은 개발중 보드·놀이·피드·라이브 퀴즈·Agent를 사용할 수 있다.
+교사 공유는 관리자 교사 전용이다. 관리자 판정은 `AURA_ADMIN_EMAILS`를 사용하는
+`isAdminEmail`로 통일한다. UI 배지는 안내이고 서버 기능 가드 및 학급/소유권
+검사가 실제 접근을 통제한다. `NEXT_PUBLIC_FF_breakoutSettings`는 UI 표시만 제어한다.
+
+학생 홈·보드 목록 API는 `productCapabilities`와 `availableLayouts`를 제공한다.
+모바일은 이를 사용하며 구버전 캐시만으로 개발중 기능을 표시하지 않는다.
+현재 앱 변경을 적용하기 전에 이 응답 계약을 제공하는 서버가 먼저 배포되어야 한다.
+기존 앱은 서버에서 제한 API가 거절되어도 메뉴가 남을 수 있으므로 앱 업데이트가 필요하다.
+
+이메일 단독 매직링크 발급(`/api/parent/signup`) 및 서버 콜백(`/parent/auth/callback`)은
+410으로 폐기되었다. 로그인 가능한 URL을 응답/로그에 남기는 개발용 구현은 제거했다.
+비밀번호와 provider OAuth 로그인은 유지한다. `/api/parent/test/*`는 production에서404,
+`/design`·`/docs/billing-setup`은 관리자 전용이다.
+
+학생 과제 API는 본인 제출물만 상세 반환하고 반 친구는 진행 상태 요약만 반환한다.
+Vibe 상세·플레이는 인증, 보드/학급 소속과 승인 상태를 함께 검사한다.
+공식 게임 상세는 카드·첨부·섹션 그래프 조회를 생략하며 개인 과제 데이터는 공용
+보드 캐시에 넣지 않는다.
+
+검증과 적용 범위는 [작업 기록](production-readiness-refactor.md), 운영 확인 항목은
+[검증 체크리스트](verification-checklist.md)를 참조한다.
+
 ## Board layouts
 | Layout | Description |
 |---|---|
@@ -325,7 +356,8 @@ Spotify 스타일 순차 YouTube 큐 + **classroom role system 신설**. DJ 역�
 
 ## 학부모 OAuth + 통합 대시보드 (parent-redesign) — 2026-04-26
 
-학부모 매직링크 인증 + 자녀 페이지 6탭 → OAuth(Google+Kakao) 추가 +
+당시 학부모 매직링크 인증 + 자녀 페이지 6탭 → OAuth(Google+Kakao) 추가 +
+(매직링크는 2026-09-07 폐기; 현재 비밀번호/provider OAuth 사용)
 학부모 화면은 모든 자녀의 게시물을 모은 피드와 자녀별 게시물 홈으로 구성한다.
 
 ### 진입점

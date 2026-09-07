@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin";
+import { availableLayoutKeys } from "@/lib/product-release";
 import { requirePermission, ForbiddenError } from "@/lib/rbac";
 import { enqueueBlobDeletion } from "@/lib/blob-cleanup";
 import { touchBoardUpdatedAt } from "@/lib/board-touch";
@@ -55,7 +57,10 @@ export async function GET(
     const user = await getCurrentUser();
 
     const board = await db.board.findFirst({
-      where: { OR: [{ id }, { slug: id }] },
+      where: {
+        OR: [{ id }, { slug: id }],
+        layout: { in: availableLayoutKeys({ isAdmin: isAdminEmail(user.email) }) },
+      },
       include: {
         cards: { orderBy: { createdAt: "asc" } },
         members: { include: { user: { select: { id: true, name: true, email: true } } } },
@@ -143,7 +148,10 @@ export async function PATCH(
     const user = await getCurrentUser();
 
     const board = await db.board.findFirst({
-      where: { OR: [{ id }, { slug: id }] },
+      where: {
+        OR: [{ id }, { slug: id }],
+        layout: { in: availableLayoutKeys({ isAdmin: isAdminEmail(user.email) }) },
+      },
     });
     if (!board) {
       return NextResponse.json({ error: "Board not found" }, { status: 404 });

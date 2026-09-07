@@ -8,6 +8,12 @@ Aura Board는 교실 활동을 카드 기반 보드로 모으고, 학생·교사
 
 ## 주요 기능
 
+**현재 공개 범위**는 [`src/lib/product-release.ts`](src/lib/product-release.ts)가 기준입니다.
+일반 신규 보드는 카드·주제별·DJ·식물 관찰일지 4종이며, 개발중 레이아웃과
+놀이·피드·라이브 퀴즈·Agent는 관리자/관리자 학급 대상으로 제한됩니다.
+아래 목록은 구현 기능을 포함하며 전체 일반 공개를 뜻하지 않습니다.
+[2026-09-07 작업 기록](docs/production-readiness-refactor.md)에 변경·검증 범위를 정리했습니다.
+
 - **보드와 카드**
   - 자유 배치, 그리드, 스트림, 칼럼 등 여러 보드 레이아웃
   - 이미지, 링크, YouTube, Canva, 파일, 다중 첨부 카드
@@ -44,7 +50,7 @@ Aura Board는 여러 신원을 동시에 고려합니다.
 
 - **교사**: Google OAuth 기반 NextAuth 세션
 - **학생**: QR/코드 기반 HMAC 서명 쿠키
-- **학부모**: 매직 링크/토큰 기반 접근
+- **학부모**: 비밀번호/provider OAuth 기반 세션. 이메일 단독 매직링크 발급·콜백은 410으로 폐기
 - **공유 방문자**: share token 기반 학생 권한
 
 카드 권한은 `src/lib/card-permissions.ts`의 Identity 기반 규칙을 중심으로 처리합니다.

@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { productFeatureDenial } from "@/lib/product-release-server";
 import { PlayBoardContinueButton } from "@/components/PlayBoardContinueButton";
 import { GameAreaShell } from "@/components/game-platform/GameAreaShell";
 import { KordleBoard } from "@/features/kordle/components/KordleBoard";
@@ -39,6 +40,7 @@ function WaitingShell({
 }
 
 export default async function KordlePlayPage({ params }: Props) {
+  if (await productFeatureDenial("play")) notFound();
   const { id: boardIdOrSlug } = await params;
   const board = await db.board.findFirst({
     where: { OR: [{ id: boardIdOrSlug }, { slug: boardIdOrSlug }] },

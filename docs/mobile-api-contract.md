@@ -3,8 +3,31 @@
 Expo React Native 모바일 앱(student + parent)용 API 계약서.
 교사/관리자는 기존 Next.js 웹 앱에 그대로 잔류.
 
-> **Source of truth**: 이 문서는 2026-06-14 기준 코드 리뷰 결과.
-> 코드 변경 시 본 문서를 동기화할 것.
+> **현재 공개 정책: 2026-09-07.** `src/lib/product-release.ts`와 서버 접근 검사가 기준이다.
+> 아래 과거 MVP·Phase 기록은 구현 이력이며 현재 공개 범위를 의미하지 않는다.
+
+## 2026-09-07 계약 변경
+
+`GET /api/student/me`와 `GET /api/student/boards`는 `productCapabilities`
+(`play`, `feed`, `community`, `liveQuiz`, `agent`, `developmentLayouts`)와
+`availableLayouts: string[]`를 내려준다. 클라이언트가 관리자 이메일이나
+출시 레이아웃 목록을 복제해서 판단하지 않는다. 정보가 없는 구버전 캐시는
+제한 기능을 표시하지 않고 서버에서 다시 확인한다.
+
+일반 신규 생성 레이아웃은 `freeform`, `columns`, `dj-queue`, `plant-roadmap`이다.
+기존 `grid`, `event-signup` 읽기는 보존된다. 개발중 보드, 놀이·피드·라이브 퀴즈,
+Agent는 관리자 또는 관리자 학급 대상이며 교사 공유는 관리자 교사 전용이다.
+관련 API는 미인증 401, 제한 기능 403 `feature_unavailable`, 정책 조회 장애 시
+503 `feature_check_unavailable`로 처리한다. 일반 리소스 RBAC는 별도로 유지된다.
+
+학생 과제 보드 응답은 본인 슬롯에만 제출 본문·파일·피드백을 포함한다.
+다른 학생 슬롯은 이름·번호·제출 상태를 표시하는 요약이며 private 필드는 빈 값이다.
+공통 `cards` 배열로 다른 학생의 과제 제출물을 다시 노출하지 않는다.
+
+이메일 단독 매직링크 `/api/parent/signup`, 웹 서버 `/parent/auth/callback`은
+**410 `magic_link_retired`**이다. 발급·검증·세션 생성·개발 로그인 URL 반환이
+모두 폐기되었다. 현재 비밀번호 및 provider OAuth와 앱의 OAuth 딥링크 콜백은 유지된다.
+앱 업데이트는 이 계약을 제공하는 서버 배포 이후 적용해야 한다.
 
 ---
 
@@ -16,7 +39,7 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
 |---|---|---|
 | Code login (6-char) | ✅ live | `POST /api/student/auth` |
 | Dashboard (my boards) | ✅ live | `GET /api/student/me` |
-| Board detail (all layouts) | ✅ live | `GET /api/student/board/[slug]` |
+| Board detail (permitted layouts) | ✅ implemented | `GET /api/student/board/[slug]`, server rollout + classroom authorization |
 | Card create | ✅ live | `POST /api/cards` (student identity) |
 | Card edit/delete | ✅ live | `PATCH/DELETE /api/cards/[id]` (own cards) |
 | File/image upload | ✅ live | `POST /api/upload` (Bearer token) |
@@ -33,7 +56,7 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
 | Capability | Status | Notes |
 |---|---|---|
 | OAuth login (Google/Kakao) | ⚠️ web-only | Cookie-based; needs Bearer token path for mobile |
-| Email magic-link signup | ✅ mobile-ready | `POST /api/parent/signup` with `client: "mobile"`; callback handoff via `auraboard://` deep link (token in fragment). |
+| Email magic-link signup | Retired 2026-09-07 | Signup and legacy web callback return 410; use password/provider OAuth. |
 | Session status | ✅ mobile-ready | Bearer accepted by `getCurrentParent` since Phase 1. |
 | Link child (code → select → request) | ⚠️ web-only | 3-step flow; needs mobile auth adapter |
 | Children list | ✅ mobile-ready | `GET /api/parent/children` (Bearer accepted; active links only) |
@@ -274,9 +297,16 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
 
 ### 2.2 Parent Endpoints
 
-#### POST /api/parent/signup
+#### Retired: POST /api/parent/signup and GET /parent/auth/callback
 
-- **Purpose**: 이메일 기반 학부모 회원가입 (매직링크 발송)
+Both routes return 410 with `{ error: "magic_link_retired", message, loginPath: "/login?role=parent" }`
+and `Cache-Control: no-store`. Neither accepts a token for session creation nor returns a login token.
+`PARENT_EMAIL_ENABLED` cannot re-enable them.
+
+<details>
+<summary>폐기된 2026-06-14 매직링크 계약 기록 — 신규 구현에 사용 금지</summary>
+
+- **Historical purpose**: 이메일 기반 학부모 회원가입 (매직링크 발송)
 - **Auth**: none
 - **Body**:
   ```json
@@ -348,6 +378,8 @@ Expo React Native 모바일 앱(student + parent)용 API 계약서.
   - HMAC 검증/만료 체크는 변경 없음. `verifyMagicLink` 호출 + `exp`
     만료 검증 그대로.
   - 토큰은 콘솔/로그에 출력하지 않음.
+
+</details>
 
 #### GET /api/parent/auth/[provider]
 
