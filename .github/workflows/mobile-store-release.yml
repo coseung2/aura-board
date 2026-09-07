@@ -20,7 +20,12 @@ on:
       expected_version:
         description: App version that must be present in app.config.ts
         required: true
-        default: 1.0.6
+        default: 1.0.12
+        type: string
+      release_notes:
+        description: App Store What's New text; required for ios-submit
+        required: false
+        default: ""
         type: string
       android_version_code:
         description: Existing Google Play versionCode to promote when platform is android-promote
@@ -104,6 +109,40 @@ jobs:
           npm run design:check
           npm run release:check
           npm run assets:check
+          node --test ../../.github/scripts/promote-google-play-track.test.mjs ../../.github/scripts/submit-ios-for-review.test.mjs
+
+      - name: Preflight Google Play release slot
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android-build' || inputs.platform == 'android' }}
+        run: |
+          VERSION_OUTPUT=$(eas build:version:get --platform android --profile production --non-interactive)
+          CURRENT_CODE=$(printf '%s\n' "$VERSION_OUTPUT" | sed -n 's/^Android versionCode - //p' | tail -n 1)
+          test -n "$CURRENT_CODE"
+          NEXT_CODE=$((CURRENT_CODE + 1))
+          node ../../.github/scripts/promote-google-play-track.mjs \
+            --preflight \
+            --package com.auraboard.app \
+            --track production \
+            --version-code "$NEXT_CODE"
+          echo "Predicted Android versionCode: $NEXT_CODE" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Preflight App Store release slot
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'ios-build' || inputs.platform == 'ios' }}
+        run: |
+          VERSION_OUTPUT=$(eas build:version:get --platform ios --profile production --non-interactive)
+          CURRENT_BUILD=$(printf '%s\n' "$VERSION_OUTPUT" | sed -n 's/^iOS buildNumber - //p' | tail -n 1)
+          test -n "$CURRENT_BUILD"
+          NEXT_BUILD=$(node -e 'const p=process.argv[1].split("."); const i=p.length-1; if (!/^\\d+$/.test(p[i])) process.exit(2); p[i]=String(Number(p[i])+1); process.stdout.write(p.join("."));' "$CURRENT_BUILD")
+          node ../../.github/scripts/submit-ios-for-review.mjs \
+            --preflight \
+            --version "${{ inputs.expected_version }}" \
+            --candidate-build-number "$NEXT_BUILD"
+          echo "Predicted iOS build number: $NEXT_BUILD" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate App Store review notes
+        if: ${{ inputs.platform == 'ios-submit' }}
+        env:
+          IOS_RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: test -n "$IOS_RELEASE_NOTES"
 
       - name: Materialize Firebase Android config for preflight
         if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android-build' || inputs.platform == 'android' }}
@@ -231,6 +270,15 @@ jobs:
           echo "aab_path=$AAB_PATH" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
+      - name: Recheck Google Play versionCode before submission
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
+        run: |
+          node ../../.github/scripts/promote-google-play-track.mjs \
+            --preflight \
+            --package com.auraboard.app \
+            --track production \
+            --version-code "${{ steps.build.outputs.build_number }}"
+
       - name: Submit AAB to Google Play production
         if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
         run: eas submit --platform android --profile production --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
@@ -350,6 +398,14 @@ jobs:
           echo "ipa_path=$IPA_PATH" >> "$GITHUB_OUTPUT"
           echo "build_number=$BUILD_NUMBER" >> "$GITHUB_OUTPUT"
 
+      - name: Recheck App Store build number before upload
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
+        run: |
+          node ../../.github/scripts/submit-ios-for-review.mjs \
+            --preflight \
+            --version "${{ inputs.expected_version }}" \
+            --candidate-build-number "${{ steps.build.outputs.build_number }}"
+
       - name: Submit IPA to App Store Connect
         if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
         run: eas submit --platform ios --profile production --path "${{ steps.build.outputs.ipa_path }}" --wait --non-interactive
@@ -405,7 +461,12 @@ jobs:
           node-version: 24
 
       - name: Submit newest ${{ inputs.expected_version }} build for App Store review
-        run: node .github/scripts/submit-ios-for-review.mjs --version "${{ inputs.expected_version }}"
+        env:
+          IOS_RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: >-
+          node .github/scripts/submit-ios-for-review.mjs
+          --version "${{ inputs.expected_version }}"
+          --whats-new "$IOS_RELEASE_NOTES"
 
       - name: Write iOS submission summary
         if: always()

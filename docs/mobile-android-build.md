@@ -197,8 +197,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File ".codex\scripts\build-androi
   -Output Both
 ```
 
-For Play Store upload, increment `android.versionCode` in the Expo config before
-building `-Output Aab` or `-Output Both`.
+The local PowerShell artifacts above are for validation and manual inspection,
+not the production Play upload path. Production releases use
+`.github/workflows/mobile-store-release.yml`: EAS remote versioning predicts and
+auto-increments the next `versionCode`, the workflow checks that number against
+all Play tracks and uploaded APK/AAB version codes before building, and checks
+the actual generated `versionCode` again immediately before submission. A
+collision or stale EAS counter fails the workflow before Google Play is
+modified.
 
 ## Outputs
 

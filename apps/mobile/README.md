@@ -72,16 +72,11 @@ EXPO_PUBLIC_API_BASE=https://example.test
 
 Shadow Alliance는 빌드에 Supabase 값을 하드코딩하지 않습니다. 인증된 학생 앱이 `/api/student/realtime-config`에서 공개 Realtime 설정을 받아 사용하며, 설정이 없는 서버에서는 명시적인 사용 불가 상태를 표시합니다.
 
-## Android 출시
+## 스토어 출시
 
-프로덕션은 EAS 원격 버전을 사용하고 AAB의 `versionCode`를 자동 증가시킵니다.
+프로덕션 스토어 출시는 `.github/workflows/mobile-store-release.yml`을 사용합니다. Android는 EAS 원격 `versionCode`를 자동 증가시키고, Google Play의 기존 트랙·APK·AAB 번호와 빌드 전/제출 직전에 중복 여부를 검사합니다. iOS도 App Store Connect의 기존 마케팅 버전, 열린 심사 제출, build number를 같은 방식으로 확인한 뒤 업로드하고 심사 제출합니다.
 
-```powershell
-npx eas-cli@latest build -p android --profile production --non-interactive --wait
-npx eas-cli@latest submit -p android --profile production --id <BUILD_ID> --non-interactive --wait
-```
-
-Google Play 첫 업로드 또는 서비스 계정 미설정 상태에서는 Play Console에서 AAB를 수동 업로드한 뒤 프로덕션 출시를 완료합니다. 로컬 Gradle 빌드는 `../../docs/mobile-android-build.md`를 따릅니다.
+로컬 APK/AAB는 검증용이며 `../../docs/mobile-android-build.md` 절차를 따릅니다. 스토어 제출에는 프로덕션 서명과 Infisical OIDC로 주입되는 스토어 자격증명을 사용하는 GitHub Actions 경로를 사용합니다.
 
 ## 설계 규칙
 

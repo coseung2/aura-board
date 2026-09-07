@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { generateKeyPairSync } from "node:crypto";
 import test from "node:test";
 import {
+  assertGooglePlayVersionCodeAvailable,
+  collectGooglePlayVersionCodes,
   createServiceAccountAssertion,
   promoteGooglePlayTrack,
 } from "./promote-google-play-track.mjs";
@@ -20,6 +22,31 @@ test("creates a bounded Android Publisher service-account assertion", () => {
   assert.equal(claims.iat, 1_000);
   assert.equal(claims.exp, 4_600);
   assert.equal(claims.aud, "https://oauth2.googleapis.com/token");
+});
+
+test("rejects reused or stale Google Play version codes across tracks and artifacts", () => {
+  const state = {
+    tracks: [
+      { track: "production", releases: [{ versionCodes: ["48", "49"] }] },
+      { track: "internal", releases: [{ versionCodes: ["51"] }] },
+    ],
+    bundles: [{ versionCode: 50 }],
+    apks: [{ versionCode: 47 }],
+  };
+
+  assert.deepEqual(collectGooglePlayVersionCodes(state), ["47", "48", "49", "50", "51"]);
+  assert.throws(
+    () => assertGooglePlayVersionCodeAvailable(state, 51),
+    /already uploaded or assigned/,
+  );
+  assert.throws(
+    () => assertGooglePlayVersionCodeAvailable(state, 50),
+    /already uploaded or assigned/,
+  );
+  assert.deepEqual(assertGooglePlayVersionCodeAvailable(state, 52), {
+    versionCode: "52",
+    highestExistingVersionCode: "51",
+  });
 });
 
 test("assigns an existing version code to production and commits the edit", async () => {

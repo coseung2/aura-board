@@ -15,6 +15,14 @@ function requireText(value, name) {
   return normalized;
 }
 
+function normalizeVersionCode(versionCode) {
+  const normalized = String(versionCode ?? "").trim();
+  if (!/^\d+$/.test(normalized) || normalized === "0") {
+    throw new Error("version code must be a positive integer");
+  }
+  return normalized;
+}
+
 export function createServiceAccountAssertion(serviceAccount, nowSeconds = Math.floor(Date.now() / 1000)) {
   const clientEmail = requireText(serviceAccount?.client_email, "service account client_email");
   const privateKey = requireText(serviceAccount?.private_key, "service account private_key");
@@ -37,25 +45,12 @@ async function googleRequest(fetchImpl, url, init, label) {
   const response = await fetchImpl(url, init);
   const body = await response.text();
   if (!response.ok) {
-    throw new Error(`${label} failed (${response.status}): ${body.slice(0, 1000)}`);
+    throw new Error(`${label} failed (${response.status}): ${body.slice(0, 4000)}`);
   }
   return body ? JSON.parse(body) : {};
 }
 
-export async function promoteGooglePlayTrack({
-  serviceAccount,
-  packageName,
-  track,
-  versionCode,
-  fetchImpl = fetch,
-}) {
-  const normalizedPackage = requireText(packageName, "package name");
-  const normalizedTrack = requireText(track, "track");
-  const normalizedVersionCode = String(versionCode ?? "").trim();
-  if (!/^\d+$/.test(normalizedVersionCode) || normalizedVersionCode === "0") {
-    throw new Error("version code must be a positive integer");
-  }
-
+async function authorizeGooglePlay(serviceAccount, fetchImpl) {
   const assertion = createServiceAccountAssertion(serviceAccount);
   const tokenBody = new URLSearchParams({
     grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
@@ -67,18 +62,101 @@ export async function promoteGooglePlayTrack({
     body: tokenBody,
   }, "Google OAuth token request");
   const accessToken = requireText(token.access_token, "Google OAuth access token");
-  const headers = {
+  return {
     Authorization: `Bearer ${accessToken}`,
     "Content-Type": "application/json",
   };
-  const appPath = `${PUBLISHER_ROOT}/applications/${encodeURIComponent(normalizedPackage)}`;
+}
+
+async function createEdit({ fetchImpl, packageName, headers }) {
+  const appPath = `${PUBLISHER_ROOT}/applications/${encodeURIComponent(packageName)}`;
   const edit = await googleRequest(fetchImpl, `${appPath}/edits`, {
     method: "POST",
     headers,
     body: "{}",
   }, "Google Play edit creation");
   const editId = requireText(edit.id, "Google Play edit id");
-  const editPath = `${appPath}/edits/${encodeURIComponent(editId)}`;
+  return {
+    appPath,
+    editId,
+    editPath: `${appPath}/edits/${encodeURIComponent(editId)}`,
+  };
+}
+
+export function collectGooglePlayVersionCodes({ tracks = [], bundles = [], apks = [] }) {
+  const codes = new Set();
+  for (const track of tracks) {
+    for (const release of track?.releases ?? []) {
+      for (const code of release?.versionCodes ?? []) {
+        const normalized = String(code ?? "").trim();
+        if (/^\d+$/.test(normalized) && normalized !== "0") codes.add(normalized);
+      }
+    }
+  }
+  for (const artifact of [...bundles, ...apks]) {
+    const normalized = String(artifact?.versionCode ?? "").trim();
+    if (/^\d+$/.test(normalized) && normalized !== "0") codes.add(normalized);
+  }
+  return [...codes].sort((left, right) => Number(left) - Number(right));
+}
+
+export function assertGooglePlayVersionCodeAvailable(state, versionCode) {
+  const candidate = normalizeVersionCode(versionCode);
+  const usedCodes = collectGooglePlayVersionCodes(state);
+  if (usedCodes.includes(candidate)) {
+    throw new Error(`Google Play versionCode ${candidate} is already uploaded or assigned to a track.`);
+  }
+  const highest = usedCodes.at(-1);
+  if (highest && Number(candidate) <= Number(highest)) {
+    throw new Error(
+      `Google Play versionCode ${candidate} must be greater than the highest existing versionCode ${highest}.`,
+    );
+  }
+  return { versionCode: candidate, highestExistingVersionCode: highest ?? null };
+}
+
+export async function inspectGooglePlayReleaseState({
+  serviceAccount,
+  packageName,
+  fetchImpl = fetch,
+}) {
+  const normalizedPackage = requireText(packageName, "package name");
+  const headers = await authorizeGooglePlay(serviceAccount, fetchImpl);
+  const { editPath } = await createEdit({ fetchImpl, packageName: normalizedPackage, headers });
+  try {
+    const [tracksResult, bundlesResult, apksResult] = await Promise.all([
+      googleRequest(fetchImpl, `${editPath}/tracks`, { method: "GET", headers }, "Google Play tracks listing"),
+      googleRequest(fetchImpl, `${editPath}/bundles`, { method: "GET", headers }, "Google Play bundles listing"),
+      googleRequest(fetchImpl, `${editPath}/apks`, { method: "GET", headers }, "Google Play APKs listing"),
+    ]);
+    return {
+      packageName: normalizedPackage,
+      tracks: tracksResult.tracks ?? [],
+      bundles: bundlesResult.bundles ?? [],
+      apks: apksResult.apks ?? [],
+    };
+  } finally {
+    await googleRequest(
+      fetchImpl,
+      editPath,
+      { method: "DELETE", headers },
+      "Google Play preflight edit cleanup",
+    );
+  }
+}
+
+export async function promoteGooglePlayTrack({
+  serviceAccount,
+  packageName,
+  track,
+  versionCode,
+  fetchImpl = fetch,
+}) {
+  const normalizedPackage = requireText(packageName, "package name");
+  const normalizedTrack = requireText(track, "track");
+  const normalizedVersionCode = normalizeVersionCode(versionCode);
+  const headers = await authorizeGooglePlay(serviceAccount, fetchImpl);
+  const { editPath } = await createEdit({ fetchImpl, packageName: normalizedPackage, headers });
 
   await googleRequest(fetchImpl, `${editPath}/tracks/${encodeURIComponent(normalizedTrack)}`, {
     method: "PUT",
@@ -106,18 +184,36 @@ async function main() {
     process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON,
     "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON",
   );
+  const serviceAccount = JSON.parse(rawServiceAccount);
+  const packageName = readArg("--package");
+  const track = readArg("--track");
+  const versionCode = readArg("--version-code");
+
+  if (process.argv.includes("--preflight")) {
+    const state = await inspectGooglePlayReleaseState({ serviceAccount, packageName });
+    const result = assertGooglePlayVersionCodeAvailable(state, versionCode);
+    const assignedTracks = state.tracks
+      .filter((candidate) => (candidate?.releases ?? []).some((release) => (release?.versionCodes ?? []).length > 0))
+      .map((candidate) => candidate.track)
+      .filter(Boolean);
+    console.log(
+      `Google Play preflight passed for versionCode ${result.versionCode}; highest existing=${result.highestExistingVersionCode ?? "none"}; populated tracks=${assignedTracks.join(",") || "none"}.`,
+    );
+    return;
+  }
+
   const result = await promoteGooglePlayTrack({
-    serviceAccount: JSON.parse(rawServiceAccount),
-    packageName: readArg("--package"),
-    track: readArg("--track"),
-    versionCode: readArg("--version-code"),
+    serviceAccount,
+    packageName,
+    track,
+    versionCode,
   });
   console.log(`Promoted ${result.packageName} versionCode ${result.versionCode} to ${result.track}.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   main().catch((error) => {
-    console.error(error instanceof Error ? error.message : "Google Play promotion failed");
+    console.error(error instanceof Error ? error.message : "Google Play release action failed");
     process.exitCode = 1;
   });
 }
