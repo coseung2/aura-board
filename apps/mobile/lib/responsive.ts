@@ -28,8 +28,9 @@ export function webSafeWidthStyle(
   return { width: width as DimensionValue } as ViewStyle;
 }
 
-export function isPortraitTabletViewport(width: number, height: number) {
-  return width >= layout.mobileBreakpoint && height >= width;
+/** Window width, not device type: landscape and split-screen are first class. */
+export function isWideViewport(width: number) {
+  return width >= layout.mobileBreakpoint;
 }
 
 /** Large fonts fall back to a vertical, scrollable game rather than tiny columns. */

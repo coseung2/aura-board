@@ -263,7 +263,7 @@ export function StudentInspectionScreen({ mode }: { mode: Mode }) {
 
   const title = mode === "cleaning" ? "청소 검사" : "실내화 정리 검사";
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title={title} onBack={() => router.back()} />
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={colors.accent} /></View>

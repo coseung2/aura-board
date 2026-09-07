@@ -4,9 +4,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import {
   colors,
   iconSizes,
@@ -70,7 +70,7 @@ function QuizBoardContent({
   data: BoardDetailResponse;
   onMutate: () => void;
 }) {
-  const { width, height, fontScale } = useWindowDimensions();
+  const { width, height, fontScale } = useSafeWindowDimensions();
   const wide = isWideGameViewport(width, height, fontScale);
   const room = data.layoutData.quiz?.room;
   const [joining, setJoining] = useState(false);

@@ -96,7 +96,7 @@ export function StudentReadingScreenView({
     editingEntryId,
   } = model;
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="독서" right={<StudentHeaderActions />} />
       <ContentTabs accessibilityLabel="독서 보기" style={styles.pageTabs}>
         <ContentTab

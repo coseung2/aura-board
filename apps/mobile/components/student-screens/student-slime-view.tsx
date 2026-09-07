@@ -96,7 +96,7 @@ export function StudentSlimeScreenView({
   } = model;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       {openEffectColor || openGrowthColor ? (
         <ControlPressable
           style={styles.effectDismissLayer}

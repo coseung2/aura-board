@@ -1,4 +1,4 @@
-import { StyleSheet } from "react-native";
+import { KeyboardAvoidingView, Platform, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { FeedComposerForm } from "../../../components/FeedComposerForm";
@@ -30,17 +30,20 @@ export default function StudentFeedComposeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.page} edges={["top"]}>
+    <SafeAreaView style={styles.page}>
       <AppHeader
         title="새 게시물"
         onBack={() => router.back()}
         showDailyBanner={false}
       />
-      <FeedComposerForm onSubmit={submit} onSuccess={() => router.back()} />
+      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+        <FeedComposerForm onSubmit={submit} onSuccess={() => router.back()} />
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  keyboard: { flex: 1 },
   page: { flex: 1, backgroundColor: colors.bg },
 });

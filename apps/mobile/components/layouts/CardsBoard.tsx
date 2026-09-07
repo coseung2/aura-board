@@ -3,9 +3,9 @@ import {
   FlatList,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import {
   colors,
   controls,
@@ -30,7 +30,7 @@ import {
 } from "../../lib/card-privacy";
 import { Fab } from "../ui";
 import { useBoardRealtime } from "../../lib/use-board-realtime";
-import { isPortraitTabletViewport } from "../../lib/responsive";
+import { isWideViewport } from "../../lib/responsive";
 import { StreamFeedPost } from "./ColumnsBoard";
 import {
   nextCardOrder,
@@ -47,8 +47,8 @@ export function CardsBoard({
   data: BoardDetailResponse;
   onMutate: () => void;
 }) {
-  const { width, height } = useWindowDimensions();
-  const usePortraitTabletLayout = isPortraitTabletViewport(width, height);
+  const { width } = useSafeWindowDimensions();
+  const useReadableLayout = isWideViewport(width);
   const [composerOpen, setComposerOpen] = useState(false);
   const [commentCard, setCommentCard] = useState<BoardCard | null>(null);
   const [authorCard, setAuthorCard] = useState<BoardCard | null>(null);
@@ -94,7 +94,7 @@ export function CardsBoard({
         keyExtractor={(card) => card.id}
         contentContainerStyle={[
           styles.streamContent,
-          usePortraitTabletLayout && styles.portraitTabletContent,
+          useReadableLayout && styles.readableContent,
         ]}
         renderItem={({ item, index }) => (
           <StreamFeedPost
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     paddingTop: pageChrome.directContentStartGap,
     paddingBottom: spacing.xxxl + controls.fab,
   },
-  portraitTabletContent: {
+  readableContent: {
     width: "100%",
     maxWidth: layout.readableMaxWidth,
     alignSelf: "center",

@@ -111,7 +111,7 @@ export default function ParentFeedScreen() {
   }, [feed.items, feed.loading, focusPostId]);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader
         title="피드"
         onBack={focusPostId ? handleFocusedBack : undefined}

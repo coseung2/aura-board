@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   Alert,
+  ScrollView,
   StyleSheet,
   Text,
   useWindowDimensions,
@@ -9,6 +10,7 @@ import {
 import { Image } from "expo-image";
 import { Ban, CircleAlert, Pencil, Trash2 } from "lucide-react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { anchoredOverlayLayout } from "../lib/overlay-layout";
 import type { BoardCard } from "../lib/types";
 import { resolveCardAuthorName } from "../lib/card-privacy";
 import { apiFetch } from "../lib/api";
@@ -43,9 +45,6 @@ type Props = {
   onDeleted?: (cardId: string) => void;
 };
 
-const SCREEN_MARGIN = spacing.lg;
-const ACTION_PANEL_HEIGHT = tapMin * 2 + spacing.sm;
-
 /** Full-screen focus layer for hiding or reporting another student's post. */
 export function PostModerationOverlay({
   card,
@@ -61,25 +60,9 @@ export function PostModerationOverlay({
   const [busy, setBusy] = useState(false);
   const author = resolveCardAuthorName(card) || "작성자";
   const preview = mediaPreviewUrls(buildMediaItems(card))[0] ?? null;
-  const width = Math.min(anchor.width, window.width - SCREEN_MARGIN * 2);
-  const safeTop = insets.top + SCREEN_MARGIN;
-  const safeBottom = window.height - insets.bottom - SCREEN_MARGIN;
-  const safeHeight = Math.max(0, safeBottom - safeTop);
-  const maxFocusHeight = Math.max(
-    tapMin * 2,
-    safeHeight - ACTION_PANEL_HEIGHT - spacing.sm,
-  );
-  const focusHeight = Math.min(anchor.height, maxFocusHeight);
-  const left = Math.max(
-    SCREEN_MARGIN,
-    Math.min(anchor.x, window.width - width - SCREEN_MARGIN),
-  );
-  const focusedContentHeight =
-    focusHeight + ACTION_PANEL_HEIGHT + spacing.sm;
-  const top = Math.max(
-    safeTop,
-    safeTop + (safeHeight - focusedContentHeight) / 2,
-  );
+  const [actionHeight, setActionHeight] = useState((tapMin + spacing.lg) * 2 * window.fontScale);
+  const geometry = anchoredOverlayLayout(window, insets, anchor, actionHeight, true);
+  const menuWidth = Math.min(geometry.width, (tapMin * 4 + spacing.sm) * window.fontScale);
   const authorStudentId =
     card.studentAuthorId ??
     card.authors?.find((item) => Boolean(item.studentId))?.studentId ??
@@ -176,8 +159,8 @@ export function PostModerationOverlay({
           onPress={busy ? undefined : onClose}
           accessibilityLabel="게시글 관리 메뉴 닫기"
         />
-        <View style={[styles.focusWrap, { left, top, width }]}>
-          <View style={[styles.post, { height: focusHeight }]}>
+        <View style={[styles.focusWrap, { left: geometry.left, top: geometry.top, width: geometry.width, gap: geometry.gap }]}>
+          {geometry.previewHeight > 0 ? <View style={[styles.post, { height: geometry.previewHeight }]}>
             <Text style={styles.author} numberOfLines={1}>
               {author}
             </Text>
@@ -198,9 +181,14 @@ export function PostModerationOverlay({
                 {card.content.trim()}
               </Text>
             ) : null}
-          </View>
+          </View> : null}
 
-          <View style={styles.actions} accessibilityLabel="게시글 관리 메뉴">
+          <ScrollView
+            style={[styles.actions, { height: geometry.actionsHeight, width: menuWidth }]}
+            onContentSizeChange={(_width, height) => setActionHeight(height + borders.hairline * 2)}
+            keyboardShouldPersistTaps="handled"
+            accessibilityLabel="게시글 관리 메뉴"
+          >
             {mode === "owner" ? (
               <>
                 <ControlPressable
@@ -271,7 +259,7 @@ export function PostModerationOverlay({
                 </ControlPressable>
               </>
             )}
-          </View>
+          </ScrollView>
         </View>
       </View>
     </AppOverlayModal>
@@ -306,8 +294,9 @@ const styles = StyleSheet.create({
   title: { ...typography.subtitle, color: colors.text },
   content: { ...typography.body, color: colors.text },
   actions: {
+    flexGrow: 0,
+    flexShrink: 0,
     alignSelf: "flex-start",
-    minWidth: 184,
     overflow: "hidden",
     borderWidth: borders.hairline,
     borderColor: colors.border,
@@ -328,7 +317,7 @@ const styles = StyleSheet.create({
     borderRadius: radii.none,
     backgroundColor: colors.surface,
   },
-  actionLabel: { ...typography.body, color: colors.text, fontWeight: "600" },
+  actionLabel: { ...typography.body, color: colors.text, fontWeight: "600", flexShrink: 1 },
   reportLabel: { color: colors.danger },
   actionLast: { borderBottomWidth: borders.none },
 });

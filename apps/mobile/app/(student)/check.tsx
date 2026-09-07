@@ -217,7 +217,7 @@ export default function StudentCheckScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="제출 체크" onBack={() => router.back()} />
 
       {listLoading ? (

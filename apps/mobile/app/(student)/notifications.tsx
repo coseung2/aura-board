@@ -120,7 +120,7 @@ export default function StudentNotificationsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="알림" onBack={handleBack} />
       {loading ? (
         <View style={styles.center}><ActivityIndicator color={colors.accent} /></View>

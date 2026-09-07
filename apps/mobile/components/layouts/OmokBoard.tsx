@@ -6,8 +6,8 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import type { BoardDetailResponse } from "../../lib/types";
 import { ApiError } from "../../lib/api";
 import {
@@ -64,7 +64,7 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   const sequenceRef = useRef(0);
   const matchmakingRefreshRef = useRef<Promise<void> | null>(null);
   const retriedRef = useRef<string | null>(null);
-  const { width } = useWindowDimensions();
+  const { width } = useSafeWindowDimensions();
   const cellSize = Math.max(20, Math.min(29, Math.floor((width - 40) / 15)));
 
   const refresh = useCallback(async () => {

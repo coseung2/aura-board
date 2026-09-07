@@ -137,7 +137,7 @@ export default function StudentWalletScreen() {
   }, [handleAuthError, loadQr]);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="은행" onBack={() => router.back()} />
 
       {loading ? (

@@ -227,7 +227,7 @@ export default function BoardDetail() {
 
   if (loading || (data && !access?.availableLayouts)) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
         <BoardHeader title="보드" layout="stream" onBack={handleBoardBack} />
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
@@ -241,7 +241,7 @@ export default function BoardDetail() {
 
   if (!data || !canReadMobileLayout(access, data.board.layout)) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
         <View style={styles.center}>
           <CircleAlert
             size={iconSizes.xl}
@@ -285,6 +285,7 @@ export default function BoardDetail() {
         onExit={handleBoardBack}
         exitLabel="게임 목록"
         scrollEnabled={board.layout === "speed-game"}
+        bottomSafeArea={false}
       >
         {renderOfficialGameLayout(data)}
       </GameAreaShell>
@@ -299,7 +300,7 @@ export default function BoardDetail() {
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: boardBackground }]}
-      edges={["top"]}
+      edges={["top", "left", "right"]}
     >
       <BoardHeader
         title={activeSectionTitle ?? board.title}

@@ -3,9 +3,9 @@ import {
   FlatList,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import {
   borders,
   colors,
@@ -38,7 +38,7 @@ import {
 import { ControlPressable, Fab, SurfaceCard } from "../ui";
 import { SectionNav, SectionNavItem } from "../NavigationTabs";
 import { useBoardRealtime } from "../../lib/use-board-realtime";
-import { isPortraitTabletViewport } from "../../lib/responsive";
+import { isWideViewport } from "../../lib/responsive";
 import { StreamFeedPost } from "./ColumnsStreamFeedPost";
 
 export { StreamFeedPost } from "./ColumnsStreamFeedPost";
@@ -65,8 +65,8 @@ export function ColumnsBoard({
   selectedSectionKey?: string | null;
   onSelectedSectionKeyChange?: (key: string | null) => void;
 }) {
-  const { width, height } = useWindowDimensions();
-  const usePortraitTabletLayout = isPortraitTabletViewport(width, height);
+  const { width } = useSafeWindowDimensions();
+  const useReadableLayout = isWideViewport(width);
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(data.cards, data.board),
   );
@@ -193,7 +193,7 @@ export function ColumnsBoard({
           keyExtractor={(card) => card.id}
           contentContainerStyle={[
             styles.listContent,
-            usePortraitTabletLayout && styles.portraitTabletContent,
+            useReadableLayout && styles.readableContent,
           ]}
           renderItem={({ item, index }) => (
             <StreamFeedPost
@@ -229,7 +229,7 @@ export function ColumnsBoard({
           keyExtractor={(summary) => sectionKey(summary.id)}
           contentContainerStyle={[
             styles.overviewContent,
-            usePortraitTabletLayout && styles.portraitTabletContent,
+            useReadableLayout && styles.readableContent,
           ]}
           ListHeaderComponent={
             <View style={styles.topicFilterHeader}>
@@ -459,7 +459,7 @@ const styles = StyleSheet.create({
     paddingTop: pageChrome.directContentStartGap,
     paddingBottom: spacing.xxxl,
   },
-  portraitTabletContent: {
+  readableContent: {
     width: "100%",
     maxWidth: layout.readableMaxWidth,
     alignSelf: "center",

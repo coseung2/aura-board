@@ -88,7 +88,7 @@ export default function StudentPortfolioScreen() {
   }, [handleAuthError, loadPortfolio]);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader
         title="포트폴리오"
         right={

@@ -41,7 +41,7 @@ export default function StudentCanvaScreen() {
     : "";
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="Canva 연결" onBack={() => router.back()} />
       <View style={styles.content}>
         <SurfaceCard style={styles.card}>

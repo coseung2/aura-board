@@ -5,8 +5,8 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { Check, ChevronDown } from "lucide-react-native";
@@ -48,7 +48,7 @@ type ContentKind = "media" | "text";
 
 export default function ParentHomeScreen() {
   const router = useRouter();
-  const { width } = useWindowDimensions();
+  const { width } = useSafeWindowDimensions();
   const [selectedChildId, setSelectedChildId] = useState<string | null>(null);
   const [kind, setKind] = useState<ContentKind>("media");
   const [childMenuOpen, setChildMenuOpen] = useState(false);
@@ -186,7 +186,7 @@ export default function ParentHomeScreen() {
 
   if (overview.loading) {
     return (
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <SafeAreaView style={styles.container}>
         <View style={styles.center}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text selectable style={styles.muted}>
@@ -198,7 +198,7 @@ export default function ParentHomeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader
         title="홈"
         right={

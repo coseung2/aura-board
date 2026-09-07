@@ -176,7 +176,7 @@ export default function ParentReadingScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="독서" right={<ParentHeaderActions />} />
       <ScrollView
         contentContainerStyle={styles.content}

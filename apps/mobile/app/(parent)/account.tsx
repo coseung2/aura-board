@@ -128,7 +128,7 @@ export default function ParentAccountScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="계정" />
       <ScrollView
         contentContainerStyle={styles.content}

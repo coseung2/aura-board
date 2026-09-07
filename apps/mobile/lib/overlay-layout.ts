@@ -1,5 +1,5 @@
 import type { ModalProps, ViewStyle } from "react-native";
-import { composer, layout, spacing } from "../theme/tokens";
+import { composer, layout, spacing, tapMin } from "../theme/tokens";
 
 export const MODAL_ORIENTATIONS: NonNullable<ModalProps["supportedOrientations"]> = [
   "portrait", "portrait-upside-down", "landscape-left", "landscape-right",
@@ -50,5 +50,32 @@ export function fitOverlaySurface(frame: OverlayFrame, style: ViewStyle = {}): V
     minHeight: dimension(style.minHeight, maxHeight, 0),
     flexShrink: 1,
     ...(style.height !== undefined ? { height: Math.min(maxHeight, dimension(style.height, height, maxHeight)) } : {}),
+  };
+}
+
+/** Stale pre-rotation anchors may position a menu, but can never size its window. */
+export function anchoredOverlayLayout(
+  frame: OverlayFrame,
+  insets: SafeInsets,
+  anchor: OverlayFrame & { x: number; y: number },
+  actionHeight: number,
+  centered = false,
+) {
+  const safeLeft = insets.left + spacing.lg;
+  const safeTop = insets.top + spacing.lg;
+  const safeWidth = Math.max(0, frame.width - safeLeft - insets.right - spacing.lg);
+  const safeHeight = Math.max(0, frame.height - safeTop - insets.bottom - spacing.lg);
+  const width = Math.min(safeWidth, Math.max(tapMin * 4 + spacing.sm, anchor.width));
+  const actionsHeight = Math.min(safeHeight, Math.max(0, actionHeight));
+  const previewBudget = Math.max(0, safeHeight - actionsHeight - spacing.sm);
+  const requestedPreview = Math.max(0, Math.min(anchor.height, previewBudget));
+  const previewHeight = requestedPreview >= tapMin ? requestedPreview : 0;
+  const gap = previewHeight > 0 ? spacing.sm : 0;
+  const height = previewHeight + gap + actionsHeight;
+  return {
+    width, height, previewHeight, actionsHeight, gap,
+    left: Math.max(safeLeft, Math.min(anchor.x, safeLeft + safeWidth - width)),
+    top: centered ? safeTop + (safeHeight - height) / 2
+      : Math.max(safeTop, Math.min(anchor.y, safeTop + safeHeight - height)),
   };
 }

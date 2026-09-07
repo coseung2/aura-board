@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View, useWindowDimensions } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
+import { useSafeWindowDimensions } from "../hooks/use-safe-window-dimensions";
 import {
   borders,
   colors,
@@ -23,7 +24,7 @@ type Props = {
 };
 
 export function ShowcaseCardGrid({ entries, emptyText, onOpen }: Props) {
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useSafeWindowDimensions();
   const columns = width > height ? 4 : 2;
   const horizontalPadding =
     width >= layoutTokens.mobileBreakpoint ? spacing.xxl : spacing.xl;

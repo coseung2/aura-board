@@ -6,9 +6,9 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import { apiFetch } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
 import {
@@ -41,7 +41,7 @@ export function VibeGalleryBoard({ data }: { data: BoardDetailResponse }) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useSafeWindowDimensions();
   const available = Math.max(0, width - layout.boardGridPadding * 2);
   const columns = width > height ? 4 : 2;
   const cardWidth =

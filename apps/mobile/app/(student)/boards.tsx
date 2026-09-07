@@ -7,8 +7,8 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import { Image } from "expo-image";
 import {
   type Href,
@@ -104,7 +104,7 @@ export default function StudentBoardsScreen() {
   const routePlayTab = Array.isArray(routeParams.playTab)
     ? routeParams.playTab[0]
     : routeParams.playTab;
-  const { width } = useWindowDimensions();
+  const { width } = useSafeWindowDimensions();
   const initialCache = readBoardCache<
     StudentBoardsResponse | LegacyStudentBoardsResponse
   >(BOARD_LIST_CACHE_KEY);
@@ -320,7 +320,7 @@ export default function StudentBoardsScreen() {
 
   if (filter === "play") {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
         <AppHeader title="보드" right={<StudentHeaderActions />} />
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
@@ -344,7 +344,7 @@ export default function StudentBoardsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="보드" right={<StudentHeaderActions />} />
       {loading && contentBoards.length === 0 ? (
         <View style={styles.screenBody}>

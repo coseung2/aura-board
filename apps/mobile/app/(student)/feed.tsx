@@ -124,7 +124,7 @@ export default function StudentFeedScreen() {
   const showEmpty = !initialLoading && !error && items.length === 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader
         title="피드"
         right={(

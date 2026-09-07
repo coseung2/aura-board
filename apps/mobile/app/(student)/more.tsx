@@ -177,7 +177,7 @@ export default function StudentMoreScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="더보기" right={<StudentHeaderActions />} />
       <ScrollView
         style={styles.scroll}

@@ -19,6 +19,7 @@ export type MobileGameAreaShellProps = Omit<MobileGameHudProps, "connection"> & 
   hostControls?: ReactNode;
   participantActions?: ReactNode;
   scrollEnabled?: boolean;
+  bottomSafeArea?: boolean;
 };
 
 export function GameAreaShell({
@@ -29,11 +30,12 @@ export function GameAreaShell({
   hostControls,
   participantActions,
   scrollEnabled = true,
+  bottomSafeArea = true,
   ...hudProps
 }: MobileGameAreaShellProps) {
   const locked = inputLocked || connection !== "online";
   return (
-    <SafeAreaView style={styles.root} edges={["top", "right", "bottom", "left"]} accessibilityState={{ busy: locked }}>
+    <SafeAreaView style={styles.root} edges={bottomSafeArea ? ["top", "right", "bottom", "left"] : ["top", "right", "left"]} accessibilityState={{ busy: locked }}>
       <GameHud {...hudProps} connection={connection} />
       <KeyboardAvoidingView style={styles.playfield} enabled={scrollEnabled} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         {hostControls ? <View style={styles.zone}>{hostControls}</View> : null}

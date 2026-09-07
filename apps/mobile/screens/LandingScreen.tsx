@@ -471,7 +471,7 @@ export function Landing() {
 
   if (booting) {
     return (
-      <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+      <SafeAreaView style={styles.container}>
         <View style={styles.bootingCenter}>
           <ActivityIndicator size="large" color={colors.accent} />
           <Text style={styles.bootingText}>불러오는 중…</Text>
@@ -481,7 +481,7 @@ export function Landing() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.select({ ios: "padding", android: "height" })}

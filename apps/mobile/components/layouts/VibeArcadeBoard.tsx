@@ -6,10 +6,12 @@ import {
   Modal,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import { WebView } from "react-native-webview";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { MODAL_ORIENTATIONS } from "../../lib/overlay-layout";
 import {
   borders,
   cardDetail,
@@ -49,10 +51,11 @@ export type PlayProject = {
   title: string;
 };
 
+
 export function VibeArcadeBoard({ data }: { data: BoardDetailResponse }) {
   const cfg = data.layoutData.vibeArcade?.config;
   const projects = data.layoutData.vibeArcade?.projects ?? [];
-  const { width } = useWindowDimensions();
+  const { width } = useSafeWindowDimensions();
   const compact = width < vibe.compactBreakpoint;
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -310,8 +313,8 @@ export function VibeProjectPlayModal({
     : null;
 
   return (
-    <Modal visible={true} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.modalRoot}>
+    <Modal visible={true} animationType="slide" onRequestClose={onClose} supportedOrientations={MODAL_ORIENTATIONS} statusBarTranslucent navigationBarTranslucent>
+      <SafeAreaView style={styles.modalRoot}>
         <View style={styles.modalBar}>
           <IconButton
             onPress={onClose}
@@ -351,7 +354,7 @@ export function VibeProjectPlayModal({
             )}
           />
         )}
-      </View>
+      </SafeAreaView>
     </Modal>
   );
 }

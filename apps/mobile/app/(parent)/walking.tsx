@@ -320,7 +320,7 @@ export default function ParentWalkingScreen() {
           : "연결 필요";
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="걷기" right={<ParentHeaderActions />} />
       <ScrollView
         contentContainerStyle={styles.content}

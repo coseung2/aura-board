@@ -71,7 +71,7 @@ export function StudentBottomNav({ duties = [], access }: Props) {
     <View
       style={[
         styles.container,
-        { paddingBottom: bottomPadding },
+        { paddingBottom: bottomPadding, paddingLeft: insets.left, paddingRight: insets.right },
       ]}
     >
       <View

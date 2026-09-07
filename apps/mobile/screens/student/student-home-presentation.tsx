@@ -44,7 +44,7 @@ import { styles } from "../../components/student-screens/student-home.styles";
 import { useMemo } from "react";
 import { useRouter } from "expo-router";
 import { useState } from "react";
-import { useWindowDimensions } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import { visibleEquippedSlimeItemKeys } from "../../lib/slime-item-visibility";
 
 const SLIME_TRAMPOLINE_ITEM_KEY = "slime-blue-trampoline";
@@ -84,7 +84,7 @@ export function DailyGamePanel({
   onOpenReadingRank: () => void;
   onOpenBoards: () => void;
 }) {
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth } = useSafeWindowDimensions();
   const homePetScene = useMemo(() => {
     const contentWidth = Math.min(windowWidth, layout.readableMaxWidth);
     const bodyWidth = Math.max(

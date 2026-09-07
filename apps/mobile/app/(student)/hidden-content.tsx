@@ -110,7 +110,7 @@ export default function StudentHiddenContentScreen() {
   const isEmpty = summary.items.length === 0 && summary.authors.length === 0;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="숨긴 항목" onBack={() => router.back()} />
       {loading ? (
         <View style={styles.center}>

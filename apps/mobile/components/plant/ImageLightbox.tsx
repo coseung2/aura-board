@@ -16,6 +16,8 @@ import {
   typography,
 } from "../../theme/tokens";
 import { IconButton, MediaPressable } from "../ui";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { MODAL_ORIENTATIONS } from "../../lib/overlay-layout";
 
 interface Props {
   url: string | null;
@@ -29,15 +31,19 @@ interface Props {
  */
 export function ImageLightbox({ url, onClose }: Props) {
   const { width, height } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
+  const safeWidth = Math.max(0, width - insets.left - insets.right);
+  const safeHeight = Math.max(0, height - insets.top - insets.bottom);
   if (!url) return null;
 
   return (
-    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
-      <MediaPressable style={styles.backdrop} onPress={onClose}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose} supportedOrientations={MODAL_ORIENTATIONS} statusBarTranslucent navigationBarTranslucent>
+      <SafeAreaView style={styles.backdrop}>
+      <MediaPressable style={styles.frame} onPress={onClose}>
         <View
           style={[
             styles.container,
-            { width, height: height * plant.lightboxHeightRatio },
+            { width: safeWidth, height: safeHeight * plant.lightboxHeightRatio },
           ]}
         >
           <Image
@@ -45,8 +51,8 @@ export function ImageLightbox({ url, onClose }: Props) {
             style={[
               styles.image,
               {
-                width: width * plant.lightboxImageWidthRatio,
-                height: height * plant.lightboxImageHeightRatio,
+                width: safeWidth * plant.lightboxImageWidthRatio,
+                height: safeHeight * plant.lightboxImageHeightRatio,
               },
             ]}
             resizeMode="contain"
@@ -64,11 +70,13 @@ export function ImageLightbox({ url, onClose }: Props) {
           </View>
         </IconButton>
       </MediaPressable>
+      </SafeAreaView>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
+  frame: { flex: 1, width: "100%", alignItems: "center", justifyContent: "center" },
   backdrop: {
     flex: 1,
     backgroundColor: colors.lightboxOverlay,
@@ -82,8 +90,8 @@ const styles = StyleSheet.create({
   image: {},
   closeBtn: {
     position: "absolute",
-    bottom: plant.lightboxCloseBottom,
-    alignSelf: "center",
+    top: spacing.md,
+    right: spacing.md,
     width: controls.iconButton,
     height: controls.iconButton,
     backgroundColor: colors.lightboxControlBg,

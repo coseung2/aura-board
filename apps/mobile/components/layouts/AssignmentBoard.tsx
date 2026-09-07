@@ -8,8 +8,8 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import {
@@ -67,7 +67,7 @@ export function AssignmentBoard({
   data: BoardDetailResponse;
   onMutate: () => void;
 }) {
-  const { width } = useWindowDimensions();
+  const { width } = useSafeWindowDimensions();
   const slots = data.layoutData.assignment?.slots ?? [];
   const mySlot = useMemo(
     () => slots.find((s) => s.studentId === data.currentStudent.id),

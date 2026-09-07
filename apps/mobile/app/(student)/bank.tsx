@@ -136,7 +136,7 @@ export default function StudentBankScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="학급 은행" onBack={() => router.back()} />
 
       {loading ? (

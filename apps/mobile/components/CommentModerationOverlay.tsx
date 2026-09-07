@@ -1,4 +1,7 @@
-import { StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useState } from "react";
+import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { anchoredOverlayLayout } from "../lib/overlay-layout";
 import { Ban, CircleAlert, Heart } from "lucide-react-native";
 import { BarePressable, ControlPressable } from "./ui";
 import {
@@ -31,9 +34,6 @@ type Props = {
   onReport: () => void;
 };
 
-const SCREEN_MARGIN = spacing.lg;
-const ACTION_PANEL_HEIGHT = tapMin * 2 + spacing.sm;
-
 /** Full-screen focus layer used after a long press on a comment. */
 export function CommentModerationOverlay({
   anchor,
@@ -46,18 +46,10 @@ export function CommentModerationOverlay({
   onReport,
 }: Props) {
   const window = useWindowDimensions();
-  const width = Math.min(anchor.width, window.width - SCREEN_MARGIN * 2);
-  const left = Math.max(
-    SCREEN_MARGIN,
-    Math.min(anchor.x, window.width - width - SCREEN_MARGIN),
-  );
-  const maxTop =
-    window.height -
-    SCREEN_MARGIN -
-    ACTION_PANEL_HEIGHT -
-    spacing.sm -
-    anchor.height;
-  const top = Math.max(SCREEN_MARGIN, Math.min(anchor.y, maxTop));
+  const insets = useSafeAreaInsets();
+  const [actionHeight, setActionHeight] = useState((tapMin + spacing.lg) * 2 * window.fontScale);
+  const geometry = anchoredOverlayLayout(window, insets, anchor, actionHeight);
+  const menuWidth = Math.min(geometry.width, (tapMin * 4 + spacing.sm) * window.fontScale);
 
   return (
     <View style={styles.root} accessibilityViewIsModal>
@@ -66,8 +58,8 @@ export function CommentModerationOverlay({
         onPress={onClose}
         accessibilityLabel="댓글 관리 메뉴 닫기"
       />
-      <View style={[styles.focusWrap, { left, top, width }]}>
-        <View style={styles.commentCard}>
+      <View style={[styles.focusWrap, { left: geometry.left, top: geometry.top, width: geometry.width, gap: geometry.gap }]}>
+        {geometry.previewHeight > 0 ? <ScrollView style={[styles.preview, { height: geometry.previewHeight }]} contentContainerStyle={styles.commentCard}>
           <View style={styles.commentRow}>
             <View style={styles.commentCopy}>
               <View style={styles.identity}>
@@ -88,9 +80,14 @@ export function CommentModerationOverlay({
               <Text style={styles.likeCount}>{likeCount}</Text>
             </View>
           </View>
-        </View>
+        </ScrollView> : null}
 
-        <View style={styles.actions} accessibilityLabel="댓글 관리 메뉴">
+        <ScrollView
+          style={[styles.actions, { height: geometry.actionsHeight, width: menuWidth }]}
+          onContentSizeChange={(_width, height) => setActionHeight(height + borders.hairline * 2)}
+          keyboardShouldPersistTaps="handled"
+          accessibilityLabel="댓글 관리 메뉴"
+        >
           <ControlPressable
             style={styles.action}
             onPress={onHide}
@@ -117,13 +114,14 @@ export function CommentModerationOverlay({
             />
             <Text style={[styles.actionLabel, styles.reportLabel]}>신고</Text>
           </ControlPressable>
-        </View>
+        </ScrollView>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  preview: { flexGrow: 0, flexShrink: 0 },
   root: {
     ...StyleSheet.absoluteFillObject,
     zIndex: layers.floatingPopover,
@@ -183,8 +181,9 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   actions: {
+    flexGrow: 0,
+    flexShrink: 0,
     alignSelf: "flex-start",
-    minWidth: 184,
     overflow: "hidden",
     borderWidth: borders.hairline,
     borderColor: colors.border,
@@ -206,6 +205,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   actionLabel: {
+    flexShrink: 1,
     ...typography.body,
     color: colors.text,
     fontWeight: "600",

@@ -77,7 +77,7 @@ export function StudentWalkingScreenView({
     connect,
   } = model;
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader
         title="걷기"
         right={

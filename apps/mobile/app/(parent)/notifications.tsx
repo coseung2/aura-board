@@ -71,7 +71,7 @@ export default function ParentNotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader
         title="알림"
         onBack={handleBack}

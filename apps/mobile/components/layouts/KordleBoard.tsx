@@ -6,9 +6,9 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import { ApiError, apiFetch } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
 import { useLiveSnapshot } from "../../lib/use-live-snapshot";
@@ -63,7 +63,7 @@ function createKordleRequestId(): string {
 }
 
 export function KordleBoard({ data }: { data: BoardDetailResponse }) {
-  const { width: viewportWidth } = useWindowDimensions();
+  const { width: viewportWidth } = useSafeWindowDimensions();
   const [puzzle, setPuzzle] = useState<PuzzleInfo | null>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [state, setState] = useState<PublicState | null>(null);

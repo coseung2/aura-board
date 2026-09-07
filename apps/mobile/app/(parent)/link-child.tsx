@@ -203,7 +203,7 @@ export default function LinkChildScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader
         title="자녀 연결"
         onBack={handleBack}

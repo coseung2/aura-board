@@ -6,8 +6,8 @@ import {
   StyleSheet,
   Text,
   View,
-  useWindowDimensions,
 } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import { useFocusEffect, useRouter, type Href } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StudentHomeSkeleton } from "../../components/loading-skeletons";
@@ -94,7 +94,7 @@ const NAV_SHARED_CACHE_MS = 5 * 60_000;
 
 export default function StudentHome() {
   const router = useRouter();
-  const { width, height } = useWindowDimensions();
+  const { width, height } = useSafeWindowDimensions();
   const initialHomeCache = readBoardCache<MeResponse>(STUDENT_HOME_CACHE_KEY, {
     kind: "boards",
   });
@@ -287,7 +287,7 @@ export default function StudentHome() {
 
   if (loading && !me) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
         <AppHeader title="홈" />
         <ScrollView
           contentInsetAdjustmentBehavior="automatic"
@@ -301,7 +301,7 @@ export default function StudentHome() {
 
   if (error && !me) {
     return (
-      <SafeAreaView style={styles.container} edges={["top"]}>
+      <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
         <AppHeader title="홈" />
         <View style={styles.errorCenter}>
           <Text style={styles.errorEmoji}>😵</Text>
@@ -337,7 +337,7 @@ export default function StudentHome() {
   const headerActions = <StudentHeaderActions />;
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader
         title="홈"
         titleAccessory={

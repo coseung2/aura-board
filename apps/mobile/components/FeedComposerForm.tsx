@@ -232,7 +232,7 @@ export function FeedComposerForm({ onSubmit, onSuccess, initialDraft, submitLabe
 }
 
 const styles = StyleSheet.create({
-  content: { padding: spacing.lg, gap: spacing.md },
+  content: { width: "100%", maxWidth: composer.sheetMaxWidth, alignSelf: "center", padding: spacing.lg, gap: spacing.md },
   field: { gap: spacing.xs },
   label: { ...typography.label, color: colors.text },
   bodyInput: {

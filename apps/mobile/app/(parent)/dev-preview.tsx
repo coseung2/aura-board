@@ -182,7 +182,7 @@ export default function ParentDevPreview() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader
         title="학부모 피드 미리보기"
         right={<Text style={styles.devBadge}>DEV</Text>}

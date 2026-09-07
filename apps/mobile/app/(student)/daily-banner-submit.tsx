@@ -372,7 +372,7 @@ export default function DailyBannerSubmitScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title="오늘의 배너 제안" onBack={() => router.back()} />
       <ScrollView
         keyboardShouldPersistTaps="handled"

@@ -471,7 +471,7 @@ export default function StudentCardCommentsScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <AppHeader title={cardTitle} onBack={() => router.back()} />
       <KeyboardAvoidingView
         style={styles.flex}

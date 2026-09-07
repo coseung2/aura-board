@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Animated, Easing, useWindowDimensions } from "react-native";
+import { Animated, Easing } from "react-native";
+import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { resolvePetCardSceneGeometry } from "../../components/slime/slime-types";
 import type { SlimeAction, SlimeColor } from "../slime-assets";
@@ -33,7 +34,7 @@ import { useStudentSlimeMutations } from "./use-student-slime-mutations";
 
 export function useStudentSlimeScreenModel() {
   const router = useRouter();
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth } = useSafeWindowDimensions();
   const petCardScene = useMemo(() => {
     const contentWidth = Math.min(windowWidth, layout.readableMaxWidth);
     const gridWidth = Math.max(
