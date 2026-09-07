@@ -284,7 +284,7 @@ export default function BoardDetail() {
         connection="online"
         onExit={handleBoardBack}
         exitLabel="게임 목록"
-        scrollEnabled={false}
+        scrollEnabled={board.layout === "speed-game"}
       >
         {renderOfficialGameLayout(data)}
       </GameAreaShell>

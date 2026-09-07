@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from "react-native";
 import {
   colors,
   iconSizes,
+  layout,
   quiz as quizTokens,
   spacing,
   typography,
@@ -15,6 +18,7 @@ import {
 } from "../../theme/tokens";
 import { apiFetch, ApiError } from "../../lib/api";
 import { useLiveSnapshot } from "../../lib/use-live-snapshot";
+import { isWideGameViewport } from "../../lib/responsive";
 import type { BoardDetailResponse } from "../../lib/types";
 import { AppButton, SurfaceCard, SurfacePressable } from "../ui";
 
@@ -51,13 +55,23 @@ type Player = { id: string; nickname: string; score: number };
 
 type Letter = "A" | "B" | "C" | "D";
 
-export function QuizBoard({
+export function QuizBoard(props: { data: BoardDetailResponse; onMutate: () => void }) {
+  return (
+    <ScrollView style={styles.scroll} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+      <QuizBoardContent {...props} />
+    </ScrollView>
+  );
+}
+
+function QuizBoardContent({
   data,
   onMutate,
 }: {
   data: BoardDetailResponse;
   onMutate: () => void;
 }) {
+  const { width, height, fontScale } = useWindowDimensions();
+  const wide = isWideGameViewport(width, height, fontScale);
   const room = data.layoutData.quiz?.room;
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState<string | null>(null);
@@ -362,10 +376,11 @@ export function QuizBoard({
         <Text style={styles.topScore}>{player.nickname} · {myScore}점</Text>
       </View>
       {refreshErrorNotice}
-      <SurfaceCard style={styles.qCard}>
+      <View style={[styles.playArea, wide && styles.playAreaWide]}>
+      <SurfaceCard style={[styles.qCard, wide && styles.questionWide]}>
         <Text style={styles.qText}>{q.question}</Text>
       </SurfaceCard>
-      <View style={styles.optGrid}>
+      <View style={[styles.optGrid, wide && styles.optionsWide]}>
         {options.map((opt) => {
           const isSelected = selected === opt.letter;
           return (
@@ -387,10 +402,11 @@ export function QuizBoard({
               disabled={selected !== null}
             >
               <Text style={styles.optLetter}>{opt.letter}</Text>
-              <Text style={styles.optText} numberOfLines={3}>{opt.text}</Text>
+              <Text style={styles.optText}>{opt.text}</Text>
             </SurfacePressable>
           );
         })}
+      </View>
       </View>
       {showFeedback ? (
         <View style={styles.feedbackBar}>
@@ -404,8 +420,14 @@ export function QuizBoard({
 }
 
 const styles = StyleSheet.create({
+  scroll: { flex: 1 },
+  scrollContent: { flexGrow: 1, width: "100%", maxWidth: layout.readableMaxWidth, alignSelf: "center" },
+  playArea: { gap: spacing.lg },
+  playAreaWide: { flexDirection: "row", alignItems: "stretch" },
+  questionWide: { flex: 1, minWidth: 0 },
+  optionsWide: { flex: 1, minWidth: 0 },
   center: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: "center",
     justifyContent: "center",
     padding: spacing.xxl,
@@ -439,9 +461,11 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.lg,
   },
 
-  activeRoot: { flex: 1, paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, paddingBottom: spacing.xl, gap: spacing.lg },
+  activeRoot: { flexGrow: 1, paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, paddingBottom: spacing.xl, gap: spacing.lg },
   topBar: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
     justifyContent: "space-between",
     alignItems: "center",
   },
@@ -458,7 +482,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   optGrid: {
-    flex: 1,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: spacing.md,

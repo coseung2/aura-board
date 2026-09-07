@@ -31,3 +31,8 @@ export function webSafeWidthStyle(
 export function isPortraitTabletViewport(width: number, height: number) {
   return width >= layout.mobileBreakpoint && height >= width;
 }
+
+/** Large fonts fall back to a vertical, scrollable game rather than tiny columns. */
+export function isWideGameViewport(width: number, height: number, fontScale = 1) {
+  return width > height && Math.min(width, layout.readableMaxWidth) / Math.max(1, fontScale) >= layout.authTwoPaneBreakpoint;
+}

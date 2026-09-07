@@ -1,9 +1,10 @@
 import type { ReactNode } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import type { MobileGameConnectionState } from "../../lib/game-platform";
 import {
   colors,
+  layout,
   layers,
   spacing,
   typography,
@@ -27,17 +28,26 @@ export function GameAreaShell({
   statusMessage,
   hostControls,
   participantActions,
-  scrollEnabled: _scrollEnabled = true,
+  scrollEnabled = true,
   ...hudProps
 }: MobileGameAreaShellProps) {
   const locked = inputLocked || connection !== "online";
   return (
-    <SafeAreaView style={styles.root} edges={["top", "bottom"]} accessibilityState={{ busy: locked }}>
+    <SafeAreaView style={styles.root} edges={["top", "right", "bottom", "left"]} accessibilityState={{ busy: locked }}>
       <GameHud {...hudProps} connection={connection} />
-      <View style={styles.playfield}>
+      <KeyboardAvoidingView style={styles.playfield} enabled={scrollEnabled} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         {hostControls ? <View style={styles.zone}>{hostControls}</View> : null}
         {participantActions ? <View style={styles.zone}>{participantActions}</View> : null}
-        <View style={styles.content}>{children}</View>
+        {scrollEnabled ? (
+          <ScrollView
+            style={styles.content}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
+          >
+            {children}
+          </ScrollView>
+        ) : <View style={styles.content}>{children}</View>}
         {locked ? (
           <View style={styles.lockOverlay} accessibilityLiveRegion="polite">
             <Text selectable style={styles.lockText}>
@@ -48,7 +58,7 @@ export function GameAreaShell({
             </Text>
           </View>
         ) : null}
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -65,7 +75,9 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+    minHeight: spacing.none,
   },
+  scrollContent: { flexGrow: 1, width: "100%", maxWidth: layout.readableMaxWidth, alignSelf: "center", padding: spacing.lg },
   zone: {
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
