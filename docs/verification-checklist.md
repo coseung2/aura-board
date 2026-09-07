@@ -323,6 +323,51 @@ Object payload replication or a documented media degraded-mode is a separate gat
 - Submit the exact verified build ID. Confirm the Google Play production track
   and release status; a successful AAB build alone is not a Play release.
 
+## Mobile Tablet Rotation And Short Height
+
+Implementation plan: [mobile-tablet-ux-plan.md](mobile-tablet-ux-plan.md).
+
+- Run mobile `npm run typecheck`, `npm run design:check`,
+  `../../node_modules/.bin/vitest run`, `npm run release:test`,
+  `npm run release:check` and `npm run assets:check`; run repository
+  `npm run test -- mobile`. The design scan includes extracted `screens/`.
+- Exercise 430×932, 932×430, 800×1280, 1280×800, 1366×1024 and 320×480
+  app windows. Include split-screen/free-form resize and font scales 1.0, 1.3
+  and 2.0. These are logical window sizes, not screenshot pixel resolutions.
+- With each dialog already open, rotate in both directions, resize, open/close
+  the keyboard and focus the last field. Verify content can scroll, every
+  action can be reached, touch targets remain usable, and neither sheet nor
+  drawer overlaps system bars. Test backdrop, Android Back, drag handle and
+  close-button dismissal independently.
+- Cover card create/edit, feed create/edit, reading, assignment, observation,
+  daily banner, DJ request/history, author selection, comments/replies,
+  walking settings/permission/error, plant stage details/no-photo custom
+  reason, pet wardrobe and purchase with quantity/warning/vehicle preview.
+  Retain drafts/attachments across rotation; submit and reload to verify the
+  server result. Do not perform destructive actions against production data.
+- Long-press a long comment/post near each screen edge, then rotate with the
+  menu open. Repeat on both the full comment route and a comment bottom sheet.
+  Actions must fit the measured overlay root, including any navigation below
+  it, and remain reachable with large fonts or an oversized preview.
+- Confirm card/column feeds have a readable width in either orientation;
+  check grid/game/pet sizing after left/right safe insets change. Open the
+  image lightbox and project viewer and verify safe, reachable close controls.
+- In quiz waiting/active/error/finished states, verify full option text and
+  scroll fallback; check wide split versus large-font stacked layouts.
+  In speed-game lobby/active/result states, use long participant/score lists,
+  focus the answer with keyboard open, and reach the last action. Game HUD
+  must not cover score/status controls; rotating must not reset answers or
+  server game state. Existing independently scrolling games must not acquire
+  nested vertical scroll owners.
+- Android bundle/native verification uses the final pushed commit and the
+  [Windows validation workflow](mobile-android-build.md#github-actions-windows-validation).
+  Record its run ID, head SHA and final conclusion separately from local tests.
+  A queued or running workflow is not a successful build.
+- Geometry and source-contract tests do not prove native Yoga layout,
+  keyboard/IME behavior, touch routing or accessibility focus. Physical Android
+  tablet and iPad checks above remain required before claiming device UX
+  acceptance. No physical-device acceptance was performed in this code pass.
+
 ## Test Fixtures
 
 ### Canva reviewer credentials

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 
 const root = process.cwd();
-const scanRoots = ["app", "components"];
+const scanRoots = ["app", "components", "screens"];
 const tokenFile = join(root, "theme", "tokens.ts");
 
 const checks = [

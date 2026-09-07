@@ -60,6 +60,10 @@ jobs:
         working-directory: apps/mobile
         run: npm run design:check
 
+      - name: Android verifier regression tests
+        working-directory: apps/mobile
+        run: npm run release:test
+
       - name: Mobile asset checks
         working-directory: apps/mobile
         run: npm run assets:check

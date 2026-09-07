@@ -54,7 +54,7 @@ describe("AppModal touch routing", () => {
     const [body, footer] = fragment.props.children as ElementLike[];
     expect(body.type).toBe("ScrollView");
     expect(body.props.children).toBe("long body");
-    expect(footer.type).toBe("View");
+    expect(footer.type).toBe("ScrollView");
     expect(footer.props.children).toBe("submit");
   });
 

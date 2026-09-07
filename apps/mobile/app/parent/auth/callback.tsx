@@ -74,7 +74,7 @@ export default function ParentAuthCallback() {
   }, [router]);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.inner}>
         <LogoLockup size={brand.logoSize} wordmarkStyle={styles.brandTitle} />
         <View style={styles.loading} accessibilityLabel="로그인 처리 중" accessibilityLiveRegion="polite">

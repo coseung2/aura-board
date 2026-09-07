@@ -21,7 +21,7 @@ export default function ParentAuthTokenCallback() {
   }, [routeToken, router]);
 
   return (
-    <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
+    <SafeAreaView style={styles.container}>
       <View style={styles.loading}>
         <ActivityIndicator size="large" color={colors.accent} />
         <Text style={styles.text}>로그인 처리 중…</Text>

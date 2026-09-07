@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
-import { anchoredOverlayLayout, fitOverlaySurface, MODAL_ORIENTATIONS, overlayFrameInsets } from "./overlay-layout";
+import { anchoredOverlayLayout, fitOverlaySurface, insetsWithinFrame, MODAL_ORIENTATIONS, overlayFrameInsets } from "./overlay-layout";
 
 const insets = { top: 24, right: 24, bottom: 34, left: 24 };
 const viewports = [[430, 932], [932, 430], [800, 1280], [1280, 800], [1366, 1024], [320, 480]];
 
 describe("adaptive overlay geometry", () => {
+  it("does not count safe edges twice inside a shorter route overlay", () => {
+    const window = { width: 800, height: 600 };
+    const rect = { x: 24, y: 24, width: 752, height: 480 };
+    const localInsets = insetsWithinFrame(window, insets, rect);
+    expect(localInsets).toEqual({ top: 0, left: 0, right: 0, bottom: 0 });
+    const result = anchoredOverlayLayout(rect, localInsets, { x: 0, y: 550, width: 700, height: 600 }, 100);
+    expect(result.top + result.height).toBeLessThanOrEqual(rect.height);
+  });
   it.each(viewports)("bounds stale anchors and large-font actions at %i×%i", (width, height) => {
     for (const actionHeight of [96, 180, 2000]) {
       for (const centered of [true, false]) {

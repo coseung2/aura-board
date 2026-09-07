@@ -6,7 +6,7 @@ import process from "node:process";
 import { spawnSync } from "node:child_process";
 import { inflateRawSync } from "node:zlib";
 
-const PAGE_16K = 16 * 1024;
+import { assertAndroidElfAlignment } from "./android-elf-alignment.mjs";
 
 function fail(message) {
   throw new Error(message);
@@ -286,71 +286,15 @@ function assertAabPageAlignment16K(filePath, zip) {
   }
 }
 
-function readUInt64LE(buffer, offset) {
-  return Number(buffer.readBigUInt64LE(offset));
-}
-
-function assertElfLoadAlignment16K(filePath, zip) {
+function assertElfLoadAlignment(filePath, zip) {
   const nativeEntries = zip.entries.filter((entry) =>
     /(^|\/)lib\/[^/]+\/[^/]+\.so$/.test(entry.fileName),
   );
   for (const entry of nativeEntries) {
-    const bytes = readZipEntry(zip, entry);
-    if (
-      bytes.length < 64 ||
-      bytes[0] !== 0x7f ||
-      bytes[1] !== 0x45 ||
-      bytes[2] !== 0x4c ||
-      bytes[3] !== 0x46
-    ) {
-      fail(`16 KB gate failed: invalid ELF native library: ${entry.fileName}`);
-    }
-    const elfClass = bytes[4];
-    const elfData = bytes[5];
-    if (elfData !== 1) {
-      fail(`16 KB gate failed: non-little-endian ELF: ${entry.fileName}`);
-    }
-
-    let programHeaderOffset;
-    let programHeaderEntrySize;
-    let programHeaderCount;
-    let alignOffset;
-    let is64Bit;
-    if (elfClass === 1) {
-      programHeaderOffset = bytes.readUInt32LE(28);
-      programHeaderEntrySize = bytes.readUInt16LE(42);
-      programHeaderCount = bytes.readUInt16LE(44);
-      alignOffset = 28;
-      is64Bit = false;
-    } else if (elfClass === 2) {
-      programHeaderOffset = readUInt64LE(bytes, 32);
-      programHeaderEntrySize = bytes.readUInt16LE(54);
-      programHeaderCount = bytes.readUInt16LE(56);
-      alignOffset = 48;
-      is64Bit = true;
-    } else {
-      fail(`16 KB gate failed: unsupported ELF class ${elfClass}: ${entry.fileName}`);
-    }
-
-    for (let index = 0; index < programHeaderCount; index += 1) {
-      const headerOffset =
-        programHeaderOffset + index * programHeaderEntrySize;
-      if (headerOffset + programHeaderEntrySize > bytes.length) {
-        fail(`16 KB gate failed: malformed ELF headers: ${entry.fileName}`);
-      }
-      if (bytes.readUInt32LE(headerOffset) !== 1) continue;
-      const segmentAlignment = is64Bit
-        ? readUInt64LE(bytes, headerOffset + alignOffset)
-        : bytes.readUInt32LE(headerOffset + alignOffset);
-      if (segmentAlignment < PAGE_16K) {
-        fail(
-          `16 KB gate failed: ${entry.fileName} has PT_LOAD alignment ${segmentAlignment} bytes`,
-        );
-      }
-    }
+    assertAndroidElfAlignment(readZipEntry(zip, entry), entry.fileName);
   }
   console.log(
-    `16 KB ELF alignment check passed for ${nativeEntries.length} native libraries in ${path.basename(filePath)}.`,
+    `ELF alignment check passed (64-bit: 16 KB; 32-bit: 4 KB) for ${nativeEntries.length} native libraries in ${path.basename(filePath)}.`,
   );
 }
 
@@ -432,7 +376,7 @@ function verifyArtifact(filePath, sdkRoot) {
   } else {
     assertApkZipAlignment16K(filePath, sdkRoot);
   }
-  assertElfLoadAlignment16K(filePath, zip);
+  assertElfLoadAlignment(filePath, zip);
   console.log(`${extension.slice(1).toUpperCase()} 16 KB page-size gate passed: ${filePath}`);
 }
 

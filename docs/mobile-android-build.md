@@ -26,6 +26,9 @@ The workflow checks mobile types/design/assets and unit/contract tests, exports
 Android with Hermes enabled and validates its binary header, then uses the
 existing PowerShell build script in `C:\\build-aura-board-android` to build APK and
 AAB. R8/resource shrinking, manifest, ELF, AAB and APK alignment checks remain on.
+The workflow also runs `npm run release:test` against the ELF verifier's synthetic
+32-bit/64-bit fixtures before building; accepting legacy 32-bit alignment must
+never allow a 4 KB-aligned 64-bit library through the gate.
 The build script must copy `screens/` along with the app's other source folders,
 and failed dependency/prebuild commands must stop the job.
 
@@ -102,7 +105,9 @@ the following are true:
 - R8 generated a non-empty release `mapping.txt`.
 - AAB `BundleConfig.pb` requests `PAGE_ALIGNMENT_16K` for uncompressed native
   libraries.
-- every packaged native `.so` has ELF `PT_LOAD` alignment of at least 16 KB.
+- Every packaged 64-bit native `.so` has ELF `PT_LOAD` alignment of at least
+  16 KB; legacy 32-bit libraries retain a 4 KB minimum. All ELF classes must
+  match their packaged ABI, with valid load headers and power-of-two alignment.
 - APK output, when requested, passes `zipalign -c -P 16 -v 4`.
 
 This makes the February 2027 Google Play DEX optimization requirement, the
@@ -111,6 +116,18 @@ compatibility checks release-time failures instead of Play Console surprises.
 The Play Console remains the source of truth for the reported optimization,
 obfuscation, and shrinking percentages; R8 must reach at least 25% in all three
 for apps whose DEX code exceeds Google's enforcement threshold.
+
+### ABI-aware ELF validation
+
+The 2026-09-07 validation of baseline `1f699312` compiled successfully but failed
+its artifact gate on `armeabi-v7a/libanimation-decoder-gif.so` with 4096-byte
+alignment. The verifier had incorrectly applied the 64-bit 16 KB requirement to
+32-bit ABIs. `scripts/android-elf-alignment.mjs` now validates each ELF class
+without removing 32-bit device support. See the Android NDK
+[page-size guidance](https://android.googlesource.com/platform/ndk/+/master/docs/BuildSystemMaintainers.md#page-sizes).
+AAB page alignment and APK ZIP alignment checks are unchanged. This correction
+is not evidence that a subsequent native build has passed; inspect its final
+workflow conclusion for the exact commit.
 
 ### Play Console display recommendations
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, useWindowDimensions, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useOverlayRootFrame } from "../hooks/use-overlay-root-frame";
 import { anchoredOverlayLayout } from "../lib/overlay-layout";
 import { Ban, CircleAlert, Heart } from "lucide-react-native";
 import { BarePressable, ControlPressable } from "./ui";
@@ -46,13 +46,13 @@ export function CommentModerationOverlay({
   onReport,
 }: Props) {
   const window = useWindowDimensions();
-  const insets = useSafeAreaInsets();
+  const { rootRef, measure, frame, insets } = useOverlayRootFrame();
   const [actionHeight, setActionHeight] = useState((tapMin + spacing.lg) * 2 * window.fontScale);
-  const geometry = anchoredOverlayLayout(window, insets, anchor, actionHeight);
+  const geometry = anchoredOverlayLayout(frame, insets, { ...anchor, x: anchor.x - frame.x, y: anchor.y - frame.y }, actionHeight);
   const menuWidth = Math.min(geometry.width, (tapMin * 4 + spacing.sm) * window.fontScale);
 
   return (
-    <View style={styles.root} accessibilityViewIsModal>
+    <View ref={rootRef} onLayout={measure} collapsable={false} style={styles.root} accessibilityViewIsModal>
       <BarePressable
         style={styles.backdrop}
         onPress={onClose}

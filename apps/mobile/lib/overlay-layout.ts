@@ -6,8 +6,19 @@ export const MODAL_ORIENTATIONS: NonNullable<ModalProps["supportedOrientations"]
 ];
 
 export type OverlayFrame = { width: number; height: number };
+export type OverlayRect = OverlayFrame & { x: number; y: number };
 export type SafeInsets = { top: number; right: number; bottom: number; left: number };
 export type OverlayAlignment = "center" | "right" | "bottom";
+
+/** Only apply the part of a system inset that overlaps this local root. */
+export function insetsWithinFrame(window: OverlayFrame, insets: SafeInsets, rect: OverlayRect): SafeInsets {
+  return {
+    top: Math.max(0, insets.top - rect.y),
+    left: Math.max(0, insets.left - rect.x),
+    right: Math.max(0, insets.right - Math.max(0, window.width - rect.x - rect.width)),
+    bottom: Math.max(0, insets.bottom - Math.max(0, window.height - rect.y - rect.height)),
+  };
+}
 
 /** Insets belong to the overlay window, not a guessed device/orientation size. */
 export function overlayFrameInsets(

@@ -46,6 +46,14 @@ jobs:
           set -o pipefail
           npm run design:check 2>&1 | tee "$GITHUB_WORKSPACE/.artifacts/mobile-quality/design-check.log"
 
+      - name: Mobile unit and tablet layout tests
+        working-directory: apps/mobile
+        run: ../../node_modules/.bin/vitest run
+
+      - name: Android verifier regression tests
+        working-directory: apps/mobile
+        run: npm run release:test
+
       - name: Mobile overview and model tests
         run: |
           set -o pipefail

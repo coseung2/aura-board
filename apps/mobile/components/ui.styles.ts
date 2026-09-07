@@ -72,6 +72,7 @@ export const styles = StyleSheet.create({
   modalScrollBody: { flexShrink: 1, minHeight: spacing.none },
   modalScrollContent: { padding: spacing.xl, gap: spacing.md },
   modalFooter: { flexShrink: 0, padding: spacing.xl, paddingTop: spacing.md },
+  modalFooterScroll: { flexGrow: 0, flexShrink: 0 },
   modalSheet: {
     width: "100%",
     maxWidth: composer.sheetMaxWidth,

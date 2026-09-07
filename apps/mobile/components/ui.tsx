@@ -310,7 +310,15 @@ export function AppModal({
                 {children}
               </ScrollView>
             ) : children}
-            {footer ? <View style={styles.modalFooter}>{footer}</View> : null}
+            {footer ? (
+              <ScrollView
+                style={[styles.modalFooterScroll, { maxHeight: fitted.maxHeight }]}
+                contentContainerStyle={styles.modalFooter}
+                keyboardShouldPersistTaps="handled"
+              >
+                {footer}
+              </ScrollView>
+            ) : null}
           </>
         ) : null}
       </SurfaceCard>
