@@ -97,6 +97,8 @@ export const BOARD_CACHE_MAX_ENTRIES = 32;
 
 const entries = new Map<string, InternalEntry>();
 const inFlight = new Map<string, Promise<unknown>>();
+const forceRevision = new Map<string, number>();
+let nextForceRevision = 0;
 let cacheGeneration = 0;
 let hydrationPromise: Promise<void> | null = null;
 let hydrated = false;
@@ -201,12 +203,14 @@ export const getBoardCache = readBoardCache;
  * until its stale-max age, but callers should schedule one revalidation.
  */
 export function invalidateBoardCache(key?: string): void {
-  if (key) {
-    const entry = entries.get(key);
+  const keys = key ? [key] : new Set([...entries.keys(), ...inFlight.keys()]);
+  for (const currentKey of keys) {
+    const entry = entries.get(currentKey);
     if (entry) entry.dirty = true;
-    return;
+    if (inFlight.has(currentKey)) {
+      forceRevision.set(currentKey, ++nextForceRevision);
+    }
   }
-  for (const entry of entries.values()) entry.dirty = true;
 }
 
 export const markBoardCacheDirty = invalidateBoardCache;
@@ -219,6 +223,9 @@ export const markBoardCacheDirty = invalidateBoardCache;
  */
 export function removeBoardCache(key: string): void {
   entries.delete(key);
+  inFlight.delete(key);
+  forceRevision.delete(key);
+  if (isPersistedBoardCacheKey(key)) void persistBoardCache();
 }
 
 /** Remove expired/least-recently-used entries while respecting the cap. */
@@ -245,6 +252,7 @@ export function clearBoardCache(): void {
   cacheGeneration += 1;
   entries.clear();
   inFlight.clear();
+  forceRevision.clear();
   hydrated = false;
   hydrationPromise = null;
   void removePersistentJson(PERSISTED_BOARD_CACHE_KEY);
@@ -350,30 +358,55 @@ export function revalidateBoardCache<T>(
   const current = readBoardCache<T>(key, { now, kind: options.kind });
   if (!options.force && current?.isFresh) return Promise.resolve(current.data);
 
+  if (options.force) {
+    nextForceRevision += 1;
+    forceRevision.set(key, nextForceRevision);
+  }
+
   const existing = inFlight.get(key) as Promise<T> | undefined;
   if (existing) return existing;
 
   const generationAtStart = cacheGeneration;
-  let loaded: Promise<T>;
-  try {
-    // Start the loader synchronously so a second caller in the same tick can
-    // observe the in-flight registry and share this exact promise.
-    loaded = Promise.resolve(loader());
-  } catch (error) {
-    loaded = Promise.reject(error);
-  }
-  const request = loaded
-    .then((data) => {
-      // Do not let a request belonging to a previous student session write
-      // into this session's cache.
-      if (generationAtStart === cacheGeneration) {
-        writeBoardCache(key, data, { now: Date.now(), kind: options.kind });
+  let observedForceRevision = forceRevision.get(key) ?? 0;
+  const run = async (): Promise<T> => {
+    while (true) {
+      let data: T;
+      try {
+        // Start the loader immediately. If a realtime force refresh arrives
+        // while this request is in flight, the revision check below performs
+        // one trailing authoritative read instead of letting the older
+        // response satisfy the newer invalidation.
+        data = await loader();
+      } catch (error) {
+        const latestForceRevision = forceRevision.get(key) ?? 0;
+        if (
+          generationAtStart === cacheGeneration &&
+          latestForceRevision > observedForceRevision
+        ) {
+          observedForceRevision = latestForceRevision;
+          continue;
+        }
+        throw error;
       }
+
+      if (generationAtStart !== cacheGeneration || inFlight.get(key) !== request) return data;
+
+      const latestForceRevision = forceRevision.get(key) ?? 0;
+      if (latestForceRevision > observedForceRevision) {
+        observedForceRevision = latestForceRevision;
+        continue;
+      }
+
+      writeBoardCache(key, data, { now: Date.now(), kind: options.kind });
       return data;
-    })
-    .finally(() => {
-      if (inFlight.get(key) === request) inFlight.delete(key);
-    });
+    }
+  };
+  const request = run().finally(() => {
+    if (inFlight.get(key) === request) inFlight.delete(key);
+    if (forceRevision.get(key) === observedForceRevision) {
+      forceRevision.delete(key);
+    }
+  });
   inFlight.set(key, request);
   return request;
 }

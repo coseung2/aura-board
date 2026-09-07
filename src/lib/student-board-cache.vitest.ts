@@ -84,4 +84,33 @@ describe("student board base cache", () => {
     ).resolves.toMatchObject({ version: 2 });
     expect(secondLoader).toHaveBeenCalledTimes(1);
   });
+
+  it("does not reuse a pre-mutation pending graph after targeted invalidation", async () => {
+    let resolveOld!: (value: { id: string; version: number }) => void;
+    const oldLoader = vi.fn(
+      () =>
+        new Promise<{ id: string; version: number }>((resolve) => {
+          resolveOld = resolve;
+        }),
+    );
+    const first = loadStudentBoardBaseCached(
+      "class-1",
+      "board-slug",
+      oldLoader,
+    );
+
+    invalidateStudentBoardCache("board-1");
+    const freshLoader = vi.fn(async () => ({ id: "board-1", version: 2 }));
+    await expect(
+      loadStudentBoardBaseCached("class-1", "board-slug", freshLoader),
+    ).resolves.toEqual({ id: "board-1", version: 2 });
+    expect(freshLoader).toHaveBeenCalledTimes(1);
+
+    resolveOld({ id: "board-1", version: 1 });
+    await expect(first).resolves.toEqual({ id: "board-1", version: 1 });
+    await expect(
+      loadStudentBoardBaseCached("class-1", "board-slug", freshLoader),
+    ).resolves.toEqual({ id: "board-1", version: 2 });
+    expect(freshLoader).toHaveBeenCalledTimes(1);
+  });
 });

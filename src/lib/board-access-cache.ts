@@ -13,13 +13,11 @@ type BoardAccessCacheEntry = {
   hasValue: boolean;
   expiresAt: number;
   pending: Promise<BoardAccessBase | null> | null;
-  generation: number;
 };
 
 const BOARD_ACCESS_CACHE_TTL_MS = 60_000;
 const BOARD_ACCESS_CACHE_MAX = 2_000;
 const entries = new Map<string, BoardAccessCacheEntry>();
-let generation = 0;
 
 function remove(boardId: string, expected?: BoardAccessCacheEntry): void {
   const current = entries.get(boardId);
@@ -47,7 +45,6 @@ export function primeBoardAccessCache(value: BoardAccessBase): void {
     hasValue: true,
     expiresAt: Date.now() + BOARD_ACCESS_CACHE_TTL_MS,
     pending: null,
-    generation,
   });
   touch(value.id, entries.get(value.id)!);
   trim();
@@ -69,20 +66,15 @@ export async function loadBoardAccessBaseCached(
     remove(boardId, existing);
   }
 
-  const requestGeneration = generation;
   const entry: BoardAccessCacheEntry = {
     value: undefined,
     hasValue: false,
     expiresAt: 0,
     pending: null,
-    generation: requestGeneration,
   };
   const pending = loader()
     .then((value) => {
-      if (
-        generation !== requestGeneration ||
-        entries.get(boardId) !== entry
-      ) {
+      if (entries.get(boardId) !== entry) {
         remove(boardId, entry);
         return value;
       }
@@ -105,7 +97,6 @@ export async function loadBoardAccessBaseCached(
 }
 
 export function invalidateBoardAccessCache(boardId?: string): void {
-  generation += 1;
   if (boardId) entries.delete(boardId);
   else entries.clear();
 }

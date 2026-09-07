@@ -7,6 +7,8 @@ type RequestCacheEntry = {
 const MAX_REQUEST_CACHE_ENTRIES = 32;
 const entries = new Map<string, RequestCacheEntry>();
 const inFlight = new Map<string, Promise<unknown>>();
+const forceRevision = new Map<string, number>();
+let nextForceRevision = 0;
 let cacheGeneration = 0;
 
 export function cachedRequest<T>(options: {
@@ -22,33 +24,57 @@ export function cachedRequest<T>(options: {
     return Promise.resolve(current.value as T);
   }
 
+  if (options.force) {
+    nextForceRevision += 1;
+    forceRevision.set(options.key, nextForceRevision);
+  }
+
   const existing = inFlight.get(options.key) as Promise<T> | undefined;
   if (existing) return existing;
 
-  let loaded: Promise<T>;
   const generationAtStart = cacheGeneration;
-  try {
-    loaded = Promise.resolve(options.loader());
-  } catch (error) {
-    loaded = Promise.reject(error);
-  }
-
-  const request = loaded
-    .then((value) => {
-      const completedAt = Date.now();
-      if (generationAtStart === cacheGeneration) {
-        entries.set(options.key, {
-          value,
-          expiresAt: completedAt + Math.max(0, options.ttlMs),
-          lastAccessAt: completedAt,
-        });
-        pruneRequestCache();
+  let observedForceRevision = forceRevision.get(options.key) ?? 0;
+  const run = async (): Promise<T> => {
+    while (true) {
+      let value: T;
+      try {
+        value = await options.loader();
+      } catch (error) {
+        const latestForceRevision = forceRevision.get(options.key) ?? 0;
+        if (
+          generationAtStart === cacheGeneration &&
+          latestForceRevision > observedForceRevision
+        ) {
+          observedForceRevision = latestForceRevision;
+          continue;
+        }
+        throw error;
       }
+
+      if (generationAtStart !== cacheGeneration) return value;
+      const latestForceRevision = forceRevision.get(options.key) ?? 0;
+      if (latestForceRevision > observedForceRevision) {
+        observedForceRevision = latestForceRevision;
+        continue;
+      }
+
+      const completedAt = Date.now();
+      entries.set(options.key, {
+        value,
+        expiresAt: completedAt + Math.max(0, options.ttlMs),
+        lastAccessAt: completedAt,
+      });
+      pruneRequestCache();
       return value;
-    })
-    .finally(() => {
-      if (inFlight.get(options.key) === request) inFlight.delete(options.key);
-    });
+    }
+  };
+
+  const request = run().finally(() => {
+    if (inFlight.get(options.key) === request) inFlight.delete(options.key);
+    if (forceRevision.get(options.key) === observedForceRevision) {
+      forceRevision.delete(options.key);
+    }
+  });
   inFlight.set(options.key, request);
   return request;
 }
@@ -57,6 +83,7 @@ export function clearRequestCache(): void {
   cacheGeneration += 1;
   entries.clear();
   inFlight.clear();
+  forceRevision.clear();
 }
 
 function pruneRequestCache(): void {

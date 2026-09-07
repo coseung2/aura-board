@@ -91,17 +91,23 @@ export async function loadRewardPolicyCached(
   if (cached?.value && cached.expiresAt > now) return { ...cached.value };
   if (cached?.pending) return { ...(await cached.pending) };
 
-  const pending = loadRewardPolicy(db, classroomId)
+  let pending!: Promise<RewardPolicy>;
+  pending = loadRewardPolicy(db, classroomId)
     .then((policy) => {
-      rewardPolicyCache.set(classroomId, {
-        value: policy,
-        expiresAt: Date.now() + REWARD_POLICY_CACHE_TTL_MS,
-        pending: null,
-      });
+      const current = rewardPolicyCache.get(classroomId);
+      if (current?.pending === pending) {
+        rewardPolicyCache.set(classroomId, {
+          value: policy,
+          expiresAt: Date.now() + REWARD_POLICY_CACHE_TTL_MS,
+          pending: null,
+        });
+      }
       return policy;
     })
     .catch((error) => {
-      rewardPolicyCache.delete(classroomId);
+      if (rewardPolicyCache.get(classroomId)?.pending === pending) {
+        rewardPolicyCache.delete(classroomId);
+      }
       throw error;
     });
   rewardPolicyCache.set(classroomId, {

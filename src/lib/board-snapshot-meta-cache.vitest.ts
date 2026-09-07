@@ -36,6 +36,26 @@ describe("board snapshot metadata cache", () => {
     expect(loader).toHaveBeenCalledTimes(1);
   });
 
+  it("does not reuse a pre-invalidation pending slug lookup", async () => {
+    let resolveFirst!: (value: ReturnType<typeof meta>) => void;
+    const firstLoader = vi.fn(
+      () =>
+        new Promise<ReturnType<typeof meta>>((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+    const first = loadBoardSnapshotMetaCached("board-slug", firstLoader);
+
+    invalidateBoardSnapshotMetaCache("board-1");
+    const secondLoader = vi.fn(async () => meta(2));
+    const second = loadBoardSnapshotMetaCached("board-slug", secondLoader);
+    resolveFirst(meta(1));
+
+    await expect(first).resolves.toMatchObject({ id: "board-1" });
+    await expect(second).resolves.toMatchObject({ updatedAt: meta(2).updatedAt });
+    expect(secondLoader).toHaveBeenCalledTimes(1);
+  });
+
   it("invalidates a slug lookup by resolved board id", async () => {
     const loader = vi
       .fn()

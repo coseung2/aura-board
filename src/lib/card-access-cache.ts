@@ -16,13 +16,11 @@ type CardAccessCacheEntry = {
   hasValue: boolean;
   expiresAt: number;
   pending: Promise<CachedCardAccessBase | null> | null;
-  generation: number;
 };
 
 const CARD_ACCESS_CACHE_TTL_MS = 5_000;
 const CARD_ACCESS_CACHE_MAX = 5_000;
 const entries = new Map<string, CardAccessCacheEntry>();
-let generation = 0;
 
 function remove(cardId: string, expected?: CardAccessCacheEntry): void {
   const current = entries.get(cardId);
@@ -60,20 +58,15 @@ export async function loadCardAccessBaseCached(
     remove(cardId, existing);
   }
 
-  const requestGeneration = generation;
   const entry: CardAccessCacheEntry = {
     value: undefined,
     hasValue: false,
     expiresAt: 0,
     pending: null,
-    generation: requestGeneration,
   };
   const pending = loader()
     .then((value) => {
-      if (
-        generation !== requestGeneration ||
-        entries.get(cardId) !== entry
-      ) {
+      if (entries.get(cardId) !== entry) {
         remove(cardId, entry);
         return value;
       }
@@ -96,7 +89,6 @@ export async function loadCardAccessBaseCached(
 }
 
 export function invalidateCardAccessCache(cardId?: string): void {
-  generation += 1;
   if (cardId) entries.delete(cardId);
   else entries.clear();
 }

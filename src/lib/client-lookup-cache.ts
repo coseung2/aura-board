@@ -40,6 +40,7 @@ type BreakoutTemplate = {
 
 const cache = new Map<string, CacheEntry<unknown>>();
 const inflight = new Map<string, Promise<unknown>>();
+const revisions = new Map<string, number>();
 
 function now() {
   return Date.now();
@@ -55,37 +56,51 @@ function getCached<T>(key: string): T | null {
   return entry.value;
 }
 
+function revisionFor(key: string): number {
+  return revisions.get(key) ?? 0;
+}
+
+function bumpRevision(key: string): void {
+  revisions.set(key, revisionFor(key) + 1);
+  cache.delete(key);
+  inflight.delete(key);
+}
+
 async function fetchCached<T>(
   key: string,
   ttlMs: number,
   load: () => Promise<T>,
   options: { force?: boolean } = {},
 ): Promise<T> {
-  if (!options.force) {
+  if (options.force) {
+    bumpRevision(key);
+  } else {
     const cached = getCached<T>(key);
     if (cached) return cached;
     const pending = inflight.get(key) as Promise<T> | undefined;
     if (pending) return pending;
   }
 
-  const pending = load()
+  const revisionAtStart = revisionFor(key);
+  let pending!: Promise<T>;
+  pending = load()
     .then((value) => {
-      cache.set(key, { value, expiresAt: now() + ttlMs });
+      if (revisionAtStart === revisionFor(key) && inflight.get(key) === pending) {
+        cache.set(key, { value, expiresAt: now() + ttlMs });
+      }
       return value;
     })
     .finally(() => {
-      inflight.delete(key);
+      if (inflight.get(key) === pending) inflight.delete(key);
     });
   inflight.set(key, pending);
   return pending;
 }
 
 function invalidateByPrefix(prefix: string) {
-  for (const key of Array.from(cache.keys())) {
-    if (key.startsWith(prefix)) cache.delete(key);
-  }
-  for (const key of Array.from(inflight.keys())) {
-    if (key.startsWith(prefix)) inflight.delete(key);
+  const keys = new Set([...cache.keys(), ...inflight.keys(), ...revisions.keys()]);
+  for (const key of keys) {
+    if (key.startsWith(prefix)) bumpRevision(key);
   }
 }
 

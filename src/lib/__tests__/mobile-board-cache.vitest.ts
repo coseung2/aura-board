@@ -83,6 +83,35 @@ describe("mobile board cache", () => {
     await expect(first).resolves.toEqual(["done"]);
   });
 
+  it("runs a trailing authoritative read when a force refresh arrives during an older request", async () => {
+    const resolvers: Array<(value: { version: number }) => void> = [];
+    const loader = vi.fn(
+      () =>
+        new Promise<{ version: number }>((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    const key = boardDetailCacheKey("room-race");
+
+    const initial = revalidateBoardCache(key, loader, { kind: "detail" });
+    const forced = revalidateBoardCache(key, loader, {
+      kind: "detail",
+      force: true,
+    });
+
+    expect(initial).toBe(forced);
+    expect(loader).toHaveBeenCalledTimes(1);
+
+    resolvers[0]({ version: 1 });
+    await vi.runAllTicks();
+    expect(loader).toHaveBeenCalledTimes(2);
+    expect(readBoardCache(key)).toBeNull();
+
+    resolvers[1]({ version: 2 });
+    await expect(initial).resolves.toEqual({ version: 2 });
+    expect(readBoardCache(key)?.data).toEqual({ version: 2 });
+  });
+
   it("supports invalidation and force refresh for otherwise-fresh data", async () => {
     const key = boardDetailCacheKey("room-1");
     writeBoardCache(key, { version: 1 }, { kind: "detail", now: 0 });

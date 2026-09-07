@@ -184,6 +184,31 @@ describe("reward policy cache", () => {
     });
     expect(mocks.cachedPolicyFind).toHaveBeenCalledTimes(2);
   });
+
+  it("does not let an invalidated in-flight policy resurrect stale cache state", async () => {
+    let resolveFirst!: (value: { commentRewardAmount: number }) => void;
+    mocks.cachedPolicyFind
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirst = resolve;
+          }),
+      )
+      .mockResolvedValueOnce({ commentRewardAmount: 9 });
+
+    const stale = loadRewardPolicyCached("classroom-1");
+    invalidateRewardPolicyCache("classroom-1");
+    const fresh = loadRewardPolicyCached("classroom-1");
+
+    await expect(fresh).resolves.toMatchObject({ commentRewardAmount: 9 });
+    resolveFirst({ commentRewardAmount: 5 });
+    await expect(stale).resolves.toMatchObject({ commentRewardAmount: 5 });
+
+    await expect(loadRewardPolicyCached("classroom-1")).resolves.toMatchObject({
+      commentRewardAmount: 9,
+    });
+    expect(mocks.cachedPolicyFind).toHaveBeenCalledTimes(2);
+  });
 });
 
 describe("reward service caps and buffs", () => {

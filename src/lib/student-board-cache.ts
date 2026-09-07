@@ -1,4 +1,5 @@
 import "server-only";
+import { revalidateSnapshot } from "./snapshot-revalidation";
 
 type StudentBoardCacheEntry<T> = {
   key: string;
@@ -7,6 +8,7 @@ type StudentBoardCacheEntry<T> = {
   hasValue: boolean;
   expiresAt: number;
   pending: Promise<T> | null;
+  generation: number;
 };
 
 const STUDENT_BOARD_CACHE_TTL_MS = 60_000;
@@ -62,10 +64,25 @@ export async function loadStudentBoardBaseCached<
   classroomId: string,
   lookup: string,
   loader: () => Promise<T>,
+  options: { force?: boolean } = {},
 ): Promise<T> {
   const key = cacheKey(classroomId, lookup);
+  if (options.force) {
+    return revalidateSnapshot(`student-board:${key}`, () => {
+      removeEntry(key);
+      return loadStudentBoardBaseCached(classroomId, lookup, loader);
+    });
+  }
   const now = Date.now();
-  const existing = entries.get(key) as StudentBoardCacheEntry<T> | undefined;
+  let existing = entries.get(key) as StudentBoardCacheEntry<T> | undefined;
+  // A board mutation may happen before a pending loader has resolved its board
+  // id, so targeted invalidation cannot find that entry through keysByBoardId
+  // yet. The generation guard makes a later request refuse that pre-mutation
+  // pending promise and start a fresh authoritative read instead.
+  if (existing?.pending && existing.generation !== generation) {
+    removeEntry(key, existing as StudentBoardCacheEntry<unknown>);
+    existing = undefined;
+  }
   if (existing) {
     if (existing.hasValue && existing.expiresAt > now) {
       touchEntry(key, existing as StudentBoardCacheEntry<unknown>);
@@ -83,6 +100,7 @@ export async function loadStudentBoardBaseCached<
     hasValue: false,
     expiresAt: 0,
     pending: null,
+    generation: requestGeneration,
   };
   const pending = loader()
     .then((value) => {

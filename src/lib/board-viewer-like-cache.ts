@@ -8,13 +8,11 @@ type ViewerLikeCacheEntry = {
   cardIds: Set<string> | null;
   expiresAt: number;
   pending: Promise<Set<string>> | null;
-  generation: number;
 };
 
 const VIEWER_LIKE_CACHE_TTL_MS = 60_000;
 const VIEWER_LIKE_CACHE_MAX = 10_000;
 const entries = new Map<string, ViewerLikeCacheEntry>();
-let generation = 0;
 
 function keyFor(
   boardId: string,
@@ -52,7 +50,6 @@ export async function loadBoardViewerLikedCardsCached(
   const existing = entries.get(key);
   if (existing) {
     if (existing.cardIds && existing.expiresAt > now) {
-      existing.expiresAt = now + VIEWER_LIKE_CACHE_TTL_MS;
       touch(key, existing);
       return cloneCardIds(existing.cardIds);
     }
@@ -60,20 +57,15 @@ export async function loadBoardViewerLikedCardsCached(
     entries.delete(key);
   }
 
-  const requestGeneration = generation;
   const entry: ViewerLikeCacheEntry = {
     cardIds: null,
     expiresAt: 0,
     pending: null,
-    generation: requestGeneration,
   };
   const pending = loader()
     .then((rows) => {
       const cardIds = new Set(rows);
-      if (
-        generation === requestGeneration &&
-        entries.get(key) === entry
-      ) {
+      if (entries.get(key) === entry) {
         entry.cardIds = cardIds;
         entry.expiresAt = Date.now() + VIEWER_LIKE_CACHE_TTL_MS;
         entry.pending = null;
@@ -102,17 +94,20 @@ export function updateBoardViewerLikeCache(
   const key = keyFor(boardId, viewer);
   const now = Date.now();
   const existing = entries.get(key);
-  const cardIds =
-    existing?.cardIds && existing.expiresAt > now
-      ? cloneCardIds(existing.cardIds)
-      : new Set<string>();
+  // A mutation tells us about one card, not the viewer's entire board. A
+  // missing/expired/in-flight snapshot must be reloaded, not synthesized from
+  // an empty set (which would incorrectly un-like every other card).
+  if (!existing?.cardIds || existing.expiresAt <= now) {
+    entries.delete(key);
+    return;
+  }
+  const cardIds = cloneCardIds(existing.cardIds);
   if (liked) cardIds.add(cardId);
   else cardIds.delete(cardId);
   const entry: ViewerLikeCacheEntry = {
     cardIds,
     expiresAt: now + VIEWER_LIKE_CACHE_TTL_MS,
     pending: null,
-    generation,
   };
   entries.set(key, entry);
   touch(key, entry);
@@ -120,7 +115,6 @@ export function updateBoardViewerLikeCache(
 }
 
 export function invalidateBoardViewerLikeCache(boardId?: string): void {
-  generation += 1;
   if (!boardId) {
     entries.clear();
     return;

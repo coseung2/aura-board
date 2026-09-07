@@ -63,6 +63,8 @@ export const PARENT_POST_COLLECTION_CACHE_PREFIX = "parent:posts:" as const;
 const entries = new Map<string, ParentDataCacheEntry>();
 const inFlight = new Map<string, Promise<unknown>>();
 const revisions = new Map<string, number>();
+const forceRevisions = new Map<string, number>();
+let nextForceRevision = 0;
 let cacheGeneration = 0;
 
 export function parentPostCollectionCacheKey(endpoint: string): string {
@@ -181,8 +183,9 @@ export function invalidateParentDataCache(key?: string): void {
     return;
   }
 
-  for (const [entryKey, entry] of entries) {
-    entry.dirty = true;
+  for (const entryKey of new Set([...entries.keys(), ...inFlight.keys()])) {
+    const entry = entries.get(entryKey);
+    if (entry) entry.dirty = true;
     bumpRevision(entryKey);
   }
 }
@@ -193,7 +196,7 @@ export function removeParentDataCache(key: string): void {
 }
 
 export function removeParentDataCacheByPrefix(prefix: string): void {
-  for (const key of entries.keys()) {
+  for (const key of new Set([...entries.keys(), ...inFlight.keys()])) {
     if (key.startsWith(prefix)) removeParentDataCache(key);
   }
 }
@@ -203,6 +206,7 @@ export function clearParentDataCache(): void {
   entries.clear();
   inFlight.clear();
   revisions.clear();
+  forceRevisions.clear();
 }
 
 export function pruneParentDataCache(now = Date.now()): void {
@@ -235,31 +239,40 @@ export function revalidateParentDataCache<T>(
     return Promise.resolve(current.data);
   }
 
+  if (options.force) forceRevisions.set(key, ++nextForceRevision);
   const existing = inFlight.get(key) as Promise<T> | undefined;
   if (existing) return existing;
 
   const generationAtStart = cacheGeneration;
   const revisionAtStart = revisionFor(key);
-  let loaded: Promise<T>;
-  try {
-    loaded = Promise.resolve(loader());
-  } catch (error) {
-    loaded = Promise.reject(error);
-  }
-
-  const request = loaded
-    .then((data) => {
-      if (
-        generationAtStart === cacheGeneration &&
-        revisionAtStart === revisionFor(key)
-      ) {
-        setParentDataCache(key, data, options, false);
+  let observedForceRevision = forceRevisions.get(key) ?? 0;
+  const run = async (): Promise<T> => {
+    while (true) {
+      let data: T;
+      try {
+        data = await loader();
+      } catch (error) {
+        const latest = forceRevisions.get(key) ?? 0;
+        if (generationAtStart === cacheGeneration && revisionAtStart === revisionFor(key) && latest > observedForceRevision) {
+          observedForceRevision = latest;
+          continue;
+        }
+        throw error;
       }
+      if (generationAtStart !== cacheGeneration || revisionAtStart !== revisionFor(key)) return data;
+      const latest = forceRevisions.get(key) ?? 0;
+      if (latest > observedForceRevision) {
+        observedForceRevision = latest;
+        continue;
+      }
+      setParentDataCache(key, data, options, false);
       return data;
-    })
-    .finally(() => {
-      if (inFlight.get(key) === request) inFlight.delete(key);
-    });
+    }
+  };
+  const request = run().finally(() => {
+    if (inFlight.get(key) === request) inFlight.delete(key);
+    if (forceRevisions.get(key) === observedForceRevision) forceRevisions.delete(key);
+  });
   inFlight.set(key, request);
   return request;
 }

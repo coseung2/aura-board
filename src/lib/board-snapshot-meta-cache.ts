@@ -1,4 +1,5 @@
 import "server-only";
+import { revalidateSnapshot } from "./snapshot-revalidation";
 
 export type BoardSnapshotMeta = {
   id: string;
@@ -64,18 +65,30 @@ function trim(): void {
 export async function loadBoardSnapshotMetaCached(
   lookup: string,
   loader: () => Promise<BoardSnapshotMeta | null>,
+  options: { force?: boolean } = {},
 ): Promise<BoardSnapshotMeta | null> {
+  if (options.force) {
+    return revalidateSnapshot(`board-meta:${lookup}`, () => {
+      removeKey(lookup);
+      return loadBoardSnapshotMetaCached(lookup, loader);
+    });
+  }
   const now = Date.now();
   const existing = entries.get(lookup);
   if (existing) {
     if (existing.hasValue && existing.expiresAt > now) {
-      existing.expiresAt = now + SNAPSHOT_META_TTL_MS;
       touch(lookup, existing);
       return existing.value ? cloneMeta(existing.value) : null;
     }
-    if (existing.pending) {
+    if (existing.pending && existing.generation === generation) {
       const value = await existing.pending;
       return value ? cloneMeta(value) : null;
+    }
+    if (existing.pending) {
+      // An invalidation may happen before a slug lookup has resolved to a board
+      // id, so keysByBoardId cannot remove that pending entry yet. Do not let a
+      // post-mutation caller reuse a request that began in an older generation.
+      removeKey(lookup, existing);
     }
     removeKey(lookup, existing);
   }
