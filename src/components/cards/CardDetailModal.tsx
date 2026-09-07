@@ -212,9 +212,12 @@ export function CardDetailModal({
   const hasMediaAttachment = Boolean(
     card.imageUrl || card.videoUrl || mediaAttachments.length > 0,
   );
+  const hasCanvaMedia = Boolean(
+    card.linkUrl && isCanvaDesignUrl(card.linkUrl),
+  );
   const hasEmbeddableLink = Boolean(
     card.linkUrl &&
-    (isYouTubeLink(card.linkUrl) || isCanvaDesignUrl(card.linkUrl)),
+    (isYouTubeLink(card.linkUrl) || hasCanvaMedia),
   );
   const mediaLinkUrl = hasEmbeddableLink ? card.linkUrl : null;
   const hasTextLink = Boolean(card.linkUrl && !isYouTubeLink(card.linkUrl));
@@ -256,6 +259,7 @@ export function CardDetailModal({
         data-detail-layout={detailLayout}
         data-has-media={hasMedia ? "true" : "false"}
         data-has-body={hasTextContent ? "true" : "false"}
+        data-canva-media={hasCanvaMedia ? "true" : "false"}
         data-fullscreen={isFullscreen ? "true" : "false"}
         onClick={(e) => e.stopPropagation()}
       >
