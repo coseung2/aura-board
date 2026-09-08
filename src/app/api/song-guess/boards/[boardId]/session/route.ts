@@ -15,6 +15,8 @@ type Params = { params: Promise<{ boardId: string }> };
 const RequestIdSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9._-]+$/);
 const CreateSchema = z.object({
   requestId: RequestIdSchema,
+  answerMode: z.enum(["text", "multiple-choice"]).default("text"),
+  answerTarget: z.enum(["title", "artist", "artist-title"]).default("title"),
   studentIds: z.array(z.string().min(1)).max(100).optional(),
 });
 
@@ -44,6 +46,8 @@ export async function POST(request: Request, { params }: Params) {
       boardId,
       parsed.data.requestId,
       parsed.data.studentIds,
+      parsed.data.answerMode,
+      parsed.data.answerTarget,
     );
     const response = await playEngineFetch(
       `/v1/boards/${encodeURIComponent(boardId)}/song-guess/sessions`,

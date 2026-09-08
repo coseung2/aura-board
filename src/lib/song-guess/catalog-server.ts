@@ -110,6 +110,7 @@ export async function createSongGuessSetupFromCatalog(
       uploadedIds.push(uploaded.id);
       rounds.push({
         representativeAnswer: entry.title,
+        artist: entry.artist,
         aliases: entry.aliases,
         accessibilityClue: null,
         clipAssetIds: [uploaded.id],

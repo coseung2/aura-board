@@ -12,6 +12,7 @@ export type SongGuessGeneratedClipUpload = {
 };
 
 export type SongGuessRoundSaveDraft = {
+  artist?: string | null;
   representativeAnswer: string;
   aliasesText: string;
   accessibilityClue: string;
@@ -106,6 +107,7 @@ export async function persistSongGuessRoundPack<TSetup>(
       }
       if (!clipAssetIds) throw new Error("three_clips_required");
       rounds.push({
+        ...(draft.artist !== undefined ? { artist: draft.artist?.trim() || null } : {}),
         representativeAnswer: draft.representativeAnswer.trim(),
         aliases: parseSongGuessAliases(draft.aliasesText),
         accessibilityClue: draft.accessibilityClue.trim() || null,

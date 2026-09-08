@@ -115,6 +115,26 @@ describe("SongGuessBoard authoritative web flow", () => {
     window.localStorage.clear();
   });
 
+  it.each(["text", "multiple-choice"] as const)("creates a game using the selected %s answer mode", async (answerMode) => {
+    mocks.createSession.mockResolvedValue({ snapshot: snapshot("host", { phase: "lobby", answerMode }) });
+    render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="teacher" />);
+    const textMode = await screen.findByRole("radio", { name: "서술형" });
+    expect(textMode).toBeChecked();
+    if (answerMode === "multiple-choice") fireEvent.click(screen.getByRole("radio", { name: "객관식 (4지선다)" }));
+    fireEvent.click(screen.getByRole("button", { name: "게임 만들기" }));
+    await waitFor(() => expect(mocks.createSession).toHaveBeenCalledWith("board-1", answerMode, "title"));
+    await screen.findByText("시작 대기");
+  });
+
+  it.each(["artist", "artist-title"] as const)("sends the selected %s creation target independently of answer mode", async (target) => {
+    mocks.createSession.mockResolvedValue({ snapshot: snapshot("host", { phase: "lobby", answerTarget: target }) });
+    render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="teacher" />);
+    fireEvent.change(await screen.findByRole("combobox", { name: "출제 모드" }), { target: { value: target } });
+    fireEvent.click(screen.getByRole("radio", { name: "객관식 (4지선다)" }));
+    fireEvent.click(screen.getByRole("button", { name: "게임 만들기" }));
+    await waitFor(() => expect(mocks.createSession).toHaveBeenCalledWith("board-1", "multiple-choice", target));
+  });
+
   it.each([null, "draft", "guessing"] as const)("lets teachers inspect saved answers in %s without revealing them to the game", async (phase) => {
     mocks.fetchCurrent.mockResolvedValue(phase ? snapshot("host", { phase }) : null);
     render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="teacher" />);
@@ -196,6 +216,29 @@ describe("SongGuessBoard authoritative web flow", () => {
     expect(await screen.findByText("입장 완료")).toBeInTheDocument();
     expect(mocks.submitCommand).toHaveBeenCalledTimes(3);
     expect(screen.queryByRole("button", { name: "다시 시도" })).not.toBeInTheDocument();
+  });
+
+  it("preserves a pending choice after a lost response and retries the same request", async () => {
+    const state = snapshot("participant", { answerMode: "multiple-choice" });
+    state.currentRound.choices = ["봄날", "밤편지", "좋은 날", "달리반피카소"].map((label, i) => ({ id: `option-${i}`, label }));
+    mocks.fetchCurrent.mockResolvedValue(state);
+    mocks.submitCommand.mockRejectedValue(new TypeError("Network request failed"));
+    render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="student" />);
+    fireEvent.click(await screen.findByRole("button", { name: "밤편지" }));
+    await waitFor(() => expect(mocks.submitCommand).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("button", { name: "다시 보내기" })).toBeEnabled());
+    const firstRequest = mocks.submitCommand.mock.calls[0][1];
+    expect(mocks.submitCommand.mock.calls[1][1]).toEqual(firstRequest);
+    expect(screen.getByRole("button", { name: "좋은 날" })).toBeDisabled();
+    expect(JSON.parse(window.localStorage.getItem("aura-song-guess-pending:board-1")!).request).toEqual(firstRequest);
+    mocks.submitCommand.mockImplementation(async (_id, request) => ({
+      requestId: request.requestId, previousVersion: 2, version: 3, result: null,
+      snapshot: { ...state, version: 3, viewer: { ...state.viewer, answeredCurrentRound: true, selectedChoiceId: "option-1" } },
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "다시 보내기" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /밤편지/ })).toHaveAttribute("aria-pressed", "true"));
+    expect(mocks.submitCommand.mock.calls[2][1]).toEqual(firstRequest);
+    expect(window.localStorage.getItem("aura-song-guess-pending:board-1")).toBeNull();
   });
 
   it("reports a missing audio file for a legacy video-only round without loading a provider", async () => {

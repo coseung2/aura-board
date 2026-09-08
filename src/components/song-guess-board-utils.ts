@@ -7,6 +7,7 @@ export function emptyRoundDraft(): RoundDraft {
   return {
     clientId: createClientId(),
     representativeAnswer: "",
+    artist: "",
     aliasesText: "",
     accessibilityClue: "",
     rightsConfirmed: false,
@@ -25,6 +26,7 @@ export function draftsFromSetup(setup: SongGuessTeacherSetup): RoundDraft[] {
     return {
       clientId: `saved-${round.id}`,
       representativeAnswer: round.representativeAnswer,
+      artist: round.artist ?? "",
       aliasesText: round.aliases.join(", "),
       accessibilityClue: round.accessibilityClue ?? "",
       rightsConfirmed: false,
@@ -182,6 +184,12 @@ export function messageForAudioError(code: string): string {
 export function messageForError(error: unknown): string {
   if (error instanceof SongGuessClientError) {
     switch (error.body.error) {
+      case "song_guess_artist_required":
+        return "가수·작곡가 정보가 없는 곡이 있어요. 노래를 다시 준비하거나 직접 음원 구성에서 입력해 주세요.";
+      case "invalid_song_guess_target_answer":
+        return "가수·작곡가와 제목을 합친 답안이 너무 길어요. 대표 정답이나 별칭을 200자 이내로 줄여 주세요.";
+      case "insufficient_song_guess_choices":
+        return "노래 풀에 서로 다른 오답 후보가 부족해 보기를 자동으로 만들지 못했어요.";
       case "song_guess_setup_locked":
         return "현재 게임 세션이 있어 라운드 편집이 잠겼어요.";
       case "song_guess_clip_assigned":

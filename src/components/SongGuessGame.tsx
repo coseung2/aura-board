@@ -3,6 +3,7 @@
 import { useMemo, type ReactNode } from "react";
 import { Check, Clock3, Users, Volume2, VolumeX } from "lucide-react";
 import type { SongGuessGuessResult, SongGuessIntent, SongGuessSnapshot } from "@/lib/song-guess/contracts";
+import { songGuessAnswerPrompt, SONG_GUESS_ANSWER_TARGET_LABELS } from "@/lib/song-guess/contracts";
 import { SongGuessPlayer } from "./SongGuessPlayer";
 import { SongGuessScoreboard } from "./SongGuessScoreboard";
 import { SongGuessEntrance } from "./SongGuessEntrance";
@@ -39,6 +40,10 @@ export function SongGuessGame({ snapshot, totalRounds, canInteract, remainingSec
     ? Math.max(1, (currentRound.deadlineAtMs - currentRound.startedAtMs) / 1000) : 30;
   const hasNextRound = totalRounds === null ? null : currentRound.order + 1 < totalRounds;
   const feedback = result?.roundId === currentRound.roundId ? result : null;
+  const multipleChoice = snapshot.answerMode === "multiple-choice";
+  const answerPrompt = songGuessAnswerPrompt(snapshot.answerTarget);
+  const answered = multipleChoice && (snapshot.viewer.answeredCurrentRound === true || snapshot.viewer.selectedChoiceId != null);
+  const answerDisabled = !canInteract || expired || snapshot.viewer.scoredCurrentRound || answered;
 
   return (
     <div className={styles.layout} data-finished={finished || roundResults || waiting} onPointerDownCapture={sound.unlock} onKeyDownCapture={sound.unlock}>
@@ -63,10 +68,25 @@ export function SongGuessGame({ snapshot, totalRounds, canInteract, remainingSec
 
         {phase === "guessing" && (
           <div className={styles.question}>
+            <p className={styles.clue}>{SONG_GUESS_ANSWER_TARGET_LABELS[snapshot.answerTarget ?? "title"]}</p>
             {currentRound.currentClip && <SongGuessPlayer key={`${snapshot.sessionId}:${currentRound.currentClip.assetId}`} sessionId={snapshot.sessionId} clip={currentRound.currentClip} onPlayingChange={sound.onMusicPlaying} />}
             {currentRound.accessibilityClue && <p className={styles.clue}>{currentRound.accessibilityClue}</p>}
             {!isHost && snapshot.viewer.joined === false && <p className={styles.scored}>입장이 마감됐어요. 다음 게임을 기다려 주세요.</p>}
-            {!isHost && snapshot.viewer.joined !== false && (
+            {multipleChoice && (isHost || snapshot.viewer.joined !== false) && (
+              <div className={styles.choices} role="group" aria-label={`${answerPrompt} 보기`}>
+                {currentRound.choices?.map((choice, index) => (
+                  <button key={choice.id} type="button" className={styles.choice}
+                    data-option={index} aria-pressed={snapshot.viewer.selectedChoiceId === choice.id}
+                    disabled={isHost || answerDisabled}
+                    onClick={() => onIntent({ type: "guess", choiceId: choice.id, roundId: currentRound.roundId })}>
+                    <span className={styles.choiceNumber} aria-hidden="true">{index + 1}</span>
+                    <span>{choice.label}</span>
+                    {snapshot.viewer.selectedChoiceId === choice.id && <Check size={20} aria-label="선택한 답" />}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!multipleChoice && !isHost && snapshot.viewer.joined !== false && (
               <form className={styles.answerForm} onSubmit={(event) => {
                 event.preventDefault();
                 const text = guessText.trim();
@@ -74,16 +94,17 @@ export function SongGuessGame({ snapshot, totalRounds, canInteract, remainingSec
                 onIntent({ type: "guess", text });
                 onGuessText("");
               }}>
-                <input aria-label="노래 제목" value={guessText} maxLength={200} placeholder="정답 입력"
+                <input aria-label={answerPrompt} value={guessText} maxLength={200} placeholder={snapshot.answerTarget === "artist-title" ? "가수·작곡가 - 노래 제목" : "정답 입력"}
                   autoComplete="off" enterKeyHint="send" disabled={!canInteract || expired || snapshot.viewer.scoredCurrentRound}
                   onChange={(event) => onGuessText(event.target.value)} />
                 <button className={controls.primaryButton} type="submit" disabled={!canInteract || expired || !guessText.trim() || snapshot.viewer.scoredCurrentRound}>정답 제출</button>
               </form>
             )}
             {feedback && <p className={feedback.correct ? controls.correctResult : controls.wrongResult} role="status">
-              {feedback.timedOut ? "시간이 끝났어요." : feedback.alreadyScored ? "이 라운드는 이미 점수를 받았어요." : feedback.correct ? `정답! +${feedback.score}점` : "다시 도전해 보세요."}
+              {feedback.timedOut ? "시간이 끝났어요." : feedback.alreadyScored ? "이 라운드는 이미 점수를 받았어요." : feedback.correct ? `정답! +${feedback.score}점` : multipleChoice ? "아쉬워요! 정답 공개를 기다려 주세요." : "다시 도전해 보세요."}
             </p>}
             {!feedback && snapshot.viewer.scoredCurrentRound && <p className={styles.scored} role="status"><Check size={18} aria-hidden="true" />정답 제출 완료</p>}
+            {!feedback && answered && !snapshot.viewer.scoredCurrentRound && <p className={styles.scored} role="status">답변 제출 완료 · 정답 공개를 기다려 주세요.</p>}
             {isHost && <p className={styles.scored}>{scoredCount} / {participants.length}명 정답</p>}
           </div>
         )}

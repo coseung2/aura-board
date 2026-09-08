@@ -5,7 +5,8 @@
   "scripts": {
     "ensure-native": "node scripts/ensure-native.mjs",
     "prisma:generate": "prisma generate",
-    "predev": "npm run ensure-native && npm run prisma:generate",
+    "predev": "npm run ensure-native && npm run prisma:generate && npm run dev:check",
+    "dev:check": "node scripts/dev-preflight.mjs",
     "prebuild": "npm run ensure-native && npm run prisma:generate",
     "dev": "next dev",
     "build": "node --max-old-space-size=4096 node_modules/next/dist/bin/next build",
@@ -25,6 +26,8 @@
     "loadtest:mobile-tenancy": "node scripts/loadtest-mobile-tenancy.mjs",
     "loadtest:mobile-tenancy:fixture": "tsx scripts/loadtest-mobile-tenancy-fixture.ts",
     "test:song-guess:browser": "node scripts/verify-song-guess-browser.mjs",
+    "song-guess:ingest": "node scripts/song-guess-ingest.mjs",
+    "song-guess:chart": "python scripts/song-guess-chart-scrape.py",
     "test:watch": "vitest",
     "db:push": "prisma db push",
     "db:reset": "prisma db push --force-reset",

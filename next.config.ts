@@ -14,6 +14,10 @@ const FRAME_SRC_ALLOWLIST = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  outputFileTracingIncludes: {
+    "/api/song-guess/boards/*/imports": ["./scripts/song-guess-extract-link.py"],
+    "/api/cron/song-guess-imports": ["./scripts/song-guess-extract-link.py"],
+  },
   // Runtime song pools use the database and private storage; local files are import inputs.
   outputFileTracingExcludes: {
     "/api/song-guess/**": ["./data/song-guess/**/*"],

@@ -36,6 +36,8 @@ export type SongGuessRepresentativePet = {
 };
 
 export type SongGuessSnapshot = {
+  answerMode?: "text" | "multiple-choice";
+  answerTarget?: "title" | "artist" | "artist-title";
   sessionId: string;
   boardId: string;
   gameKind: "song-guess";
@@ -46,6 +48,7 @@ export type SongGuessSnapshot = {
   previousSessionId: string | null;
   phase: SongGuessPhase;
   currentRound: {
+    choices?: Array<{ id: string; label: string }>;
     roundId: string;
     order: number;
     accessibilityClue: string | null;
@@ -74,6 +77,8 @@ export type SongGuessSnapshot = {
     representativePet?: SongGuessRepresentativePet | null;
   }>;
   viewer: {
+    answeredCurrentRound?: boolean;
+    selectedChoiceId?: string | null;
     role: "host" | "participant";
     scoredCurrentRound: boolean;
     joined?: boolean;
@@ -83,6 +88,7 @@ export type SongGuessSnapshot = {
 
 export type SongGuessIntent =
   | { type: "guess"; text: string; roundId?: string }
+  | { type: "guess"; choiceId: string; roundId?: string }
   | { type: "join" };
 
 export type SongGuessCommandRequest = {
@@ -130,6 +136,19 @@ function isMimeType(value: unknown): value is SongGuessMimeType {
   ].includes(String(value));
 }
 
+/** Also validates commands restored from the on-device retry queue. */
+export function isSongGuessIntent(value: unknown): value is SongGuessIntent {
+  if (!isRecord(value)) return false;
+  if (value.type === "join") return true;
+  if (value.type !== "guess") return false;
+  if (value.roundId !== undefined &&
+      (typeof value.roundId !== "string" || !value.roundId.trim())) return false;
+  return (
+    (typeof value.text === "string" && !("choiceId" in value)) ||
+    (typeof value.choiceId === "string" && !!value.choiceId.trim() && !("text" in value))
+  );
+}
+
 export function isSongGuessSnapshot(
   value: unknown,
 ): value is SongGuessSnapshot {
@@ -143,9 +162,14 @@ export function isSongGuessSnapshot(
     "original",
     "source",
     "sourceUrl",
+    "videoId",
+    "youtubeVideoId",
+    "playbackStartMs",
     "objectKey",
     "futureClips",
     "clips",
+    "correctChoiceId",
+    "selections",
   ];
   const hasForbiddenKey = (candidate: unknown) =>
     isRecord(candidate) && forbiddenKeys.some((key) => key in candidate);
@@ -154,7 +178,10 @@ export function isSongGuessSnapshot(
   const participants = value.participants;
   if (
     forbiddenKeys.some((key) => key in value) ||
+    (value.answerTarget !== undefined && !["title", "artist", "artist-title"].includes(String(value.answerTarget))) ||
     value.gameKind !== "song-guess" ||
+    (value.answerMode !== undefined && value.answerMode !== "text" &&
+      value.answerMode !== "multiple-choice") ||
     typeof value.sessionId !== "string" ||
     !value.sessionId ||
     typeof value.boardId !== "string" ||
@@ -197,11 +224,39 @@ export function isSongGuessSnapshot(
     ) ||
     (viewer.role !== "host" && viewer.role !== "participant") ||
     typeof viewer.scoredCurrentRound !== "boolean" ||
+    (viewer.answeredCurrentRound !== undefined &&
+      typeof viewer.answeredCurrentRound !== "boolean") ||
+    (viewer.selectedChoiceId !== undefined && viewer.selectedChoiceId !== null &&
+      (typeof viewer.selectedChoiceId !== "string" || !viewer.selectedChoiceId.trim())) ||
     ("joined" in viewer && typeof viewer.joined !== "boolean") ||
     ("participantIndex" in viewer &&
       (!Number.isSafeInteger(viewer.participantIndex) ||
         Number(viewer.participantIndex) < 0))
   )
+    return false;
+
+  const choices = currentRound.choices;
+  const showChoices = value.answerMode === "multiple-choice" &&
+    value.phase !== "draft" && value.phase !== "lobby";
+  if (showChoices) {
+    if (!Array.isArray(choices) || choices.length !== 4 || choices.some((choice) =>
+      !isRecord(choice) || Array.isArray(choice) ||
+      typeof choice.id !== "string" || !choice.id.trim() ||
+      typeof choice.label !== "string" || !choice.label.trim() ||
+      Object.keys(choice).some((key) => key !== "id" && key !== "label")
+    )) return false;
+    if (new Set(choices.map((choice) => choice.id.trim())).size !== choices.length ||
+        new Set(choices.map((choice) => choice.label.normalize("NFKC")
+          .replace(/[\u200B-\u200D\uFEFF]/gu, "").toLocaleLowerCase("und")
+          .trim().replace(/\s+/gu, " "))).size !== choices.length)
+      return false;
+  } else if (choices !== undefined) return false;
+  if (viewer.selectedChoiceId != null &&
+      (viewer.role !== "participant" || viewer.answeredCurrentRound !== true ||
+        !Array.isArray(choices) || !choices.some((choice) => choice.id === viewer.selectedChoiceId)))
+    return false;
+  if (participants.some((participant) => isRecord(participant) &&
+      ("selectedChoiceId" in participant || "answeredCurrentRound" in participant)))
     return false;
 
   if (value.phase !== "guessing" && currentRound.currentClip !== null)

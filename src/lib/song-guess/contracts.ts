@@ -19,6 +19,17 @@ export type SongGuessPhase = "draft" | "lobby" | "guessing" | "reveal" | "finish
 export type SongGuessClipTierMs = (typeof SONG_GUESS_CLIP_TIERS_MS)[number];
 export type SongGuessMimeType = (typeof SONG_GUESS_ALLOWED_MIME_TYPES)[number];
 export type SongGuessActorRole = "host" | "participant";
+export type SongGuessAnswerMode = "text" | "multiple-choice";
+export type SongGuessAnswerTarget = "title" | "artist" | "artist-title";
+export const SONG_GUESS_ANSWER_TARGET_LABELS: Record<SongGuessAnswerTarget, string> = {
+  title: "노래 제목 맞히기",
+  artist: "가수·작곡가 맞히기",
+  "artist-title": "가수·작곡가 + 노래 제목 맞히기",
+};
+export function songGuessAnswerPrompt(target: SongGuessAnswerTarget = "title"): string {
+  return target === "artist" ? "가수·작곡가" : target === "artist-title" ? "가수·작곡가 - 노래 제목" : "노래 제목";
+}
+export type SongGuessChoice = { id: string; label: string };
 
 export type SongGuessClipSnapshot = {
   assetId: string;
@@ -54,7 +65,10 @@ export type SongGuessSnapshot = {
   stateSchemaVersion: 1 | typeof SONG_GUESS_STATE_SCHEMA_VERSION;
   previousSessionId: string | null;
   phase: SongGuessPhase;
+  answerMode?: SongGuessAnswerMode;
+  answerTarget?: SongGuessAnswerTarget;
   currentRound: {
+    choices?: SongGuessChoice[];
     roundId: string;
     order: number;
     accessibilityClue: string | null;
@@ -77,6 +91,8 @@ export type SongGuessSnapshot = {
     representativePet?: SongGuessRepresentativePet | null;
   }>;
   viewer: {
+    answeredCurrentRound?: boolean;
+    selectedChoiceId?: string | null;
     role: SongGuessActorRole;
     scoredCurrentRound: boolean;
     joined?: boolean;
@@ -89,7 +105,7 @@ export type SongGuessIntent =
   | { type: "join" }
   | { type: "start" }
   | { type: "unlock_clip" }
-  | { type: "guess"; text: string; roundId?: string }
+  | { type: "guess"; text?: string; choiceId?: string; roundId?: string }
   | { type: "reveal" }
   | { type: "next_round" }
   | { type: "finish" };
@@ -133,6 +149,7 @@ export type SongGuessClipMetadata = {
 };
 
 export type SongGuessRoundSetupInput = {
+  artist?: string | null;
   representativeAnswer: string;
   aliases?: string[];
   accessibilityClue?: string | null;
@@ -158,6 +175,7 @@ export type SongGuessTeacherSetup = {
     id: string;
     order: number;
     representativeAnswer: string;
+    artist?: string | null;
     aliases: string[];
     accessibilityClue: string | null;
     clips: SongGuessTeacherClip[];
@@ -172,6 +190,7 @@ export type SongGuessSessionResponse = {
 };
 
 export type NormalizedSongGuessRound = {
+  artist?: string | null;
   order: number;
   representativeAnswer: string;
   normalizedAnswer: string;
@@ -284,6 +303,10 @@ export function normalizeSongGuessSetup(
       throw new Error("invalid_representative_answer");
     }
     const normalizedAnswer = normalizeSongGuessAnswer(representativeAnswer);
+    if (round.artist != null && (typeof round.artist !== "string" || round.artist.trim().length > 200)) {
+      throw new Error("invalid_song_guess_artist");
+    }
+    const artist = round.artist?.trim() || null;
     if (!normalizedAnswer) throw new Error("invalid_representative_answer");
 
     const aliases = [...(round.aliases ?? [])].map((alias) => alias.trim());
@@ -314,6 +337,7 @@ export function normalizeSongGuessSetup(
     return {
       order,
       representativeAnswer,
+      artist,
       normalizedAnswer,
       aliases,
       normalizedAliases,
@@ -345,6 +369,8 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
     "objectKey",
     "futureClips",
     "clips",
+    "correctChoiceId",
+    "selections",
   ];
   if (forbiddenKeys.some((key) => key in value)) return false;
   const currentRound = value.currentRound;
@@ -392,6 +418,24 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
   if (currentRound.currentClip !== null && hasForbiddenKey(currentRound.currentClip)) {
     return false;
   }
+  if (value.answerMode !== undefined && value.answerMode !== "text" && value.answerMode !== "multiple-choice") return false;
+  if (value.answerTarget !== undefined && !["title", "artist", "artist-title"].includes(String(value.answerTarget))) return false;
+  const choices = currentRound.choices;
+  const showChoices = value.answerMode === "multiple-choice" && value.phase !== "draft" && value.phase !== "lobby";
+  if (showChoices) {
+    if (!Array.isArray(choices) || choices.length !== 4 || choices.some((choice) =>
+      !isRecord(choice) || Object.keys(choice).some((key) => key !== "id" && key !== "label") ||
+      typeof choice.id !== "string" || !choice.id || typeof choice.label !== "string" || !choice.label.trim()
+    )) return false;
+    if (new Set(choices.map((choice) => choice.id)).size !== 4 ||
+      new Set(choices.map((choice) => normalizeSongGuessAnswer(choice.label))).size !== 4) return false;
+  } else if (choices !== undefined) return false;
+  if (viewer.answeredCurrentRound !== undefined && typeof viewer.answeredCurrentRound !== "boolean") return false;
+  if (viewer.selectedChoiceId != null && (viewer.role !== "participant" ||
+    viewer.answeredCurrentRound !== true || !Array.isArray(choices) ||
+    !choices.some((choice) => choice.id === viewer.selectedChoiceId))) return false;
+  if (participants.some((participant) => isRecord(participant) &&
+    ("selectedChoiceId" in participant || "answeredCurrentRound" in participant))) return false;
   if (value.rulesVersion === 2) {
     const { startedAtMs, deadlineAtMs, maxScore } = currentRound;
     const waiting = value.phase === "draft" || value.phase === "lobby";

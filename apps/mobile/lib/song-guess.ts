@@ -5,6 +5,7 @@ import { loadSessionToken } from "./session";
 import {
   SONG_GUESS_COMMAND_SCHEMA_VERSION,
   isSongGuessCommandResponse,
+  isSongGuessIntent,
   isSongGuessSnapshot,
   type SongGuessApiError,
   type SongGuessCommandRequest,
@@ -144,13 +145,7 @@ export async function loadPendingSongGuessCommand(
       !Number.isSafeInteger(value.request.expectedVersion) ||
       value.request.commandSchemaVersion !==
         SONG_GUESS_COMMAND_SCHEMA_VERSION ||
-      (value.request.command?.type !== "guess" &&
-        value.request.command?.type !== "join") ||
-      (value.request.command?.type === "guess" &&
-        (typeof value.request.command.text !== "string" ||
-          (value.request.command.roundId !== undefined &&
-            (typeof value.request.command.roundId !== "string" ||
-              !value.request.command.roundId))))
+      !isSongGuessIntent(value.request.command)
     ) {
       await clearPendingSongGuessCommand(boardId);
       return null;

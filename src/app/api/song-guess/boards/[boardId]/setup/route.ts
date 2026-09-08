@@ -19,6 +19,7 @@ const BodySchema = z.object({
     .array(
       z.object({
         representativeAnswer: z.string().trim().min(1).max(200),
+        artist: z.string().trim().max(200).nullable().optional(),
         aliases: z.array(z.string().trim().min(1).max(200)).max(20).optional(),
         accessibilityClue: z.string().trim().max(500).nullable().optional(),
         clipAssetIds: z.array(z.string().min(1)).refine((ids) => ids.length === 1 || ids.length === 3),

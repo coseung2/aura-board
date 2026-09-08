@@ -59,6 +59,15 @@ describe("song-guess catalog sync", () => {
     });
     expect(applied.uploadedClips).toBe(1);
     expect(songUpsert.mock.calls[0]?.[0].create.sourceMetadata).toEqual({ originalVideoId: "dQw4w9WgXcQ", highlightStartSeconds: 2 });
+    const savedClip = clipUpsert.mock.calls[0]?.[0].create;
+    clipFind.mockResolvedValue({ sha256: savedClip.sha256, objectKey: savedClip.objectKey });
+    const upload = vi.fn();
+    const repeated = await syncSongGuessCatalog({ manifestPath, apply: true,
+      dbClient: { songGuessCatalogSong: { upsert: songUpsert }, songGuessCatalogClip: { findUnique: clipFind, upsert: clipUpsert } },
+      storage: { uploadPrivateObject: upload },
+    });
+    expect(repeated.unchangedClips).toBe(1);
+    expect(upload).not.toHaveBeenCalled();
     await fs.rm(root, { recursive: true, force: true });
   });
 });

@@ -1,0 +1,729 @@
+{
+  "fileKey": "I74zYjs7O4bOtFAwahqfza",
+  "updated": "2026-09-08",
+  "collections": [
+    "VariableCollectionId:39:2",
+    "VariableCollectionId:39:3"
+  ],
+  "variables": {
+    "teacher/bg": "VariableID:39:5",
+    "teacher/text": "VariableID:39:7",
+    "teacher/muted": "VariableID:39:9",
+    "teacher/accent": "VariableID:39:11",
+    "teacher/pressed": "VariableID:39:13",
+    "teacher/tint": "VariableID:39:15",
+    "teacher/tintText": "VariableID:39:17",
+    "teacher/border": "VariableID:39:19",
+    "teacher/subtle": "VariableID:39:21",
+    "teacher/danger": "VariableID:39:23",
+    "teacher/successBg": "VariableID:39:25",
+    "teacher/success": "VariableID:39:27",
+    "student/bg": "VariableID:39:29",
+    "student/surface": "VariableID:39:31",
+    "student/text": "VariableID:39:33",
+    "student/muted": "VariableID:39:35",
+    "student/accent": "VariableID:39:37",
+    "student/track": "VariableID:39:39",
+    "student/disc": "VariableID:39:41",
+    "answer/1": "VariableID:39:43",
+    "answer/2": "VariableID:39:45",
+    "answer/3": "VariableID:39:47",
+    "answer/4": "VariableID:39:49",
+    "answer/darkText": "VariableID:39:51",
+    "answer/badge": "VariableID:39:53",
+    "space/0": "VariableID:39:55",
+    "space/4": "VariableID:39:57",
+    "space/8": "VariableID:39:59",
+    "space/12": "VariableID:39:61",
+    "space/16": "VariableID:39:63",
+    "space/20": "VariableID:39:65",
+    "space/24": "VariableID:39:67",
+    "space/32": "VariableID:39:69",
+    "radius/10": "VariableID:39:71",
+    "radius/12": "VariableID:39:73",
+    "radius/16": "VariableID:39:75",
+    "radius/24": "VariableID:39:77"
+  },
+  "styles": {
+    "Display": "S:7a9968656749b7bb591ba9c87ea451bb3e9b5f55,",
+    "Title": "S:cba1cb69027011630b0cf5c6b7e7ecbcad1353e0,",
+    "Subtitle": "S:6c3346f43caaa4f59740af9ba360693235d832aa,",
+    "Body": "S:8e8d8526ed674798855def9d95afe231883eacb6,",
+    "Label": "S:4a0e86635515e8c53f4e92249535bc9925d7e23f,",
+    "Caption": "S:c3d094fea22f8795d9191e9a5271e0d7a09f401d,",
+    "Student Answer": "S:b102831cba6d932890fbb6efa5eb1d9317409f9b,",
+    "Student Question": "S:938dac9d7c83ddc3e4d9197cc949a68c3049efd1,"
+  },
+  "counts": {
+    "variables": 74,
+    "textStyles": 8
+  },
+  "pages": {
+    "guide": "39:86",
+    "tokens": "39:87",
+    "teacherComponents": "39:88",
+    "studentComponents": "39:89",
+    "teacher": "39:90",
+    "student": "39:91"
+  },
+  "components": {
+    "buttons": [
+      {
+        "id": "40:74",
+        "name": "State=Primary"
+      },
+      {
+        "id": "40:76",
+        "name": "State=Secondary"
+      },
+      {
+        "id": "40:78",
+        "name": "State=Selected"
+      },
+      {
+        "id": "40:80",
+        "name": "State=Disabled"
+      }
+    ],
+    "fields": [
+      {
+        "id": "41:2",
+        "name": "State=Default"
+      },
+      {
+        "id": "41:6",
+        "name": "State=Focus"
+      },
+      {
+        "id": "41:10",
+        "name": "State=Error"
+      }
+    ],
+    "songRows": [
+      {
+        "id": "41:15",
+        "name": "State=Default"
+      },
+      {
+        "id": "41:23",
+        "name": "State=Selected"
+      }
+    ],
+    "studentHeader": "42:2",
+    "players": [
+      {
+        "id": "42:20",
+        "name": "State=Playing"
+      },
+      {
+        "id": "42:32",
+        "name": "State=Submitted"
+      },
+      {
+        "id": "42:44",
+        "name": "State=Reveal"
+      }
+    ],
+    "answers": [
+      {
+        "id": "42:46",
+        "name": "Color=1, State=Default"
+      },
+      {
+        "id": "42:51",
+        "name": "Color=1, State=Selected"
+      },
+      {
+        "id": "42:56",
+        "name": "Color=1, State=Muted"
+      },
+      {
+        "id": "42:61",
+        "name": "Color=1, State=Correct"
+      },
+      {
+        "id": "42:66",
+        "name": "Color=1, State=Wrong"
+      },
+      {
+        "id": "42:71",
+        "name": "Color=2, State=Default"
+      },
+      {
+        "id": "42:76",
+        "name": "Color=2, State=Selected"
+      },
+      {
+        "id": "42:81",
+        "name": "Color=2, State=Muted"
+      },
+      {
+        "id": "42:86",
+        "name": "Color=2, State=Correct"
+      },
+      {
+        "id": "42:91",
+        "name": "Color=2, State=Wrong"
+      },
+      {
+        "id": "42:96",
+        "name": "Color=3, State=Default"
+      },
+      {
+        "id": "42:101",
+        "name": "Color=3, State=Selected"
+      },
+      {
+        "id": "42:106",
+        "name": "Color=3, State=Muted"
+      },
+      {
+        "id": "42:111",
+        "name": "Color=3, State=Correct"
+      },
+      {
+        "id": "42:116",
+        "name": "Color=3, State=Wrong"
+      },
+      {
+        "id": "42:121",
+        "name": "Color=4, State=Default"
+      },
+      {
+        "id": "42:126",
+        "name": "Color=4, State=Selected"
+      },
+      {
+        "id": "42:131",
+        "name": "Color=4, State=Muted"
+      },
+      {
+        "id": "42:136",
+        "name": "Color=4, State=Correct"
+      },
+      {
+        "id": "42:141",
+        "name": "Color=4, State=Wrong"
+      }
+    ],
+    "scores": [
+      {
+        "id": "42:147",
+        "name": "Theme=Teacher"
+      },
+      {
+        "id": "42:151",
+        "name": "Theme=Student"
+      }
+    ],
+    "studentButtons": [
+      {
+        "id": "42:156",
+        "name": "State=Primary"
+      },
+      {
+        "id": "42:158",
+        "name": "State=Secondary"
+      },
+      {
+        "id": "42:160",
+        "name": "State=Disabled"
+      }
+    ],
+    "textAnswers": [
+      {
+        "id": "49:2",
+        "name": "State=Empty"
+      },
+      {
+        "id": "49:4",
+        "name": "State=Filled"
+      }
+    ]
+  },
+  "screens": [
+    {
+      "id": "42:163",
+      "name": "T01 · 출제 준비",
+      "png": "screens/t01.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=42-163"
+    },
+    {
+      "id": "42:164",
+      "name": "T02 · 링크로 곡 등록",
+      "png": "screens/t02.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=42-164"
+    },
+    {
+      "id": "42:165",
+      "name": "T03 · 우리 반 곡 관리",
+      "png": "screens/t03.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=42-165"
+    },
+    {
+      "id": "42:166",
+      "name": "T04 · 참가 대기",
+      "png": "screens/t04.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=42-166"
+    },
+    {
+      "id": "42:167",
+      "name": "T05 · 게임 진행",
+      "png": "screens/t05.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=42-167"
+    },
+    {
+      "id": "42:168",
+      "name": "T06 · 라운드 결과",
+      "png": "screens/t06.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=42-168"
+    },
+    {
+      "id": "42:169",
+      "name": "T07 · 최종 순위",
+      "png": "screens/t07.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=42-169"
+    },
+    {
+      "id": "48:2",
+      "name": "S01 · 참가 대기",
+      "png": "screens/s01.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-2"
+    },
+    {
+      "id": "48:3",
+      "name": "S02 · 객관식 답변",
+      "png": "screens/s02.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-3"
+    },
+    {
+      "id": "48:4",
+      "name": "S03 · 답변 제출",
+      "png": "screens/s03.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-4"
+    },
+    {
+      "id": "48:5",
+      "name": "S04 · 정답 결과",
+      "png": "screens/s04.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-5"
+    },
+    {
+      "id": "48:6",
+      "name": "S05 · 최종 순위",
+      "png": "screens/s05.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-6"
+    },
+    {
+      "id": "48:7",
+      "name": "S06 · 직접 입력",
+      "png": "screens/s06.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-7"
+    },
+    {
+      "id": "48:8",
+      "name": "S07 · 오답 결과",
+      "png": "screens/s07.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-8"
+    },
+    {
+      "id": "48:9",
+      "name": "S08 · 시간 종료",
+      "png": "screens/s08.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-9"
+    },
+    {
+      "id": "48:10",
+      "name": "S09 · 연결 오류",
+      "png": "screens/s09.png",
+      "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-10"
+    }
+  ],
+  "status": "Design complete; application implementation pending",
+  "tokenValues": {
+    "teacher/bg": {
+      "type": "COLOR",
+      "value": {
+        "r": 1,
+        "g": 1,
+        "b": 1,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-bg)"
+      }
+    },
+    "teacher/text": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.0941176488995552,
+        "g": 0.1921568661928177,
+        "b": 0.24705882370471954,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-text)"
+      }
+    },
+    "teacher/muted": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.364705890417099,
+        "g": 0.43529412150382996,
+        "b": 0.4627451002597809,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-text-muted)"
+      }
+    },
+    "teacher/accent": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.08627451211214066,
+        "g": 0.5137255191802979,
+        "b": 0.7803921699523926,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-accent)"
+      }
+    },
+    "teacher/pressed": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.05098039284348488,
+        "g": 0.40392157435417175,
+        "b": 0.6235294342041016,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-accent-active)"
+      }
+    },
+    "teacher/tint": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.9137254953384399,
+        "g": 0.9686274528503418,
+        "b": 1,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-accent-tinted-bg)"
+      }
+    },
+    "teacher/tintText": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.05882352963089943,
+        "g": 0.43921568989753723,
+        "b": 0.6784313917160034,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-accent-tinted-text)"
+      }
+    },
+    "teacher/border": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.0941176488995552,
+        "g": 0.29019609093666077,
+        "b": 0.3607843220233917,
+        "a": 0.1411764770746231
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-border)"
+      }
+    },
+    "teacher/subtle": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.0941176488995552,
+        "g": 0.29019609093666077,
+        "b": 0.3607843220233917,
+        "a": 0.07058823853731155
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-surface-alt)"
+      }
+    },
+    "teacher/danger": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.7764706015586853,
+        "g": 0.1568627506494522,
+        "b": 0.1568627506494522,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-danger)"
+      }
+    },
+    "teacher/successBg": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.9098039269447327,
+        "g": 0.9607843160629272,
+        "b": 0.9137254953384399,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-status-reviewed-bg)"
+      }
+    },
+    "teacher/success": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.18039216101169586,
+        "g": 0.4901960790157318,
+        "b": 0.19607843458652496,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--color-status-reviewed-text)"
+      }
+    },
+    "student/bg": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.125490203499794,
+        "g": 0.07450980693101883,
+        "b": 0.25882354378700256,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-student-bg)"
+      }
+    },
+    "student/surface": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.1882352977991104,
+        "g": 0.125490203499794,
+        "b": 0.30588236451148987,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-student-surface)"
+      }
+    },
+    "student/text": {
+      "type": "COLOR",
+      "value": {
+        "r": 1,
+        "g": 1,
+        "b": 1,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-student-text)"
+      }
+    },
+    "student/muted": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.7843137383460999,
+        "g": 0.7450980544090271,
+        "b": 0.8784313797950745,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-student-muted)"
+      }
+    },
+    "student/accent": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.7843137383460999,
+        "g": 0.6980392336845398,
+        "b": 1,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-student-accent)"
+      }
+    },
+    "student/track": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.2862745225429535,
+        "g": 0.21568627655506134,
+        "b": 0.3843137323856354,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-student-track)"
+      }
+    },
+    "student/disc": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.08627451211214066,
+        "g": 0.05098039284348488,
+        "b": 0.16862745583057404,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-student-disc)"
+      }
+    },
+    "answer/1": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.7254902124404907,
+        "g": 0.19607843458652496,
+        "b": 0.27843138575553894,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-answer-1)"
+      }
+    },
+    "answer/2": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.13725490868091583,
+        "g": 0.35686275362968445,
+        "b": 0.7647058963775635,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-answer-2)"
+      }
+    },
+    "answer/3": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.9098039269447327,
+        "g": 0.7333333492279053,
+        "b": 0.2549019753932953,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-answer-3)"
+      }
+    },
+    "answer/4": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.09803921729326248,
+        "g": 0.5058823823928833,
+        "b": 0.4274509847164154,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-answer-4)"
+      }
+    },
+    "answer/darkText": {
+      "type": "COLOR",
+      "value": {
+        "r": 0.21960784494876862,
+        "g": 0.1725490242242813,
+        "b": 0.0784313753247261,
+        "a": 1
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-answer-darkText)"
+      }
+    },
+    "answer/badge": {
+      "type": "COLOR",
+      "value": {
+        "r": 1,
+        "g": 1,
+        "b": 1,
+        "a": 0.1411764770746231
+      },
+      "codeSyntax": {
+        "WEB": "var(--song-answer-badge)"
+      }
+    },
+    "space/0": {
+      "type": "FLOAT",
+      "value": 0,
+      "codeSyntax": {
+        "WEB": "var(--song-space-0)"
+      }
+    },
+    "space/4": {
+      "type": "FLOAT",
+      "value": 4,
+      "codeSyntax": {
+        "WEB": "var(--song-space-4)"
+      }
+    },
+    "space/8": {
+      "type": "FLOAT",
+      "value": 8,
+      "codeSyntax": {
+        "WEB": "var(--song-space-8)"
+      }
+    },
+    "space/12": {
+      "type": "FLOAT",
+      "value": 12,
+      "codeSyntax": {
+        "WEB": "var(--song-space-12)"
+      }
+    },
+    "space/16": {
+      "type": "FLOAT",
+      "value": 16,
+      "codeSyntax": {
+        "WEB": "var(--song-space-16)"
+      }
+    },
+    "space/20": {
+      "type": "FLOAT",
+      "value": 20,
+      "codeSyntax": {
+        "WEB": "var(--song-space-20)"
+      }
+    },
+    "space/24": {
+      "type": "FLOAT",
+      "value": 24,
+      "codeSyntax": {
+        "WEB": "var(--song-space-24)"
+      }
+    },
+    "space/32": {
+      "type": "FLOAT",
+      "value": 32,
+      "codeSyntax": {
+        "WEB": "var(--song-space-32)"
+      }
+    },
+    "radius/10": {
+      "type": "FLOAT",
+      "value": 10,
+      "codeSyntax": {
+        "WEB": "var(--song-radius-10)"
+      }
+    },
+    "radius/12": {
+      "type": "FLOAT",
+      "value": 12,
+      "codeSyntax": {
+        "WEB": "var(--song-radius-12)"
+      }
+    },
+    "radius/16": {
+      "type": "FLOAT",
+      "value": 16,
+      "codeSyntax": {
+        "WEB": "var(--song-radius-16)"
+      }
+    },
+    "radius/24": {
+      "type": "FLOAT",
+      "value": 24,
+      "codeSyntax": {
+        "WEB": "var(--song-radius-24)"
+      }
+    }
+  }
+}

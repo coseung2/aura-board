@@ -3,12 +3,14 @@
   "songs": [
     {
       "id": "mozart-turkish-march",
-      "title": "Turkish March",
+      "title": "터키행진곡",
       "artist": "Wolfgang Amadeus Mozart",
       "aliases": [
         "Rondo Alla Turca",
         "Mozart Turkish March",
-        "터키 행진곡"
+        "터키 행진곡",
+        "Turkish March",
+        "터키행진곡"
       ],
       "categories": [
         "classical"
@@ -23,17 +25,31 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 0,
         "chapterEndSeconds": 24,
-        "clipStartSeconds": 0
+        "clipStartSeconds": 0,
+        "originalTitle": "Turkish March",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 0,
+          "trackEndSeconds": 24,
+          "quizStartSeconds": 0,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "vivaldi-summer-3rd-movement",
-      "title": "The Four Seasons: Summer, 3rd Movement",
+      "title": "사계",
       "artist": "Antonio Vivaldi",
       "aliases": [
         "Vivaldi Summer 3rd Movement",
         "Four Seasons Summer 3rd Movement",
-        "비발디 사계 여름 3악장"
+        "비발디 사계 여름 3악장",
+        "The Four Seasons: Summer, 3rd Movement",
+        "사계",
+        "사계 여름",
+        "여름"
       ],
       "categories": [
         "classical"
@@ -48,16 +64,28 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 24,
         "chapterEndSeconds": 45,
-        "clipStartSeconds": 24
+        "clipStartSeconds": 24,
+        "originalTitle": "The Four Seasons: Summer, 3rd Movement",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 24,
+          "trackEndSeconds": 45,
+          "quizStartSeconds": 24,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "chopin-waltz-no19",
-      "title": "Waltz No. 19 in A minor, B. 150, Op. posth.",
+      "title": "왈츠 19번",
       "artist": "Frédéric Chopin",
       "aliases": [
         "Chopin Waltz No. 19",
-        "쇼팽 왈츠 19번"
+        "쇼팽 왈츠 19번",
+        "Waltz No. 19 in A minor, B. 150, Op. posth.",
+        "왈츠 19번"
       ],
       "categories": [
         "classical"
@@ -72,16 +100,27 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 45,
         "chapterEndSeconds": 65,
-        "clipStartSeconds": 45
+        "clipStartSeconds": 45,
+        "originalTitle": "Waltz No. 19 in A minor, B. 150, Op. posth.",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 45,
+          "trackEndSeconds": 65,
+          "quizStartSeconds": 45,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "brahms-lullaby",
-      "title": "Lullaby",
+      "title": "자장가",
       "artist": "Johannes Brahms",
       "aliases": [
         "Brahms Lullaby",
-        "자장가"
+        "자장가",
+        "Lullaby"
       ],
       "categories": [
         "classical"
@@ -96,16 +135,28 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 65,
         "chapterEndSeconds": 85,
-        "clipStartSeconds": 65
+        "clipStartSeconds": 65,
+        "originalTitle": "Lullaby",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 65,
+          "trackEndSeconds": 85,
+          "quizStartSeconds": 65,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "schubert-moment-musical-no3",
-      "title": "Moment Musical No. 3",
+      "title": "악흥의 순간",
       "artist": "Franz Schubert",
       "aliases": [
         "Schubert Moment Musical No. 3",
-        "악흥의 순간 3번"
+        "악흥의 순간 3번",
+        "Moment Musical No. 3",
+        "악흥의 순간"
       ],
       "categories": [
         "classical"
@@ -120,16 +171,29 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 85,
         "chapterEndSeconds": 105,
-        "clipStartSeconds": 85
+        "clipStartSeconds": 85,
+        "originalTitle": "Moment Musical No. 3",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 85,
+          "trackEndSeconds": 105,
+          "quizStartSeconds": 85,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "beethoven-moonlight-sonata-1st-movement",
-      "title": "Moonlight Sonata, 1st Movement",
+      "title": "월광",
       "artist": "Ludwig van Beethoven",
       "aliases": [
         "Beethoven Moonlight Sonata 1st Movement",
-        "월광 소나타 1악장"
+        "월광 소나타 1악장",
+        "Moonlight Sonata, 1st Movement",
+        "월광",
+        "월광 소나타"
       ],
       "categories": [
         "classical"
@@ -144,17 +208,29 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 105,
         "chapterEndSeconds": 125,
-        "clipStartSeconds": 105
+        "clipStartSeconds": 105,
+        "originalTitle": "Moonlight Sonata, 1st Movement",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 105,
+          "trackEndSeconds": 125,
+          "quizStartSeconds": 105,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "tchaikovsky-june-barcarolle",
-      "title": "June: Barcarolle (The Seasons)",
+      "title": "뱃노래",
       "artist": "Pyotr Ilyich Tchaikovsky",
       "aliases": [
         "Tchaikovsky June Barcarolle",
         "June Barcarolle",
-        "사계 6월 뱃노래"
+        "사계 6월 뱃노래",
+        "June: Barcarolle (The Seasons)",
+        "뱃노래"
       ],
       "categories": [
         "classical"
@@ -169,16 +245,29 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 125,
         "chapterEndSeconds": 145,
-        "clipStartSeconds": 125
+        "clipStartSeconds": 125,
+        "originalTitle": "June: Barcarolle (The Seasons)",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 125,
+          "trackEndSeconds": 145,
+          "quizStartSeconds": 125,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "chopin-mazurka-op67-no4",
-      "title": "Mazurka Op. 67 No. 4",
+      "title": "마주르카",
       "artist": "Frédéric Chopin",
       "aliases": [
         "Chopin Mazurka Op. 67 No. 4",
-        "쇼팽 마주르카 Op.67 No.4"
+        "쇼팽 마주르카 Op.67 No.4",
+        "Mazurka Op. 67 No. 4",
+        "마주르카",
+        "마주르카 67-4"
       ],
       "categories": [
         "classical"
@@ -193,16 +282,27 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 145,
         "chapterEndSeconds": 165,
-        "clipStartSeconds": 145
+        "clipStartSeconds": 145,
+        "originalTitle": "Mazurka Op. 67 No. 4",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 145,
+          "trackEndSeconds": 165,
+          "quizStartSeconds": 145,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "tchaikovsky-swan-lake",
-      "title": "Swan Lake",
+      "title": "백조의 호수",
       "artist": "Pyotr Ilyich Tchaikovsky",
       "aliases": [
         "Tchaikovsky Swan Lake",
-        "백조의 호수"
+        "백조의 호수",
+        "Swan Lake"
       ],
       "categories": [
         "classical"
@@ -217,16 +317,28 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 165,
         "chapterEndSeconds": 185,
-        "clipStartSeconds": 165
+        "clipStartSeconds": 165,
+        "originalTitle": "Swan Lake",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 165,
+          "trackEndSeconds": 185,
+          "quizStartSeconds": 165,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "bach-minuet-in-g-major",
-      "title": "Minuet in G Major",
+      "title": "미뉴에트",
       "artist": "Johann Sebastian Bach",
       "aliases": [
         "Bach Minuet in G Major",
-        "바흐 미뉴에트 G장조"
+        "바흐 미뉴에트 G장조",
+        "Minuet in G Major",
+        "미뉴에트"
       ],
       "categories": [
         "classical"
@@ -241,16 +353,30 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 185,
         "chapterEndSeconds": 205,
-        "clipStartSeconds": 185
+        "clipStartSeconds": 185,
+        "originalTitle": "Minuet in G Major",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 185,
+          "trackEndSeconds": 205,
+          "quizStartSeconds": 185,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "chopin-nocturne-no20-csharp-minor",
-      "title": "Nocturne No. 20 in C-sharp minor",
+      "title": "녹턴",
       "artist": "Frédéric Chopin",
       "aliases": [
         "Chopin Nocturne No. 20 in C# minor",
-        "쇼팽 녹턴 20번 C# 단조"
+        "쇼팽 녹턴 20번 C# 단조",
+        "Nocturne No. 20 in C-sharp minor",
+        "녹턴",
+        "녹턴 20번",
+        "야상곡"
       ],
       "categories": [
         "classical"
@@ -265,16 +391,30 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 205,
         "chapterEndSeconds": 228,
-        "clipStartSeconds": 205
+        "clipStartSeconds": 205,
+        "originalTitle": "Nocturne No. 20 in C-sharp minor",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 205,
+          "trackEndSeconds": 228,
+          "quizStartSeconds": 205,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "beethoven-sonata-17-tempest-3rd-movement",
-      "title": "Sonata No. 17 ‘Tempest’, 3rd Movement",
+      "title": "템페스트",
       "artist": "Ludwig van Beethoven",
       "aliases": [
         "Beethoven Sonata No. 17 Tempest 3rd Movement",
-        "템페스트 3악장"
+        "템페스트 3악장",
+        "Sonata No. 17 ‘Tempest’, 3rd Movement",
+        "템페스트",
+        "폭풍",
+        "폭풍 소나타"
       ],
       "categories": [
         "classical"
@@ -289,16 +429,30 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 228,
         "chapterEndSeconds": 250,
-        "clipStartSeconds": 228
+        "clipStartSeconds": 228,
+        "originalTitle": "Sonata No. 17 ‘Tempest’, 3rd Movement",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 228,
+          "trackEndSeconds": 250,
+          "quizStartSeconds": 228,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "liszt-paganini-etude-no6",
-      "title": "Paganini Etude No. 6 (Caprice No. 24)",
+      "title": "파가니니 연습곡",
       "artist": "Franz Liszt",
       "aliases": [
         "Liszt Paganini Etude No. 6",
-        "파가니니 에튀드 6번"
+        "파가니니 에튀드 6번",
+        "Paganini Etude No. 6 (Caprice No. 24)",
+        "파가니니 연습곡",
+        "파가니니 에튀드",
+        "파가니니 연습곡 6번"
       ],
       "categories": [
         "classical"
@@ -313,16 +467,28 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 250,
         "chapterEndSeconds": 272,
-        "clipStartSeconds": 250
+        "clipStartSeconds": 250,
+        "originalTitle": "Paganini Etude No. 6 (Caprice No. 24)",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 250,
+          "trackEndSeconds": 272,
+          "quizStartSeconds": 250,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "mozart-sonata-c-major-k545-1st-movement",
-      "title": "Sonata in C Major, K.545, 1st Movement: Allegro",
+      "title": "피아노 소나타 16번",
       "artist": "Wolfgang Amadeus Mozart",
       "aliases": [
         "Mozart Sonata in C Major K.545",
-        "피아노 소나타 16번 C장조"
+        "피아노 소나타 16번 C장조",
+        "Sonata in C Major, K.545, 1st Movement: Allegro",
+        "피아노 소나타 16번"
       ],
       "categories": [
         "classical"
@@ -337,16 +503,27 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 272,
         "chapterEndSeconds": 292,
-        "clipStartSeconds": 272
+        "clipStartSeconds": 272,
+        "originalTitle": "Sonata in C Major, K.545, 1st Movement: Allegro",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 272,
+          "trackEndSeconds": 292,
+          "quizStartSeconds": 272,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "liszt-tarantella-venezia-e-napoli",
-      "title": "Tarantella (Venezia e Napoli)",
+      "title": "타란텔라",
       "artist": "Franz Liszt",
       "aliases": [
         "Liszt Tarantella",
-        "타란텔라"
+        "타란텔라",
+        "Tarantella (Venezia e Napoli)"
       ],
       "categories": [
         "classical"
@@ -361,16 +538,29 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 292,
         "chapterEndSeconds": 312,
-        "clipStartSeconds": 292
+        "clipStartSeconds": 292,
+        "originalTitle": "Tarantella (Venezia e Napoli)",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 292,
+          "trackEndSeconds": 312,
+          "quizStartSeconds": 292,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "bach-prelude-c-major-bwv846",
-      "title": "Prelude in C Major (BWV 846)",
+      "title": "전주곡",
       "artist": "Johann Sebastian Bach",
       "aliases": [
         "Bach Prelude in C Major",
-        "프렐류드 C장조"
+        "프렐류드 C장조",
+        "Prelude in C Major (BWV 846)",
+        "전주곡",
+        "프렐류드"
       ],
       "categories": [
         "classical"
@@ -385,16 +575,28 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 312,
         "chapterEndSeconds": 333,
-        "clipStartSeconds": 312
+        "clipStartSeconds": 312,
+        "originalTitle": "Prelude in C Major (BWV 846)",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 312,
+          "trackEndSeconds": 333,
+          "quizStartSeconds": 312,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "mozart-serenade-no13-eine-kleine-nachtmusik",
-      "title": "Serenade No. 13 in G Major, K.525: Eine Kleine Nachtmusik",
+      "title": "아이네 클라이네 나흐트무지크",
       "artist": "Wolfgang Amadeus Mozart",
       "aliases": [
         "Mozart Eine Kleine Nachtmusik",
-        "작은 밤의 음악"
+        "작은 밤의 음악",
+        "Serenade No. 13 in G Major, K.525: Eine Kleine Nachtmusik",
+        "아이네 클라이네 나흐트무지크"
       ],
       "categories": [
         "classical"
@@ -409,16 +611,28 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 333,
         "chapterEndSeconds": 352,
-        "clipStartSeconds": 333
+        "clipStartSeconds": 333,
+        "originalTitle": "Serenade No. 13 in G Major, K.525: Eine Kleine Nachtmusik",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 333,
+          "trackEndSeconds": 352,
+          "quizStartSeconds": 333,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "chopin-waltz-e-minor-b56",
-      "title": "Waltz in E minor, B. 56",
+      "title": "왈츠 14번",
       "artist": "Frédéric Chopin",
       "aliases": [
         "Chopin Waltz in E Minor",
-        "쇼팽 왈츠 14번 마단조"
+        "쇼팽 왈츠 14번 마단조",
+        "Waltz in E minor, B. 56",
+        "왈츠 14번"
       ],
       "categories": [
         "classical"
@@ -433,16 +647,28 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 352,
         "chapterEndSeconds": 372,
-        "clipStartSeconds": 352
+        "clipStartSeconds": 352,
+        "originalTitle": "Waltz in E minor, B. 56",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 352,
+          "trackEndSeconds": 372,
+          "quizStartSeconds": 352,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "schubert-serenade-d957-no4",
-      "title": "Serenade D.957, No. 4",
+      "title": "세레나데",
       "artist": "Franz Schubert",
       "aliases": [
         "Schubert Serenade D.957 No. 4",
-        "슈베르트 세레나데"
+        "슈베르트 세레나데",
+        "Serenade D.957, No. 4",
+        "세레나데"
       ],
       "categories": [
         "classical"
@@ -457,16 +683,30 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 372,
         "chapterEndSeconds": 392,
-        "clipStartSeconds": 372
+        "clipStartSeconds": 372,
+        "originalTitle": "Serenade D.957, No. 4",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 372,
+          "trackEndSeconds": 392,
+          "quizStartSeconds": 372,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {
       "id": "pachelbel-canon-d-major",
-      "title": "Canon in D Major",
+      "title": "캐논",
       "artist": "Johann Pachelbel",
       "aliases": [
         "Pachelbel Canon",
-        "캐논 D장조"
+        "캐논 D장조",
+        "Canon in D Major",
+        "캐논",
+        "카논",
+        "캐논 변주곡"
       ],
       "categories": [
         "classical"
@@ -481,7 +721,17 @@
         "videoId": "wcIY33Q1GmE",
         "chapterStartSeconds": 392,
         "chapterEndSeconds": 416,
-        "clipStartSeconds": 392
+        "clipStartSeconds": 392,
+        "originalTitle": "Canon in D Major",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "highlight",
+          "trackStartSeconds": 392,
+          "trackEndSeconds": 416,
+          "quizStartSeconds": 392,
+          "selectionStatus": "uploader-highlight"
+        }
       }
     },
     {

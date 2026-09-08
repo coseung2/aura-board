@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   assetFindUnique: vi.fn(),
   songGuessGameFindUnique: vi.fn(),
+  catalogFindMany: vi.fn(),
   playSessionFindUnique: vi.fn(),
   studentFindMany: vi.fn(),
   resolveSongGuessActorForBoard: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     songGuessAsset: { findUnique: mocks.assetFindUnique },
     songGuessGame: { findUnique: mocks.songGuessGameFindUnique },
+    songGuessCatalogSong: { findMany: mocks.catalogFindMany },
     playSession: { findUnique: mocks.playSessionFindUnique },
     student: { findMany: mocks.studentFindMany },
   },
@@ -186,6 +188,53 @@ describe("song-guess gated clip retrieval", () => {
     });
     expect(mocks.playEngineFetch).not.toHaveBeenCalled();
     expect(mocks.downloadPrivateObject).not.toHaveBeenCalled();
+  });
+
+  it.each(["text", "multiple-choice"] as const)("creates a one-song %s game and automatically fills choices from catalog", async (mode) => {
+    mocks.loadSongGuessTeacherBoard.mockResolvedValue({ actor: { userId: "teacher-1" } });
+    mocks.resolveSongGuessParticipantSeeds.mockResolvedValue([]);
+    mocks.songGuessGameFindUnique.mockResolvedValue({ rounds: [{
+      id: "round-1", order: 0, representativeAnswer: "달리반피카소", normalizedAnswer: "달리반피카소",
+      aliases: ["Dali, Van, Picasso"], normalizedAliases: ["dali, van, picasso"], accessibilityClue: null,
+      clips: [{ id: "asset-1", tierMs: 15000, mimeType: "audio/wav", sizeBytes: 1323044, durationMs: 15000 }],
+    }] });
+    mocks.catalogFindMany.mockResolvedValue([
+      { title: "Dali, Van, Picasso", aliases: ["달리반피카소"] },
+      ...["밤편지", "봄날", "좋은 날"].map((title) => ({ title, aliases: [] })),
+    ]);
+    const request = await buildSongGuessCreateRequest("board-1", "request-1", undefined, mode);
+    expect(request.rounds).toHaveLength(1);
+    if (mode === "multiple-choice") {
+      expect(request.rounds[0].choices?.map((choice) => choice.label).sort()).toEqual(["달리반피카소", "밤편지", "봄날", "좋은 날"].sort());
+      expect(mocks.catalogFindMany).toHaveBeenCalledOnce();
+      expect(mocks.downloadPrivateObject).not.toHaveBeenCalled();
+    } else {
+      expect(request.rounds[0].choices).toBeUndefined();
+      expect(mocks.catalogFindMany).not.toHaveBeenCalled();
+    }
+  });
+
+  it.each(["title", "artist", "artist-title"] as const)("automatically creates one-question choices for %s", async (target) => {
+    mocks.loadSongGuessTeacherBoard.mockResolvedValue({ actor: { userId: "teacher-1" } });
+    mocks.resolveSongGuessParticipantSeeds.mockResolvedValue([]);
+    const song = { id: "r1", order: 0, representativeAnswer: "밤편지", normalizedAnswer: "밤편지", artist: "아이유",
+      aliases: ["Through the Night"], normalizedAliases: ["through the night"], accessibilityClue: null,
+      clips: [{ id: "a1", tierMs: 15000, mimeType: "audio/wav", sizeBytes: 1323044, durationMs: 15000 }] };
+    mocks.songGuessGameFindUnique.mockResolvedValue({ rounds: [song] });
+    mocks.catalogFindMany.mockResolvedValue([
+      { title: "밤편지", artist: "아이유", aliases: ["Through the Night"] },
+      { title: "좋은 날", artist: "아이유", aliases: [] },
+      ...["방탄소년단", "베토벤", "쇼팽"].map((artist, i) => ({ title: `곡 ${i}`, artist, aliases: [] })),
+    ]);
+    const result = await buildSongGuessCreateRequest("board-1", "request-1", undefined, "multiple-choice", target);
+    expect(result.answerTarget).toBe(target);
+    expect(result.rounds).toHaveLength(1);
+    const round = result.rounds[0];
+    expect(round.choices).toHaveLength(4);
+    expect(new Set(round.choices?.map((choice) => choice.label)).size).toBe(4);
+    expect(round.representativeAnswer).toBe(target === "title" ? "밤편지" : target === "artist" ? "아이유" : "아이유 - 밤편지");
+    if (target !== "title") expect(round.aliases).not.toContain("Through the Night");
+    if (target === "artist") expect(round.choices?.map((choice) => choice.label).sort()).toEqual(["아이유", "방탄소년단", "베토벤", "쇼팽"].sort());
   });
 
   it("rejects a legacy video-only setup before starting a session", async () => {

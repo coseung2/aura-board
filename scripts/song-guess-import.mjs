@@ -9,6 +9,8 @@ export const SONG_GUESS_CATEGORIES = [
   "boy-idol",
   "2000s",
   "2010s",
+  "2020s",
+  "other",
   "classical",
 ];
 export const SEGMENTS = ["intro", "highlight"];
@@ -144,6 +146,7 @@ export function normalizeImportManifest(
       categories: validateCategories(raw.categories),
       sourceFile: path.resolve(sourceBaseDir, sourceFile),
       sourceUrl: validateSourceUrl(raw.sourceUrl),
+      ...(raw.sourceMetadata ? { sourceMetadata: raw.sourceMetadata } : {}),
       introStartSeconds,
       highlightStartSeconds,
     };
@@ -226,6 +229,7 @@ function normalizeExistingCatalog(value) {
       ),
       categories: validateCategories(song.categories),
       sourceUrl: validateSourceUrl(song.sourceUrl),
+      ...(song.sourceMetadata ? { sourceMetadata: song.sourceMetadata } : {}),
       clips,
     };
   });
@@ -276,10 +280,10 @@ function ffprobeFor(ffmpegPath) {
   return path.join(path.dirname(ffmpegPath), `ffprobe${extension}`);
 }
 
-async function probeDuration(sourceFile, { ffmpegPath, spawnImpl, cwd }) {
+async function probeDuration(sourceFile, { ffmpegPath, ffprobePath, spawnImpl, cwd }) {
   const result = await spawnProcess(
     spawnImpl,
-    ffprobeFor(ffmpegPath),
+    ffprobePath ?? ffprobeFor(ffmpegPath),
     [
       "-v",
       "error",
@@ -469,6 +473,7 @@ export async function importSongGuessCatalog(
   manifest,
   {
     ffmpegPath = "ffmpeg",
+    ffprobePath,
     catalogPath = DEFAULT_CATALOG,
     clipsRoot = DEFAULT_CLIPS_ROOT,
     spawnImpl = nodeSpawn,
@@ -496,6 +501,7 @@ export async function importSongGuessCatalog(
       if (!stat?.isFile()) fail("song_guess_import_source_unavailable");
       const duration = await probeDuration(entry.sourceFile, {
         ffmpegPath,
+        ffprobePath,
         spawnImpl,
         cwd,
       });
@@ -534,6 +540,9 @@ export async function importSongGuessCatalog(
         aliases: entry.aliases,
         categories: entry.categories,
         sourceUrl: entry.sourceUrl,
+        ...((entry.sourceMetadata ?? prior?.sourceMetadata)
+          ? { sourceMetadata: { ...prior?.sourceMetadata, ...entry.sourceMetadata } }
+          : {}),
         clips: prior ? { ...prior.clips, ...clips } : clips,
       });
     }

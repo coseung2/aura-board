@@ -7,7 +7,63 @@ exactly what passed and what still has risk.
 When adding project-specific verification guidance, update this file instead of
 creating overlapping testing-notes documents.
 
-## Baseline
+## Local development startup and login
+
+- 2026-09-08 KST design handoff: `docs/design/song-guess/README.md` and
+  `figma-manifest.json` record the approved teacher design-system screens and
+  student B-layout/A-palette screens. Figma has 7 teacher + 9 student screens,
+  9 component families / 40 main variants, and 16 exported PNGs. Font and
+  overflow checks passed. These designs are not yet applied to the app.
+- 2026-09-08 KST pre-handoff checks: direct root/mobile TypeScript checks,
+  song-guess Vitest (28 files / 319 tests), Rust workspace (68 tests), clippy,
+  line limits, Python extractor/chart/playlist (11/7/4), and 20 Node ingestion
+  tests passed. The Node FFmpeg integration was initially skipped; rerunning
+  with FFmpeg exposed missing ffprobe (ENOENT). The npm typecheck prehook also
+  hit a locked Prisma DLL (EPERM); direct tsc passed using the existing client.
+  Neither a fresh production build nor authenticated UI acceptance was claimed
+  for this design handoff. See the handoff document for continuation steps.
+
+- 2026-09-08 KST source provenance: existing 20 classical catalog rows were
+  classified as multi-track/highlight/uploader-highlight in the local manifest
+  and production JSON metadata; exact provenance readback passed for all 20.
+  The 18 new candidates remain timestamp-only with unknown completeness.
+  The audit reports 576 legacy local entries as unclassified, not full recordings.
+  `node --test scripts/song-guess-provenance.test.mjs scripts/song-guess-register-metadata.test.mjs scripts/song-guess-ingest.test.mjs`
+  passed 11 tests; Python chart/playlist tests passed 7/4; catalog/catalog-server
+  Vitest passed 12. A temporary SSH failure occurred before any DB update; retry
+  succeeded, and temporary IP removal was verified. No new UI or deployment.
+
+- 2026-09-08 KST classical catalog title correction: all 20 existing classical
+  song IDs in `data/song-guess/catalog.json` now use short Korean titles.
+  Production `SongGuessCatalogSong` title/aliases were updated and read back for
+  all 20 IDs; old titles remain aliases and original titles remain metadata.
+  Clip references and saved classroom packs were not modified. Targeted catalog
+  and catalog-server tests passed (12 tests). Existing saved packs retain their
+  copied titles; new packs use the corrected catalog names.
+
+- Start with `infisical.exe run --env=dev -- npm run dev -- --port 3000`.
+  Do not bypass `predev` with `npx next dev`: `dev:check` must verify a real
+  database query and the login tables before Next starts.
+- Infisical injection alone does not establish the SSH tunnel. The `aura_dev`
+  database uses `127.0.0.1:15434`; establish an authorized OCI tunnel first,
+  preserve host-key checking, and account for Bastion session expiry.
+- If startup fails, restore the development connection and rerun
+  `infisical.exe run --env=dev -- npm run dev:check`. Never switch to the
+  production database or apply migrations there to make local login work.
+- A landing page, anonymous session endpoint, or login page returning 200 does
+  not prove login works. Verify the DB check and an authenticated page after
+  login before reporting authenticated development ready. Do not copy OAuth
+  callback URLs, credentials, or raw sensitive requests into diagnostic reports.
+- Check feature-specific migrations separately before testing new DB-backed
+  features. The startup check verifies connectivity and login tables only.
+- 2026-09-08 KST: reproduced Google callback configuration failure with the
+  development DB tunnel absent. Confirmed `dev:check` rejects that state and
+  passes after restoring the tunnel to isolated `aura_dev`. Applied the four
+  song-guess migrations dated `20260908090000` through `20260908160000` to that
+  development DB and verified the new import table and round artist column.
+  A fresh interactive Google login remains a separate user check.
+
+## Baseline checks
 
 - Run `npm run check:lines` for source changes. Code, styles, tests, scripts,
   native modules, and generated source files must each stay at or below 800
@@ -279,6 +335,17 @@ Object payload replication or a documented media degraded-mode is a separate gat
 
 ### Song-guess browser ingestion and play checks
 
+- Teacher timed links: run import-link/import-server/import-worker and SongGuessImportPanel tests. Verify teachers cannot query or materialize another board's imports; students are rejected before DB/audio work. Stale workers must not overwrite a newer lease, and only ready hash-verified audio may be added to a draft. Repeated same-board links reuse the same job. Saving or deleting the round pack must not remove the reusable import source.
+- 2026-09-08 implementation verification: full Vitest 427 files / 2,538 tests passed; extractor Python 11 tests passed with FFmpeg on PATH; playlist credit normalization 4 tests and metadata matcher 3 tests passed. Typecheck, Prisma validate, line-limit, diff-check and production build passed; standalone includes the extractor. Actual YouTube video `1uDzUPzS2w8` at45s produced exact15s/1,323,044byte WAV. No teacher-import migration, app deployment, cron activation or authenticated two-classroom production test has run yet. Independent worker implemented the bounded parser/extractor and boundary tests using inherited model routing; primary integrated and fixed the detected retry-quota and lost-acknowledgement cleanup defects.
+- Apply teacher-import migration, install pinned Python dependencies/FFmpeg, verify standalone extractor inclusion, and enable Oracle recovery cron before production acceptance. Check `t=45` and `t=0`, wrong hosts, too-short/private videos, retries and reload. Test teacher correction of missing title/artist; no composer is required for K-pop.
+
+- Select title, artist/composer, or artist + title independently of text/multiple-choice. Verify server-created answers and automatic distractors use the same target, repeated artists do not duplicate options, and a title-only submission cannot answer an artist or combined question. Restore sessions and verify the target remains available to web/mobile; legacy sessions default to title and old create-request hashes remain compatible.
+- Apply `20260908120000_song_guess_round_artist` before releasing artist-target support. Catalog preparation and manual pack save/reload must preserve artist/composer metadata. Legacy missing artists may resolve only from an unambiguous catalog match; ambiguous titles require an explicit artist. No title aliases become artist aliases. Combined answers use `가수·작곡가 - 노래 제목`, including qualified title aliases.
+- 2026-09-08 target checks: full Vitest 423 files / 2410 tests passed; four additional mobile target cases passed in a 66-test isolated run. Rust workspace 68 tests and clippy passed. Root/mobile typechecks, mobile design check, line limits and diff checks passed. Prisma schema generation/validation passed (validation used disposable localhost URL values without connecting). The artist-column migration has not been applied to a live database; authenticated save/reload and physical-device acceptance remain deployment checks.
+- Create games in both 서술형 and 객관식 (4지선다) modes. Reload each persisted session and verify its mode, stable current-round options, and the student's submitted choice. Legacy sessions without a mode remain text games. Multiple-choice games must contain exactly four distinct labels with opaque IDs; never expose correctness metadata, other students' selections, or future-round options.
+- In multiple-choice mode, test correct and wrong selections, invalid IDs, free-text bypasses, duplicate requests, a second selection after a wrong answer, expired deadlines, and stale round IDs. The server must enforce one submission per participant per round. Check the four buttons at 390px and desktop widths, keyboard access, submission locking, and reset on the next round on web and mobile. Reject creation clearly if three unambiguous distractors cannot be generated.
+- 2026-09-08 answer-mode validation: `npm run test -- SongGuess song-guess` passed 23 files / 178 tests; Rust workspace passed 67 tests plus fmt/clippy. Root/mobile typechecks, mobile design checks, line limits and diff checks passed. Earlier full Vitest passed 421 files / 2370 tests before the last targeted additions. The `.codex/artifacts/song-guess-ui/preview-choices.mjs` fixture verified real web components at 390px and 1440px, selected-choice locking and legacy text input. Storage serialization/replay tests passed; authenticated multi-client play, actual PostgreSQL restart, physical devices and production deployment remain unverified.
+- Automatic choices now use the full catalog's title/alias metadata plus the selected pack. A single selected song must produce one question with its answer and three distinct distractors; never require the teacher to select extra questions. Exclude normalized duplicate titles and alias overlap, including a candidate whose aliases match the correct title. Text mode must not query the catalog. Follow-up choices/server/board tests passed 29 tests; catalog metadata does not require downloading distractor audio.
 - For new v2 games, verify one exact 15-second clip per round, category selection (including empty selection = all), intro/highlight filtering, and a persisted setup reload before creating a session. A missing segment must exclude that song; never substitute another segment silently.
 - Run the catalog, DB, sync, route, and pool picker tests plus `node --test scripts/song-guess-import.test.mjs scripts/song-guess-import-youtube.test.mjs`. Verify exact FFmpeg output, manifest preservation, short-source rejection, and partial upload cleanup. Runtime catalog reads must use the DB and private storage; standalone releases do not need to bundle the source manifest or local audio pool.
 - Apply the 15-second asset constraint migration before deploying v2. Check that web and play-engine processes use the same DB target and an actual current-session query succeeds; `/health` alone does not verify storage.
@@ -526,5 +593,15 @@ change's unit tests do not measure production propagation latency.
   provider is enabled.
 - Confirm repeated invalid reviewer attempts are rate-limited and that a
   transient production rate-limit failure is fail-closed for this provider.
+
+## Song guess folder ingestion
+
+- `node --test scripts/song-guess-register-metadata.test.mjs`: artist/title alias matching without composer requirements, same-title different-artist separation, and ambiguous source matches. Production registration must compare live DB rows before insert and read back every resulting song ID.
+
+- `python scripts/song-guess-chart-scrape.test.py`: description/chapter parsing, explicit uploader ranks, alias/reverse-order catalog matching, stable IDs across videos, missing/short/ambiguous segments, chart disclaimer and date separation. Live trial reports with zero extracted tracks are a source limitation, not end-to-end extraction success.
+
+- `node --test scripts/song-guess-ingest.test.mjs scripts/song-guess-import.test.mjs`: normalize tags/filename/overrides, preserve performer/composer, classify decades, reject invalid sources/segments, deduplicate recordings, detect conflicting metadata, preserve provenance through repeated imports.
+- `npx vitest run src/lib/song-guess/catalog-sync.vitest.ts`: dry-run has no writes; apply preserves metadata; repeated upload skips unchanged audio.
+- Before a real batch: inspect `ready/review/warnings`, run with FFmpeg/FFprobe installed, then validate generated 15-second clips and the intended DB/storage environment. A skipped FFmpeg test does not verify real extraction. Production registration is a separate operation.
 
 - Student login code: `DCY366`

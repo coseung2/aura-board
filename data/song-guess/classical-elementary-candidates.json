@@ -1,0 +1,579 @@
+{
+  "schema": "aura-board/classical-elementary-candidates/v1",
+  "status": "metadata-reviewed-audio-pending",
+  "audience": "elementary",
+  "songs": [
+    {
+      "id": "classical-elementary-rossini-william-tell",
+      "title": "윌리엄 텔 서곡",
+      "artist": "로시니",
+      "aliases": [
+        "윌리엄텔",
+        "윌리엄 텔"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=0s",
+      "sourceMetadata": {
+        "composer": "로시니",
+        "originalTitle": "William Tell Overture",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 0,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 0,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-offenbach-cancan",
+      "title": "캉캉",
+      "artist": "오펜바흐",
+      "aliases": [
+        "천국과 지옥",
+        "천국과 지옥 서곡"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=204s",
+      "sourceMetadata": {
+        "composer": "오펜바흐",
+        "originalTitle": "Orphée aux enfers: Galop Infernal",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 204,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 204,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-bizet-carmen",
+      "title": "카르멘",
+      "artist": "비제",
+      "aliases": [
+        "카르멘 서곡"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=335s",
+      "sourceMetadata": {
+        "composer": "비제",
+        "originalTitle": "Carmen Suite No. 1, Overture: I. Prélude",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 335,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 335,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-mozart-nachtmusik",
+      "title": "아이네 클라이네 나흐트무지크",
+      "artist": "모차르트",
+      "aliases": [
+        "작은 밤의 음악",
+        "Eine kleine Nachtmusik"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=1425s",
+      "sourceMetadata": {
+        "composer": "모차르트",
+        "originalTitle": "Eine Kleine Nachtmusik, K. 525: I. Allegro",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 1425,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 1425,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-vivaldi-seasons",
+      "title": "사계",
+      "artist": "비발디",
+      "aliases": [
+        "사계 봄",
+        "봄"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=2036s",
+      "sourceMetadata": {
+        "composer": "비발디",
+        "originalTitle": "The Four Seasons, RV 269 Spring: I. Allegro",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 2036,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 2036,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-tchaikovsky-nutcracker",
+      "title": "호두까기 인형",
+      "artist": "차이콥스키",
+      "aliases": [
+        "호두까기인형",
+        "꽃의 왈츠"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=2240s",
+      "sourceMetadata": {
+        "composer": "차이콥스키",
+        "originalTitle": "The Nutcracker Suite, Op. 71a: VIII. Waltz of the Flowers",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 2240,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 2240,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-mendelssohn-wedding",
+      "title": "결혼행진곡",
+      "artist": "멘델스존",
+      "aliases": [
+        "결혼 행진곡",
+        "한여름 밤의 꿈 결혼행진곡"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=3240s",
+      "sourceMetadata": {
+        "composer": "멘델스존",
+        "originalTitle": "A Midsummer Night's Dream, Op. 61: Wedding March",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 3240,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 3240,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-saint-saens-swan",
+      "title": "백조",
+      "artist": "생상스",
+      "aliases": [
+        "동물의 사육제 백조",
+        "동물의 사육제"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=3970s",
+      "sourceMetadata": {
+        "composer": "생상스",
+        "originalTitle": "The Carnival of the Animals: XIII. The Swan",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 3970,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 3970,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-grieg-morning",
+      "title": "아침의 기분",
+      "artist": "그리그",
+      "aliases": [
+        "페르 귄트 아침의 기분",
+        "페르귄트"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=4937s",
+      "sourceMetadata": {
+        "composer": "그리그",
+        "originalTitle": "Peer Gynt Suite No. 1, Op. 46: Morning Mood",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 4937,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 4937,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-bach-air",
+      "title": "G선상의 아리아",
+      "artist": "바흐",
+      "aliases": [
+        "지선상의 아리아",
+        "G선 위의 아리아"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=5152s",
+      "sourceMetadata": {
+        "composer": "바흐",
+        "originalTitle": "Orchestral Suite No. 3, BWV 1068: II. Air",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 5152,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 5152,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-brahms-hungarian",
+      "title": "헝가리 무곡",
+      "artist": "브람스",
+      "aliases": [
+        "헝가리무곡",
+        "헝가리 무곡 5번"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=6419s",
+      "sourceMetadata": {
+        "composer": "브람스",
+        "originalTitle": "Hungarian Dance No. 5",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 6419,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 6419,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-tchaikovsky-swan-lake",
+      "title": "백조의 호수",
+      "artist": "차이콥스키",
+      "aliases": [
+        "백조의호수"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=6858s",
+      "sourceMetadata": {
+        "composer": "차이콥스키",
+        "originalTitle": "Swan Lake Theme",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 6858,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 6858,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-beethoven-fate",
+      "title": "운명",
+      "artist": "베토벤",
+      "aliases": [
+        "운명 교향곡",
+        "교향곡 5번"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_PlEGwqB2FM&t=8742s",
+      "sourceMetadata": {
+        "composer": "베토벤",
+        "originalTitle": "Symphony No. 5, Op. 67: I. Allegro con brio",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_PlEGwqB2FM",
+        "chapterStartSeconds": 8742,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 8742,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-beethoven-elise",
+      "title": "엘리제를 위하여",
+      "artist": "베토벤",
+      "aliases": [
+        "엘리제를위하여",
+        "엘리제를 위해"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=IPnTL8HCpxU&t=14586s",
+      "sourceMetadata": {
+        "composer": "베토벤",
+        "originalTitle": "Bagatelle No. 25, WoO 59 Für Elise",
+        "channel": "HALIDONMUSIC",
+        "videoId": "IPnTL8HCpxU",
+        "chapterStartSeconds": 14586,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 14586,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-mozart-turkish",
+      "title": "터키행진곡",
+      "artist": "모차르트",
+      "aliases": [
+        "터키 행진곡",
+        "터키풍으로"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=IPnTL8HCpxU&t=1092s",
+      "sourceMetadata": {
+        "composer": "모차르트",
+        "originalTitle": "Piano Sonata No. 11, K. 331: III. Alla Turca",
+        "channel": "HALIDONMUSIC",
+        "videoId": "IPnTL8HCpxU",
+        "chapterStartSeconds": 1092,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 1092,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-beethoven-moonlight",
+      "title": "월광",
+      "artist": "베토벤",
+      "aliases": [
+        "월광 소나타",
+        "달빛 소나타"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_sha04Kk0hI&t=7658s",
+      "sourceMetadata": {
+        "composer": "베토벤",
+        "originalTitle": "Piano Sonata No. 14: I. Adagio sostenuto",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_sha04Kk0hI",
+        "chapterStartSeconds": 7658,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 7658,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-elgar-salut",
+      "title": "사랑의 인사",
+      "artist": "엘가",
+      "aliases": [
+        "사랑의인사"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_sha04Kk0hI&t=6776s",
+      "sourceMetadata": {
+        "composer": "엘가",
+        "originalTitle": "Salut d'amour",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_sha04Kk0hI",
+        "chapterStartSeconds": 6776,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 6776,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    },
+    {
+      "id": "classical-elementary-debussy-clair",
+      "title": "달빛",
+      "artist": "드뷔시",
+      "aliases": [
+        "베르가마스크 모음곡 달빛"
+      ],
+      "categories": [
+        "classical"
+      ],
+      "sourceUrl": "https://www.youtube.com/watch?v=_sha04Kk0hI&t=7233s",
+      "sourceMetadata": {
+        "composer": "드뷔시",
+        "originalTitle": "Suite Bergamasque: Clair de Lune",
+        "channel": "HALIDONMUSIC",
+        "videoId": "_sha04Kk0hI",
+        "chapterStartSeconds": 7233,
+        "highlightStartSeconds": null,
+        "highlightStatus": "listening-review-required",
+        "provenance": {
+          "version": 1,
+          "container": "multi-track",
+          "content": "unknown",
+          "trackStartSeconds": 7233,
+          "trackEndSeconds": null,
+          "quizStartSeconds": null,
+          "selectionStatus": "timestamp-only"
+        },
+        "audience": "elementary"
+      }
+    }
+  ]
+}

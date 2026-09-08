@@ -569,3 +569,8 @@
 .shell h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
 .shell h3 { font-size: 16px; font-weight: 700; letter-spacing: -0.25px; }
 .field input, .field textarea, .field select { border-radius: var(--radius-control); font-size: 14px; }
+.answerMode { display: grid; gap: 12px; margin: 16px 0; padding: 16px; border: 1px solid var(--color-border); border-radius: var(--radius-control); }
+.answerMode legend { font-weight: 700; }
+.answerMode label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.answerMode input { accent-color: var(--color-accent); }
+.answerMode p { margin: 0; font-size: 13px; color: var(--color-text-muted); line-height: 1.5; }

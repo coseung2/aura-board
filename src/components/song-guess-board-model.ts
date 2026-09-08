@@ -7,6 +7,7 @@ export type GeneratedClipDraft = {
 export type RoundDraft = {
   clientId: string;
   representativeAnswer: string;
+  artist: string;
   aliasesText: string;
   accessibilityClue: string;
   rightsConfirmed: boolean;

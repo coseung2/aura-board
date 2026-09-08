@@ -19,6 +19,7 @@
     "viewer"
   ],
   "properties": {
+    "answerTarget": { "enum": ["title", "artist", "artist-title"] },
     "sessionId": { "type": "string", "minLength": 1 },
     "boardId": { "type": "string", "minLength": 1 },
     "gameKind": { "const": "song-guess" },
@@ -27,6 +28,7 @@
     "rulesVersion": { "const": 2 },
     "stateSchemaVersion": { "const": 2 },
     "previousSessionId": { "type": ["string", "null"] },
+    "answerMode": { "type": "string", "enum": ["text", "multiple-choice"], "default": "text" },
     "phase": { "type": "string", "enum": ["draft", "lobby", "guessing", "reveal", "finished"] },
     "currentRound": { "$ref": "#/$defs/currentRound" },
     "participants": {
@@ -48,7 +50,7 @@
             "assetId": { "type": "string", "minLength": 1 },
             "tierMs": { "type": "integer", "enum": [500, 1000, 1500, 15000] },
             "mimeType": { "type": "string", "enum": ["audio/wav", "audio/mp4", "audio/webm", "audio/ogg"] },
-            "durationMs": { "type": "integer", "minimum": 450, "maximum": 1550 },
+            "durationMs": { "type": "integer", "minimum": 450, "maximum": 15050 },
             "sizeBytes": { "type": "integer", "minimum": 1, "maximum": 8388608 }
           }
         },
@@ -80,6 +82,16 @@
         "maxScore"
       ],
       "properties": {
+        "choices": {
+          "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["id", "label"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "label": { "type": "string", "minLength": 1, "maxLength": 200 }
+            }
+          }
+        },
         "roundId": { "type": "string", "minLength": 1 },
         "order": { "type": "integer", "minimum": 0 },
         "accessibilityClue": { "type": ["string", "null"], "maxLength": 500 },
@@ -127,6 +139,8 @@
       "additionalProperties": false,
       "required": ["role", "scoredCurrentRound"],
       "properties": {
+        "answeredCurrentRound": { "type": "boolean" },
+        "selectedChoiceId": { "type": ["string", "null"], "minLength": 1 },
         "role": { "type": "string", "enum": ["host", "participant"] },
         "scoredCurrentRound": { "type": "boolean" },
         "joined": { "type": "boolean" },

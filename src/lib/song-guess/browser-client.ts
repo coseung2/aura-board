@@ -130,11 +130,13 @@ export async function deleteSongGuessClip(
 
 export async function createSongGuessSession(
   boardId: string,
+  answerMode: import("./contracts").SongGuessAnswerMode = "text",
+  answerTarget: import("./contracts").SongGuessAnswerTarget = "title",
 ): Promise<SongGuessSessionResponse> {
   const requestId = createPlayRequestId("song_guess_create");
   const value = await requestJson<unknown>(
     `/api/song-guess/boards/${encodeURIComponent(boardId)}/session`,
-    { method: "POST", body: JSON.stringify({ requestId }) },
+    { method: "POST", body: JSON.stringify({ requestId, answerMode, answerTarget }) },
   );
   if (!isRecord(value) || value.requestId !== requestId || !isSongGuessSnapshot(value.snapshot)) {
     throw new Error("invalid_song_guess_session_response");
@@ -212,6 +214,7 @@ function isSongGuessTeacherSetup(value: unknown): value is SongGuessTeacherSetup
       typeof round.id !== "string" ||
       !Number.isSafeInteger(round.order) ||
       typeof round.representativeAnswer !== "string" ||
+      (round.artist != null && (typeof round.artist !== "string" || round.artist.length > 200)) ||
       !Array.isArray(round.aliases) ||
       round.aliases.some((alias) => typeof alias !== "string") ||
       !(round.accessibilityClue === null || typeof round.accessibilityClue === "string") ||

@@ -59,7 +59,7 @@ $hostArgs = "-H 0.0.0.0"
 
 Start-Process -FilePath "pwsh" -ArgumentList @(
   "-NoProfile", "-NoExit", "-Command",
-  "Set-Location '$repo'; infisical run --env=$Env -- npx next dev $hostArgs"
+  "Set-Location '$repo'; infisical.exe run --env=$Env -- npm run dev -- $hostArgs"
 ) -WorkingDirectory $repo
 
 Start-Process -FilePath "pwsh" -ArgumentList @(

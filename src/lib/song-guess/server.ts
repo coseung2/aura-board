@@ -31,6 +31,9 @@ import {
   type UploadedSongGuessClip,
 } from "./contracts";
 import { enrichSongGuessSnapshot } from "./participant-identity";
+import { buildSongGuessChoices } from "./choices";
+import type { SongGuessAnswerMode, SongGuessAnswerTarget } from "./contracts";
+import { resolveSongGuessArtist, transformSongGuessAnswer } from "./answer-target";
 
 export type {
   SongGuessTeacherClip,
@@ -101,6 +104,7 @@ export async function saveSongGuessSetup(
       id: string;
       order: number;
       representativeAnswer: string;
+      artist: string | null;
       aliases: string[];
       accessibilityClue: string | null;
       clips: SongGuessTeacherClip[];
@@ -111,6 +115,7 @@ export async function saveSongGuessSetup(
           gameId: game.id,
           order: round.order,
           representativeAnswer: round.representativeAnswer,
+          artist: round.artist ?? null,
           normalizedAnswer: round.normalizedAnswer,
           aliases: round.aliases,
           normalizedAliases: round.normalizedAliases,
@@ -128,6 +133,7 @@ export async function saveSongGuessSetup(
         id: createdRound.id,
         order: round.order,
         representativeAnswer: round.representativeAnswer,
+        artist: round.artist ?? null,
         aliases: round.aliases,
         accessibilityClue: round.accessibilityClue,
         clips: round.clipAssetIds.map((id) => {
@@ -269,6 +275,8 @@ export async function buildSongGuessCreateRequest(
   boardId: string,
   requestId: string,
   studentIds?: readonly string[],
+  answerMode: SongGuessAnswerMode = "text",
+  answerTarget: SongGuessAnswerTarget = "title",
 ) {
   const { actor } = await loadSongGuessTeacherBoard(boardId);
   if (!actor.userId) throw new PlayAccessError(403, "forbidden");
@@ -296,10 +304,41 @@ export async function buildSongGuessCreateRequest(
     game.rounds.flatMap((round) => round.clips),
   );
   const participants = await resolveSongGuessParticipantSeeds(boardId, studentIds);
+  const catalog = answerMode === "multiple-choice" || (answerTarget !== "title" && game.rounds.some((round) => !round.artist?.trim()))
+    ? await db.songGuessCatalogSong.findMany({ select: { title: true, artist: true, aliases: true }, orderBy: { id: "asc" } })
+    : [];
+  const catalogAnswers = catalog.map((song) => ({ ...song, aliases: readStringArray(song.aliases) }));
+  let rounds;
+  try {
+    rounds = game.rounds.map((round) => {
+      const source = { ...round, aliases: readStringArray(round.aliases) };
+      return { ...round, ...transformSongGuessAnswer({ ...source,
+        artist: answerTarget === "title" ? round.artist : resolveSongGuessArtist(source, catalogAnswers),
+      }, answerTarget) };
+    });
+  } catch (error) {
+    throw new PlayAccessError(400, error instanceof Error ? error.message : "invalid_song_guess_target_answer");
+  }
+  let choices;
+  try {
+    choices = answerMode === "multiple-choice" ? buildSongGuessChoices(requestId,
+      rounds,
+      catalogAnswers.flatMap((song) => {
+        try {
+          const answer = transformSongGuessAnswer({ ...song, representativeAnswer: song.title }, answerTarget);
+          return [{ title: answer.representativeAnswer, aliases: answer.aliases }];
+        } catch { return []; }
+      })) : undefined;
+  } catch {
+    throw new PlayAccessError(400, "insufficient_song_guess_choices");
+  }
   return {
     requestId,
+    answerMode,
+    answerTarget,
     participants,
-    rounds: game.rounds.map((round) => ({
+    rounds: rounds.map((round, index) => ({
+      ...(choices ? { choices: choices[index] } : {}),
       roundId: round.id,
       representativeAnswer: round.representativeAnswer,
       normalizedAnswer: round.normalizedAnswer,
@@ -447,6 +486,7 @@ function serializeTeacherSetup(game: {
     id: string;
     order: number;
     representativeAnswer: string;
+    artist?: string | null;
     aliases: unknown;
     accessibilityClue: string | null;
     clips: ReadonlyArray<StoredSongGuessClip>;
@@ -459,6 +499,7 @@ function serializeTeacherSetup(game: {
       id: round.id,
       order: round.order,
       representativeAnswer: round.representativeAnswer,
+      artist: round.artist ?? null,
       aliases: readStringArray(round.aliases),
       accessibilityClue: round.accessibilityClue,
       clips: round.clips.map(serializeTeacherClip),

@@ -87,7 +87,7 @@ describe("song-guess catalog WAV normalization", () => {
     const bytes = Buffer.from(await file.arrayBuffer());
     expect(validateSongGuessWavBytes(bytes, 15_000)).toBeNull();
     expect(mocks.saveSetup).toHaveBeenCalledWith("board-1", {
-      rounds: [{ representativeAnswer: result.songs[0]!.title, aliases: expect.any(Array), accessibilityClue: null, clipAssetIds: ["asset-1"] }],
+      rounds: [{ representativeAnswer: result.songs[0]!.title, artist: result.songs[0]!.artist, aliases: expect.any(Array), accessibilityClue: null, clipAssetIds: ["asset-1"] }],
     });
   });
 

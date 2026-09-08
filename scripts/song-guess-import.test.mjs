@@ -96,6 +96,17 @@ test("validates exact mono 44.1 kHz 16-bit fifteen-second WAV output", () => {
   assert.equal(validateExactWav(pcmWav(PCM_DATA_BYTES - 2)), false);
 });
 
+test("preserves creator provenance and all runtime categories across repeated imports", async () => {
+  const fixture = await temporaryFixture();
+  const options = { catalogPath: fixture.catalogPath, clipsRoot: fixture.clipsRoot, spawnImpl: fakeSpawn() };
+  await importSongGuessCatalog(input(fixture.sourceFile, {
+    categories: ["2020s", "other"], sourceMetadata: { composer: "Composer", sourceSha256: "abc" },
+  }), options);
+  const second = await importSongGuessCatalog(input(fixture.sourceFile, { categories: ["2020s"] }), options);
+  assert.equal(second.songs[0].sourceMetadata.composer, "Composer");
+  assert.equal(second.songs[0].sourceMetadata.sourceSha256, "abc");
+});
+
 test("imports both segments atomically and preserves existing catalog songs", async () => {
   const fixture = await temporaryFixture();
   await fs.mkdir(path.dirname(fixture.catalogPath), { recursive: true });

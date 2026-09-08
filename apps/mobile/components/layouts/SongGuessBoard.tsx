@@ -49,7 +49,8 @@ import {
 } from "../../theme/tokens";
 import { SongGuessScoreboard } from "../song-guess/SongGuessScoreboard";
 import { SongGuessLobbyStatus } from "../song-guess/SongGuessLobbyStatus";
-import { AppButton, EmptyState, TextField } from "../ui";
+import { SongGuessAnswer } from "../song-guess/SongGuessAnswer";
+import { AppButton, EmptyState } from "../ui";
 type SongGuessSound =
   | "correct"
   | "join"
@@ -378,13 +379,17 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     if (snapshot.phase === "finished") playSound("podium");
   }, [playSound, snapshot]);
 
-  const submitGuess = useCallback(() => {
+  const submitGuess = useCallback((choiceId?: string) => {
     const text = guess.trim();
+    const multipleChoice = snapshot?.answerMode === "multiple-choice";
     if (
       !snapshot ||
       snapshot.phase !== "guessing" ||
       snapshot.viewer.joined === false ||
-      !text ||
+      snapshot.viewer.scoredCurrentRound ||
+      (multipleChoice && (snapshot.viewer.answeredCurrentRound || snapshot.viewer.selectedChoiceId != null)) ||
+      (multipleChoice ? !snapshot.currentRound.choices?.some((choice) => choice.id === choiceId) : !text) ||
+      hasPending ||
       busy ||
       syncing
     )
@@ -393,13 +398,17 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       const serverNowMs =
         clockRef.current?.key === snapshotClockKey
           ? clockRef.current.serverTimeMs +
-            Math.max(0, monotonicNowMs - clockRef.current.monotonicMs)
+            Math.max(0, monotonicNow() - clockRef.current.monotonicMs)
           : snapshot.serverTimeMs;
       if (songGuessRemainingSeconds(snapshot, serverNowMs) === 0) return;
     }
     void executePending({
       sessionId: snapshot.sessionId,
-      request: makeSongGuessCommand(snapshot, {
+      request: makeSongGuessCommand(snapshot, multipleChoice && choiceId ? {
+        type: "guess",
+        choiceId,
+        roundId: snapshot.currentRound.roundId,
+      } : {
         type: "guess",
         text,
         roundId: snapshot.currentRound.roundId,
@@ -409,7 +418,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     busy,
     executePending,
     guess,
-    monotonicNowMs,
+    hasPending,
     snapshot,
     snapshotClockKey,
     syncing,
@@ -494,6 +503,8 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     snapshot.phase === "guessing" &&
     snapshot.viewer.joined !== false &&
     !snapshot.viewer.scoredCurrentRound &&
+    !(snapshot.answerMode === "multiple-choice" &&
+      (snapshot.viewer.answeredCurrentRound || snapshot.viewer.selectedChoiceId != null)) &&
     !deadlineReached;
   const progress =
     playerStatus.duration > 0
@@ -610,30 +621,15 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         </Text>
       ) : null}
 
-      {snapshot.phase === "guessing" && snapshot.viewer.joined !== false ? (
-        <View style={styles.guessCard}>
-          <TextField
-            value={guess}
-            onChangeText={setGuess}
-            placeholder="정답"
-            returnKeyType="send"
-            editable={canGuess && !busy}
-            maxLength={200}
-            autoCorrect={false}
-            onSubmitEditing={submitGuess}
-            accessibilityLabel="노래 정답"
-          />
-          <AppButton
-            loading={busy}
-            disabled={!canGuess || !guess.trim() || syncing}
-            onPress={submitGuess}
-          >
-            {snapshot.viewer.scoredCurrentRound || deadlineReached
-              ? "완료"
-              : "제출"}
-          </AppButton>
-        </View>
-      ) : null}
+      <SongGuessAnswer
+        snapshot={snapshot}
+        canGuess={canGuess}
+        busy={busy}
+        blocked={syncing || hasPending}
+        guess={guess}
+        onGuessChange={setGuess}
+        onSubmit={submitGuess}
+      />
 
       {snapshot.phase === "guessing" && snapshot.viewer.joined === false ? (
         <View style={styles.waitingCard} accessibilityLiveRegion="polite">
@@ -779,7 +775,6 @@ const styles = StyleSheet.create({
   playerButton: { flexGrow: 1, minWidth: tapMin * 2 },
   playerError: { ...typography.badge, color: colors.danger },
   clueText: { ...typography.body, color: colors.textMuted },
-  guessCard: { gap: spacing.md },
   resultText: { ...typography.subtitle },
   successText: { color: colors.plantActive },
   missText: { color: colors.danger },

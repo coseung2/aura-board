@@ -24,6 +24,8 @@ import {
 } from "@/lib/song-guess/browser-client";
 import {
   isSongGuessSnapshot,
+  SONG_GUESS_ANSWER_TARGET_LABELS,
+  type SongGuessAnswerTarget,
   mergeSongGuessSnapshot,
   type SongGuessCommandRequest,
   type SongGuessGuessResult,
@@ -47,6 +49,7 @@ import { useSongGuessClock } from "./use-song-guess-clock";
 import { SongGuessPoolPicker } from "./SongGuessPoolPicker";
 import { SongGuessGame } from "./SongGuessGame";
 import { SongGuessAnswerGuide } from "./SongGuessAnswerGuide";
+import { SongGuessImportPanel } from "./SongGuessImportPanel";
 import {
   BoardHeading,
   SongGuessRoundEditor,
@@ -91,6 +94,8 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   const [hasPending, setHasPending] = useState(false);
   const [failedJoinSessionId, setFailedJoinSessionId] = useState<string | null>(null);
   const [customEditor, setCustomEditor] = useState(false);
+  const [answerMode, setAnswerMode] = useState<"text" | "multiple-choice">("text");
+  const [answerTarget, setAnswerTarget] = useState<SongGuessAnswerTarget>("title");
   const sessionSequence = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
@@ -263,13 +268,14 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
 
   const sendIntent = useCallback(
     (command: SongGuessIntent) => {
-      if (!snapshot || busy || (command.type === "guess" && expired)) return;
+      if (!snapshot || busy || (command.type === "guess" && (expired ||
+        (snapshot.answerMode === "multiple-choice" && (hasPending || snapshot.viewer.answeredCurrentRound))))) return;
       void executeCommand({
         sessionId: snapshot.sessionId,
         request: makeSongGuessCommand(snapshot, command),
       });
     },
-    [busy, executeCommand, snapshot, expired],
+    [busy, executeCommand, snapshot, expired, hasPending],
   );
 
   async function createSession() {
@@ -278,7 +284,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     setError(null);
     setNotice(null);
     try {
-      const response = await createSongGuessSession(boardId);
+      const response = await createSongGuessSession(boardId, answerMode, answerTarget);
       setSnapshot(response.snapshot);
       setNotice(null);
     } catch (cause) {
@@ -394,6 +400,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     try {
       const workflowDrafts: SongGuessRoundSaveDraft[] = drafts.map((draft) => ({
         representativeAnswer: draft.representativeAnswer,
+        artist: draft.artist,
         aliasesText: draft.aliasesText,
         accessibilityClue: draft.accessibilityClue,
         rightsConfirmed: draft.rightsConfirmed,
@@ -459,9 +466,17 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     return (
       <section className={styles.shell} aria-label={boardTitle}>
         <BoardHeading title={boardTitle} />
-        {setup && <SongGuessAnswerGuide key={boardId} setup={setup} />}
+        {setup && <SongGuessAnswerGuide key={boardId} setup={setup} answerTarget={answerTarget} />}
         <div className={styles.editorLayout}>
           <main className={styles.editorMain}>
+            <SongGuessImportPanel boardId={boardId} disabled={busy || drafts.length >= 50} onBusyChange={setBusy} onAdd={({ title, artist, clip }) => {
+              setCustomEditor(true);
+              setDrafts(current => {
+                const next = { ...emptyRoundDraft(), representativeAnswer: title, artist, existingClipAssetIds: [clip.id], existingClipSummary: [clip] };
+                const empty = current.length === 1 && !current[0]!.representativeAnswer && !current[0]!.sourceBuffer && !current[0]!.existingClipAssetIds;
+                return empty ? [next] : [...current, next];
+              });
+            }} />
             <SongGuessPoolPicker boardId={boardId} busy={busy} onPreparingChange={setBusy} onPrepared={(prepared) => {
               revokeDraftUrls(draftsRef.current);
               setSetup(prepared);
@@ -498,6 +513,17 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
             <div className={styles.sidebarCard}>
               <h2>저장 및 시작</h2>
               {setup && <p>{setup.rounds.length}문제</p>}
+              <label className={styles.field}><span>출제 모드</span>
+                <select value={answerTarget} disabled={busy} onChange={(event) => setAnswerTarget(event.target.value as SongGuessAnswerTarget)}>
+                  {Object.entries(SONG_GUESS_ANSWER_TARGET_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+              <fieldset disabled={busy} className={styles.answerMode}>
+                <legend>답변 방식</legend>
+                <label><input type="radio" name={`answer-mode-${boardId}`} value="text" checked={answerMode === "text"} onChange={() => setAnswerMode("text")} /> 서술형</label>
+                <label><input type="radio" name={`answer-mode-${boardId}`} value="multiple-choice" checked={answerMode === "multiple-choice"} onChange={() => setAnswerMode("multiple-choice")} /> 객관식 (4지선다)</label>
+                <p>{answerMode === "text" ? "노래 제목을 직접 입력해요. 등록된 별칭도 정답으로 인정돼요." : "정답과 오답 보기 3개를 자동으로 채워요. 문제마다 한 번만 제출할 수 있어요."}</p>
+              </fieldset>
               {customEditor && <button
                 type="button"
                 className={styles.primaryButton}
@@ -546,9 +572,9 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     <section className={styles.shell} aria-label={boardTitle}>
       <BoardHeading title={boardTitle} />
       {viewer === "teacher" && snapshot.viewer.role === "host" && setup &&
-        <SongGuessAnswerGuide key={`${boardId}:${snapshot.sessionId}`} setup={setup} currentRoundId={snapshot.currentRound.roundId} />}
+        <SongGuessAnswerGuide key={`${boardId}:${snapshot.sessionId}`} setup={setup} answerTarget={snapshot.answerTarget} currentRoundId={snapshot.currentRound.roundId} />}
       <SongGuessGame snapshot={snapshot} totalRounds={setup?.rounds.length ?? null}
-        canInteract={!busy} remainingSeconds={remainingSeconds} expired={expired}
+        canInteract={!busy && !(hasPending && snapshot.answerMode === "multiple-choice")} remainingSeconds={remainingSeconds} expired={expired}
         entryFailed={entryFailed}
         guessText={guessText} onGuessText={setGuessText} onIntent={sendIntent}
         result={lastGuessResult} onReloadSetup={() => void reloadSetup()}

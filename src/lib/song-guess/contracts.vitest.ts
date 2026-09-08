@@ -40,6 +40,24 @@ function snapshot(overrides: Partial<SongGuessSnapshot> = {}): SongGuessSnapshot
 }
 
 describe("song-guess authoritative wire contract", () => {
+  it("validates optional MC fields and rejects correctness hints, future options and peer selections", () => {
+    const base = snapshot();
+    const choices = ["a", "b", "c", "d"].map((id) => ({ id, label: id.toUpperCase() }));
+    const mc = { ...base, answerMode: "multiple-choice",
+      currentRound: { ...base.currentRound, choices },
+      viewer: { ...base.viewer, answeredCurrentRound: false, selectedChoiceId: null } };
+    expect(isSongGuessSnapshot(mc)).toBe(true);
+    expect(isSongGuessSnapshot({ ...mc, viewer: { ...mc.viewer, answeredCurrentRound: true, selectedChoiceId: "b" } })).toBe(true);
+    expect(isSongGuessSnapshot({ ...mc, viewer: { ...mc.viewer, selectedChoiceId: "b" } })).toBe(false);
+    expect(isSongGuessSnapshot({ ...mc, viewer: { ...mc.viewer, answeredCurrentRound: true, selectedChoiceId: "missing" } })).toBe(false);
+    expect(isSongGuessSnapshot({ ...mc, currentRound: { ...mc.currentRound, choices: choices.slice(1) } })).toBe(false);
+    expect(isSongGuessSnapshot({ ...mc, currentRound: { ...mc.currentRound, choices: [...choices.slice(0, 3), choices[0]] } })).toBe(false);
+    expect(isSongGuessSnapshot({ ...mc, currentRound: { ...mc.currentRound, choices: choices.map((c) => ({ ...c, correct: false })) } })).toBe(false);
+    expect(isSongGuessSnapshot({ ...mc, currentRound: { ...mc.currentRound, correctChoiceId: "b" } })).toBe(false);
+    expect(isSongGuessSnapshot({ ...mc, phase: "lobby", currentRound: { ...mc.currentRound, currentClip: null, accessibilityClue: null } })).toBe(false);
+    expect(isSongGuessSnapshot({ ...mc, participants: [{ ...base.participants[0], selectedChoiceId: "a" }] })).toBe(false);
+    expect(isSongGuessSnapshot(base)).toBe(true);
+  });
   it.each(["draft", "lobby"] as const)("accepts explicit null v2 timing in %s", (phase) => {
     const base = snapshot();
     const waiting = {

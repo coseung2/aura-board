@@ -95,6 +95,12 @@ export function SongGuessRoundEditor({ draft, index, draftCount, busy, decodingR
                     />
                   </label>
                   <label className={styles.field}>
+                    <span>가수·작곡가</span>
+                    <input value={draft.artist} maxLength={200}
+                      onChange={(event) => updateDraft(setDrafts, draft.clientId, { artist: event.target.value })}
+                      placeholder="예: 방탄소년단 / 베토벤" />
+                  </label>
+                  <label className={styles.field}>
                     <span>접근성 단서 (선택)</span>
                     <textarea
                       value={draft.accessibilityClue}

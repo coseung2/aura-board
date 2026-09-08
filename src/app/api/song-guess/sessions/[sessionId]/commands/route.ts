@@ -16,7 +16,7 @@ const CommandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("join") }),
   z.object({ type: z.literal("start") }),
   z.object({ type: z.literal("unlock_clip") }),
-  z.object({ type: z.literal("guess"), text: z.string().max(200), roundId: z.string().min(1).max(128).optional() }),
+  z.object({ type: z.literal("guess"), text: z.string().max(200).optional(), choiceId: z.string().min(1).max(128).optional(), roundId: z.string().min(1).max(128).optional() }),
   z.object({ type: z.literal("reveal") }),
   z.object({ type: z.literal("next_round") }),
   z.object({ type: z.literal("finish") }),

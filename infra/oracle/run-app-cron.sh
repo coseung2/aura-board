@@ -17,6 +17,7 @@ case "${job}:${method}" in
   blob-cleanup:GET | \
   notification-push:GET | \
   reading-feedback:POST | \
+  song-guess-imports:POST | \
   attendance-reminder:GET | \
   afternoon-attendance-reminder:GET | \
   role-salary-payout:GET | \

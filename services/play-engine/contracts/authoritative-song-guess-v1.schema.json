@@ -19,6 +19,7 @@
     "viewer"
   ],
   "properties": {
+    "answerTarget": { "enum": ["title", "artist", "artist-title"] },
     "sessionId": { "type": "string", "minLength": 1 },
     "boardId": { "type": "string", "minLength": 1 },
     "gameKind": { "const": "song-guess" },
@@ -31,6 +32,7 @@
     "rulesVersion": { "const": 1 },
     "stateSchemaVersion": { "const": 1 },
     "previousSessionId": { "type": ["string", "null"] },
+    "answerMode": { "type": "string", "enum": ["text", "multiple-choice"], "default": "text" },
     "phase": {
       "type": "string",
       "enum": ["draft", "lobby", "guessing", "reveal", "finished"]
@@ -62,6 +64,16 @@
       "additionalProperties": false,
       "required": ["roundId", "order", "accessibilityClue", "revealedAnswer", "currentClip"],
       "properties": {
+        "choices": {
+          "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["id", "label"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1, "maxLength": 128 },
+              "label": { "type": "string", "minLength": 1, "maxLength": 200 }
+            }
+          }
+        },
         "roundId": { "type": "string", "minLength": 1 },
         "order": { "type": "integer", "minimum": 0 },
         "accessibilityClue": { "type": ["string", "null"], "maxLength": 500 },
@@ -105,6 +117,8 @@
       "additionalProperties": false,
       "required": ["role", "scoredCurrentRound"],
       "properties": {
+        "answeredCurrentRound": { "type": "boolean" },
+        "selectedChoiceId": { "type": ["string", "null"], "minLength": 1 },
         "role": { "type": "string", "enum": ["host", "participant"] },
         "scoredCurrentRound": { "type": "boolean" }
       }
