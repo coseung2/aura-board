@@ -266,6 +266,9 @@ Object payload replication or a documented media degraded-mode is a separate gat
 
 #### Local verification, 2026-09-08 (KST)
 
+- Teacher answer guide: after preparing questions and after creating a session, open/close `교사용 정답 목록`; verify ordered representative answers, accepted aliases, current-round marker and grading guidance. Opening must not send a reveal command. Student views must neither request teacher setup nor render this control or its answers.
+- Background refresh: hold a current-session GET pending while a student types. The header must retain its geometry without a transient loading badge; the answer remains enabled, focused and unchanged. Server version-conflict recovery remains authoritative for a simultaneous command.
+
 - Continued the song-guess work from Codex session `01a07e3c-d2aa-71c3-b75c-76e306be0df8`.
 - Root `npm run typecheck` and `npm run build` passed after the audio-only correction. The built route manifest has no song-guess playback/embed route. The later DB catalog verification below supersedes the initial three-file local pool.
 - Initial UI continuation `npm run test -- SongGuess song-guess`: 19 files / 90 tests passed, including native audio replay/error/visibility handling and a single automatic join on board entry. Failed joins retain a retry action after state refresh; 403/429 cases cover repeated rejection then successful manual retry without an automatic request loop. Earlier full `npm run test`: 419 files passed; one existing registry-writer test exceeded its 5-second timeout while the build ran concurrently (2318 tests passed). Its file passed all 4 tests on isolated rerun in 1.29 seconds. No registry-writer source was changed to hide the timeout.

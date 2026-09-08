@@ -46,6 +46,7 @@ import type { RoundDraft } from "./song-guess-board-model";
 import { useSongGuessClock } from "./use-song-guess-clock";
 import { SongGuessPoolPicker } from "./SongGuessPoolPicker";
 import { SongGuessGame } from "./SongGuessGame";
+import { SongGuessAnswerGuide } from "./SongGuessAnswerGuide";
 import {
   BoardHeading,
   SongGuessRoundEditor,
@@ -262,13 +263,13 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
 
   const sendIntent = useCallback(
     (command: SongGuessIntent) => {
-      if (!snapshot || busy || syncing || (command.type === "guess" && expired)) return;
+      if (!snapshot || busy || (command.type === "guess" && expired)) return;
       void executeCommand({
         sessionId: snapshot.sessionId,
         request: makeSongGuessCommand(snapshot, command),
       });
     },
-    [busy, executeCommand, snapshot, syncing, expired],
+    [busy, executeCommand, snapshot, expired],
   );
 
   async function createSession() {
@@ -457,7 +458,8 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   if (!snapshot && viewer === "teacher") {
     return (
       <section className={styles.shell} aria-label={boardTitle}>
-        <BoardHeading title={boardTitle} syncing={syncing} version={null} />
+        <BoardHeading title={boardTitle} />
+        {setup && <SongGuessAnswerGuide key={boardId} setup={setup} />}
         <div className={styles.editorLayout}>
           <main className={styles.editorMain}>
             <SongGuessPoolPicker boardId={boardId} busy={busy} onPreparingChange={setBusy} onPrepared={(prepared) => {
@@ -528,7 +530,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   if (!snapshot) {
     return (
       <section className={styles.shell} aria-label={boardTitle}>
-        <BoardHeading title={boardTitle} syncing={syncing} version={null} />
+        <BoardHeading title={boardTitle} />
         <div className={styles.panel}>
           <h2>{error ? "게임을 불러오지 못했어요" : "게임 준비 중"}</h2>
           <button className={styles.secondaryButton} type="button" onClick={() => void refreshSession()} disabled={syncing}>
@@ -542,9 +544,11 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
 
   return (
     <section className={styles.shell} aria-label={boardTitle}>
-      <BoardHeading title={boardTitle} syncing={syncing} version={snapshot.version} />
+      <BoardHeading title={boardTitle} />
+      {viewer === "teacher" && snapshot.viewer.role === "host" && setup &&
+        <SongGuessAnswerGuide key={`${boardId}:${snapshot.sessionId}`} setup={setup} currentRoundId={snapshot.currentRound.roundId} />}
       <SongGuessGame snapshot={snapshot} totalRounds={setup?.rounds.length ?? null}
-        canInteract={!busy && !syncing} remainingSeconds={remainingSeconds} expired={expired}
+        canInteract={!busy} remainingSeconds={remainingSeconds} expired={expired}
         entryFailed={entryFailed}
         guessText={guessText} onGuessText={setGuessText} onIntent={sendIntent}
         result={lastGuessResult} onReloadSetup={() => void reloadSetup()}

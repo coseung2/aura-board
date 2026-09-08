@@ -8,19 +8,14 @@ import { moveRound, revokeGenerated, updateDraft } from "./song-guess-board-util
 
 export function BoardHeading({
   title,
-  syncing,
-  version,
 }: {
   title: string;
-  syncing: boolean;
-  version: number | null;
 }) {
   return (
     <header className={styles.header}>
       <div>
         <h1>{title || "초단위 음악 퀴즈"}</h1>
       </div>
-      {syncing && <span className={styles.version}>불러오는 중</span>}
     </header>
   );
 }

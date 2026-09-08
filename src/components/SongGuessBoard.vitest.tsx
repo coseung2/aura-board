@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SongGuessSnapshot, SongGuessTeacherSetup } from "@/lib/song-guess/contracts";
 import { SongGuessClientError } from "@/lib/song-guess/browser-client";
@@ -14,10 +14,13 @@ const mocks = vi.hoisted(() => ({
   deleteSetup: vi.fn(),
   uploadClip: vi.fn(),
   deleteClip: vi.fn(),
+  refresh: vi.fn(),
 }));
 
 vi.mock("@/hooks/useRealtimeInvalidation", () => ({
-  useRealtimeInvalidation: () => undefined,
+  useRealtimeInvalidation: ({ refresh }: { refresh: () => Promise<void> }) => {
+    mocks.refresh.mockImplementation(refresh);
+  },
 }));
 
 vi.mock("@/lib/song-guess/browser-client", async (importOriginal) => {
@@ -110,6 +113,42 @@ describe("SongGuessBoard authoritative web flow", () => {
 
   afterEach(() => {
     window.localStorage.clear();
+  });
+
+  it.each([null, "draft", "guessing"] as const)("lets teachers inspect saved answers in %s without revealing them to the game", async (phase) => {
+    mocks.fetchCurrent.mockResolvedValue(phase ? snapshot("host", { phase }) : null);
+    render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="teacher" />);
+    const button = await screen.findByRole("button", { name: "교사용 정답 목록" });
+    expect(screen.queryByText("비밀 정답")).not.toBeInTheDocument();
+    fireEvent.click(button);
+    expect(screen.getByText("비밀 정답")).toBeVisible();
+    expect(screen.getByText("별칭")).toBeVisible();
+    expect(screen.getByText(/영어 대소문자와 앞뒤 공백/)).toBeVisible();
+    if (phase) expect(screen.getByText("현재 문제")).toBeVisible();
+    expect(mocks.submitCommand).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "교사용 정답 목록 닫기" }));
+    expect(screen.queryByText("비밀 정답")).not.toBeInTheDocument();
+  });
+
+  it("keeps heading and answer input stable during a delayed background refresh", async () => {
+    const current = snapshot("participant");
+    mocks.fetchCurrent.mockResolvedValue(current);
+    const { container } = render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="student" />);
+    const input = await screen.findByPlaceholderText("정답 입력");
+    input.focus();
+    fireEvent.change(input, { target: { value: "작성 중인 답" } });
+    const heading = container.querySelector("header")!.outerHTML;
+    let finish!: (value: SongGuessSnapshot) => void;
+    mocks.fetchCurrent.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    act(() => { void mocks.refresh(); });
+    expect(container.querySelector("header")!.outerHTML).toBe(heading);
+    expect(input).toBeEnabled();
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue("작성 중인 답");
+    expect(screen.getByRole("button", { name: "정답 제출" })).toBeEnabled();
+    expect(screen.queryByRole("button", { name: "교사용 정답 목록" })).not.toBeInTheDocument();
+    await act(async () => { finish(current); });
+    expect(input).toHaveValue("작성 중인 답");
   });
 
   it("automatically joins the opened board and shows only the server-acknowledged entrance", async () => {
