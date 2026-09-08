@@ -3,12 +3,12 @@ import { SLIME_ASSET_COLORS, type SlimeColor } from "../../lib/slime-assets";
 import type { SongGuessSnapshot } from "../../lib/song-guess-contract";
 import {
   borders,
-  colors,
   radii,
   spacing,
   tapMin,
   typography,
 } from "../../theme/tokens";
+import { songGuessStudentTheme as song } from "../../theme/song-guess";
 import { SlimeSprite } from "../slime/SlimeSprite";
 
 type RankedSongGuessParticipant = SongGuessSnapshot["participants"][number] & {
@@ -179,19 +179,19 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderRadius: radii.card,
     borderCurve: "continuous",
-    backgroundColor: colors.surface,
+    backgroundColor: song.surface,
     borderWidth: borders.hairline,
-    borderColor: colors.border,
+    borderColor: song.border,
   },
-  revealTitle: { ...typography.title, color: colors.text, textAlign: "center" },
+  revealTitle: { ...typography.title, color: song.text, textAlign: "center" },
   revealRows: { gap: spacing.sm },
   scoreCard: {
     gap: spacing.sm,
     borderTopWidth: borders.hairline,
-    borderColor: colors.border,
+    borderColor: song.border,
     paddingTop: spacing.md,
   },
-  scoreHeading: { ...typography.label, color: colors.text },
+  scoreHeading: { ...typography.label, color: song.muted },
   scoreRow: {
     minHeight: tapMin,
     flexDirection: "row",
@@ -200,10 +200,10 @@ const styles = StyleSheet.create({
   },
   podiumRow: {
     paddingVertical: spacing.sm,
-    backgroundColor: colors.accentTintedBg,
+    backgroundColor: song.track,
     borderRadius: radii.control,
   },
-  podiumRank: { color: colors.accentActive },
+  podiumRank: { color: song.accent },
   scoreAvatar: {
     width: spacing.xxl,
     height: spacing.xxl,
@@ -211,14 +211,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     overflow: "hidden",
   },
-  scoreAvatarFallback: { ...typography.label, color: colors.accentActive },
+  scoreAvatarFallback: { ...typography.label, color: song.accent },
   scoreIdentity: { flex: 1, minWidth: 0, gap: spacing.xxs },
-  rank: { ...typography.subtitle, width: spacing.xxl, color: colors.textMuted },
-  playerName: { ...typography.body, flex: 1, color: colors.text },
-  unjoinedLabel: { ...typography.micro, color: colors.textMuted },
-  rankUp: { ...typography.badge, color: colors.plantActive },
-  rankDown: { ...typography.badge, color: colors.danger },
-  roundScore: { ...typography.badge, color: colors.accentActive },
-  score: { ...typography.subtitle, color: colors.text },
-  muted: { ...typography.body, color: colors.textMuted },
+  rank: { ...typography.subtitle, width: spacing.xxl, color: song.muted },
+  playerName: { ...typography.body, flex: 1, color: song.text },
+  unjoinedLabel: { ...typography.micro, color: song.muted },
+  rankUp: { ...typography.badge, color: song.success },
+  rankDown: { ...typography.badge, color: song.danger },
+  roundScore: { ...typography.badge, color: song.accent },
+  score: { ...typography.subtitle, color: song.text },
+  muted: { ...typography.body, color: song.muted },
 });

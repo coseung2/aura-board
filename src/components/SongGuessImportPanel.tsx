@@ -83,14 +83,18 @@ function ImportRow({ item, disabled, onSave, onAdd, onRetry, onDelete }: {
   const [artist, setArtist] = useState(item.artist);
   useEffect(() => { setTitle(item.title); setArtist(item.artist); }, [item.title, item.artist]);
   return <article className={styles.sidebarCard}>
-    <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">원본 · {item.startSeconds}초부터</a>
+    <a className={styles.sourceLink} href={item.sourceUrl} target="_blank" rel="noopener noreferrer">원본 · {item.startSeconds}초부터</a>
     {item.status === "ready" ? <>
       <label className={styles.field}><span>가수 · 클래식 작곡가</span><input aria-label="등록곡 가수 또는 작곡가" value={artist} onChange={event => setArtist(event.target.value)} maxLength={200} disabled={disabled} /></label>
       <label className={styles.field}><span>노래 제목</span><input aria-label="등록곡 노래 제목" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} disabled={disabled} /></label>
-      <button type="button" className={styles.secondaryButton} disabled={disabled || !title.trim() || !artist.trim()} onClick={() => void onSave(title, artist)}>곡 정보 저장</button>
-      <button type="button" className={styles.primaryButton} disabled={disabled || !title.trim() || !artist.trim()} onClick={() => void onAdd(title, artist)}>문제에 추가</button>
-    </> : <p role="status">{item.status === "failed" ? item.error : item.status === "processing" ? "15초 음원을 준비하고 있어요…" : "차례를 기다리고 있어요…"}</p>}
-    {item.status === "failed" && <button type="button" disabled={disabled} onClick={() => void onRetry()}>다시 시도</button>}
-    <button type="button" disabled={disabled || item.status === "processing"} onClick={() => void onDelete()}>목록에서 삭제</button>
+      <div className={styles.inlineActions}>
+        <button type="button" className={styles.secondaryButton} disabled={disabled || !title.trim() || !artist.trim()} onClick={() => void onSave(title, artist)}>곡 정보 저장</button>
+        <button type="button" className={styles.primaryButton} disabled={disabled || !title.trim() || !artist.trim()} onClick={() => void onAdd(title, artist)}>문제에 추가</button>
+      </div>
+    </> : <p className={styles.importStatus} role="status">{item.status === "failed" ? item.error : item.status === "processing" ? "15초 음원을 준비하고 있어요…" : "차례를 기다리고 있어요…"}</p>}
+    <div className={styles.inlineActions}>
+      {item.status === "failed" && <button type="button" className={styles.secondaryButton} disabled={disabled} onClick={() => void onRetry()}>다시 시도</button>}
+      <button type="button" className={styles.dangerQuietButton} disabled={disabled || item.status === "processing"} onClick={() => void onDelete()}>목록에서 삭제</button>
+    </div>
   </article>;
 }

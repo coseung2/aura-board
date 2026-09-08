@@ -59,6 +59,21 @@ describe("SongGuessGame answer modes", () => {
     expect(screen.getByRole("status")).toHaveTextContent("답변 제출 완료");
   });
 
+  it("marks the revealed correct choice separately from the participant's wrong selection", () => {
+    const state = snapshot();
+    state.phase = "reveal";
+    state.currentRound.revealedAnswer = "밤편지";
+    state.viewer.answeredCurrentRound = true;
+    state.viewer.selectedChoiceId = "option-1";
+    state.viewer.scoredCurrentRound = false;
+    renderGame(state);
+    expect(screen.getByRole("button", { name: /밤편지/ })).toHaveAttribute("data-result", "correct");
+    expect(screen.getByRole("button", { name: /좋은 날/ })).toHaveAttribute("data-result", "wrong");
+    expect(screen.getByRole("button", { name: /달리반피카소/ })).toHaveAttribute("data-result", "muted");
+    expect(screen.getByLabelText("정답")).toBeInTheDocument();
+    expect(screen.getByLabelText("제출한 오답")).toBeInTheDocument();
+  });
+
   it.each([{ canInteract: false }, { expired: true }])("blocks choices while busy or expired: %j", (overrides) => {
     const { onIntent } = renderGame(snapshot(), overrides);
     fireEvent.click(screen.getByRole("button", { name: "밤편지" }));

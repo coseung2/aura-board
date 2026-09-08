@@ -5,7 +5,6 @@ import {
   AppState,
   Keyboard,
   ScrollView,
-  StyleSheet,
   Text,
   View,
 } from "react-native";
@@ -39,18 +38,11 @@ import {
   shouldUseBoardFallbackPolling,
   useBoardRealtime,
 } from "../../lib/use-board-realtime";
-import {
-  borders,
-  colors,
-  radii,
-  spacing,
-  tapMin,
-  typography,
-} from "../../theme/tokens";
 import { SongGuessScoreboard } from "../song-guess/SongGuessScoreboard";
 import { SongGuessLobbyStatus } from "../song-guess/SongGuessLobbyStatus";
 import { SongGuessAnswer } from "../song-guess/SongGuessAnswer";
-import { AppButton, EmptyState } from "../ui";
+import { songGuessBoardStyles as styles } from "../song-guess/songGuessBoardStyles";
+import { AppButton } from "../ui";
 type SongGuessSound =
   | "correct"
   | "join"
@@ -463,14 +455,12 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   if (!snapshot && error) {
     return (
       <View style={styles.emptyContainer}>
-        <EmptyState
-          title="연결할 수 없어요."
-          description="네트워크를 확인한 뒤 다시 시도해 주세요."
-        />
+        <Text style={styles.questionText}>연결할 수 없어요.</Text>
+        <Text style={styles.muted}>네트워크를 확인한 뒤 다시 시도해 주세요.</Text>
         <Text style={styles.errorText} accessibilityRole="alert">
           {error}
         </Text>
-        <AppButton variant="secondary" onPress={() => void refresh()}>
+        <AppButton variant="secondary" style={styles.actionButton} textStyle={styles.actionButtonText} onPress={() => void refresh()}>
           다시 시도
         </AppButton>
       </View>
@@ -480,9 +470,10 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   if (!snapshot || snapshot.phase === "draft") {
     return (
       <View style={styles.emptyContainer}>
-        <EmptyState title="준비 중" description="로비가 열리면 시작돼요." />
+        <Text style={styles.questionText}>준비 중</Text>
+        <Text style={styles.muted}>로비가 열리면 시작돼요.</Text>
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        <AppButton variant="secondary" onPress={() => void refresh()}>
+        <AppButton variant="secondary" style={styles.actionButton} textStyle={styles.actionButtonText} onPress={() => void refresh()}>
           다시 시도
         </AppButton>
       </View>
@@ -516,6 +507,17 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     !busy &&
     !syncing &&
     !hasPending;
+  const answerPrompt = snapshot.answerTarget === "artist"
+    ? "가수·작곡가"
+    : snapshot.answerTarget === "artist-title"
+      ? "가수·작곡가와 노래 제목"
+      : "노래 제목";
+  const roundDurationSeconds = snapshot.currentRound.deadlineAtMs != null && snapshot.currentRound.startedAtMs != null
+    ? Math.max(1, (snapshot.currentRound.deadlineAtMs - snapshot.currentRound.startedAtMs) / 1000)
+    : 30;
+  const roundTimerProgress = remainingSeconds === null
+    ? 0
+    : Math.max(0, Math.min(1, remainingSeconds / roundDurationSeconds));
 
   return (
     <ScrollView
@@ -526,9 +528,13 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       style={styles.scroll}
     >
       <View style={styles.phaseRow} accessibilityLiveRegion="polite">
-        <Text style={styles.phaseLabel}>{phaseLabel(snapshot.phase)}</Text>
+        <Text style={styles.phaseLabel}>
+          {snapshot.phase === "guessing" ? `${snapshot.currentRound.order + 1}라운드` : phaseLabel(snapshot.phase)}
+        </Text>
         <Text style={styles.roundText}>
-          {snapshot.currentRound.order + 1}라운드
+          {snapshot.phase === "guessing" && remainingSeconds !== null
+            ? deadlineReached ? "시간 종료" : `${remainingSeconds}초`
+            : `${snapshot.currentRound.order + 1}라운드`}
         </Text>
       </View>
 
@@ -548,15 +554,18 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       ) : null}
 
       {snapshot.phase === "guessing" ? (
-        <View style={styles.timingCard} accessibilityLiveRegion="polite">
-          {remainingSeconds === null ? null : deadlineReached ? (
-            <Text style={styles.timingExpired}>시간이 끝났어요.</Text>
-          ) : (
-            <Text style={styles.timingText}>
-              남은 시간 {remainingSeconds}초
-            </Text>
-          )}
+        <View
+          style={styles.roundTimerTrack}
+          accessibilityRole="progressbar"
+          accessibilityLabel={deadlineReached ? "응답 시간 종료" : "남은 응답 시간"}
+          accessibilityValue={{ min: 0, max: Math.ceil(roundDurationSeconds), now: Math.max(0, remainingSeconds ?? 0) }}
+        >
+          <View style={[styles.roundTimerFill, { width: `${roundTimerProgress * 100}%` }]} />
         </View>
+      ) : null}
+
+      {snapshot.phase === "guessing" ? (
+        <Text style={styles.questionText}>{`이 노래의 ${answerPrompt}은?`}</Text>
       ) : null}
 
       {snapshot.phase === "guessing" && clip?.mimeType === "video/youtube" ? (
@@ -586,6 +595,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
           <View style={styles.playerActions}>
             <AppButton
               style={styles.playerButton}
+              textStyle={styles.playerButtonText}
               loading={audioPreparing}
               disabled={!playerStatus.isLoaded || !!audioError}
               onPress={() => void playClip()}
@@ -594,7 +604,8 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
             </AppButton>
             {playerStatus.playing ? (
               <AppButton
-                style={styles.playerButton}
+                style={styles.secondaryPlayerButton}
+                textStyle={styles.secondaryPlayerButtonText}
                 variant="secondary"
                 onPress={() => player.pause()}
               >
@@ -602,7 +613,8 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
               </AppButton>
             ) : null}
             <AppButton
-              style={styles.playerButton}
+              style={styles.secondaryPlayerButton}
+              textStyle={styles.secondaryPlayerButtonText}
               variant="secondary"
               onPress={() => setMuted((value) => !value)}
             >
@@ -672,6 +684,8 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         {hasPending ? (
           <AppButton
             variant="secondary"
+            style={styles.actionButton}
+            textStyle={styles.actionButtonText}
             disabled={busy}
             onPress={() => {
               void loadPendingSongGuessCommand(boardId).then((pending) => {
@@ -684,6 +698,8 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         ) : null}
         <AppButton
           variant="secondary"
+          style={styles.actionButton}
+          textStyle={styles.actionButtonText}
           disabled={busy || syncing}
           onPress={() => void refresh()}
         >
@@ -700,87 +716,3 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: colors.bg },
-  container: {
-    flexGrow: 1,
-    padding: spacing.md,
-    paddingBottom: spacing.xxxl,
-    gap: spacing.md,
-    backgroundColor: colors.bg,
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.bg,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: "center",
-    gap: spacing.md,
-    padding: spacing.xl,
-    backgroundColor: colors.bg,
-  },
-  phaseRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  phaseLabel: { ...typography.subtitle, color: colors.text },
-  roundText: { ...typography.label, color: colors.textMuted },
-  timingCard: {
-    gap: spacing.xs,
-    padding: spacing.md,
-    borderRadius: radii.card,
-    backgroundColor: colors.accentTintedBg,
-  },
-  timingText: { ...typography.subtitle, color: colors.accentActive },
-  timingExpired: { ...typography.subtitle, color: colors.danger },
-  joinTitle: { ...typography.subtitle, color: colors.text },
-  waitingCard: {
-    gap: spacing.sm,
-    padding: spacing.lg,
-    borderRadius: radii.card,
-    borderCurve: "continuous",
-    backgroundColor: colors.surfaceAlt,
-  },
-  playerCard: {
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    borderTopWidth: borders.hairline,
-    borderBottomWidth: borders.hairline,
-    borderColor: colors.border,
-  },
-  playerTopRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  playerDuration: { ...typography.display, color: colors.text },
-  playerTime: { ...typography.badge, color: colors.textMuted },
-  progressTrack: {
-    height: spacing.sm,
-    overflow: "hidden",
-    backgroundColor: colors.surfaceAlt,
-  },
-  progressFill: {
-    height: spacing.sm,
-    backgroundColor: colors.accent,
-  },
-  playerActions: { flexDirection: "row", flexWrap: "wrap", gap: spacing.sm },
-  playerButton: { flexGrow: 1, minWidth: tapMin * 2 },
-  playerError: { ...typography.badge, color: colors.danger },
-  clueText: { ...typography.body, color: colors.textMuted },
-  resultText: { ...typography.subtitle },
-  successText: { color: colors.plantActive },
-  missText: { color: colors.danger },
-  answerText: { ...typography.display, color: colors.text },
-  actions: { gap: spacing.sm },
-  muted: { ...typography.body, color: colors.textMuted },
-  noticeText: { ...typography.body, color: colors.plantActive },
-  errorText: { ...typography.body, color: colors.danger },
-});

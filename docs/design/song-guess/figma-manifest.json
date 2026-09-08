@@ -339,7 +339,7 @@
       "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-10"
     }
   ],
-  "status": "Design complete; application implementation pending",
+  "status": "Design complete; web/mobile implementation applied; visual acceptance pending",
   "tokenValues": {
     "teacher/bg": {
       "type": "COLOR",

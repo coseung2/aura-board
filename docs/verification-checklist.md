@@ -9,11 +9,28 @@ creating overlapping testing-notes documents.
 
 ## Local development startup and login
 
+- 2026-09-08 KST song-guess design implementation: the approved teacher Aura
+  styling and student B-layout/A-palette are now applied to web and Expo while
+  preserving authoritative snapshots, real participant/pet scoreboards, import
+  flow and answer privacy. Student screens use the round/time header, dark music
+  player, four answer colors and selected/muted/reveal states; direct input and
+  reconnect/error states use the same theme. Targeted UI/contract verification
+  passed 4 files / 98 tests. Root/mobile TypeScript, mobile `design:check`, line
+  limits, encoding/diff checks and the Next production build passed. The broader
+  `npm run test -- SongGuess song-guess` run passed 317/319 tests; the two catalog
+  server failures require the absent untracked local fixture
+  `data/song-guess/clips/chopin-waltz-no19/highlight.wav` and are unrelated to
+  the UI change. Android Expo JS/assets export passed with `--no-bytecode`
+  (4,271 modules / 466 assets); this Linux environment could not execute the
+  bundled Hermes compiler, so bytecode validation remains a Windows-runner check.
+  Authenticated multi-client, visual comparison and physical Android/iPad checks
+  are still required before rollout.
 - 2026-09-08 KST design handoff: `docs/design/song-guess/README.md` and
   `figma-manifest.json` record the approved teacher design-system screens and
   student B-layout/A-palette screens. Figma has 7 teacher + 9 student screens,
   9 component families / 40 main variants, and 16 exported PNGs. Font and
-  overflow checks passed. These designs are not yet applied to the app.
+  overflow checks passed. At handoff time these designs were not yet applied to
+  the app; the implementation record above supersedes that status.
 - 2026-09-08 KST pre-handoff checks: direct root/mobile TypeScript checks,
   song-guess Vitest (28 files / 319 tests), Rust workspace (68 tests), clippy,
   line limits, Python extractor/chart/playlist (11/7/4), and 20 Node ingestion

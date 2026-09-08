@@ -456,7 +456,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
 
   if (loading) {
     return (
-      <section className={styles.shell} aria-label={boardTitle}>
+      <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
         <div className={styles.panel} role="status">음악 퀴즈를 불러오는 중이에요…</div>
       </section>
     );
@@ -464,7 +464,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
 
   if (!snapshot && viewer === "teacher") {
     return (
-      <section className={styles.shell} aria-label={boardTitle}>
+      <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
         <BoardHeading title={boardTitle} />
         {setup && <SongGuessAnswerGuide key={boardId} setup={setup} answerTarget={answerTarget} />}
         <div className={styles.editorLayout}>
@@ -555,8 +555,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
 
   if (!snapshot) {
     return (
-      <section className={styles.shell} aria-label={boardTitle}>
-        <BoardHeading title={boardTitle} />
+      <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
         <div className={styles.panel}>
           <h2>{error ? "게임을 불러오지 못했어요" : "게임 준비 중"}</h2>
           <button className={styles.secondaryButton} type="button" onClick={() => void refreshSession()} disabled={syncing}>
@@ -569,7 +568,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   }
 
   return (
-    <section className={styles.shell} aria-label={boardTitle}>
+    <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
       <BoardHeading title={boardTitle} />
       {viewer === "teacher" && snapshot.viewer.role === "host" && setup &&
         <SongGuessAnswerGuide key={`${boardId}:${snapshot.sessionId}`} setup={setup} answerTarget={snapshot.answerTarget} currentRoundId={snapshot.currentRound.roundId} />}

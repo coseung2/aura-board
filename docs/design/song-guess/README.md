@@ -76,23 +76,23 @@ PNG는 Figma에서 직접 내보낸 정적 화면이다. 예시 이름과 점수
 디자인에 등장하는 등록/진행/결과는 실제 DB 작업을 실행한 증거가 아니다.
 이번 산출물에는 실행 가능한 클릭 프로토타입이나 앱 디자인 적용이 포함되지 않는다.
 
-## 다음 구현 작업
+## 현재 구현 상태
 
-1. 교사 `src/components/SongGuessBoard.tsx`,
-   `SongGuessBoardParts.tsx`, `SongGuessImportPanel.tsx`를 기존 토큰으로 정돈한다.
-   저장과 대기실 열기를 현재 서버의 저장/세션 생성 순서에 맞춰 연결한다.
-2. 학생 `src/components/SongGuessGame.tsx`, 해당 CSS와
-   `apps/mobile/components/song-guess/SongGuessAnswer.tsx`에 승인 디자인을 적용한다.
-   대기/현재 라운드/제출/공개/종료/재연결은 현재 authoritative snapshot을 따른다.
-3. `SongGuessScoreboard.tsx`의 실제 참가자·점수·대표펫 처리를 유지한다.
-   시안의 데모 행으로 실제 점수판 기능을 대체하지 않는다.
-4. 링크 등록의 원본 시작 시점은 timestamp URL이 결정한다.
-   시안의 구간 필드를 자유 편집 기능으로 구현하려면 현재 import API 계약부터 확인한다.
-   새 길이를 허용하지 않는다: 현재 클립은 정확히 15초다.
-5. 학생 정답 대상에 따라 질문과 Label을 바꾼다. 가요에는 작곡가를 필수로 요구하지 않는다.
-   이미 제출했거나 시간 종료된 답은 잠그고 다음 라운드에서만 초기화한다.
-6. 390px 학생 화면과 실제 태블릿/데스크톱 반응형, 긴 곡명·가수-곡명 조합,
-   키보드 접근, 오디오 재생, 재접속, 저장/새로고침, 두 학급 권한 격리를 검증한다.
+- 교사 `SongGuessBoard`, `SongGuessImportPanel`, 노래 풀/직접 구성 영역은 기존
+  Aura Board 토큰과 카드 계층으로 정돈했다. 저장, 게임 생성, 링크 import의 기존
+  서버 순서와 권한 계약은 유지한다.
+- 학생 웹 `SongGuessGame`과 Expo 학생 화면에 승인된 B 플레이어 배치 + A 짙은
+  보라 팔레트를 적용했다. 라운드/시간 헤더, 진행 바, 질문, 플레이어, 객관식 4색,
+  직접 입력, 제출 잠금, 공개 상태와 재연결 UI가 authoritative snapshot을 따른다.
+- 객관식 Selected는 제출 표시일 뿐 정답 표시가 아니다. 정답 공개 전에는 선택한
+  보기 외 다른 보기를 흐리기만 하며, reveal 이후에만 서버의 `scoredCurrentRound`
+  상태와 공개 정답 화면을 이용해 결과 상태를 표시한다.
+- 웹·모바일 점수판은 실제 참가자·점수·대표펫 데이터를 계속 사용한다. 시안의 데모
+  행으로 대체하지 않았다.
+- 링크 등록의 원본 시작 시점은 계속 timestamp URL이 결정하며 클립 길이는 정확히
+  15초다. 시안의 구간 입력을 임의 길이 편집 기능으로 확장하지 않았다.
+- 남은 항목은 실제 인증된 브라우저/두 학생 동기화, 390px·태블릿·데스크톱의
+  시각 대조, 긴 문자열, 실제 Android/iPad 오디오·백그라운드·재접속 검증이다.
 
 Figma 교사 액센트는 기존 토큰 그대로다. 작은 흰색 버튼 글자와 액센트의
 대비는 기존 디자인 시스템 차원에서 검토할 항목이며, 이번에 색을 임의 변경하지 않았다.
@@ -100,7 +100,7 @@ Figma 교사 액센트는 기존 토큰 그대로다. 작은 흰색 버튼 글�
 
 ## 이번 커밋에 함께 이어지는 음악 기능
 
-새 디자인은 미적용이지만 다음 기능 소스는 이전 작업에서 구현되어 있다.
+새 디자인은 현재 웹·모바일 표현 계층에 적용되었고, 다음 기능 소스는 그대로 유지한다.
 
 - 웹·모바일·Rust: 객관식 4지선다, 곡명/아티스트/결합 정답, legacy text 호환.
 - 교사 timestamp 링크 등록: 학급별 import queue, lease/CAS, 15초 추출,
@@ -160,4 +160,12 @@ IP allowlist 확장은 별도 승인 필요. dev DB 대신 prod DB로 바꾸지 
 - `npm run typecheck`의 pretypecheck는 실행 중 Prisma DLL 잠금(EPERM)으로 실패.
   생성된 client를 사용하는 직접 tsc 검사는 통과했다. 새 DB 스키마 생성/production build는
   이번 디자인 턴에서 다시 성공 검증하지 않았다. 이전 검증 기록과 혼동하지 않는다.
-- 새 디자인의 실제 브라우저/모바일 적용 및 인증된 다중 사용자 검증은 미완료다.
+- 2026-09-08 KST 디자인 구현 후 검증: 학생 웹/모바일 승인 팔레트·헤더·플레이어·
+  객관식 상태와 교사 카드 계층을 적용했다. 관련 웹/모바일 UI 계약 4파일 98테스트,
+  root/mobile TypeScript, mobile `design:check`, line limit, encoding, `git diff --check`,
+  Next production build가 통과했다. 전체 song-guess 대상 테스트는 319개 중 317개가
+  통과했고, 2개는 이 체크아웃에 추적되지 않은
+  `data/song-guess/clips/chopin-waltz-no19/highlight.wav` fixture가 없어 실패했다.
+  Android Expo JS/assets export는 `--no-bytecode`로 4,271 modules / 466 assets를
+  성공했다. 이 Linux 환경에서는 포함된 Hermes compiler 실행이 실패하므로 bytecode
+  검증은 Windows runner에서 수행한다. 인증된 다중 사용자·실기기·시각 대조는 남아 있다.

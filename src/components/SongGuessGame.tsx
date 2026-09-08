@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import { Check, Clock3, Users, Volume2, VolumeX } from "lucide-react";
+import { Check, Clock3, Users, Volume2, VolumeX, X } from "lucide-react";
 import type { SongGuessGuessResult, SongGuessIntent, SongGuessSnapshot } from "@/lib/song-guess/contracts";
-import { songGuessAnswerPrompt, SONG_GUESS_ANSWER_TARGET_LABELS } from "@/lib/song-guess/contracts";
+import { normalizeSongGuessAnswer, songGuessAnswerPrompt, SONG_GUESS_ANSWER_TARGET_LABELS } from "@/lib/song-guess/contracts";
 import { SongGuessPlayer } from "./SongGuessPlayer";
 import { SongGuessScoreboard } from "./SongGuessScoreboard";
 import { SongGuessEntrance } from "./SongGuessEntrance";
@@ -32,6 +32,7 @@ export function SongGuessGame({ snapshot, totalRounds, canInteract, remainingSec
   const participants = useMemo(() => snapshot.participants.filter((participant) => participant.joined !== false), [snapshot.participants]);
   const sound = useSongGuessSounds(snapshot, result, remainingSeconds);
   const isHost = snapshot.viewer.role === "host";
+  const studentView = !isHost;
   const waiting = phase === "draft" || phase === "lobby";
   const finished = phase === "finished";
   const roundResults = phase === "reveal";
@@ -42,15 +43,19 @@ export function SongGuessGame({ snapshot, totalRounds, canInteract, remainingSec
   const feedback = result?.roundId === currentRound.roundId ? result : null;
   const multipleChoice = snapshot.answerMode === "multiple-choice";
   const answerPrompt = songGuessAnswerPrompt(snapshot.answerTarget);
+  const questionText = `이 노래의 ${answerPrompt}은?`;
   const answered = multipleChoice && (snapshot.viewer.answeredCurrentRound === true || snapshot.viewer.selectedChoiceId != null);
   const answerDisabled = !canInteract || expired || snapshot.viewer.scoredCurrentRound || answered;
 
   return (
-    <div className={styles.layout} data-finished={finished || roundResults || waiting} onPointerDownCapture={sound.unlock} onKeyDownCapture={sound.unlock}>
+    <div className={styles.layout} data-viewer={studentView ? "student" : "teacher"} data-finished={finished || roundResults || waiting} onPointerDownCapture={sound.unlock} onKeyDownCapture={sound.unlock}>
       <main className={styles.stage}>
         <div className={styles.roundHeading}>
-          <span>{finished ? "최종 결과" : waiting ? "시작 대기" : `${currentRound.order + 1}라운드${totalRounds ? ` / ${totalRounds}` : ""}`}</span>
-          <div className={styles.headingActions}><span className={styles.participantCount}><Users size={16} aria-hidden="true" />{participants.length}명</span>
+          <span className={styles.roundLabel}>{finished ? "최종 결과" : waiting ? "시작 대기" : `${currentRound.order + 1}라운드${totalRounds ? ` / ${totalRounds}` : ""}`}</span>
+          <div className={styles.headingActions}>
+            {studentView && phase === "guessing" && remainingSeconds !== null
+              ? <span className={styles.studentTime} data-expired={expired}>{expired ? "시간 종료" : `${remainingSeconds}초`}</span>
+              : <span className={styles.participantCount}><Users size={16} aria-hidden="true" />{participants.length}명</span>}
             <button type="button" className={controls.iconButton} onClick={sound.toggleMuted} aria-label={sound.muted ? "효과음 켜기" : "효과음 끄기"} aria-pressed={!sound.muted}>
               {sound.muted ? <VolumeX size={18} aria-hidden="true" /> : <Volume2 size={18} aria-hidden="true" />}
             </button>
@@ -68,7 +73,7 @@ export function SongGuessGame({ snapshot, totalRounds, canInteract, remainingSec
 
         {phase === "guessing" && (
           <div className={styles.question}>
-            <p className={styles.clue}>{SONG_GUESS_ANSWER_TARGET_LABELS[snapshot.answerTarget ?? "title"]}</p>
+            <p className={studentView ? styles.studentQuestion : styles.clue}>{studentView ? questionText : SONG_GUESS_ANSWER_TARGET_LABELS[snapshot.answerTarget ?? "title"]}</p>
             {currentRound.currentClip && <SongGuessPlayer key={`${snapshot.sessionId}:${currentRound.currentClip.assetId}`} sessionId={snapshot.sessionId} clip={currentRound.currentClip} onPlayingChange={sound.onMusicPlaying} />}
             {currentRound.accessibilityClue && <p className={styles.clue}>{currentRound.accessibilityClue}</p>}
             {!isHost && snapshot.viewer.joined === false && <p className={styles.scored}>입장이 마감됐어요. 다음 게임을 기다려 주세요.</p>}
@@ -100,7 +105,7 @@ export function SongGuessGame({ snapshot, totalRounds, canInteract, remainingSec
                 <button className={controls.primaryButton} type="submit" disabled={!canInteract || expired || !guessText.trim() || snapshot.viewer.scoredCurrentRound}>정답 제출</button>
               </form>
             )}
-            {feedback && <p className={feedback.correct ? controls.correctResult : controls.wrongResult} role="status">
+            {feedback && <p className={`${feedback.correct ? controls.correctResult : controls.wrongResult} ${styles.answerFeedback}`} role="status">
               {feedback.timedOut ? "시간이 끝났어요." : feedback.alreadyScored ? "이 라운드는 이미 점수를 받았어요." : feedback.correct ? `정답! +${feedback.score}점` : multipleChoice ? "아쉬워요! 정답 공개를 기다려 주세요." : "다시 도전해 보세요."}
             </p>}
             {!feedback && snapshot.viewer.scoredCurrentRound && <p className={styles.scored} role="status"><Check size={18} aria-hidden="true" />정답 제출 완료</p>}
@@ -114,6 +119,17 @@ export function SongGuessGame({ snapshot, totalRounds, canInteract, remainingSec
             <div><p>정답</p><h2>{currentRound.revealedAnswer ?? "정답을 불러오는 중…"}</h2></div>
             <span>{scoredCount} / {participants.length}명 정답</span>
           </div>
+          {studentView && multipleChoice && currentRound.choices && <div className={styles.choices} data-reveal="true" role="group" aria-label={`${answerPrompt} 제출 결과`}>
+            {currentRound.choices.map((choice, index) => {
+              const selected = snapshot.viewer.selectedChoiceId === choice.id;
+              const correct = currentRound.revealedAnswer != null && normalizeSongGuessAnswer(choice.label) === normalizeSongGuessAnswer(currentRound.revealedAnswer);
+              const state = correct ? "correct" : selected ? "wrong" : "muted";
+              return <button key={choice.id} type="button" className={styles.choice} data-option={index} data-result={state} aria-pressed={selected} disabled>
+                <span className={styles.choiceNumber} aria-hidden="true">{index + 1}</span><span>{choice.label}</span>
+                {correct ? <Check size={20} aria-label="정답" /> : selected ? <X size={20} aria-label="제출한 오답" /> : null}
+              </button>;
+            })}
+          </div>}
           <SongGuessScoreboard participants={participants} roundResults />
         </>}
 

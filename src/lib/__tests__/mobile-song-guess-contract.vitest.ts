@@ -137,6 +137,19 @@ describe("mobile song guess contract", () => {
     expect([...container.querySelectorAll("button")].every((button) => button.disabled)).toBe(true);
   });
 
+  it("labels the revealed correct choice separately from a persisted wrong selection", () => {
+    const current = multipleChoiceSnapshot();
+    current.phase = "reveal";
+    current.currentRound.currentClip = null;
+    current.currentRound.revealedAnswer = "봄";
+    current.viewer = { ...current.viewer, answeredCurrentRound: true, selectedChoiceId: "choice-2" };
+    const container = renderAnswer(current);
+    const labels = [...container.querySelectorAll("button")].map((button) => button.getAttribute("aria-label"));
+    expect(labels).toContain("1번, 봄, 정답");
+    expect(labels).toContain("2번, 여름, 제출한 오답");
+    expect(container.textContent).toContain("선택한 답이 오답이에요.");
+  });
+
   it("retains text entry for absent or explicit text mode", () => {
     for (const current of [snapshot(), snapshot({ answerMode: "text" })]) {
       const container = renderAnswer(current);
