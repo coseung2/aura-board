@@ -40,6 +40,20 @@ function snapshot(overrides: Partial<SongGuessSnapshot> = {}): SongGuessSnapshot
 }
 
 describe("song-guess authoritative wire contract", () => {
+  it.each(["draft", "lobby"] as const)("accepts explicit null v2 timing in %s", (phase) => {
+    const base = snapshot();
+    const waiting = {
+      ...base, phase, rulesVersion: 2, stateSchemaVersion: 2,
+      currentRound: {
+        ...base.currentRound, accessibilityClue: null, currentClip: null,
+        startedAtMs: null, deadlineAtMs: null, maxScore: 1000,
+      },
+    };
+    expect(isSongGuessSnapshot(JSON.parse(JSON.stringify(waiting)))).toBe(true);
+    expect(isSongGuessSnapshot({
+      ...waiting, currentRound: { ...waiting.currentRound, startedAtMs: undefined },
+    })).toBe(false);
+  });
   it("requires server timestamps for v2 and accepts a single highlight setup", () => {
     const base = snapshot();
     const current = { ...base, rulesVersion: 2, stateSchemaVersion: 2,

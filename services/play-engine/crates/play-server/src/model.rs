@@ -263,9 +263,8 @@ pub struct SongGuessRoundSnapshot {
     pub accessibility_clue: Option<String>,
     pub revealed_answer: Option<String>,
     pub current_clip: Option<SongGuessClipSnapshot>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    // Waiting snapshots must include explicit nulls for the v2 wire contract.
     pub started_at_ms: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub deadline_at_ms: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub max_score: Option<u32>,
@@ -1173,7 +1172,9 @@ mod tests {
             0,
         )
         .unwrap();
+        assert_waiting_song_guess_wire(&session, "draft");
         session.apply(&host(), &SongGuessIntent::OpenLobby).unwrap();
+        assert_waiting_song_guess_wire(&session, "lobby");
         session
             .apply(&actor("one"), &SongGuessIntent::Join)
             .unwrap();
@@ -1213,5 +1214,16 @@ mod tests {
         assert_eq!(snapshot.participants[1].round_score, Some(1_000));
         assert_eq!(snapshot.participants[0].previous_rank, Some(1));
         assert_eq!(snapshot.participants[1].previous_rank, Some(2));
+    }
+
+    fn assert_waiting_song_guess_wire(session: &SongGuessSessionRecord, phase: &str) {
+        for viewer in [host(), actor("one")] {
+            let wire = serde_json::to_value(session.snapshot(&viewer, 100).unwrap()).unwrap();
+            assert_eq!(wire["phase"], phase);
+            let round = wire["currentRound"].as_object().unwrap();
+            assert_eq!(round.get("startedAtMs"), Some(&serde_json::Value::Null));
+            assert_eq!(round.get("deadlineAtMs"), Some(&serde_json::Value::Null));
+            assert_eq!(round.get("maxScore"), Some(&serde_json::json!(1000)));
+        }
     }
 }

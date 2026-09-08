@@ -216,10 +216,14 @@ function isSongGuessTeacherSetup(value: unknown): value is SongGuessTeacherSetup
       round.aliases.some((alias) => typeof alias !== "string") ||
       !(round.accessibilityClue === null || typeof round.accessibilityClue === "string") ||
       !Array.isArray(round.clips) ||
-      round.clips.length !== 3
+      ![1, 3].includes(round.clips.length)
     ) {
       return false;
     }
-    return round.clips.every(isUploadedSongGuessClip);
+    if (!round.clips.every(isUploadedSongGuessClip)) return false;
+    const tiers = round.clips.map((clip) => clip.tierMs).sort((a, b) => a - b);
+    return tiers.length === 1
+      ? tiers[0] === 15000
+      : tiers.join(",") === "500,1000,1500";
   });
 }
