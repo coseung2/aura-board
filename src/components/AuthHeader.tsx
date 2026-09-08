@@ -86,8 +86,7 @@ export function AuthHeader() {
     }
   }
 
-  return (
-    <div className="auth-header auth-header-teacher">
+  const profile = <>
       {session.user.image && (
         <img
           src={session.user.image}
@@ -98,20 +97,17 @@ export function AuthHeader() {
         />
       )}
       <span className="auth-name">{teacherDisplayName}</span>
-      {canSwitchToParent && (
-        <details ref={roleMenuRef} className="auth-role-menu">
-          <summary className="auth-role-trigger" aria-label="사용자 유형 전환">
-            <span className="auth-role-trigger-content">
-              <span className="auth-role-icon"><RoleIcon role="teacher" /></span>
-              <span>교사</span>
+  </>;
+
+  return (
+    <div className="auth-header auth-header-teacher">
+      {canSwitchToParent ? (
+        <details ref={roleMenuRef} className="auth-role-menu auth-profile-menu">
+          <summary className="auth-role-trigger auth-profile-trigger" aria-label={`${teacherDisplayName} 사용자 유형 전환`}>
+            {profile}
               <ChevronDownIcon size={14} className="auth-role-chevron" />
-            </span>
           </summary>
           <div className="auth-role-menu-panel" role="menu" aria-label="사용자 유형">
-            <span className="auth-role-option is-current" role="menuitem" aria-current="page">
-              <span className="auth-role-icon"><RoleIcon role="teacher" /></span>
-              <span>교사</span>
-            </span>
             <button
               type="button"
               className="auth-role-option auth-role-option-button"
@@ -124,7 +120,7 @@ export function AuthHeader() {
             </button>
           </div>
         </details>
-      )}
+      ) : <span className="auth-profile-static">{profile}</span>}
       <TeacherNotificationBell />
       <SettingsMenu />
       <button

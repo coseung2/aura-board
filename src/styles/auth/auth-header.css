@@ -76,6 +76,21 @@
   color: var(--color-text);
 }
 
+.auth-profile-static,
+.auth-profile-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  min-width: 0;
+}
+.auth-profile-menu { min-width: 0; }
+.auth-profile-trigger.auth-role-trigger { min-height: 44px; padding: 0; }
+.auth-profile-trigger .auth-name,
+.auth-profile-static .auth-name { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auth-profile-trigger:focus-visible { outline: 2px solid var(--color-border-hover); outline-offset: 3px; border-radius: 6px; }
+.auth-profile-menu[open] .auth-role-chevron { transform: rotate(180deg); }
+
 .auth-logout-btn {
   display: inline-flex;
   align-items: center;
