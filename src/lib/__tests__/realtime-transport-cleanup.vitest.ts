@@ -18,6 +18,31 @@ describe("realtime transport cleanup", () => {
     );
   });
 
+  it("keeps mobile speed-game on realtime invalidation instead of a 2.5s poll", () => {
+    const board = source("apps/mobile/components/layouts/SpeedGameBoard.tsx");
+
+    expect(board).toContain("useLiveSnapshot");
+    expect(board).toContain('events: ["speed_game_changed"]');
+    expect(board).not.toContain("2_500");
+  });
+
+  it("keeps mobile shadow-alliance on realtime invalidation instead of a 10s poll", () => {
+    const board = source("apps/mobile/components/layouts/ShadowAllianceBoard.tsx");
+
+    expect(board).toContain("useLiveSnapshot");
+    expect(board).toContain('events: ["play_session_changed"]');
+    expect(board).not.toContain('setInterval(() => void load("refresh"), 10_000)');
+  });
+
+  it("subscribes the mobile assignment board to the existing assignment channel", () => {
+    const board = source("apps/mobile/components/layouts/AssignmentBoard.tsx");
+
+    expect(board).toContain("useLiveSnapshot");
+    expect(board).toContain('`board:${data.board.id}:assignment`');
+    expect(board).toContain('"slot.updated"');
+    expect(board).toContain('"slot.returned"');
+  });
+
   it.each([
     "src/app/api/boards/[id]/stream/route.ts",
     "src/app/api/speed-game/games/[gameId]/stream/route.ts",

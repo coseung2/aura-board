@@ -86,14 +86,17 @@ export function GameHubCatalog({
       if (!cancelled && body?.statuses) setStatuses(body.statuses);
     };
     void loadStatuses();
+    const loadVisibleStatuses = () => {
+      if (document.visibilityState === "visible") void loadStatuses();
+    };
     const onFocus = () => void loadStatuses();
     window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-    const timer = window.setInterval(loadStatuses, 15_000);
+    document.addEventListener("visibilitychange", loadVisibleStatuses);
+    const timer = window.setInterval(loadVisibleStatuses, 15_000);
     return () => {
       cancelled = true;
       window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
+      document.removeEventListener("visibilitychange", loadVisibleStatuses);
       window.clearInterval(timer);
     };
   }, []);

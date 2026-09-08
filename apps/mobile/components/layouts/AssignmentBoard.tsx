@@ -23,6 +23,7 @@ import {
   pageChrome,
 } from "../../theme/tokens";
 import { ApiError, apiFetch } from "../../lib/api";
+import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 import { uploadMobileFile } from "../../lib/upload";
 import type { BoardDetailResponse } from "../../lib/types";
 import { ExpandablePostContent } from "../ExpandablePostContent";
@@ -106,6 +107,14 @@ export function AssignmentBoard({
     mySlot?.submissionStatus === "orphaned" ||
     gradingLocked ||
     (deadlinePassed && !assignmentAllowLate);
+
+  useLiveSnapshot({
+    channelName: `board:${data.board.id}:assignment`,
+    events: ["slot.updated", "slot.returned", "reminder.issued"],
+    reload: async () => {
+      await onMutate();
+    },
+  });
 
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 30_000);

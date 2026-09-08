@@ -24,6 +24,7 @@ import {
   shadowAllianceStyles as styles,
 } from "../../theme/shadow-alliance";
 import { ControlPressable, TextField } from "../ui";
+import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 
 const { Cinzel_500Medium } = require("@expo-google-fonts/cinzel/500Medium") as {
   Cinzel_500Medium: number;
@@ -295,13 +296,20 @@ export function ShadowAllianceBoard({ data }: Props) {
     commandRef.current = null;
     joinedRunRef.current = null;
     readyRunRef.current = null;
-    void load("initial");
+    setLoading(true);
+  }, [data.board.id]);
+
+  const refreshFromAuthority = useCallback(async () => {
+    await load(snapshotRef.current ? "refresh" : "initial");
   }, [load]);
 
-  useEffect(() => {
-    const timer = setInterval(() => void load("refresh"), 10_000);
-    return () => clearInterval(timer);
-  }, [load]);
+  useLiveSnapshot({
+    channelName: `board:${data.board.id}`,
+    events: ["play_session_changed"],
+    terminal:
+      snapshot?.phase === "finished" || snapshot?.phase === "host-ended",
+    reload: refreshFromAuthority,
+  });
 
   useEffect(() => {
     if (snapshot?.phase !== "playing" || !snapshot.timerRunning) return;

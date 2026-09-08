@@ -15,6 +15,7 @@ import { AppButton, TextField } from "../ui";
 import { GameExitDialog } from "../game-platform/GameExitDialog";
 import { GameLobby } from "../game-platform/GameLobby";
 import { GameResultPanel } from "../game-platform/GameResultPanel";
+import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 
 type Props = { data: BoardDetailResponse };
 type ParticipantAction = "join" | "ready" | "forfeit";
@@ -112,13 +113,13 @@ export function SpeedGameBoard({ data }: Props) {
     joinedRunRef.current = null;
   }, [data]);
 
-  useEffect(() => {
-    if (!game?.id) return;
-    const timer = setInterval(() => {
-      void load();
-    }, 2_500);
-    return () => clearInterval(timer);
-  }, [game?.id, load]);
+  useLiveSnapshot({
+    channelName: game?.id ? `speed-game:${game.id}` : "",
+    events: ["speed_game_changed"],
+    enabled: Boolean(game?.id),
+    terminal: game?.status === "finished",
+    reload: load,
+  });
 
   const participant = useMemo(() => {
     if (!game) return null;

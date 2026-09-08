@@ -141,12 +141,20 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
     onReload: matchmakingEnabled ? refreshMatchmaking : refresh,
   });
   useEffect(() => {
-    if (!shouldUseBoardFallbackPolling(realtime.status)) return;
+    // Matchmaking already has a lease heartbeat below, which also returns the
+    // authoritative matchmaking snapshot. Avoid a second identical 15s poll
+    // when Realtime is degraded while waiting in the lobby.
+    if (
+      matchmakingEnabled ||
+      !shouldUseBoardFallbackPolling(realtime.status)
+    ) {
+      return;
+    }
     const timer = setInterval(() => {
-      void (matchmakingEnabled ? refreshMatchmaking() : refresh());
+      void refresh();
     }, BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [matchmakingEnabled, realtime.status, refresh, refreshMatchmaking]);
+  }, [matchmakingEnabled, realtime.status, refresh]);
 
   useEffect(() => {
     if (!matchmakingEnabled || matchmaking.status !== "waiting") return;
