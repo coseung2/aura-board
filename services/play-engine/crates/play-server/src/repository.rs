@@ -492,13 +492,35 @@ impl PlayRepository for MemoryRepository {
             .cloned()
             .ok_or(RepositoryError::NotFound)?;
         current.authorize(actor)?;
-        if current.version != request.expected_version {
+        let allow_stale_guess = matches!(
+            &request.command,
+            crate::model::SongGuessIntent::Guess {
+                round_id: Some(round_id),
+                ..
+            } if current.rules_version == crate::model::SONG_GUESS_RULES_VERSION
+                && current.state.phase == play_domain::song_guess::SongGuessPhase::Guessing
+                && current
+                    .state
+                    .current_round()
+                    .map(|round| round.round_id.as_str() == round_id.as_str())
+                .unwrap_or(false)
+        );
+        let allow_stale_join = matches!(
+            &request.command,
+            crate::model::SongGuessIntent::Join
+                if current.rules_version == crate::model::SONG_GUESS_RULES_VERSION
+                    && current.state.phase == play_domain::song_guess::SongGuessPhase::Lobby
+        );
+        if current.version != request.expected_version
+            && !((allow_stale_guess || allow_stale_join)
+                && request.expected_version < current.version)
+        {
             return Err(RepositoryError::SongGuessVersionConflict {
                 current: Box::new(current),
             });
         }
         let mut updated = current.clone();
-        let result = updated.apply(actor, &request.command)?;
+        let result = updated.apply_at(actor, &request.command, now_ms)?;
         let previous_version = updated.version;
         updated.version = updated
             .version
@@ -1312,13 +1334,28 @@ mod tests {
         assert!(retry.replayed);
         assert_eq!(retry.value, opened.value);
 
+        repository
+            .execute_song_guess_command(
+                &participant("first"),
+                &session_id,
+                &SongGuessCommandRequest {
+                    request_id: "join-first".to_owned(),
+                    expected_version: 1,
+                    command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
+                    command: SongGuessIntent::Join,
+                },
+                900,
+            )
+            .await
+            .unwrap();
+
         let started = repository
             .execute_song_guess_command(
                 &host(),
                 &session_id,
                 &SongGuessCommandRequest {
                     request_id: "start-for-reveal".to_owned(),
-                    expected_version: 1,
+                    expected_version: 2,
                     command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
                     command: SongGuessIntent::Start,
                 },
@@ -1343,7 +1380,7 @@ mod tests {
                 &session_id,
                 &SongGuessCommandRequest {
                     request_id: "reveal-answer".to_owned(),
-                    expected_version: 2,
+                    expected_version: 3,
                     command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
                     command: SongGuessIntent::Reveal,
                 },
@@ -1367,11 +1404,17 @@ mod tests {
         let (repository, session_id) = setup_song_guess().await;
         for (version, command, id) in [
             (0, SongGuessIntent::OpenLobby, "open"),
-            (1, SongGuessIntent::Start, "start"),
+            (1, SongGuessIntent::Join, "join"),
+            (2, SongGuessIntent::Start, "start"),
         ] {
+            let actor = if matches!(&command, SongGuessIntent::Join) {
+                participant("first")
+            } else {
+                host()
+            };
             repository
                 .execute_song_guess_command(
-                    &host(),
+                    &actor,
                     &session_id,
                     &SongGuessCommandRequest {
                         request_id: id.to_owned(),
@@ -1390,10 +1433,11 @@ mod tests {
                 &session_id,
                 &SongGuessCommandRequest {
                     request_id: "guess".to_owned(),
-                    expected_version: 2,
+                    expected_version: 3,
                     command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
                     command: SongGuessIntent::Guess {
                         text: " BLUE   MOON ".to_owned(),
+                        round_id: None,
                     },
                 },
                 300,
@@ -1402,7 +1446,7 @@ mod tests {
             .unwrap();
         assert_eq!(
             correct.value.result.as_ref().map(|result| result.score),
-            Some(1_000)
+            Some(997)
         );
 
         let duplicate = repository
@@ -1411,10 +1455,11 @@ mod tests {
                 &session_id,
                 &SongGuessCommandRequest {
                     request_id: "guess-again".to_owned(),
-                    expected_version: 3,
+                    expected_version: 4,
                     command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
                     command: SongGuessIntent::Guess {
                         text: "blue moon".to_owned(),
+                        round_id: None,
                     },
                 },
                 300,
@@ -1433,10 +1478,11 @@ mod tests {
                 &session_id,
                 &SongGuessCommandRequest {
                     request_id: "stale".to_owned(),
-                    expected_version: 2,
+                    expected_version: 3,
                     command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
                     command: SongGuessIntent::Guess {
                         text: "blue moon".to_owned(),
+                        round_id: None,
                     },
                 },
                 300,
@@ -1445,7 +1491,7 @@ mod tests {
             .unwrap_err();
         assert!(matches!(
             stale,
-            RepositoryError::SongGuessVersionConflict { current } if current.version == 4
+            RepositoryError::SongGuessVersionConflict { current } if current.version == 5
         ));
     }
 
@@ -1454,11 +1500,17 @@ mod tests {
         let (repository, session_id) = setup_song_guess().await;
         for (version, command, id) in [
             (0, SongGuessIntent::OpenLobby, "open"),
-            (1, SongGuessIntent::Start, "start"),
+            (1, SongGuessIntent::Join, "join"),
+            (2, SongGuessIntent::Start, "start"),
         ] {
+            let actor = if matches!(&command, SongGuessIntent::Join) {
+                participant("first")
+            } else {
+                host()
+            };
             repository
                 .execute_song_guess_command(
-                    &host(),
+                    &actor,
                     &session_id,
                     &SongGuessCommandRequest {
                         request_id: id.to_owned(),
@@ -1473,10 +1525,11 @@ mod tests {
         }
         let first = SongGuessCommandRequest {
             request_id: "concurrent-a".to_owned(),
-            expected_version: 2,
+            expected_version: 3,
             command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
             command: SongGuessIntent::Guess {
                 text: "blue moon".to_owned(),
+                round_id: None,
             },
         };
         let second = SongGuessCommandRequest {
@@ -1493,15 +1546,69 @@ mod tests {
             .filter_map(Result::ok)
             .collect::<Vec<_>>();
         assert_eq!(successes.len(), 1);
-        assert_eq!(successes[0].value.result.as_ref().unwrap().score, 1_000);
+        assert_eq!(successes[0].value.result.as_ref().unwrap().score, 997);
         assert_eq!(
             repository
                 .get_song_guess_session(&session_id)
                 .await
                 .unwrap()
                 .version,
-            3
+            4
         );
+    }
+
+    #[tokio::test]
+    async fn concurrent_song_guess_joins_accept_one_lobby_version_and_keep_both_entries() {
+        let (repository, session_id) = setup_song_guess().await;
+        repository
+            .execute_song_guess_command(
+                &host(),
+                &session_id,
+                &SongGuessCommandRequest {
+                    request_id: "open-join-race".to_owned(),
+                    expected_version: 0,
+                    command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
+                    command: SongGuessIntent::OpenLobby,
+                },
+                200,
+            )
+            .await
+            .unwrap();
+        let first = SongGuessCommandRequest {
+            request_id: "join-first-race".to_owned(),
+            expected_version: 1,
+            command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
+            command: SongGuessIntent::Join,
+        };
+        let second = SongGuessCommandRequest {
+            request_id: "join-second-race".to_owned(),
+            ..first.clone()
+        };
+        let first_actor = participant("first");
+        let second_actor = participant("second");
+        let (left, right) = tokio::join!(
+            repository.execute_song_guess_command(&first_actor, &session_id, &first, 300),
+            repository.execute_song_guess_command(&second_actor, &session_id, &second, 300),
+        );
+        assert!(left.is_ok());
+        assert!(right.is_ok());
+        let replay = repository
+            .execute_song_guess_command(&first_actor, &session_id, &first, 400)
+            .await
+            .unwrap();
+        assert!(replay.replayed);
+        let session = repository
+            .get_song_guess_session(&session_id)
+            .await
+            .unwrap();
+        assert!(
+            session
+                .state
+                .participants
+                .iter()
+                .all(|participant| participant.joined)
+        );
+        assert_eq!(session.version, 3);
     }
 
     #[tokio::test]

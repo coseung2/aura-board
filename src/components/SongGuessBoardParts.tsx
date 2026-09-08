@@ -1,6 +1,7 @@
 "use client";
 import type { ChangeEvent, Dispatch, SetStateAction } from "react";
 import { maxSongGuessStartSeconds, SONG_GUESS_MAX_SOURCE_SIZE_BYTES } from "@/lib/song-guess/audio";
+import { SONG_GUESS_HIGHLIGHT_MS } from "@/lib/song-guess/contracts";
 import styles from "./SongGuessBoard.module.css";
 import type { RoundDraft } from "./song-guess-board-model";
 import { moveRound, revokeGenerated, updateDraft } from "./song-guess-board-utils";
@@ -17,12 +18,9 @@ export function BoardHeading({
   return (
     <header className={styles.header}>
       <div>
-        <p className={styles.eyebrow}>Authoritative song guess</p>
         <h1>{title || "초단위 음악 퀴즈"}</h1>
       </div>
-      <span className={styles.version}>
-        {version === null ? "설정" : `v${version}`} · {syncing ? "동기화 중" : "동기화됨"}
-      </span>
+      {syncing && <span className={styles.version}>불러오는 중</span>}
     </header>
   );
 }
@@ -124,7 +122,7 @@ export function SongGuessRoundEditor({ draft, index, draftCount, busy, decodingR
                     />
                   </label>
                   <p className={styles.helperText}>
-                    최대 {Math.round(SONG_GUESS_MAX_SOURCE_SIZE_BYTES / 1024 / 1024)}MB. 원본 파일명과 원본 바이트는 서버 요청에 포함되지 않습니다.
+                    최대 {Math.round(SONG_GUESS_MAX_SOURCE_SIZE_BYTES / 1024 / 1024)}MB
                   </p>
 
                   {draft.sourceBuffer && (
@@ -139,7 +137,7 @@ export function SongGuessRoundEditor({ draft, index, draftCount, busy, decodingR
                           <input
                             type="range"
                             min={0}
-                            max={maxSongGuessStartSeconds(draft.sourceBuffer)}
+                            max={maxSongGuessStartSeconds(draft.sourceBuffer, SONG_GUESS_HIGHLIGHT_MS)}
                             step={0.01}
                             value={draft.startSeconds}
                             onChange={(event) => {
@@ -154,7 +152,7 @@ export function SongGuessRoundEditor({ draft, index, draftCount, busy, decodingR
                             className={styles.numberInput}
                             type="number"
                             min={0}
-                            max={maxSongGuessStartSeconds(draft.sourceBuffer)}
+                            max={maxSongGuessStartSeconds(draft.sourceBuffer, SONG_GUESS_HIGHLIGHT_MS)}
                             step={0.01}
                             value={draft.startSeconds}
                             onChange={(event) => {
@@ -171,10 +169,10 @@ export function SongGuessRoundEditor({ draft, index, draftCount, busy, decodingR
                       </label>
                       <div className={styles.inlineActions}>
                         <button type="button" className={styles.secondaryButton} onClick={() => void onPreviewSource(draft)}>
-                          선택 구간 1.5초 듣기
+                          선택 구간 15초 듣기
                         </button>
                         <button type="button" className={styles.primaryButton} onClick={() => onGenerateClips(draft.clientId)}>
-                          3개 파생 클립 만들기
+                          하이라이트 만들기
                         </button>
                       </div>
                     </div>

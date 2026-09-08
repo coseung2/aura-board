@@ -18,6 +18,8 @@ import {
   isSongGuessSnapshot,
   normalizeSongGuessSetup,
   SONG_GUESS_CLIP_TIERS_MS,
+  SONG_GUESS_LEGACY_CLIP_TIERS_MS,
+  SONG_GUESS_HIGHLIGHT_MS,
   validateSongGuessClipMetadata,
   validateSongGuessWavBytes,
   type SongGuessClipMetadata,
@@ -28,6 +30,7 @@ import {
   type SongGuessTeacherSetup,
   type UploadedSongGuessClip,
 } from "./contracts";
+import { enrichSongGuessSnapshot } from "./participant-identity";
 
 export type {
   SongGuessTeacherClip,
@@ -41,6 +44,9 @@ type StoredSongGuessClip = {
   mimeType: string;
   sizeBytes: number;
   durationMs: number;
+  objectKey?: string;
+  youtubeVideoId?: string | null;
+  playbackStartMs?: number | null;
 };
 
 export async function saveSongGuessSetup(
@@ -206,7 +212,7 @@ export async function storeSongGuessClip(
   }
   if (
     metadata.mimeType === "audio/wav" &&
-    validateSongGuessWavBytes(body, metadata.tierMs as 500 | 1000 | 1500)
+    validateSongGuessWavBytes(body, metadata.tierMs as SongGuessClipTierMs)
   ) {
     throw new PlayAccessError(400, "invalid_wav_clip");
   }
@@ -221,6 +227,8 @@ export async function storeSongGuessClip(
         sizeBytes: metadata.sizeBytes,
         durationMs: metadata.durationMs,
         objectKey,
+        youtubeVideoId: null,
+        playbackStartMs: null,
       },
     });
     return serializeTeacherClip(asset);
@@ -239,17 +247,21 @@ export async function deleteUploadedSongGuessClip(
   const deleted = await db.$transaction(async (tx) => {
     const asset = await tx.songGuessAsset.findFirst({
       where: { id: assetId, boardId },
-      select: { id: true, roundId: true, objectKey: true },
+      select: { id: true, roundId: true, objectKey: true, mimeType: true },
     });
     if (!asset) return null;
     if (asset.roundId) throw new PlayAccessError(409, "song_guess_clip_assigned");
     const result = await tx.songGuessAsset.deleteMany({
       where: { id: asset.id, boardId, roundId: null },
     });
-    return result.count === 1 ? asset.objectKey : null;
+    return result.count === 1
+      ? { objectKey: asset.objectKey, mimeType: asset.mimeType }
+      : null;
   });
   if (!deleted) return false;
-  await deletePrivateObject(deleted).catch(() => undefined);
+  if (deleted.mimeType !== "video/youtube") {
+    await deletePrivateObject(deleted.objectKey).catch(() => undefined);
+  }
   return true;
 }
 
@@ -305,6 +317,47 @@ export async function buildSongGuessCreateRequest(
   };
 }
 
+/**
+ * Enrich a play-engine snapshot (or command response snapshot) before it
+ * crosses the web API boundary. Pet data is display-only and is looked up from
+ * the board's classroom, so the Rust scoring state remains authoritative.
+ */
+export async function enrichSongGuessPlayEngineResponse(
+  response: Response,
+): Promise<Response> {
+  const raw = await response.text();
+  let payload: unknown = null;
+  try {
+    payload = JSON.parse(raw) as unknown;
+  } catch {
+    return replaySongGuessResponse(response, raw);
+  }
+
+  const snapshot =
+    isSongGuessSnapshot(payload) ? payload :
+    isRecord(payload) && isSongGuessSnapshot(payload.snapshot) ? payload.snapshot :
+    null;
+  if (!snapshot) return replaySongGuessResponse(response, raw);
+
+  const enriched = await enrichSongGuessSnapshot(snapshot).catch(() => snapshot);
+  const nextPayload = isSongGuessSnapshot(payload)
+    ? enriched
+    : { ...(payload as Record<string, unknown>), snapshot: enriched };
+  return replaySongGuessResponse(response, JSON.stringify(nextPayload));
+}
+
+function replaySongGuessResponse(response: Response, body: string): Response {
+  const headers = new Headers(response.headers);
+  headers.set("content-type", headers.get("content-type") ?? "application/json");
+  headers.set("cache-control", "private, no-store, max-age=0");
+  headers.delete("content-length");
+  return new Response(body, { status: response.status, headers });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === "object";
+}
+
 export async function loadSongGuessClipResponse(
   sessionId: string,
   assetId: string,
@@ -314,6 +367,9 @@ export async function loadSongGuessClipResponse(
     include: { round: { select: { id: true, gameId: true } } },
   });
   if (!asset?.round) throw new PlayAccessError(404, "song_guess_clip_not_found");
+  if (asset.mimeType === "video/youtube") {
+    throw new PlayAccessError(409, "song_guess_audio_clip_missing");
+  }
   const { actor } = await resolveSongGuessActorForBoard(asset.boardId);
   const upstream = await playEngineFetch(
     `/v1/song-guess/sessions/${encodeURIComponent(sessionId)}/snapshot`,
@@ -358,7 +414,7 @@ function validateSetupAssets(
   assets: ReadonlyArray<StoredSongGuessClip>,
 ): void {
   const requestedIds = rounds.flatMap((round) => round.clipAssetIds);
-  if (rounds.length < 1 || requestedIds.length !== rounds.length * 3) {
+  if (rounds.length < 1 || rounds.some((round) => ![1, 3].includes(round.clipAssetIds.length))) {
     throw new PlayAccessError(400, "three_clips_required");
   }
   const ids = new Set(requestedIds);
@@ -371,7 +427,11 @@ function validateSetupAssets(
     if (roundAssets.some((asset) => !asset)) {
       throw new PlayAccessError(400, "invalid_clip_assets");
     }
-    for (const tierMs of SONG_GUESS_CLIP_TIERS_MS) {
+    if (roundAssets.some((asset) => asset?.mimeType === "video/youtube")) {
+      throw new PlayAccessError(409, "song_guess_audio_clip_missing");
+    }
+    const expectedTiers = roundAssets.length === 1 ? [SONG_GUESS_HIGHLIGHT_MS] : SONG_GUESS_LEGACY_CLIP_TIERS_MS;
+    for (const tierMs of expectedTiers) {
       const tierAssets = roundAssets.filter((asset) => asset?.tierMs === tierMs);
       if (tierAssets.length !== 1) throw new PlayAccessError(400, "invalid_clip_tiers");
       const metadataError = validateSongGuessClipMetadata(tierAssets[0]!);

@@ -19,7 +19,8 @@ by this repository slice.
   Postgres repository.
 - `contracts/authoritative-omok-v1.schema.json`: shared v1 JSON command and
   snapshot contract used by Rust, Next.js, web, and Expo.
-- `contracts/authoritative-song-guess-v1.schema.json`: redacted v1 snapshot
+- `contracts/authoritative-song-guess-v1.schema.json`: redacted legacy v1 snapshot
+- `contracts/authoritative-song-guess-v2.schema.json`: redacted server-timed v2 snapshot
   contract. It intentionally contains no answer, alias, original, future clip,
   or storage object-key fields.
 
@@ -27,8 +28,9 @@ The first product path is 15x15 freestyle Omok. Five or more contiguous stones
 wins. Shadow Alliance remains a hardened domain engine but is not exposed by
 this server yet. Song-guess uses a separate `song-guess` session projection;
 its current phase is `draft -> lobby -> guessing -> reveal -> finished` and
-its only public clip projection is the currently unlocked 500/1000/1500 ms
-derivative.
+its only public clip projection is the currently unlocked derivative: legacy
+500/1000/1500 ms packs remain readable, while new catalog rounds use a 15,000
+ms highlight clip and server-authoritative 30-second answer window.
 
 ## Authority and lifecycle
 

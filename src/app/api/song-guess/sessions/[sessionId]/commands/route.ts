@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { resolvePlayActor } from "@/lib/play-platform/actor";
-import { playEngineFetch, proxyPlayEngineResponse } from "@/lib/play-platform/server-client";
+import { playEngineFetch } from "@/lib/play-platform/server-client";
 import { playRouteError } from "@/lib/play-platform/route-utils";
 import { SONG_GUESS_COMMAND_SCHEMA_VERSION } from "@/lib/song-guess/contracts";
+import { enrichSongGuessPlayEngineResponse } from "@/lib/song-guess/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -12,9 +13,10 @@ type Params = { params: Promise<{ sessionId: string }> };
 const RequestIdSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9._-]+$/);
 const CommandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("open_lobby") }),
+  z.object({ type: z.literal("join") }),
   z.object({ type: z.literal("start") }),
   z.object({ type: z.literal("unlock_clip") }),
-  z.object({ type: z.literal("guess"), text: z.string().max(200) }),
+  z.object({ type: z.literal("guess"), text: z.string().max(200), roundId: z.string().min(1).max(128).optional() }),
   z.object({ type: z.literal("reveal") }),
   z.object({ type: z.literal("next_round") }),
   z.object({ type: z.literal("finish") }),
@@ -38,7 +40,7 @@ export async function POST(request: Request, { params }: Params) {
       `/v1/song-guess/sessions/${encodeURIComponent(sessionId)}/commands`,
       { actor, method: "POST", body: parsed.data },
     );
-    return proxyPlayEngineResponse(response);
+    return enrichSongGuessPlayEngineResponse(response);
   } catch (error) {
     return playRouteError(error);
   }

@@ -25,4 +25,8 @@ pub enum DomainError {
     NotEnoughParticipants,
     #[error("the participant has already submitted and editing is disabled")]
     SubmissionLocked,
+    #[error("the participant has not joined the lobby")]
+    NotJoined,
+    #[error("at least one participant must join before starting")]
+    ParticipantsNotReady,
 }

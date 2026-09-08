@@ -158,7 +158,7 @@ export function makeSongGuessCommand(
     requestId: createPlayRequestId(`song_guess_${command.type}`),
     expectedVersion: snapshot.version,
     commandSchemaVersion: SONG_GUESS_COMMAND_SCHEMA_VERSION,
-    command,
+    command: command.type === "guess" ? { ...command, roundId: snapshot.currentRound.roundId } : command,
   };
 }
 
@@ -189,7 +189,7 @@ function isUploadedSongGuessClip(value: unknown): value is UploadedSongGuessClip
     isRecord(value) &&
     typeof value.id === "string" &&
     !!value.id &&
-    [500, 1000, 1500].includes(Number(value.tierMs)) &&
+    [500, 1000, 1500, 15000].includes(Number(value.tierMs)) &&
     ["audio/wav", "audio/mp4", "audio/webm", "audio/ogg"].includes(String(value.mimeType)) &&
     Number.isSafeInteger(value.sizeBytes) &&
     Number(value.sizeBytes) > 0 &&

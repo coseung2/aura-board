@@ -1,5 +1,6 @@
 import {
-  SONG_GUESS_CLIP_TIERS_MS,
+  SONG_GUESS_LEGACY_CLIP_TIERS_MS,
+  SONG_GUESS_HIGHLIGHT_MS,
   type SongGuessClipTierMs,
   type SongGuessRoundSetupInput,
   type SongGuessSetupInput,
@@ -15,7 +16,7 @@ export type SongGuessRoundSaveDraft = {
   aliasesText: string;
   accessibilityClue: string;
   rightsConfirmed: boolean;
-  existingClipAssetIds: [string, string, string] | null;
+  existingClipAssetIds: string[] | null;
   generatedClips: readonly SongGuessGeneratedClipUpload[] | null;
   sourceSelected: boolean;
 };
@@ -54,11 +55,14 @@ export function validateSongGuessRoundSaveDraft(
   if (draft.sourceSelected && !draft.generatedClips) return "clips_not_generated";
   if (draft.generatedClips) {
     if (!draft.rightsConfirmed) return "rights_confirmation_required";
+    const expectedTiers = draft.generatedClips.length === 1
+      ? [SONG_GUESS_HIGHLIGHT_MS]
+      : SONG_GUESS_LEGACY_CLIP_TIERS_MS;
     if (
-      draft.generatedClips.length !== SONG_GUESS_CLIP_TIERS_MS.length ||
+      draft.generatedClips.length !== expectedTiers.length ||
       draft.generatedClips.some(
         (clip, index) =>
-          clip.tierMs !== SONG_GUESS_CLIP_TIERS_MS[index] ||
+          clip.tierMs !== expectedTiers[index] ||
           clip.blob.type !== "audio/wav" ||
           clip.blob.size < 45,
       )
@@ -98,7 +102,7 @@ export async function persistSongGuessRoundPack<TSetup>(
           uploadedAssetIds.push(uploaded.id);
           nextIds.push(uploaded.id);
         }
-        clipAssetIds = nextIds as [string, string, string];
+        clipAssetIds = nextIds;
       }
       if (!clipAssetIds) throw new Error("three_clips_required");
       rounds.push({

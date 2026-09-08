@@ -1,0 +1,52 @@
+.board { min-width: 0; }
+.heading { display: flex; gap: 12px; align-items: center; margin: 0 0 20px; }
+.list { list-style: none; margin: 0; padding: 0; }
+.row { display: flex; align-items: center; gap: 8px; min-height: 72px; border-bottom: 1px solid var(--color-border); }
+.row:last-child { border-bottom: 0; }
+.rank { flex-shrink: 0; min-width: 20px; color: var(--color-text-muted); font-weight: 700; font-variant-numeric: tabular-nums; }
+.row[data-leading="true"] .rank { color: var(--color-accent-tinted-text); }
+.pet { display: flex; width: 64px; height: 64px; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; color: var(--color-text-faint); }
+.pet > div { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
+.name { min-width: 0; flex: 1; overflow-wrap: anywhere; line-height: 1.4; font-size: 14px; font-weight: 600; }
+.score { white-space: nowrap; font-size: 14px; font-variant-numeric: tabular-nums; }
+.podium { display: flex; justify-content: center; align-items: flex-end; gap: 12px; list-style: none; margin: 48px auto 32px; padding: 0; max-width: 640px; }
+.podiumPlace { display: flex; flex-direction: column; align-items: center; width: 30%; min-width: 0; gap: 8px; animation: arrive 420ms ease both; }
+.podiumPlace[data-place="1"] { order: 2; animation-delay: 700ms; }
+.podiumPlace[data-place="2"] { order: 1; animation-delay: 350ms; }
+.podiumPlace[data-place="3"] { order: 3; }
+.podiumPlace .pet { width: 96px; height: 96px; max-width: 100%; }
+.podiumPlace .pet > div { transform: scale(1.5); }
+.podiumName { max-width: 100%; font-size: 16px; text-align: center; overflow-wrap: anywhere; }
+.podiumScore { font-size: 13px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
+.pedestal { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 12px; width: 100%; min-height: 90px; margin-top: 8px; padding: 20px 8px; border-radius: var(--radius-card) var(--radius-card) 0 0; background: var(--color-surface-alt); color: var(--color-text); }
+.pedestal strong { font-size: 26px; }
+.pedestal[data-rank="1"] { min-height: 170px; background: var(--color-learning-sun); }
+.pedestal[data-rank="2"] { min-height: 130px; background: var(--color-learning-lavender); }
+.pedestal[data-rank="3"] { background: var(--color-learning-coral); }
+.listHeading { margin: 32px 0 12px; }
+.empty { color: var(--color-text-muted); }
+.board[data-round-results="true"] .row { min-height: 88px; animation: arrive 320ms ease both; }
+.board[data-round-results="true"] .row:nth-child(2) { animation-delay: 80ms; }
+.board[data-round-results="true"] .row:nth-child(3) { animation-delay: 160ms; }
+.board[data-round-results="true"] .row:nth-child(4) { animation-delay: 240ms; }
+.board[data-round-results="true"] .row:nth-child(5) { animation-delay: 320ms; }
+.board[data-round-results="true"] .name { font-size: 16px; }
+.board[data-round-results="true"] .rank { width: 32px; font-size: 20px; }
+.roundGain { min-width: 52px; text-align: right; color: var(--color-status-reviewed-text); font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.movement { width: 42px; display: flex; align-items: center; justify-content: flex-end; gap: 2px; flex-shrink: 0; font-size: 12px; color: var(--color-status-reviewed-text); }
+.movement[data-direction="down"] { color: var(--color-text-muted); }
+.allRanks { margin-top: 20px; }
+.allRanks summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; color: var(--color-text-muted); font-size: 13px; }
+.srOnly { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+@keyframes arrive { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 560px) {
+  .podium { gap: 8px; margin-top: 32px; } .podiumName { font-size: 14px; }
+  .board[data-round-results="true"] .row { gap: 4px; }
+  .board[data-round-results="true"] .rank { width: 20px; font-size: 16px; }
+  .board[data-round-results="true"] .name { font-size: 14px; }
+  .board[data-round-results="true"] .pet { width: 48px; }
+  .board[data-round-results="true"] .pet > div { transform: scale(0.75); }
+  .roundGain { min-width: 40px; font-size: 12px; }
+  .movement { width: 28px; }
+}
+@media (prefers-reduced-motion: reduce) { .podiumPlace, .board[data-round-results="true"] .row { animation: none; } }

@@ -2,6 +2,9 @@ use std::collections::HashSet;
 
 use play_domain::omok::{OmokPosition, OmokSide, OmokState, OmokStatus};
 use play_domain::song_guess::{
+    SONG_GUESS_LEGACY_RULES_VERSION, SONG_GUESS_LEGACY_STATE_SCHEMA_VERSION,
+    SONG_GUESS_RULES_VERSION as DOMAIN_SONG_GUESS_RULES_VERSION,
+    SONG_GUESS_STATE_SCHEMA_VERSION as DOMAIN_SONG_GUESS_STATE_SCHEMA_VERSION,
     SongGuessGuessResult, SongGuessParticipantSeed, SongGuessPhase, SongGuessRoundSeed,
     SongGuessState,
 };
@@ -11,8 +14,8 @@ use thiserror::Error;
 pub const OMOK_RULES_VERSION: u16 = 1;
 pub const SESSION_STATE_SCHEMA_VERSION: u16 = 1;
 pub const COMMAND_SCHEMA_VERSION: u16 = 1;
-pub const SONG_GUESS_RULES_VERSION: u16 = 1;
-pub const SONG_GUESS_STATE_SCHEMA_VERSION: u16 = 1;
+pub const SONG_GUESS_RULES_VERSION: u16 = DOMAIN_SONG_GUESS_RULES_VERSION;
+pub const SONG_GUESS_STATE_SCHEMA_VERSION: u16 = DOMAIN_SONG_GUESS_STATE_SCHEMA_VERSION;
 pub const MAX_SAFE_VERSION: u64 = 9_007_199_254_740_991;
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -244,6 +247,12 @@ pub struct SongGuessParticipantSnapshot {
     pub display_name: String,
     pub score: u32,
     pub scored_current_round: bool,
+    #[serde(default)]
+    pub joined: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub round_score: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous_rank: Option<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -254,6 +263,12 @@ pub struct SongGuessRoundSnapshot {
     pub accessibility_clue: Option<String>,
     pub revealed_answer: Option<String>,
     pub current_clip: Option<SongGuessClipSnapshot>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub started_at_ms: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub deadline_at_ms: Option<i64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_score: Option<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -261,6 +276,10 @@ pub struct SongGuessRoundSnapshot {
 pub struct SongGuessViewer {
     pub role: ActorRole,
     pub scored_current_round: bool,
+    #[serde(default)]
+    pub joined: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub participant_index: Option<u32>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -284,9 +303,14 @@ pub struct SongGuessSnapshot {
 #[serde(rename_all = "snake_case", tag = "type")]
 pub enum SongGuessIntent {
     OpenLobby,
+    Join,
     Start,
     UnlockClip,
-    Guess { text: String },
+    Guess {
+        text: String,
+        #[serde(default)]
+        round_id: Option<String>,
+    },
     Reveal,
     NextRound,
     Finish,
@@ -703,8 +727,14 @@ impl SongGuessSessionRecord {
             || self.board_id.is_empty()
             || self.host_subject.is_empty()
             || self.version > MAX_SAFE_VERSION
-            || self.rules_version != SONG_GUESS_RULES_VERSION
-            || self.state_schema_version != SONG_GUESS_STATE_SCHEMA_VERSION
+            || !matches!(
+                (self.rules_version, self.state_schema_version),
+                (SONG_GUESS_RULES_VERSION, SONG_GUESS_STATE_SCHEMA_VERSION)
+                    | (
+                        SONG_GUESS_LEGACY_RULES_VERSION,
+                        SONG_GUESS_LEGACY_STATE_SCHEMA_VERSION
+                    )
+            )
             || self
                 .state
                 .participants
@@ -752,6 +782,17 @@ impl SongGuessSessionRecord {
                 .correct_participants
                 .iter()
                 .any(|subject| subject == &actor.subject);
+        let viewer_index = self
+            .state
+            .participants
+            .iter()
+            .position(|participant| participant.actor_subject == actor.subject)
+            .and_then(|index| u32::try_from(index).ok());
+        let viewer_joined = is_host
+            || viewer_index
+                .and_then(|index| self.state.participants.get(index as usize))
+                .is_some_and(|participant| participant.joined);
+        let has_v2_round_metrics = self.rules_version == SONG_GUESS_RULES_VERSION;
         let current_clip = if self.state.phase == SongGuessPhase::Guessing {
             round
                 .clips
@@ -796,6 +837,10 @@ impl SongGuessSessionRecord {
                 accessibility_clue,
                 revealed_answer: round_is_revealed.then(|| round.representative_answer.clone()),
                 current_clip,
+                started_at_ms: round.started_at_ms,
+                deadline_at_ms: round.deadline_at_ms,
+                max_score: (self.rules_version == SONG_GUESS_RULES_VERSION)
+                    .then_some(round.max_score),
             },
             participants: self
                 .state
@@ -804,6 +849,47 @@ impl SongGuessSessionRecord {
                 .map(|participant| SongGuessParticipantSnapshot {
                     display_name: participant.display_name.clone(),
                     score: participant.score,
+                    joined: participant.joined,
+                    round_score: has_v2_round_metrics.then(|| {
+                        round
+                            .round_scores
+                            .iter()
+                            .find(|entry| entry.actor_subject == participant.actor_subject)
+                            .map(|entry| entry.score)
+                            .unwrap_or(0)
+                    }),
+                    previous_rank: if has_v2_round_metrics && participant.joined {
+                        Some({
+                            let round_score = round
+                                .round_scores
+                                .iter()
+                                .find(|entry| entry.actor_subject == participant.actor_subject)
+                                .map(|entry| entry.score)
+                                .unwrap_or(0);
+                            let previous_score = participant.score.saturating_sub(round_score);
+                            1 + self
+                                .state
+                                .participants
+                                .iter()
+                                .filter(|candidate| {
+                                    candidate.joined && {
+                                        let candidate_round_score = round
+                                            .round_scores
+                                            .iter()
+                                            .find(|entry| {
+                                                entry.actor_subject == candidate.actor_subject
+                                            })
+                                            .map(|entry| entry.score)
+                                            .unwrap_or(0);
+                                        candidate.score.saturating_sub(candidate_round_score)
+                                            > previous_score
+                                    }
+                                })
+                                .count() as u32
+                        })
+                    } else {
+                        None
+                    },
                     scored_current_round: round
                         .correct_participants
                         .iter()
@@ -813,6 +899,8 @@ impl SongGuessSessionRecord {
             viewer: SongGuessViewer {
                 role: actor.role,
                 scored_current_round,
+                joined: viewer_joined,
+                participant_index: viewer_index,
             },
         })
     }
@@ -821,6 +909,15 @@ impl SongGuessSessionRecord {
         &mut self,
         actor: &ActorContext,
         intent: &SongGuessIntent,
+    ) -> Result<Option<SongGuessGuessResult>, ModelError> {
+        self.apply_at(actor, intent, self.created_at_ms)
+    }
+
+    pub fn apply_at(
+        &mut self,
+        actor: &ActorContext,
+        intent: &SongGuessIntent,
+        now_ms: i64,
     ) -> Result<Option<SongGuessGuessResult>, ModelError> {
         self.validate()?;
         let is_host = self.authorize(actor)?;
@@ -832,11 +929,23 @@ impl SongGuessSessionRecord {
                     .map_err(|error| ModelError::DomainRejected(error.to_string()))?;
                 None
             }
+            SongGuessIntent::Join => {
+                if is_host {
+                    return Err(ModelError::Forbidden);
+                }
+                self.state
+                    .join(&actor.subject)
+                    .map_err(|error| ModelError::DomainRejected(error.to_string()))?;
+                None
+            }
             SongGuessIntent::Start => {
                 require_host(is_host)?;
-                self.state
-                    .start()
-                    .map_err(|error| ModelError::DomainRejected(error.to_string()))?;
+                let transition = if self.rules_version == SONG_GUESS_RULES_VERSION {
+                    self.state.start_at(now_ms)
+                } else {
+                    self.state.start()
+                };
+                transition.map_err(|error| ModelError::DomainRejected(error.to_string()))?;
                 None
             }
             SongGuessIntent::UnlockClip => {
@@ -846,13 +955,22 @@ impl SongGuessSessionRecord {
                     .map_err(|error| ModelError::DomainRejected(error.to_string()))?;
                 None
             }
-            SongGuessIntent::Guess { text } => {
+            SongGuessIntent::Guess { text, round_id } => {
                 if is_host {
                     return Err(ModelError::Forbidden);
                 }
+                if let Some(round_id) = round_id {
+                    let current_round = self
+                        .state
+                        .current_round()
+                        .map_err(|error| ModelError::DomainRejected(error.to_string()))?;
+                    if round_id != &current_round.round_id {
+                        return Err(ModelError::InvalidPhase);
+                    }
+                }
                 Some(
                     self.state
-                        .guess(&actor.subject, text)
+                        .guess_at(&actor.subject, text, now_ms)
                         .map_err(|error| ModelError::DomainRejected(error.to_string()))?,
                 )
             }
@@ -865,9 +983,12 @@ impl SongGuessSessionRecord {
             }
             SongGuessIntent::NextRound => {
                 require_host(is_host)?;
-                self.state
-                    .next_round()
-                    .map_err(|error| ModelError::DomainRejected(error.to_string()))?;
+                let transition = if self.rules_version == SONG_GUESS_RULES_VERSION {
+                    self.state.next_round_at(now_ms)
+                } else {
+                    self.state.next_round()
+                };
+                transition.map_err(|error| ModelError::DomainRejected(error.to_string()))?;
                 None
             }
             SongGuessIntent::Finish => {
@@ -906,6 +1027,8 @@ pub fn validate_request_id(value: &str) -> Result<(), ModelError> {
 
 #[cfg(test)]
 mod tests {
+    use play_domain::song_guess::SongGuessClip;
+
     use super::*;
 
     fn seed(id: &str) -> ParticipantSeed {
@@ -996,5 +1119,99 @@ mod tests {
             .unwrap();
         assert_eq!(first.actor_subject, "student:second");
         assert_eq!(rematch.state.room_status, RoomStatus::Waiting);
+    }
+
+    #[test]
+    fn song_guess_snapshot_reports_authoritative_round_points_and_previous_rank() {
+        let round = |round_id: &str, answer: &str| SongGuessRoundSeed {
+            round_id: round_id.to_owned(),
+            representative_answer: answer.to_owned(),
+            normalized_answer: answer.to_ascii_lowercase(),
+            aliases: vec![],
+            normalized_aliases: vec![],
+            accessibility_clue: None,
+            clips: vec![
+                SongGuessClip {
+                    asset_id: format!("{round_id}-500"),
+                    tier_ms: 500,
+                    mime_type: "audio/webm".to_owned(),
+                    size_bytes: 100,
+                    duration_ms: 500,
+                },
+                SongGuessClip {
+                    asset_id: format!("{round_id}-1000"),
+                    tier_ms: 1_000,
+                    mime_type: "audio/webm".to_owned(),
+                    size_bytes: 100,
+                    duration_ms: 1_000,
+                },
+                SongGuessClip {
+                    asset_id: format!("{round_id}-1500"),
+                    tier_ms: 1_500,
+                    mime_type: "audio/webm".to_owned(),
+                    size_bytes: 100,
+                    duration_ms: 1_500,
+                },
+            ],
+        };
+        let mut session = SongGuessSessionRecord::new(
+            "song-1".to_owned(),
+            "board-1".to_owned(),
+            host().subject,
+            vec![
+                SongGuessParticipantSeed {
+                    actor_subject: "student:one".to_owned(),
+                    display_name: "One".to_owned(),
+                },
+                SongGuessParticipantSeed {
+                    actor_subject: "student:two".to_owned(),
+                    display_name: "Two".to_owned(),
+                },
+            ],
+            vec![round("round-1", "Blue Moon"), round("round-2", "Red Sun")],
+            None,
+            0,
+        )
+        .unwrap();
+        session.apply(&host(), &SongGuessIntent::OpenLobby).unwrap();
+        session
+            .apply(&actor("one"), &SongGuessIntent::Join)
+            .unwrap();
+        session
+            .apply(&actor("two"), &SongGuessIntent::Join)
+            .unwrap();
+        session
+            .apply_at(&host(), &SongGuessIntent::Start, 1_000)
+            .unwrap();
+        session
+            .apply_at(
+                &actor("one"),
+                &SongGuessIntent::Guess {
+                    text: "blue moon".to_owned(),
+                    round_id: None,
+                },
+                1_000,
+            )
+            .unwrap();
+        session.apply(&host(), &SongGuessIntent::Reveal).unwrap();
+        session
+            .apply_at(&host(), &SongGuessIntent::NextRound, 2_000)
+            .unwrap();
+        session
+            .apply_at(
+                &actor("two"),
+                &SongGuessIntent::Guess {
+                    text: "red sun".to_owned(),
+                    round_id: None,
+                },
+                2_000,
+            )
+            .unwrap();
+
+        let snapshot = session.snapshot(&host(), 2_100).unwrap();
+        assert_eq!(snapshot.participants[0].round_score, Some(0));
+        assert_eq!(snapshot.participants[1].round_score, Some(1_000));
+        assert_eq!(snapshot.participants[0].previous_rank, Some(1));
+        assert_eq!(snapshot.participants[1].previous_rank, Some(2));
     }
 }

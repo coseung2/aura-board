@@ -1,5 +1,7 @@
 import {
   SONG_GUESS_CLIP_TIERS_MS,
+  SONG_GUESS_LEGACY_CLIP_TIERS_MS,
+  SONG_GUESS_HIGHLIGHT_MS,
   type SongGuessClipTierMs,
 } from "./contracts";
 
@@ -59,8 +61,8 @@ export function validateSongGuessDecodedAudio(
   return null;
 }
 
-export function maxSongGuessStartSeconds(audio: SongGuessAudioBufferLike): number {
-  const requiredFrames = Math.ceil(audio.sampleRate * 1.5);
+export function maxSongGuessStartSeconds(audio: SongGuessAudioBufferLike, durationMs = 1500): number {
+  const requiredFrames = Math.ceil(audio.sampleRate * durationMs / 1000);
   const availableStartFrames = Math.max(0, audio.length - requiredFrames);
   return availableStartFrames / audio.sampleRate;
 }
@@ -85,7 +87,7 @@ export function createSongGuessWavClips(
   const startError = validateSongGuessStartSeconds(audio, startSeconds);
   if (startError) throw new Error(startError);
 
-  return SONG_GUESS_CLIP_TIERS_MS.map((tierMs) => {
+  return SONG_GUESS_LEGACY_CLIP_TIERS_MS.map((tierMs) => {
     const pcm = renderMonoPcm(audio, startSeconds, tierMs);
     return {
       tierMs,
@@ -94,6 +96,24 @@ export function createSongGuessWavClips(
       bytes: encodePcm16Wav(pcm, SONG_GUESS_OUTPUT_SAMPLE_RATE),
     };
   });
+}
+
+export function createSongGuessHighlight(
+  audio: SongGuessAudioBufferLike,
+  startSeconds: number,
+): SongGuessGeneratedWav {
+  const decodedError = validateSongGuessDecodedAudio(audio);
+  if (decodedError) throw new Error(decodedError);
+  if (audio.duration < SONG_GUESS_HIGHLIGHT_MS / 1000) throw new Error("highlight_source_too_short");
+  if (!Number.isFinite(startSeconds) || startSeconds < 0 || startSeconds > maxSongGuessStartSeconds(audio, SONG_GUESS_HIGHLIGHT_MS)) {
+    throw new Error("highlight_start_too_close_to_end");
+  }
+  return {
+    tierMs: SONG_GUESS_HIGHLIGHT_MS,
+    durationMs: SONG_GUESS_HIGHLIGHT_MS,
+    mimeType: SONG_GUESS_WAV_MIME_TYPE,
+    bytes: encodePcm16Wav(renderMonoPcm(audio, startSeconds, SONG_GUESS_HIGHLIGHT_MS), SONG_GUESS_OUTPUT_SAMPLE_RATE),
+  };
 }
 
 export function renderMonoPcm(

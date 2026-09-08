@@ -1,7 +1,9 @@
 export const SONG_GUESS_COMMAND_SCHEMA_VERSION = 1 as const;
-export const SONG_GUESS_RULES_VERSION = 1 as const;
-export const SONG_GUESS_STATE_SCHEMA_VERSION = 1 as const;
-export const SONG_GUESS_CLIP_TIERS_MS = [500, 1000, 1500] as const;
+export const SONG_GUESS_RULES_VERSION = 2 as const;
+export const SONG_GUESS_STATE_SCHEMA_VERSION = 2 as const;
+export const SONG_GUESS_LEGACY_CLIP_TIERS_MS = [500, 1000, 1500] as const;
+export const SONG_GUESS_HIGHLIGHT_MS = 15000 as const;
+export const SONG_GUESS_CLIP_TIERS_MS = [500, 1000, 1500, 15000] as const;
 export const SONG_GUESS_CLIP_SCORES = [1000, 700, 400] as const;
 export const SONG_GUESS_MAX_ROUNDS = 50;
 export const SONG_GUESS_MAX_CLIP_SIZE_BYTES = 8 * 1024 * 1024;
@@ -10,6 +12,7 @@ export const SONG_GUESS_ALLOWED_MIME_TYPES = [
   "audio/mp4",
   "audio/webm",
   "audio/ogg",
+  "video/youtube",
 ] as const;
 
 export type SongGuessPhase = "draft" | "lobby" | "guessing" | "reveal" | "finished";
@@ -25,14 +28,30 @@ export type SongGuessClipSnapshot = {
   sizeBytes: number;
 };
 
+/**
+ * Display-only representative pet data attached by the web API layer.
+ *
+ * The play engine remains the authority for names and scores.  This shape is
+ * deliberately optional on snapshots so older sessions and cached payloads
+ * remain readable while the API enriches current sessions from the student's
+ * classroom-scoped pet inventory.
+ */
+export type SongGuessRepresentativePet = {
+  color: string;
+  growthStage: 1 | 2 | 3;
+  equippedItemKeys: string[];
+  hiddenItemKeys: string[];
+  equippedTitleKey: string | null;
+};
+
 export type SongGuessSnapshot = {
   sessionId: string;
   boardId: string;
   gameKind: "song-guess";
   version: number;
   serverTimeMs: number;
-  rulesVersion: typeof SONG_GUESS_RULES_VERSION;
-  stateSchemaVersion: typeof SONG_GUESS_STATE_SCHEMA_VERSION;
+  rulesVersion: 1 | typeof SONG_GUESS_RULES_VERSION;
+  stateSchemaVersion: 1 | typeof SONG_GUESS_STATE_SCHEMA_VERSION;
   previousSessionId: string | null;
   phase: SongGuessPhase;
   currentRound: {
@@ -41,23 +60,36 @@ export type SongGuessSnapshot = {
     accessibilityClue: string | null;
     revealedAnswer: string | null;
     currentClip: SongGuessClipSnapshot | null;
+    startedAtMs?: number | null;
+    deadlineAtMs?: number | null;
+    maxScore?: number;
   };
   participants: Array<{
     displayName: string;
     score: number;
     scoredCurrentRound: boolean;
+    joined?: boolean;
+    roundScore?: number;
+    previousRank?: number;
+    /** Student identity used to join display-only classroom data. */
+    participantId?: string;
+    /** Null means the student has not selected a representative pet. */
+    representativePet?: SongGuessRepresentativePet | null;
   }>;
   viewer: {
     role: SongGuessActorRole;
     scoredCurrentRound: boolean;
+    joined?: boolean;
+    participantIndex?: number;
   };
 };
 
 export type SongGuessIntent =
   | { type: "open_lobby" }
+  | { type: "join" }
   | { type: "start" }
   | { type: "unlock_clip" }
-  | { type: "guess"; text: string }
+  | { type: "guess"; text: string; roundId?: string }
   | { type: "reveal" }
   | { type: "next_round" }
   | { type: "finish" };
@@ -75,6 +107,7 @@ export type SongGuessGuessResult = {
   correct: boolean;
   alreadyScored: boolean;
   score: number;
+  timedOut?: boolean;
 };
 
 export type SongGuessCommandResponse = {
@@ -103,7 +136,7 @@ export type SongGuessRoundSetupInput = {
   representativeAnswer: string;
   aliases?: string[];
   accessibilityClue?: string | null;
-  clipAssetIds: [string, string, string];
+  clipAssetIds: string[];
 };
 
 export type SongGuessSetupInput = {
@@ -145,7 +178,7 @@ export type NormalizedSongGuessRound = {
   aliases: string[];
   normalizedAliases: string[];
   accessibilityClue: string | null;
-  clipAssetIds: [string, string, string];
+  clipAssetIds: string[];
 };
 
 export type NormalizedSongGuessSetup = {
@@ -162,7 +195,7 @@ export function normalizeSongGuessAnswer(value: string): string {
 }
 
 export function scoreForSongGuessTier(tierMs: number): number | null {
-  const index = SONG_GUESS_CLIP_TIERS_MS.indexOf(tierMs as SongGuessClipTierMs);
+  const index = SONG_GUESS_LEGACY_CLIP_TIERS_MS.indexOf(tierMs as 500 | 1000 | 1500);
   return index < 0 ? null : SONG_GUESS_CLIP_SCORES[index];
 }
 
@@ -173,10 +206,15 @@ export function isSongGuessMimeType(value: string): value is SongGuessMimeType {
 export function validateSongGuessClipMetadata(
   metadata: SongGuessClipMetadata,
 ): string | null {
-  if (!Number.isSafeInteger(metadata.tierMs) || scoreForSongGuessTier(metadata.tierMs) === null) {
+  if (!Number.isSafeInteger(metadata.tierMs) || !SONG_GUESS_CLIP_TIERS_MS.includes(metadata.tierMs as SongGuessClipTierMs)) {
     return "invalid_clip_tier";
   }
   if (!isSongGuessMimeType(metadata.mimeType)) return "invalid_clip_mime_type";
+  if (metadata.mimeType === "video/youtube") {
+    if (metadata.tierMs !== SONG_GUESS_HIGHLIGHT_MS) return "invalid_clip_tier";
+    if (metadata.sizeBytes !== 0) return "invalid_clip_size";
+    return metadata.durationMs === SONG_GUESS_HIGHLIGHT_MS ? null : "invalid_clip_duration";
+  }
   if (
     !Number.isSafeInteger(metadata.sizeBytes) ||
     metadata.sizeBytes <= 0 ||
@@ -265,9 +303,9 @@ export function normalizeSongGuessSetup(
     }
     if (
       !Array.isArray(round.clipAssetIds) ||
-      round.clipAssetIds.length !== 3 ||
+      ![1, 3].includes(round.clipAssetIds.length) ||
       round.clipAssetIds.some((id) => !/^[A-Za-z0-9._-]{1,255}$/.test(id)) ||
-      new Set(round.clipAssetIds).size !== 3 ||
+      new Set(round.clipAssetIds).size !== round.clipAssetIds.length ||
       round.clipAssetIds.some((id) => usedAssetIds.has(id))
     ) {
       throw new Error("invalid_clip_assets");
@@ -301,6 +339,9 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
     "original",
     "source",
     "sourceUrl",
+    "videoId",
+    "youtubeVideoId",
+    "playbackStartMs",
     "objectKey",
     "futureClips",
     "clips",
@@ -320,8 +361,8 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
     !Number.isSafeInteger(value.version) ||
     Number(value.version) < 0 ||
     !Number.isSafeInteger(value.serverTimeMs) ||
-    value.rulesVersion !== SONG_GUESS_RULES_VERSION ||
-    value.stateSchemaVersion !== SONG_GUESS_STATE_SCHEMA_VERSION ||
+    (value.rulesVersion !== 1 && value.rulesVersion !== SONG_GUESS_RULES_VERSION) ||
+    value.stateSchemaVersion !== value.rulesVersion ||
     !(value.previousSessionId === null || typeof value.previousSessionId === "string") ||
     !["draft", "lobby", "guessing", "reveal", "finished"].includes(String(value.phase)) ||
     !isRecord(currentRound) ||
@@ -341,12 +382,26 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
     !(currentRound.revealedAnswer === null || typeof currentRound.revealedAnswer === "string") ||
     !(currentRound.currentClip === null || isRecord(currentRound.currentClip)) ||
     (viewer.role !== "host" && viewer.role !== "participant") ||
-    typeof viewer.scoredCurrentRound !== "boolean"
+    typeof viewer.scoredCurrentRound !== "boolean" ||
+    (viewer.joined !== undefined && typeof viewer.joined !== "boolean") ||
+    (viewer.participantIndex !== undefined &&
+      (!Number.isSafeInteger(viewer.participantIndex) || Number(viewer.participantIndex) < 0))
   ) {
     return false;
   }
   if (currentRound.currentClip !== null && hasForbiddenKey(currentRound.currentClip)) {
     return false;
+  }
+  if (value.rulesVersion === 2) {
+    const { startedAtMs, deadlineAtMs, maxScore } = currentRound;
+    const waiting = value.phase === "draft" || value.phase === "lobby";
+    if (maxScore !== 1000) return false;
+    if (waiting) {
+      if (startedAtMs !== null || deadlineAtMs !== null) return false;
+    } else if (
+      !Number.isSafeInteger(startedAtMs) || Number(startedAtMs) < 0 ||
+      !Number.isSafeInteger(deadlineAtMs) || Number(deadlineAtMs) - Number(startedAtMs) !== 30000
+    ) return false;
   }
   if (value.phase !== "guessing" && currentRound.currentClip !== null) return false;
   if (
@@ -374,6 +429,20 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
       return false;
     }
   }
+  const isRepresentativePet = (candidate: unknown): candidate is SongGuessRepresentativePet => {
+    if (!isRecord(candidate)) return false;
+    return (
+      typeof candidate.color === "string" &&
+      candidate.color.length > 0 &&
+      Number.isSafeInteger(candidate.growthStage) &&
+      [1, 2, 3].includes(Number(candidate.growthStage)) &&
+      Array.isArray(candidate.equippedItemKeys) &&
+      candidate.equippedItemKeys.every((key) => typeof key === "string") &&
+      Array.isArray(candidate.hiddenItemKeys) &&
+      candidate.hiddenItemKeys.every((key) => typeof key === "string") &&
+      (candidate.equippedTitleKey === null || typeof candidate.equippedTitleKey === "string")
+    );
+  };
   return participants.every(
     (participant) =>
       isRecord(participant) &&
@@ -381,7 +450,17 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
       !!participant.displayName &&
       Number.isSafeInteger(participant.score) &&
       Number(participant.score) >= 0 &&
-      typeof participant.scoredCurrentRound === "boolean",
+      typeof participant.scoredCurrentRound === "boolean" &&
+      (participant.joined === undefined || typeof participant.joined === "boolean") &&
+      (participant.roundScore === undefined ||
+        (Number.isSafeInteger(participant.roundScore) && Number(participant.roundScore) >= 0)) &&
+      (participant.previousRank === undefined ||
+        (Number.isSafeInteger(participant.previousRank) && Number(participant.previousRank) >= 1)) &&
+      (participant.participantId === undefined ||
+        (typeof participant.participantId === "string" && !!participant.participantId)) &&
+      (participant.representativePet === undefined ||
+        participant.representativePet === null ||
+        isRepresentativePet(participant.representativePet)),
   );
 }
 

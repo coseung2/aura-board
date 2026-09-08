@@ -3,6 +3,7 @@ import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SongGuessSnapshot, SongGuessTeacherSetup } from "@/lib/song-guess/contracts";
+import { SongGuessClientError } from "@/lib/song-guess/browser-client";
 
 const mocks = vi.hoisted(() => ({
   fetchCurrent: vi.fn(),
@@ -111,6 +112,74 @@ describe("SongGuessBoard authoritative web flow", () => {
     window.localStorage.clear();
   });
 
+  it("automatically joins the opened board and shows only the server-acknowledged entrance", async () => {
+    const lobby = snapshot("participant", {
+      phase: "lobby",
+      participants: [{ participantId: "student-1", displayName: "하늘", score: 0, scoredCurrentRound: false, joined: false }],
+      viewer: { role: "participant", scoredCurrentRound: false, joined: false, participantIndex: 0 },
+    });
+    mocks.fetchCurrent.mockResolvedValue(lobby);
+    mocks.submitCommand.mockImplementation(async (_id, request) => ({ requestId: request.requestId, previousVersion: 2, version: 3,
+      snapshot: { ...lobby, version: 3, participants: [{ ...lobby.participants[0], joined: true }], viewer: { ...lobby.viewer, joined: true } }, result: null }));
+    render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="student" />);
+    expect(await screen.findByText("입장 완료")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "입장하기" })).not.toBeInTheDocument();
+    expect(mocks.submitCommand).toHaveBeenCalledTimes(1);
+    expect(mocks.submitCommand).toHaveBeenCalledWith("session-1", expect.objectContaining({ command: { type: "join" } }));
+    expect(screen.queryByRole("button", { name: "음악 퀴즈 시작" })).not.toBeInTheDocument();
+  });
+
+  it.each([403, 429])("allows explicit retry after a %s join rejection without an automatic retry loop", async (status) => {
+    const lobby = snapshot("participant", {
+      phase: "lobby",
+      participants: [{ displayName: "하늘", score: 0, scoredCurrentRound: false, joined: false }],
+      viewer: { role: "participant", scoredCurrentRound: false, joined: false, participantIndex: 0 },
+    });
+    mocks.fetchCurrent.mockResolvedValue(lobby);
+    mocks.submitCommand.mockImplementation(async (_id, request) => ({
+      requestId: request.requestId, previousVersion: 2, version: 3,
+      snapshot: { ...lobby, version: 3, participants: [{ ...lobby.participants[0], joined: true }], viewer: { ...lobby.viewer, joined: true } }, result: null,
+    })).mockRejectedValueOnce(new SongGuessClientError(status, { error: "join_rejected" }))
+      .mockRejectedValueOnce(new SongGuessClientError(status, { error: "join_rejected" }));
+
+    render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="student" />);
+    expect(await screen.findByText("입장하지 못했어요")).toBeInTheDocument();
+    expect(mocks.submitCommand).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "최신 상태 확인" }));
+    await waitFor(() => expect(mocks.fetchCurrent).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.getByRole("button", { name: "다시 시도" })).toBeEnabled());
+    expect(screen.getByText("입장하지 못했어요")).toBeInTheDocument();
+    expect(mocks.submitCommand).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByText("입장하지 못했어요")).toBeInTheDocument();
+    expect(mocks.submitCommand).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByText("입장 완료")).toBeInTheDocument();
+    expect(mocks.submitCommand).toHaveBeenCalledTimes(3);
+    expect(screen.queryByRole("button", { name: "다시 시도" })).not.toBeInTheDocument();
+  });
+
+  it("reports a missing audio file for a legacy video-only round without loading a provider", async () => {
+    mocks.fetchCurrent.mockResolvedValue(snapshot("participant", { currentRound: { roundId: "youtube-round", order: 0,
+      accessibilityClue: null, revealedAnswer: null, currentClip: { assetId: "opaque-video", tierMs: 15000, mimeType: "video/youtube", durationMs: 15000, sizeBytes: 0 } } }));
+    const { container } = render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="student" />);
+    expect(await screen.findByText("음원 파일이 없는 문제예요.")).toBeInTheDocument();
+    expect(screen.getByPlaceholderText("정답 입력")).toBeEnabled();
+    expect(container.querySelector("iframe, audio")).toBeNull();
+  });
+
+  it("shows the round's earned points and ranking in the main result area", async () => {
+    mocks.fetchCurrent.mockResolvedValue(snapshot("participant", { phase: "reveal", participants: [
+      { displayName: "하늘", score: 1400, roundScore: 800, previousRank: 2, scoredCurrentRound: true },
+      { displayName: "별", score: 1200, roundScore: 400, previousRank: 1, scoredCurrentRound: true },
+    ] }));
+    render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="student" />);
+    expect(await screen.findByRole("heading", { name: "라운드 순위" })).toBeInTheDocument();
+    expect(screen.getByText("+800")).toBeInTheDocument();
+    expect(screen.getByLabelText("1위 상승")).toBeInTheDocument();
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+  });
+
   it("locks teacher editing whenever a current authoritative session exists", async () => {
     mocks.fetchCurrent.mockResolvedValue(snapshot("host", {
       phase: "draft",
@@ -127,7 +196,8 @@ describe("SongGuessBoard authoritative web flow", () => {
 
     expect(await screen.findByRole("button", { name: "로비 열기" })).toBeInTheDocument();
     expect(screen.queryByText("라운드 음원 준비")).not.toBeInTheDocument();
-    expect(screen.getByText("세션이 존재하는 동안 라운드 편집은 잠깁니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "노래 풀" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "직접 음원 구성" })).not.toBeInTheDocument();
   });
 
   it("blocks reveal progression until a failed teacher setup reload recovers", async () => {
@@ -209,7 +279,7 @@ describe("SongGuessBoard authoritative web flow", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "정답 제출" }));
 
-    expect(await screen.findByText("정답! 서버가 1000점을 반영했어요.")).toBeInTheDocument();
+    expect(await screen.findByText("정답! +1000점")).toBeInTheDocument();
     expect(screen.getByText("1000점")).toBeInTheDocument();
   });
 

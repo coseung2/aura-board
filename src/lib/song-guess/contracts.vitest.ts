@@ -40,6 +40,16 @@ function snapshot(overrides: Partial<SongGuessSnapshot> = {}): SongGuessSnapshot
 }
 
 describe("song-guess authoritative wire contract", () => {
+  it("requires server timestamps for v2 and accepts a single highlight setup", () => {
+    const base = snapshot();
+    const current = { ...base, rulesVersion: 2, stateSchemaVersion: 2,
+      currentRound: { ...base.currentRound, startedAtMs: 1000, deadlineAtMs: 31000, maxScore: 1000,
+        currentClip: { ...base.currentRound.currentClip!, tierMs: 15000, durationMs: 15000 } } };
+    expect(isSongGuessSnapshot(current)).toBe(true);
+    expect(isSongGuessSnapshot({ ...current, currentRound: { ...current.currentRound, deadlineAtMs: 32000 } })).toBe(false);
+    expect(isSongGuessSnapshot({ ...current, currentRound: { ...current.currentRound, startedAtMs: undefined } })).toBe(false);
+    expect(normalizeSongGuessSetup({ rounds: [{ representativeAnswer: "곡", clipAssetIds: ["highlight-1"] }] }).rounds[0]?.clipAssetIds).toEqual(["highlight-1"]);
+  });
   it("normalizes only Unicode form, case, and whitespace", () => {
     expect(normalizeSongGuessAnswer("  Bℓue\u00a0Moon ")).toBe("blue moon");
     expect(normalizeSongGuessAnswer("blue-moon")).not.toBe("blue moon");

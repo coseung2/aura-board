@@ -56,12 +56,13 @@ describe("song-guess unassigned derivative cleanup", () => {
       id: "asset-500",
       roundId: null,
       objectKey: "song-guess/board-1/private/500.wav",
+      mimeType: "audio/wav",
     });
 
     await expect(deleteUploadedSongGuessClip("board-1", "asset-500")).resolves.toBe(true);
     expect(mocks.findFirst).toHaveBeenCalledWith({
       where: { id: "asset-500", boardId: "board-1" },
-      select: { id: true, roundId: true, objectKey: true },
+      select: { id: true, roundId: true, objectKey: true, mimeType: true },
     });
     expect(mocks.deleteMany).toHaveBeenCalledWith({
       where: { id: "asset-500", boardId: "board-1", roundId: null },
@@ -76,6 +77,7 @@ describe("song-guess unassigned derivative cleanup", () => {
       id: "asset-500",
       roundId: "round-1",
       objectKey: "song-guess/board-1/private/500.wav",
+      mimeType: "audio/wav",
     });
 
     await expect(deleteUploadedSongGuessClip("board-1", "asset-500")).rejects.toMatchObject({

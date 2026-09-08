@@ -78,7 +78,26 @@
       "properties": {
         "displayName": { "type": "string", "minLength": 1, "maxLength": 100 },
         "score": { "type": "integer", "minimum": 0 },
-        "scoredCurrentRound": { "type": "boolean" }
+        "scoredCurrentRound": { "type": "boolean" },
+        "participantId": { "type": "string", "minLength": 1 },
+        "representativePet": {
+          "oneOf": [
+            { "$ref": "#/$defs/representativePet" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "representativePet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["color", "growthStage", "equippedItemKeys", "hiddenItemKeys", "equippedTitleKey"],
+      "properties": {
+        "color": { "type": "string", "minLength": 1 },
+        "growthStage": { "type": "integer", "enum": [1, 2, 3] },
+        "equippedItemKeys": { "type": "array", "items": { "type": "string" } },
+        "hiddenItemKeys": { "type": "array", "items": { "type": "string" } },
+        "equippedTitleKey": { "type": ["string", "null"] }
       }
     },
     "viewer": {

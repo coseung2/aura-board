@@ -417,13 +417,35 @@ impl PlayRepository for PostgresRepository {
         }
         let current = lock_song_guess_session(&mut tx, session_id).await?;
         current.authorize(actor)?;
-        if current.version != request.expected_version {
+        let allow_stale_guess = matches!(
+            &request.command,
+            crate::model::SongGuessIntent::Guess {
+                round_id: Some(round_id),
+                ..
+            } if current.rules_version == crate::model::SONG_GUESS_RULES_VERSION
+                && current.state.phase == play_domain::song_guess::SongGuessPhase::Guessing
+                && current
+                    .state
+                    .current_round()
+                    .map(|round| round.round_id.as_str() == round_id.as_str())
+                .unwrap_or(false)
+        );
+        let allow_stale_join = matches!(
+            &request.command,
+            crate::model::SongGuessIntent::Join
+                if current.rules_version == crate::model::SONG_GUESS_RULES_VERSION
+                    && current.state.phase == play_domain::song_guess::SongGuessPhase::Lobby
+        );
+        if current.version != request.expected_version
+            && !((allow_stale_guess || allow_stale_join)
+                && request.expected_version < current.version)
+        {
             return Err(RepositoryError::SongGuessVersionConflict {
                 current: Box::new(current),
             });
         }
         let mut updated = current.clone();
-        let result = updated.apply(actor, &request.command)?;
+        let result = updated.apply_at(actor, &request.command, now_ms)?;
         let previous_version = updated.version;
         updated.version = updated
             .version

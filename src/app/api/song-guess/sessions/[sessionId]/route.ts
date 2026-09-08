@@ -1,6 +1,7 @@
 import { resolvePlayActor } from "@/lib/play-platform/actor";
-import { playEngineFetch, proxyPlayEngineResponse } from "@/lib/play-platform/server-client";
+import { playEngineFetch } from "@/lib/play-platform/server-client";
 import { playRouteError } from "@/lib/play-platform/route-utils";
+import { enrichSongGuessPlayEngineResponse } from "@/lib/song-guess/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -15,7 +16,7 @@ export async function GET(_request: Request, { params }: Params) {
       `/v1/song-guess/sessions/${encodeURIComponent(sessionId)}/snapshot`,
       { actor },
     );
-    return proxyPlayEngineResponse(response);
+    return enrichSongGuessPlayEngineResponse(response);
   } catch (error) {
     return playRouteError(error);
   }

@@ -59,6 +59,7 @@ export type DownloadPrivateObjectResult = {
 };
 
 const DEFAULT_BUCKET = "aura-board-uploads";
+const DEFAULT_PRIVATE_BUCKET = "aura-board-song-guess";
 
 export type SupabaseStorageConfig = {
   url: string;
@@ -368,11 +369,11 @@ function privateFilesystemPath(pathname: string): string {
   return path.join(process.cwd(), ".song-guess-private", ...pathname.split("/"));
 }
 
-function getPrivateStorageBucket(): string | null {
+function getPrivateStorageBucket(): string {
   return (
     process.env.SONG_GUESS_STORAGE_BUCKET?.trim() ||
     process.env.AURA_SONG_GUESS_BUCKET?.trim() ||
-    null
+    DEFAULT_PRIVATE_BUCKET
   );
 }
 

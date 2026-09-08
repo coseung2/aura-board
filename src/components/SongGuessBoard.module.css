@@ -1,15 +1,62 @@
 .shell {
-  min-height: 100vh;
-  padding: 28px;
-  background:
-    radial-gradient(circle at top right, rgba(124, 92, 255, 0.13), transparent 34%),
-    linear-gradient(180deg, #f7f8fc 0%, #eef1f7 100%);
-  color: #182033;
+  min-height: 100%;
+  padding: 32px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  font-size: 14px;
+}
+
+.poolFieldset {
+  border: 0;
+  padding: 0;
+  margin: 20px 0;
+}
+
+.poolFieldset legend {
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+.poolCategories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.poolControls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.poolActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.poolCategories button[aria-pressed="true"] {
+  background: var(--color-accent-tinted-bg);
+  border-color: var(--color-accent);
+  color: var(--color-accent-tinted-text);
+}
+
+.field select {
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  padding: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
 }
 
 .header {
-  max-width: 1240px;
-  margin: 0 auto 22px;
+  max-width: var(--container-max-width);
+  margin: 0 auto 24px;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -29,56 +76,62 @@
 
 .eyebrow {
   margin: 0 0 5px;
-  color: #6554c0;
-  font-size: 0.78rem;
-  font-weight: 800;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
+  color: var(--color-accent);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .version,
 .roleBadge {
   display: inline-flex;
   align-items: center;
-  min-height: 34px;
+  min-height: 44px;
   padding: 7px 12px;
-  border: 1px solid #d6d9e6;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.86);
-  color: #576079;
-  font-size: 0.82rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
 }
 
-.panel,
 .roundCard,
 .sidebarCard,
-.phaseCard,
 .clueCard,
 .playerCard,
-.guessForm,
-.revealCard,
-.stageMessage {
-  border: 1px solid #dde1ec;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 14px 38px rgba(31, 38, 61, 0.07);
+.revealCard {
+  background: var(--color-surface);
+  border: var(--border-card);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.roundCard:hover,
+.sidebarCard:hover,
+.clueCard:hover,
+.playerCard:hover,
+.revealCard:hover {
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--color-border-hover);
 }
 
 .panel {
   max-width: 900px;
   margin: 0 auto;
-  padding: 30px;
+  padding: 0;
 }
 
 .editorLayout,
 .gameLayout {
-  max-width: 1240px;
+  max-width: var(--container-max-width);
   margin: 0 auto;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 300px;
-  gap: 22px;
+  gap: 20px;
   align-items: start;
 }
 
@@ -87,7 +140,7 @@
 .editorSidebar,
 .gameSidebar {
   display: grid;
-  gap: 18px;
+  gap: 20px;
 }
 
 .editorSidebar,
@@ -107,7 +160,7 @@
 }
 
 .roundCard {
-  padding: 22px;
+  padding: 20px;
 }
 
 .roundHeader {
@@ -128,8 +181,8 @@
 .field {
   display: grid;
   gap: 7px;
-  color: #3f4860;
-  font-size: 0.88rem;
+  color: var(--color-text);
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -138,11 +191,11 @@
 .numberInput {
   width: 100%;
   box-sizing: border-box;
-  border: 1px solid #cfd5e3;
-  border-radius: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
   padding: 11px 12px;
-  background: #fff;
-  color: #182033;
+  background: var(--color-surface);
+  color: var(--color-text);
   font: inherit;
   font-weight: 500;
 }
@@ -153,16 +206,17 @@
 
 .field input:focus,
 .field textarea:focus,
+.field select:focus-visible,
 .numberInput:focus,
 .filePicker:focus-within {
-  outline: 3px solid rgba(101, 84, 192, 0.22);
-  border-color: #6554c0;
+  outline: 2px solid var(--color-accent-tinted-text);
+  border-color: var(--color-accent);
 }
 
 .audioWorkbench {
   margin-top: 18px;
   padding-top: 18px;
-  border-top: 1px solid #e6e8f0;
+  border-top: 1px solid var(--color-border);
   display: grid;
   gap: 14px;
 }
@@ -173,11 +227,11 @@
   justify-content: center;
   min-height: 46px;
   padding: 0 16px;
-  border: 1px dashed #8e83cb;
-  border-radius: 12px;
-  background: #f7f5ff;
-  color: #51439a;
-  font-weight: 800;
+  border: 1px dashed var(--color-border-hover);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-alt);
+  color: var(--color-accent-tinted-text);
+  font-weight: 700;
   cursor: pointer;
 }
 
@@ -192,9 +246,9 @@
 .trimPanel,
 .savedClipSummary {
   padding: 15px;
-  border: 1px solid #e0e3ed;
-  border-radius: 14px;
-  background: #fafbfe;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-alt);
   display: grid;
   gap: 14px;
 }
@@ -207,7 +261,7 @@
 .clueCard p,
 .panel p {
   margin: 0;
-  color: #667087;
+  color: var(--color-text-muted);
   line-height: 1.55;
 }
 
@@ -219,7 +273,7 @@
 }
 
 .rangeRow input[type="range"] {
-  accent-color: #6554c0;
+  accent-color: var(--color-accent);
 }
 
 .numberInput {
@@ -237,56 +291,65 @@
 .dangerButton,
 .dangerQuietButton,
 .iconButton {
-  min-height: 42px;
-  border-radius: 11px;
+  min-height: 44px;
+  border-radius: var(--radius-btn);
   padding: 9px 14px;
   border: 1px solid transparent;
   font: inherit;
-  font-weight: 800;
+  font-weight: 700;
   cursor: pointer;
-  transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+  transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
 }
 
 .primaryButton {
-  background: #6554c0;
-  color: #fff;
-  box-shadow: 0 8px 18px rgba(101, 84, 192, 0.2);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  box-shadow: var(--shadow-accent);
 }
 
 .secondaryButton {
-  border-color: #cfd5e3;
-  background: #fff;
-  color: #3d4760;
+  border-color: var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  box-shadow: none;
 }
 
 .dangerButton {
-  border-color: #efb3ba;
-  background: #fff3f4;
-  color: #a42c3a;
+  border-color: var(--color-border);
+  background: var(--color-status-returned-bg);
+  color: var(--color-danger);
 }
 
 .dangerQuietButton {
-  min-height: 34px;
+  min-height: 44px;
   padding: 5px 10px;
   background: transparent;
-  color: #a42c3a;
+  color: var(--color-danger);
 }
 
 .iconButton {
-  min-width: 36px;
-  min-height: 34px;
+  min-width: 44px;
+  min-height: 44px;
   padding: 5px 9px;
-  border-color: #d6d9e6;
-  background: #fff;
-  color: #4d566c;
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
 }
 
 .primaryButton:hover:not(:disabled),
 .secondaryButton:hover:not(:disabled),
 .dangerButton:hover:not(:disabled),
 .iconButton:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(31, 38, 61, 0.12);
+  border-color: var(--color-border-hover);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--color-accent-active);
+}
+
+.secondaryButton:hover:not(:disabled),
+.iconButton:hover:not(:disabled) {
+  background: var(--color-surface-alt);
 }
 
 .primaryButton:focus-visible,
@@ -294,7 +357,7 @@
 .dangerButton:focus-visible,
 .dangerQuietButton:focus-visible,
 .iconButton:focus-visible {
-  outline: 3px solid rgba(101, 84, 192, 0.28);
+  outline: 2px solid var(--color-accent-tinted-text);
   outline-offset: 2px;
 }
 
@@ -310,20 +373,20 @@
 
 .previewGrid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 12px;
 }
 
 .previewItem {
   min-width: 0;
   padding: 12px;
-  border: 1px solid #dfe3ed;
-  border-radius: 12px;
-  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
   display: grid;
   gap: 8px;
-  font-size: 0.86rem;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .previewItem audio,
@@ -338,22 +401,22 @@
   gap: 10px;
   align-items: start;
   padding: 13px;
-  border: 1px solid #ead99b;
-  border-radius: 12px;
-  background: #fffbed;
-  color: #5b4e23;
-  font-size: 0.88rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  font-size: 13px;
   line-height: 1.45;
 }
 
 .rightsCheck input {
   width: 18px;
   height: 18px;
-  accent-color: #6554c0;
+  accent-color: var(--color-accent);
 }
 
 .sidebarCard {
-  padding: 19px;
+  padding: 20px;
   display: grid;
   gap: 13px;
 }
@@ -364,22 +427,22 @@
 .wrongResult {
   margin: 0;
   padding: 13px 15px;
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   line-height: 1.45;
 }
 
 .notice,
 .correctResult {
-  border: 1px solid #a8dfc2;
-  background: #effaf4;
-  color: #24633f;
+  border: 1px solid var(--color-border);
+  background: var(--color-status-reviewed-bg);
+  color: var(--color-status-reviewed-text);
 }
 
 .error,
 .wrongResult {
-  border: 1px solid #efb3ba;
-  background: #fff3f4;
-  color: #912b38;
+  border: 1px solid var(--color-border);
+  background: var(--color-status-returned-bg);
+  color: var(--color-danger);
 }
 
 .phaseCard,
@@ -388,7 +451,7 @@
 .guessForm,
 .revealCard,
 .stageMessage {
-  padding: 22px;
+  padding: 20px;
 }
 
 .clueCard,
@@ -396,15 +459,6 @@
 .revealCard {
   display: grid;
   gap: 10px;
-}
-
-.clueCard {
-  border-left: 5px solid #d9a441;
-  background: #fffdf5;
-}
-
-.playerCard {
-  border-left: 5px solid #6554c0;
 }
 
 .guessForm {
@@ -415,7 +469,7 @@
 }
 
 .stageMessage {
-  color: #59637a;
+  color: var(--color-text-muted);
   font-weight: 700;
 }
 
@@ -432,16 +486,20 @@
   justify-content: space-between;
   gap: 12px;
   padding: 10px 0;
-  border-bottom: 1px solid #edf0f5;
+  border-bottom: 1px solid var(--color-border);
 }
 
 .scoreList li:last-child {
   border-bottom: 0;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 1080px) {
+  .shell { padding: 24px; }
+}
+
+@media (max-width: 768px) {
   .shell {
-    padding: 18px;
+    padding: 16px;
   }
 
   .editorLayout,
@@ -465,7 +523,7 @@
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 560px) {
   .header,
   .sectionHeading,
   .roundHeader,
@@ -476,7 +534,6 @@
   }
 
   .roundCard,
-  .panel,
   .phaseCard,
   .clueCard,
   .playerCard,
@@ -487,6 +544,7 @@
   }
 
   .rangeRow,
+  .poolControls,
   .guessForm {
     grid-template-columns: 1fr;
   }
@@ -500,4 +558,14 @@
   .iconButton {
     transition: none;
   }
+  .roundCard,
+  .sidebarCard,
+  .clueCard,
+  .playerCard,
+  .revealCard { transition: none; }
 }
+
+.header h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+.shell h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+.shell h3 { font-size: 16px; font-weight: 700; letter-spacing: -0.25px; }
+.field input, .field textarea, .field select { border-radius: var(--radius-control); font-size: 14px; }

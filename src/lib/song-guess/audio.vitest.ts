@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   createSongGuessWavClips,
+  createSongGuessHighlight,
   encodePcm16Wav,
   maxSongGuessStartSeconds,
   renderMonoPcm,
@@ -27,6 +28,19 @@ function readAscii(bytes: Uint8Array, offset: number, length: number): string {
 }
 
 describe("song-guess deterministic PCM WAV pipeline", () => {
+  it("creates a 15s highlight at the selected start without padding or leaking earlier audio", () => {
+    const samples = new Float32Array(44100 * 17).fill(-0.5);
+    samples.fill(0.25, 44100 * 2);
+    const source = audioBuffer([samples]);
+    const clip = createSongGuessHighlight(source, 2);
+    expect(clip.tierMs).toBe(15000);
+    expect(clip.bytes.byteLength).toBe(44 + 44100 * 15 * 2);
+    const view = new DataView(clip.bytes.buffer);
+    expect(view.getInt16(44, true)).toBe(8192);
+    expect(view.getInt16(clip.bytes.length - 2, true)).toBe(8192);
+    expect(() => createSongGuessHighlight(source, 2.001)).toThrow("highlight_start_too_close_to_end");
+    expect(() => createSongGuessHighlight(audioBuffer([new Float32Array(44100 * 14)]), 0)).toThrow("highlight_source_too_short");
+  });
   it("starts at the selected source frame and preserves exact samples", () => {
     const source = new Float32Array(110_250);
     source.fill(-0.5, 0, 44_100);

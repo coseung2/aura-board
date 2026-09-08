@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { resolveSongGuessActorForBoard } from "@/lib/play-platform/actor";
-import { playEngineFetch, proxyPlayEngineResponse } from "@/lib/play-platform/server-client";
+import { playEngineFetch } from "@/lib/play-platform/server-client";
 import { playRouteError } from "@/lib/play-platform/route-utils";
-import { buildSongGuessCreateRequest } from "@/lib/song-guess/server";
+import {
+  buildSongGuessCreateRequest,
+  enrichSongGuessPlayEngineResponse,
+} from "@/lib/song-guess/server";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -23,7 +26,7 @@ export async function GET(_request: Request, { params }: Params) {
       `/v1/boards/${encodeURIComponent(boardId)}/song-guess/sessions/current`,
       { actor },
     );
-    return proxyPlayEngineResponse(response);
+    return enrichSongGuessPlayEngineResponse(response);
   } catch (error) {
     return playRouteError(error);
   }
@@ -46,7 +49,7 @@ export async function POST(request: Request, { params }: Params) {
       `/v1/boards/${encodeURIComponent(boardId)}/song-guess/sessions`,
       { actor, method: "POST", body },
     );
-    return proxyPlayEngineResponse(response);
+    return enrichSongGuessPlayEngineResponse(response);
   } catch (error) {
     return playRouteError(error);
   }

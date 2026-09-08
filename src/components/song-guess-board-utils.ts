@@ -28,7 +28,7 @@ export function draftsFromSetup(setup: SongGuessTeacherSetup): RoundDraft[] {
       aliasesText: round.aliases.join(", "),
       accessibilityClue: round.accessibilityClue ?? "",
       rightsConfirmed: false,
-      existingClipAssetIds: clips.map((clip) => clip.id) as [string, string, string],
+      existingClipAssetIds: clips.map((clip) => clip.id),
       existingClipSummary: clips.map((clip) => ({
         tierMs: clip.tierMs,
         durationMs: clip.durationMs,
@@ -156,6 +156,10 @@ export function phaseLabel(phase: SongGuessSnapshot["phase"]): string {
 
 export function messageForAudioError(code: string): string {
   switch (code) {
+    case "highlight_source_too_short":
+      return "하이라이트를 만들려면 15초 이상의 음원이 필요해요.";
+    case "highlight_start_too_close_to_end":
+      return "시작 지점 뒤에 15초 분량이 남도록 조정해 주세요.";
     case "empty_source_file":
       return "빈 음원 파일은 사용할 수 없어요.";
     case "source_file_too_large":
@@ -182,6 +186,8 @@ export function messageForError(error: unknown): string {
         return "현재 게임 세션이 있어 라운드 편집이 잠겼어요.";
       case "song_guess_clip_assigned":
         return "이미 저장된 라운드의 클립은 개별 정리할 수 없어요.";
+      case "song_guess_audio_clip_missing":
+        return "음원 파일이 없는 문제가 있어요. 해당 문제에 음원을 등록해 주세요.";
       case "song_guess_clip_assignment_conflict":
         return "임시 클립 정리와 저장이 겹쳤어요. 라운드 구성을 다시 확인해 주세요.";
       case "invalid_phase":
@@ -190,7 +196,7 @@ export function messageForError(error: unknown): string {
       case "forbidden":
         return "이 음악 퀴즈를 조작할 권한이 없어요.";
       case "play_engine_unavailable":
-        return "게임 서버에 연결할 수 없어요. 미확인 요청은 같은 ID로 다시 보낼 수 있어요.";
+        return "게임 서버에 연결하지 못했어요. 잠시 후 다시 확인해 주세요.";
       case "idempotency_key_reuse":
         return "요청 식별자가 충돌했어요. 최신 상태에서 다시 시도해 주세요.";
       default:
@@ -202,7 +208,7 @@ export function messageForError(error: unknown): string {
       case "rights_confirmation_required":
         return "새 파생 클립을 저장하려면 음원 사용 권한을 확인해 주세요.";
       case "clips_not_generated":
-        return "선택한 시작 지점으로 세 개의 파생 클립을 먼저 만들어 주세요.";
+        return "선택한 시작 지점으로 하이라이트를 먼저 만들어 주세요.";
       case "audio_source_required":
         return "모든 라운드에 음원 또는 저장된 파생 클립이 필요해요.";
       case "representative_answer_required":
@@ -213,7 +219,7 @@ export function messageForError(error: unknown): string {
       case "accessibility_clue_too_long":
         return "정답, 별칭, 접근성 단서의 길이와 개수를 확인해 주세요.";
       case "three_clips_required":
-        return "각 라운드에는 0.5초·1.0초·1.5초 WAV 파생 클립이 모두 필요해요.";
+        return "각 라운드의 하이라이트를 다시 만들어 주세요.";
       case "round_required":
         return "한 곡 이상 추가해 주세요.";
       case "too_many_rounds":

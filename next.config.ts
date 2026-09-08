@@ -14,6 +14,10 @@ const FRAME_SRC_ALLOWLIST = [
 const nextConfig: NextConfig = {
   reactStrictMode: true,
   output: "standalone",
+  // Runtime song pools use the database and private storage; local files are import inputs.
+  outputFileTracingExcludes: {
+    "/api/song-guess/**": ["./data/song-guess/**/*"],
+  },
   allowedDevOrigins: ["127.0.0.1", "egestive-sharron-farrandly.ngrok-free.dev"],
   images: {
     // Thumbnails we optimize via next/image. All other external hosts

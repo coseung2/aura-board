@@ -21,7 +21,7 @@ const BodySchema = z.object({
         representativeAnswer: z.string().trim().min(1).max(200),
         aliases: z.array(z.string().trim().min(1).max(200)).max(20).optional(),
         accessibilityClue: z.string().trim().max(500).nullable().optional(),
-        clipAssetIds: z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)]),
+        clipAssetIds: z.array(z.string().min(1)).refine((ids) => ids.length === 1 || ids.length === 3),
       }),
     )
     .min(1)

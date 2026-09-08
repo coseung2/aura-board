@@ -10,7 +10,7 @@ export type RoundDraft = {
   aliasesText: string;
   accessibilityClue: string;
   rightsConfirmed: boolean;
-  existingClipAssetIds: [string, string, string] | null;
+  existingClipAssetIds: string[] | null;
   existingClipSummary: Array<{
     tierMs: number;
     durationMs: number;

@@ -2,13 +2,14 @@ import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   Keyboard,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import { ApiError } from "../../lib/api";
+import { ApiError, getApiUrl } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
 import {
   isSongGuessSnapshot,
@@ -22,7 +23,13 @@ import {
   fetchCurrentSongGuessSession,
   loadPendingSongGuessCommand,
   loadSongGuessAudioSource,
+  formatClipLabel,
+  formatSeconds,
+  messageForError,
+  monotonicNow,
+  phaseLabel,
   savePendingSongGuessCommand,
+  songGuessRemainingSeconds,
   songGuessApiError,
   submitSongGuessCommand,
   type PendingSongGuessCommand,
@@ -40,8 +47,16 @@ import {
   tapMin,
   typography,
 } from "../../theme/tokens";
+import { SongGuessScoreboard } from "../song-guess/SongGuessScoreboard";
+import { SongGuessLobbyStatus } from "../song-guess/SongGuessLobbyStatus";
 import { AppButton, EmptyState, TextField } from "../ui";
-
+type SongGuessSound =
+  | "correct"
+  | "join"
+  | "podium"
+  | "round-results"
+  | "start"
+  | "wrong";
 export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const boardId = data.board.id;
   const [snapshot, setSnapshot] = useState<SongGuessSnapshot | null>(null);
@@ -51,14 +66,99 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [guess, setGuess] = useState("");
-  const [lastResult, setLastResult] = useState<SongGuessGuessResult | null>(null);
+  const [lastResult, setLastResult] = useState<SongGuessGuessResult | null>(
+    null,
+  );
   const [hasPending, setHasPending] = useState(false);
+  const [failedJoinSessionId, setFailedJoinSessionId] = useState<string | null>(null);
   const [audioPreparing, setAudioPreparing] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
+  const [muted, setMuted] = useState(false);
   const sequenceRef = useRef(0);
   const retriedRef = useRef<string | null>(null);
-  const player = useAudioPlayer(null, { downloadFirst: true, updateInterval: 100 });
+  const autoJoinedSessionRef = useRef<string | null>(null);
+  const pendingRequestIdRef = useRef<string | null>(null);
+  const player = useAudioPlayer(null, {
+    downloadFirst: true,
+    updateInterval: 100,
+  });
   const playerStatus = useAudioPlayerStatus(player);
+  const soundPlayer = useAudioPlayer(null, { downloadFirst: true });
+  const phaseSoundKeyRef = useRef<string | null>(null);
+  const appStateRef = useRef(AppState.currentState);
+  const playSound = useCallback(
+    (sound: SongGuessSound) => {
+      if (muted || appStateRef.current !== "active") return;
+      try {
+        player.pause();
+        soundPlayer.replace({
+          uri: getApiUrl(`/sounds/song-guess/${sound}.ogg`),
+        });
+        soundPlayer.play();
+      } catch {}
+    },
+    [muted, player, soundPlayer],
+  );
+
+  useEffect(() => {
+    player.muted = muted;
+    soundPlayer.muted = muted;
+  }, [muted, player, soundPlayer]);
+
+  useEffect(
+    () => () => {
+      try {
+        player.pause();
+        soundPlayer.pause();
+      } catch {}
+    },
+    [player, soundPlayer],
+  );
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextState) => {
+      appStateRef.current = nextState;
+      if (nextState !== "active") {
+        try {
+          player.pause();
+          soundPlayer.pause();
+        } catch {}
+      }
+    });
+    return () => subscription.remove();
+  }, [player, soundPlayer]);
+
+  const clockRef = useRef<{
+    key: string;
+    serverTimeMs: number;
+    monotonicMs: number;
+  } | null>(null);
+  const [monotonicNowMs, setMonotonicNowMs] = useState(0);
+  const snapshotClockKey = snapshot
+    ? `${snapshot.sessionId}:${snapshot.version}:${snapshot.currentRound.roundId}`
+    : null;
+
+  useEffect(() => {
+    if (
+      !snapshot ||
+      snapshot.phase !== "guessing" ||
+      snapshot.rulesVersion !== 2
+    ) {
+      setMonotonicNowMs(0);
+      return;
+    }
+    const now = monotonicNow();
+    if (clockRef.current?.key !== snapshotClockKey) {
+      clockRef.current = {
+        key: snapshotClockKey ?? "",
+        serverTimeMs: snapshot.serverTimeMs,
+        monotonicMs: now,
+      };
+    }
+    setMonotonicNowMs(now);
+    const timer = setInterval(() => setMonotonicNowMs(monotonicNow()), 100);
+    return () => clearInterval(timer);
+  }, [snapshot?.phase, snapshot?.rulesVersion, snapshotClockKey]);
 
   const refresh = useCallback(async () => {
     const sequence = ++sequenceRef.current;
@@ -92,50 +192,77 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const realtime = useBoardRealtime({ slug: boardId, onReload: refresh });
   useEffect(() => {
     if (!shouldUseBoardFallbackPolling(realtime.status)) return;
-    const timer = setInterval(() => void refresh(), BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS);
+    const timer = setInterval(
+      () => void refresh(),
+      BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+    );
     return () => clearInterval(timer);
   }, [realtime.status, refresh]);
 
   const executePending = useCallback(
     async (pending: PendingSongGuessCommand, persist = true) => {
+      if (pendingRequestIdRef.current) return;
+      pendingRequestIdRef.current = pending.request.requestId;
       if (persist) {
-        await savePendingSongGuessCommand(boardId, pending).catch(() => undefined);
+        await savePendingSongGuessCommand(boardId, pending).catch(
+          () => undefined,
+        );
       }
       setHasPending(true);
       setBusy(true);
       setError(null);
       setNotice(null);
       try {
-        const response = await submitSongGuessCommand(pending.sessionId, pending.request);
+        const response = await submitSongGuessCommand(
+          pending.sessionId,
+          pending.request,
+        );
         setSnapshot((current) =>
           mergeSongGuessSnapshot(current, pending.sessionId, response.snapshot),
         );
-        if (response.result) setLastResult(response.result);
+        if (response.result) {
+          setLastResult(response.result);
+          playSound(response.result.correct ? "correct" : "wrong");
+        } else if (pending.request.command.type === "join") {
+          playSound("join");
+        }
         await clearPendingSongGuessCommand(boardId).catch(() => undefined);
+        if (pending.request.command.type === "join") setFailedJoinSessionId(null);
         setHasPending(false);
         setGuess("");
         Keyboard.dismiss();
       } catch (cause) {
         const body = songGuessApiError(cause);
-        if (cause instanceof ApiError && cause.status === 409 && isSongGuessSnapshot(body?.snapshot)) {
+        if (
+          cause instanceof ApiError &&
+          cause.status === 409 &&
+          isSongGuessSnapshot(body?.snapshot)
+        ) {
           setSnapshot((current) =>
             mergeSongGuessSnapshot(current, pending.sessionId, body.snapshot!),
           );
           await clearPendingSongGuessCommand(boardId).catch(() => undefined);
           setHasPending(false);
+          if (pending.request.command.type === "join") setFailedJoinSessionId(body.snapshot!.viewer.joined === false ? pending.sessionId : null);
           setNotice("최신 상태로 맞췄어요.");
         } else {
-          if (cause instanceof ApiError && cause.status < 500 && cause.status !== 408) {
+          if (pending.request.command.type === "join") setFailedJoinSessionId(pending.sessionId);
+          if (
+            cause instanceof ApiError &&
+            cause.status < 500 &&
+            cause.status !== 408
+          ) {
             await clearPendingSongGuessCommand(boardId).catch(() => undefined);
             setHasPending(false);
           }
           setError(messageForError(cause));
         }
       } finally {
+        if (pendingRequestIdRef.current === pending.request.requestId) pendingRequestIdRef.current = null;
         setBusy(false);
       }
     },
-    [boardId],
+    [boardId, playSound],
   );
 
   useEffect(() => {
@@ -147,7 +274,8 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         !pending ||
         pending.sessionId !== snapshot.sessionId ||
         retriedRef.current === pending.request.requestId
-      ) return;
+      )
+        return;
       retriedRef.current = pending.request.requestId;
       void executePending(pending, false);
     });
@@ -157,21 +285,65 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   }, [boardId, busy, executePending, snapshot]);
 
   useEffect(() => {
+    if (
+      !snapshot ||
+      snapshot.phase !== "lobby" ||
+      snapshot.viewer.role !== "participant" ||
+      snapshot.viewer.joined !== false ||
+      busy ||
+      syncing ||
+      hasPending ||
+      autoJoinedSessionRef.current === snapshot.sessionId
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    void loadPendingSongGuessCommand(boardId).then(async (pending) => {
+      if (cancelled) return;
+      if (pending?.sessionId === snapshot.sessionId) {
+        setHasPending(true);
+        return;
+      }
+      if (pending) {
+        await clearPendingSongGuessCommand(boardId).catch(() => undefined);
+      }
+      if (cancelled || autoJoinedSessionRef.current === snapshot.sessionId) {
+        return;
+      }
+      autoJoinedSessionRef.current = snapshot.sessionId;
+      void executePending({
+        sessionId: snapshot.sessionId,
+        request: makeSongGuessCommand(snapshot, { type: "join" }),
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [boardId, busy, executePending, hasPending, snapshot, syncing]);
+
+  useEffect(() => {
     setGuess("");
     setLastResult(null);
   }, [snapshot?.currentRound.roundId]);
 
-  const clip = snapshot?.phase === "guessing" ? snapshot.currentRound.currentClip : null;
+  const clip =
+    snapshot?.phase === "guessing" ? snapshot.currentRound.currentClip : null;
   useEffect(() => {
     let active = true;
     try {
       player.pause();
-    } catch {
-      // ignore pause failures while the player is empty
-    }
+    } catch {}
     setAudioError(null);
     if (!snapshot || !clip) {
       setAudioPreparing(false);
+      return () => {
+        active = false;
+      };
+    }
+    if (clip.mimeType === "video/youtube") {
+      setAudioPreparing(false);
+      setAudioError("음원 파일이 없는 문제예요.");
       return () => {
         active = false;
       };
@@ -192,25 +364,69 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       active = false;
       try {
         player.pause();
-      } catch {
-        // ignore
-      }
+      } catch {}
     };
-  }, [clip?.assetId, player, snapshot?.sessionId]);
+  }, [clip?.assetId, clip?.mimeType, player, snapshot?.sessionId]);
+
+  useEffect(() => {
+    if (!snapshot) return;
+    const key = `${snapshot.sessionId}:${snapshot.currentRound.roundId}:${snapshot.phase}`;
+    if (phaseSoundKeyRef.current === key) return;
+    phaseSoundKeyRef.current = key;
+    if (snapshot.phase === "guessing") playSound("start");
+    if (snapshot.phase === "reveal") playSound("round-results");
+    if (snapshot.phase === "finished") playSound("podium");
+  }, [playSound, snapshot]);
 
   const submitGuess = useCallback(() => {
     const text = guess.trim();
-    if (!snapshot || snapshot.phase !== "guessing" || !text || busy || syncing) return;
+    if (
+      !snapshot ||
+      snapshot.phase !== "guessing" ||
+      snapshot.viewer.joined === false ||
+      !text ||
+      busy ||
+      syncing
+    )
+      return;
+    if (snapshot.rulesVersion === 2) {
+      const serverNowMs =
+        clockRef.current?.key === snapshotClockKey
+          ? clockRef.current.serverTimeMs +
+            Math.max(0, monotonicNowMs - clockRef.current.monotonicMs)
+          : snapshot.serverTimeMs;
+      if (songGuessRemainingSeconds(snapshot, serverNowMs) === 0) return;
+    }
     void executePending({
       sessionId: snapshot.sessionId,
-      request: makeSongGuessCommand(snapshot, { type: "guess", text }),
+      request: makeSongGuessCommand(snapshot, {
+        type: "guess",
+        text,
+        roundId: snapshot.currentRound.roundId,
+      }),
     });
-  }, [busy, executePending, guess, snapshot, syncing]);
+  }, [
+    busy,
+    executePending,
+    guess,
+    monotonicNowMs,
+    snapshot,
+    snapshotClockKey,
+    syncing,
+  ]);
 
   const playClip = useCallback(async () => {
-    if (!clip || audioPreparing || !playerStatus.isLoaded) return;
+    if (
+      !clip ||
+      clip.mimeType === "video/youtube" ||
+      audioPreparing ||
+      !playerStatus.isLoaded
+    )
+      return;
     try {
-      if (playerStatus.currentTime >= Math.max(0, playerStatus.duration - 0.05)) {
+      if (
+        playerStatus.currentTime >= Math.max(0, playerStatus.duration - 0.05)
+      ) {
         await player.seekTo(0);
       }
       player.play();
@@ -218,12 +434,36 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     } catch {
       setAudioError("재생을 시작하지 못했어요.");
     }
-  }, [audioPreparing, clip, player, playerStatus.currentTime, playerStatus.duration, playerStatus.isLoaded]);
+  }, [
+    audioPreparing,
+    clip,
+    player,
+    playerStatus.currentTime,
+    playerStatus.duration,
+    playerStatus.isLoaded,
+  ]);
 
   if (loading) {
     return (
       <View style={styles.center} accessibilityLiveRegion="polite">
         <ActivityIndicator />
+      </View>
+    );
+  }
+
+  if (!snapshot && error) {
+    return (
+      <View style={styles.emptyContainer}>
+        <EmptyState
+          title="연결할 수 없어요."
+          description="네트워크를 확인한 뒤 다시 시도해 주세요."
+        />
+        <Text style={styles.errorText} accessibilityRole="alert">
+          {error}
+        </Text>
+        <AppButton variant="secondary" onPress={() => void refresh()}>
+          다시 시도
+        </AppButton>
       </View>
     );
   }
@@ -234,42 +474,103 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         <EmptyState title="준비 중" description="로비가 열리면 시작돼요." />
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
         <AppButton variant="secondary" onPress={() => void refresh()}>
-          다시 확인
+          다시 시도
         </AppButton>
       </View>
     );
   }
 
-  const ranked = [...snapshot.participants].sort(
-    (left, right) => right.score - left.score || left.displayName.localeCompare(right.displayName),
-  );
-  const canGuess = snapshot.phase === "guessing" && !snapshot.viewer.scoredCurrentRound;
-  const progress = playerStatus.duration > 0
-    ? Math.min(1, playerStatus.currentTime / playerStatus.duration)
-    : 0;
+  const estimatedServerNowMs =
+    snapshot && clockRef.current?.key === snapshotClockKey
+      ? clockRef.current.serverTimeMs +
+        Math.max(0, monotonicNowMs - clockRef.current.monotonicMs)
+      : (snapshot?.serverTimeMs ?? 0);
+  const remainingSeconds =
+    snapshot.phase === "guessing"
+      ? songGuessRemainingSeconds(snapshot, estimatedServerNowMs)
+      : null;
+  const deadlineReached = remainingSeconds !== null && remainingSeconds <= 0;
+  const canGuess =
+    snapshot.phase === "guessing" &&
+    snapshot.viewer.joined !== false &&
+    !snapshot.viewer.scoredCurrentRound &&
+    !deadlineReached;
+  const progress =
+    playerStatus.duration > 0
+      ? Math.min(1, playerStatus.currentTime / playerStatus.duration)
+      : 0;
+  const entryFailed =
+    failedJoinSessionId === snapshot.sessionId &&
+    snapshot.viewer.joined === false &&
+    !busy &&
+    !syncing &&
+    !hasPending;
 
   return (
     <ScrollView
       contentContainerStyle={styles.container}
+      contentInsetAdjustmentBehavior="automatic"
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="interactive"
       style={styles.scroll}
     >
       <View style={styles.phaseRow} accessibilityLiveRegion="polite">
         <Text style={styles.phaseLabel}>{phaseLabel(snapshot.phase)}</Text>
-        <Text style={styles.roundText}>{snapshot.currentRound.order + 1}라운드</Text>
+        <Text style={styles.roundText}>
+          {snapshot.currentRound.order + 1}라운드
+        </Text>
       </View>
 
-      {snapshot.phase === "guessing" && clip ? (
+      {snapshot.phase === "lobby" ? (
+        <SongGuessLobbyStatus
+          joined={snapshot.viewer.joined !== false}
+          pending={hasPending || busy || syncing}
+          failed={entryFailed}
+          onRetry={() => {
+            setFailedJoinSessionId(null);
+            void executePending({
+              sessionId: snapshot.sessionId,
+              request: makeSongGuessCommand(snapshot, { type: "join" }),
+            });
+          }}
+        />
+      ) : null}
+
+      {snapshot.phase === "guessing" ? (
+        <View style={styles.timingCard} accessibilityLiveRegion="polite">
+          {remainingSeconds === null ? null : deadlineReached ? (
+            <Text style={styles.timingExpired}>시간이 끝났어요.</Text>
+          ) : (
+            <Text style={styles.timingText}>
+              남은 시간 {remainingSeconds}초
+            </Text>
+          )}
+        </View>
+      ) : null}
+
+      {snapshot.phase === "guessing" && clip?.mimeType === "video/youtube" ? (
+        <View style={styles.playerCard} accessibilityLiveRegion="polite">
+          <Text style={styles.playerError} accessibilityRole="alert">
+            음원 파일이 없는 문제예요.
+          </Text>
+        </View>
+      ) : null}
+
+      {snapshot.phase === "guessing" && clip && clip.mimeType !== "video/youtube" ? (
         <View style={styles.playerCard}>
           <View style={styles.playerTopRow}>
-            <Text style={styles.playerDuration}>{formatTier(clip.tierMs)}</Text>
+            <Text style={styles.playerDuration}>
+              {formatClipLabel(clip.tierMs)}
+            </Text>
             <Text style={styles.playerTime}>
-              {formatSeconds(playerStatus.currentTime)} / {formatSeconds(clip.durationMs / 1000)}
+              {formatSeconds(playerStatus.currentTime)} /{" "}
+              {formatSeconds(clip.durationMs / 1000)}
             </Text>
           </View>
           <View style={styles.progressTrack}>
-            <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+            <View
+              style={[styles.progressFill, { width: `${progress * 100}%` }]}
+            />
           </View>
           <View style={styles.playerActions}>
             <AppButton
@@ -281,20 +582,35 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
               {playerStatus.playing ? "다시 듣기" : "듣기"}
             </AppButton>
             {playerStatus.playing ? (
-              <AppButton style={styles.playerButton} variant="secondary" onPress={() => player.pause()}>
+              <AppButton
+                style={styles.playerButton}
+                variant="secondary"
+                onPress={() => player.pause()}
+              >
                 일시정지
               </AppButton>
             ) : null}
+            <AppButton
+              style={styles.playerButton}
+              variant="secondary"
+              onPress={() => setMuted((value) => !value)}
+            >
+              {muted ? "소리 켜기" : "음소거"}
+            </AppButton>
           </View>
-          {audioError ? <Text style={styles.playerError}>{audioError}</Text> : null}
+          {audioError ? (
+            <Text style={styles.playerError}>{audioError}</Text>
+          ) : null}
         </View>
       ) : null}
 
       {snapshot.currentRound.accessibilityClue ? (
-        <Text style={styles.clueText}>{snapshot.currentRound.accessibilityClue}</Text>
+        <Text style={styles.clueText}>
+          {snapshot.currentRound.accessibilityClue}
+        </Text>
       ) : null}
 
-      {snapshot.phase === "guessing" ? (
+      {snapshot.phase === "guessing" && snapshot.viewer.joined !== false ? (
         <View style={styles.guessCard}>
           <TextField
             value={guess}
@@ -312,34 +628,49 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
             disabled={!canGuess || !guess.trim() || syncing}
             onPress={submitGuess}
           >
-            {snapshot.viewer.scoredCurrentRound ? "완료" : "제출"}
+            {snapshot.viewer.scoredCurrentRound || deadlineReached
+              ? "완료"
+              : "제출"}
           </AppButton>
         </View>
       ) : null}
 
+      {snapshot.phase === "guessing" && snapshot.viewer.joined === false ? (
+        <View style={styles.waitingCard} accessibilityLiveRegion="polite">
+          <Text style={styles.joinTitle} selectable>
+            관전 중
+          </Text>
+          <Text style={styles.muted} selectable>
+            다음 라운드부터 참여하려면 선생님에게 입장을 요청하세요.
+          </Text>
+        </View>
+      ) : null}
+
       {lastResult ? (
-        <Text style={[styles.resultText, lastResult.correct ? styles.successText : styles.missText]}>
-          {lastResult.correct
-            ? lastResult.alreadyScored
-              ? "이미 점수를 받았어요"
-              : `정답 +${lastResult.score}`
-            : "오답"}
+        <Text
+          style={[
+            styles.resultText,
+            lastResult.correct ? styles.successText : styles.missText,
+          ]}
+        >
+          {lastResult.timedOut
+            ? "시간이 지나 점수를 받지 못했어요"
+            : lastResult.correct
+              ? lastResult.alreadyScored
+                ? "이미 점수를 받았어요"
+                : `정답 +${lastResult.score}`
+              : "오답"}
         </Text>
       ) : null}
 
-      {(snapshot.phase === "reveal" || snapshot.phase === "finished") && snapshot.currentRound.revealedAnswer ? (
-        <Text style={styles.answerText}>{snapshot.currentRound.revealedAnswer}</Text>
+      {(snapshot.phase === "reveal" || snapshot.phase === "finished") &&
+      snapshot.currentRound.revealedAnswer ? (
+        <Text style={styles.answerText}>
+          {snapshot.currentRound.revealedAnswer}
+        </Text>
       ) : null}
 
-      <View style={styles.scoreCard}>
-        {ranked.length ? ranked.map((participant, index) => (
-          <View style={styles.scoreRow} key={`${participant.displayName}-${index}`}>
-            <Text style={styles.rank}>{index + 1}</Text>
-            <Text style={styles.playerName} numberOfLines={1}>{participant.displayName}</Text>
-            <Text style={styles.score}>{participant.score}</Text>
-          </View>
-        )) : <Text style={styles.muted}>점수 없음</Text>}
-      </View>
+      <SongGuessScoreboard snapshot={snapshot} />
 
       <View style={styles.actions}>
         {hasPending ? (
@@ -355,49 +686,23 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
             다시 보내기
           </AppButton>
         ) : null}
-        <AppButton variant="secondary" disabled={busy || syncing} onPress={() => void refresh()}>
+        <AppButton
+          variant="secondary"
+          disabled={busy || syncing}
+          onPress={() => void refresh()}
+        >
           새로고침
         </AppButton>
       </View>
 
       {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}
-      {error ? <Text style={styles.errorText} accessibilityRole="alert">{error}</Text> : null}
+      {error ? (
+        <Text style={styles.errorText} accessibilityRole="alert">
+          {error}
+        </Text>
+      ) : null}
     </ScrollView>
   );
-}
-
-function phaseLabel(phase: SongGuessSnapshot["phase"]): string {
-  if (phase === "lobby") return "대기";
-  if (phase === "guessing") return "진행";
-  if (phase === "reveal") return "정답";
-  if (phase === "finished") return "종료";
-  return "준비";
-}
-
-function formatTier(tierMs: number): string {
-  return `${(tierMs / 1000).toFixed(1)}초`;
-}
-
-function formatSeconds(seconds: number): string {
-  return `${Math.max(0, seconds).toFixed(1)}초`;
-}
-
-function messageForError(error: unknown): string {
-  const body = songGuessApiError(error);
-  switch (body?.error) {
-    case "invalid_phase":
-      return "지금은 제출할 수 없어요.";
-    case "domain_rejected":
-      return "정답을 처리하지 못했어요.";
-    case "forbidden":
-      return "참여 권한이 없어요.";
-    case "unauthorized":
-      return "다시 로그인해 주세요.";
-    case "play_engine_unavailable":
-      return "게임 서버 연결이 불안정해요.";
-    default:
-      return "연결을 확인해 주세요.";
-  }
 }
 
 const styles = StyleSheet.create({
@@ -430,6 +735,22 @@ const styles = StyleSheet.create({
   },
   phaseLabel: { ...typography.subtitle, color: colors.text },
   roundText: { ...typography.label, color: colors.textMuted },
+  timingCard: {
+    gap: spacing.xs,
+    padding: spacing.md,
+    borderRadius: radii.card,
+    backgroundColor: colors.accentTintedBg,
+  },
+  timingText: { ...typography.subtitle, color: colors.accentActive },
+  timingExpired: { ...typography.subtitle, color: colors.danger },
+  joinTitle: { ...typography.subtitle, color: colors.text },
+  waitingCard: {
+    gap: spacing.sm,
+    padding: spacing.lg,
+    borderRadius: radii.card,
+    borderCurve: "continuous",
+    backgroundColor: colors.surfaceAlt,
+  },
   playerCard: {
     gap: spacing.md,
     paddingVertical: spacing.md,
@@ -463,21 +784,6 @@ const styles = StyleSheet.create({
   successText: { color: colors.plantActive },
   missText: { color: colors.danger },
   answerText: { ...typography.display, color: colors.text },
-  scoreCard: {
-    gap: spacing.sm,
-    borderTopWidth: borders.hairline,
-    borderColor: colors.border,
-    paddingTop: spacing.md,
-  },
-  scoreRow: {
-    minHeight: tapMin,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  rank: { ...typography.subtitle, width: spacing.xxl, color: colors.textMuted },
-  playerName: { ...typography.body, flex: 1, color: colors.text },
-  score: { ...typography.subtitle, color: colors.text },
   actions: { gap: spacing.sm },
   muted: { ...typography.body, color: colors.textMuted },
   noticeText: { ...typography.body, color: colors.plantActive },
