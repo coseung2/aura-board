@@ -24,6 +24,15 @@ const CreateSchema = z.object({
   groups: GroupsSchema,
 });
 
+function isUniqueConstraintError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    error.code === "P2002"
+  );
+}
+
 async function requireClassroom(id: string, userId: string) {
   const classroom = await db.classroom.findUnique({
     where: { id },
@@ -84,13 +93,18 @@ export async function POST(
   }
 
   const name = parsed.data.name.trim();
-  // Same name overwrites, so re-saving a layout updates it in place.
-  const layout = await db.classroomSeatingLayout.upsert({
-    where: { classroomId_name: { classroomId: id, name } },
-    create: { classroomId: id, name, groups: parsed.data.groups },
-    update: { groups: parsed.data.groups },
-    select: { id: true, name: true, groups: true, updatedAt: true },
-  });
+  let layout;
+  try {
+    layout = await db.classroomSeatingLayout.create({
+      data: { classroomId: id, name, groups: parsed.data.groups },
+      select: { id: true, name: true, groups: true, updatedAt: true },
+    });
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return NextResponse.json({ error: "name_conflict" }, { status: 409 });
+    }
+    throw error;
+  }
 
   return NextResponse.json({ layout }, { status: 201 });
 }

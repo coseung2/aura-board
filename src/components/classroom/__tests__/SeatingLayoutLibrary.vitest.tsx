@@ -60,7 +60,7 @@ describe("SeatingLayoutLibrary", () => {
     fireEvent.change(await screen.findByLabelText("자리 배치 이름"), {
       target: { value: "1학기 2차" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "현재 배치 저장" }));
+    fireEvent.click(screen.getByRole("button", { name: "배치 보관" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
     expect(fetchMock.mock.calls[1][0]).toBe(
@@ -97,5 +97,99 @@ describe("SeatingLayoutLibrary", () => {
       "/api/classroom/classroom-1/seating-layouts/layout-1",
     );
     expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "DELETE" });
+  });
+
+  it("renames a layout through the inline editor", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ layouts: [savedLayout] }))
+      .mockResolvedValueOnce(
+        jsonResponse({ layout: { ...savedLayout, name: "새 이름" } }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ layouts: [{ ...savedLayout, name: "새 이름" }] }),
+      );
+    renderLibrary();
+
+    fireEvent.click(await screen.findByRole("button", { name: "이름 변경" }));
+    fireEvent.change(screen.getByLabelText("배치 이름"), {
+      target: { value: "새 이름" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+    expect(fetchMock.mock.calls[1][0]).toBe(
+      "/api/classroom/classroom-1/seating-layouts/layout-1",
+    );
+    expect(fetchMock.mock.calls[1][1]).toMatchObject({ method: "PATCH" });
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({
+      name: "새 이름",
+    });
+  });
+
+  it("shows refresh failure without claiming the list was saved", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ layouts: [] }))
+      .mockResolvedValueOnce(jsonResponse({ layout: savedLayout }))
+      .mockResolvedValueOnce(jsonResponse({}, false));
+    renderLibrary();
+
+    fireEvent.change(await screen.findByLabelText("자리 배치 이름"), {
+      target: { value: "새 배치" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "배치 보관" }));
+
+    expect((await screen.findByRole("alert")).textContent).toContain(
+      "목록을 새로 고치지 못했어요.",
+    );
+    expect(screen.queryByText("저장했어요")).toBeNull();
+  });
+
+  it("uses a Korean fallback for mutation error codes without offering refresh", async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse({ layouts: [] }))
+      .mockResolvedValueOnce(jsonResponse({ error: "unauthorized" }, false));
+    renderLibrary();
+
+    fireEvent.change(await screen.findByLabelText("자리 배치 이름"), {
+      target: { value: "새 배치" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "배치 보관" }));
+
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("자리 배치를 보관하지 못했어요.");
+    expect(screen.queryByRole("button", { name: "다시 불러오기" })).toBeNull();
+  });
+
+  it("keeps the newest list when an older refresh resolves later", async () => {
+    let resolveInitial: (value: unknown) => void = () => undefined;
+    let resolveLatest: (value: unknown) => void = () => undefined;
+    fetchMock.mockImplementation(() => {
+      if (fetchMock.mock.calls.length === 1) {
+        return new Promise((resolve) => {
+          resolveInitial = resolve;
+        });
+      }
+      if (fetchMock.mock.calls.length === 2) {
+        return Promise.resolve(jsonResponse({ layout: savedLayout }));
+      }
+      return new Promise((resolve) => {
+        resolveLatest = resolve;
+      });
+    });
+    renderLibrary();
+
+    fireEvent.change(screen.getByLabelText("자리 배치 이름"), {
+      target: { value: "새 배치" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "배치 보관" }));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
+
+    resolveInitial(jsonResponse({ layouts: [savedLayout] }));
+    resolveLatest(
+      jsonResponse({ layouts: [{ ...savedLayout, name: "최신 배치" }] }),
+    );
+
+    expect(await screen.findByText("최신 배치")).toBeTruthy();
+    expect(screen.queryByText("1학기 1차")).toBeNull();
   });
 });

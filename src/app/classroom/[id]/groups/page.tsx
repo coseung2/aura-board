@@ -39,9 +39,9 @@ export default async function ClassroomGroupsPage({ params }: Props) {
       <a href="/classroom" className="classroom-back-link">
         &larr; 학급 목록
       </a>
-      <h1 className="classroom-page-title">{classroom.name}</h1>
       <ClassroomGroupsTab
         classroomId={classroom.id}
+        classroomName={classroom.name}
         students={classroom.students}
         initialGroups={groups}
       />

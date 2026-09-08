@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   type GroupEditorDraft,
   type GroupEditorStudent,
@@ -8,9 +8,11 @@ import {
 import { ClassroomSeatingEditor } from "./ClassroomSeatingEditor";
 import { SeatingLayoutLibrary } from "./SeatingLayoutLibrary";
 import { isSeatingExcludedStudent } from "@/lib/seating-exclusions";
+import styles from "./ClassroomGroupsTab.module.css";
 
 type Props = {
   classroomId: string;
+  classroomName: string;
   students: GroupEditorStudent[];
   initialGroups: GroupEditorDraft[];
 };
@@ -59,21 +61,26 @@ function restoreSavedGroups(
 ): GroupEditorDraft[] {
   const validIds = new Set(students.map((student) => student.id));
   const seen = new Set<string>();
-  const groups = savedGroups
-    .map((group, index) => {
-      const studentIds = group.studentIds.filter((studentId) => {
-        if (!validIds.has(studentId) || seen.has(studentId)) return false;
-        seen.add(studentId);
-        return true;
-      });
-      return {
-        name: group.name.trim() || `${index + 1}분단`,
-        studentIds,
-      };
-    })
-    .filter((group) => group.studentIds.length > 0);
+  const groups = savedGroups.map((group, index) => {
+    const studentIds = group.studentIds.filter((studentId) => {
+      if (!validIds.has(studentId) || seen.has(studentId)) return false;
+      seen.add(studentId);
+      return true;
+    });
+    return {
+      name: group.name.trim() || `${index + 1}분단`,
+      studentIds,
+    };
+  });
 
-  return groups.length > 0 ? groups : defaultGroups(students);
+  return groups.length > 0 ? groups : [{ name: "1분단", studentIds: [] }];
+}
+
+function groupsMatch(
+  first: GroupEditorDraft[],
+  second: GroupEditorDraft[],
+): boolean {
+  return JSON.stringify(first) === JSON.stringify(second);
 }
 
 function serverErrorMessage(error: string | undefined): string {
@@ -93,6 +100,7 @@ function serverErrorMessage(error: string | undefined): string {
 
 export function ClassroomGroupsTab({
   classroomId,
+  classroomName,
   students,
   initialGroups,
 }: Props) {
@@ -100,13 +108,27 @@ export function ClassroomGroupsTab({
     () => students.filter((student) => !isSeatingExcludedStudent(student)),
     [students],
   );
+  const normalizedInitialGroups = useMemo(
+    () =>
+      initialGroups.length > 0
+        ? restoreSavedGroups(initialGroups, seatingStudents)
+        : defaultGroups(seatingStudents),
+    [initialGroups, seatingStudents],
+  );
   const [groups, setGroups] = useState<GroupEditorDraft[]>(
-    initialGroups.length > 0
-      ? restoreSavedGroups(initialGroups, seatingStudents)
-      : defaultGroups(seatingStudents),
+    normalizedInitialGroups,
+  );
+  const [appliedGroups, setAppliedGroups] = useState<GroupEditorDraft[]>(
+    initialGroups.length > 0 ? normalizedInitialGroups : [],
   );
   const [saving, setSaving] = useState(false);
-  const [status, setStatus] = useState("");
+  const [libraryBusy, setLibraryBusy] = useState(false);
+  const [status, setStatus] = useState<{
+    message: string;
+    kind: "error" | "success" | "info";
+  } | null>(null);
+  const draftVersion = useRef(0);
+  const isDirty = !groupsMatch(groups, appliedGroups);
 
   const validation = useMemo(() => {
     const studentIds = new Set(seatingStudents.map((student) => student.id));
@@ -178,17 +200,20 @@ export function ClassroomGroupsTab({
   }, [groups, seatingStudents]);
 
   async function saveGroups() {
+    if (saving || libraryBusy) return;
     if (!validation.canSave) {
-      setStatus(validation.message);
+      setStatus({ message: validation.message, kind: "error" });
       return;
     }
+    const versionAtStart = draftVersion.current;
+    const groupsAtStart = groups;
     setSaving(true);
-    setStatus("");
+    setStatus(null);
     try {
       const res = await fetch(`/api/classroom/${classroomId}/groups`, {
         method: "PUT",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ groups }),
+        body: JSON.stringify({ groups: groupsAtStart }),
       });
       if (!res.ok) {
         const payload = (await res.json().catch(() => null)) as {
@@ -197,73 +222,96 @@ export function ClassroomGroupsTab({
         throw new Error(serverErrorMessage(payload?.error));
       }
       const data = (await res.json()) as { groups: GroupEditorDraft[] };
-      setGroups(data.groups);
-      setStatus("자리 배치를 저장했어요.");
+      setAppliedGroups(data.groups);
+      if (draftVersion.current === versionAtStart) {
+        setGroups(data.groups);
+        setStatus({ message: "학급에 적용했어요.", kind: "success" });
+      } else {
+        setStatus({
+          message: "학급에 적용했어요. 이후에 바꾼 초안은 유지했어요.",
+          kind: "success",
+        });
+      }
     } catch (error) {
-      setStatus(
-        error instanceof Error ? error.message : "자리 배치 저장에 실패했어요.",
-      );
+      setStatus({
+        message:
+          error instanceof Error
+            ? error.message
+            : "자리 배치 저장에 실패했어요.",
+        kind: "error",
+      });
     } finally {
       setSaving(false);
     }
   }
 
   function handleGroupsChange(nextGroups: GroupEditorDraft[]) {
+    draftVersion.current += 1;
     setGroups(nextGroups);
-    setStatus("");
+    setStatus(null);
+  }
+
+  function handleRestore(restored: GroupEditorDraft[]) {
+    const sanitized = restoreSavedGroups(restored, seatingStudents);
+    draftVersion.current += 1;
+    setGroups(sanitized);
+    setStatus({
+      message: "배치를 불러왔어요.",
+      kind: "info",
+    });
   }
 
   return (
     <section className="classroom-boards-section">
-      <div className="classroom-boards-header">
-        <div>
-          <h2 className="classroom-boards-heading">
-            자리 배치 <span className="board-badge">관리자</span>
-          </h2>
-          <p className="classroom-setting-hint">
-            저장한 자리 배치는 학급 기본 모둠이 됩니다. 보드는 만들 때 이
-            배치를 그대로 가져가며, 이미 만든 보드의 모둠은 바뀌지 않아요.
-          </p>
-        </div>
-        <button
-          type="button"
-          className="classroom-action-btn"
-          onClick={() => void saveGroups()}
-          disabled={saving || !validation.canSave}
-        >
-          {saving ? "저장 중..." : "저장"}
-        </button>
-      </div>
       <ClassroomSeatingEditor
+        classroomName={classroomName}
         students={seatingStudents}
         groups={groups}
         onChange={handleGroupsChange}
-        disabled={saving}
+        disabled={saving || libraryBusy}
+        sidebarFooter={
+          <div className={styles.sidebarFooter}>
+            <div className={styles.applyRow}>
+              {isDirty ? (
+                <span className={styles.dirty}>변경 있음</span>
+              ) : (
+                <span aria-hidden="true" />
+              )}
+              <button
+                type="button"
+                className={styles.applyButton}
+                onClick={() => void saveGroups()}
+                disabled={
+                  saving || libraryBusy || !validation.canSave || !isDirty
+                }
+              >
+                {saving ? "적용 중..." : "학급에 적용"}
+              </button>
+            </div>
+            {validation.message && (
+              <p className={styles.validation} role="status" aria-live="polite">
+                {validation.message}
+              </p>
+            )}
+            {status && (
+              <p
+                className={`${styles.status} ${styles[`status-${status.kind}`]}`}
+                role={status.kind === "error" ? "alert" : "status"}
+                aria-live="polite"
+              >
+                {status.message}
+              </p>
+            )}
+            <SeatingLayoutLibrary
+              classroomId={classroomId}
+              currentGroups={groups}
+              onRestore={handleRestore}
+              onBusyChange={setLibraryBusy}
+              disabled={saving}
+            />
+          </div>
+        }
       />
-
-      <SeatingLayoutLibrary
-        classroomId={classroomId}
-        currentGroups={groups}
-        onRestore={(restored) => {
-          setGroups(restored);
-          setStatus("저장된 자리 배치를 불러왔어요. 저장을 눌러 반영하세요.");
-        }}
-        disabled={saving}
-      />
-      {validation.message && (
-        <p
-          className="classroom-setting-warning"
-          role="status"
-          aria-live="polite"
-        >
-          {validation.message}
-        </p>
-      )}
-      {status && (
-        <p className="classroom-setting-hint" role="status" aria-live="polite">
-          {status}
-        </p>
-      )}
     </section>
   );
 }

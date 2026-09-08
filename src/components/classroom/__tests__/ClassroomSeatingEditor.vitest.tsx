@@ -19,13 +19,30 @@ const groups = [
   { name: "2모둠", studentIds: ["s3"] },
 ];
 
+const balancedGroups = [
+  { name: "1모둠", studentIds: ["s1", "s2"] },
+  { name: "2모둠", studentIds: ["s3", "s4"] },
+];
+
+const balancedStudents = students.map((student, index) => ({
+  ...student,
+  gender: index < 2 ? "female" : "male",
+}));
+
 const onChange = vi.fn();
 
-function renderEditor() {
+function renderEditor(
+  overrides: {
+    students?: typeof students;
+    groups?: typeof groups;
+    disabled?: boolean;
+  } = {},
+) {
   return render(
     <ClassroomSeatingEditor
-      students={students}
-      groups={groups}
+      students={overrides.students ?? students}
+      groups={overrides.groups ?? groups}
+      disabled={overrides.disabled}
       onChange={onChange}
     />,
   );
@@ -88,6 +105,153 @@ describe("ClassroomSeatingEditor drag", () => {
     fireEvent.dragOver(desk("김병찬"), { dataTransfer: dataTransfer("s1") });
     fireEvent.dragEnd(desk("공서희"), { dataTransfer: dataTransfer("s1") });
 
+    expect(onChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("ClassroomSeatingEditor interactions", () => {
+  beforeEach(() => {
+    onChange.mockReset();
+    vi.stubGlobal(
+      "matchMedia",
+      vi.fn(() => ({ matches: true, addEventListener: vi.fn(), removeEventListener: vi.fn() })),
+    );
+  });
+
+  function openAdvanced() {
+    fireEvent.click(screen.getByText("고급 조건"));
+  }
+
+  function arrangeWithFixedPair(first: string, second: string) {
+    openAdvanced();
+    const selects = screen.getAllByRole("combobox");
+    fireEvent.change(selects[0], { target: { value: "mixed" } });
+    fireEvent.change(selects[1], { target: { value: first } });
+    fireEvent.change(selects[2], { target: { value: second } });
+    fireEvent.click(screen.getByRole("button", { name: "추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "자리 섞기" }));
+  }
+
+  it("applies a compatible ratio and fixed pair together", () => {
+    renderEditor({ students: balancedStudents, groups: balancedGroups });
+    openAdvanced();
+    fireEvent.click(screen.getByRole("checkbox"));
+    const ratioInputs = screen.getAllByRole("spinbutton");
+    fireEvent.change(ratioInputs[0], { target: { value: "1" } });
+    fireEvent.change(ratioInputs[1], { target: { value: "1" } });
+    const selects = screen.getAllByRole("combobox");
+    fireEvent.change(selects[0], { target: { value: "mixed" } });
+    fireEvent.change(selects[1], { target: { value: "s1" } });
+    fireEvent.change(selects[2], { target: { value: "s3" } });
+    fireEvent.click(screen.getByRole("button", { name: "추가" }));
+    fireEvent.click(screen.getByRole("button", { name: "자리 섞기" }));
+
+    expect(onChange).toHaveBeenCalledTimes(1);
+    const nextGroups = onChange.mock.calls[0][0];
+    const fixedGroup = nextGroups.find((group: { studentIds: string[] }) =>
+      group.studentIds.includes("s1"),
+    );
+    expect(fixedGroup?.studentIds.slice(0, 2).sort()).toEqual(["s1", "s3"]);
+    expect(nextGroups.flatMap((group: { studentIds: string[] }) => group.studentIds).sort()).toEqual(
+      ["s1", "s2", "s3", "s4"],
+    );
+  });
+
+  it("keeps the seating unchanged when a fixed pair conflicts with the pair mode", () => {
+    renderEditor({ students: balancedStudents, groups: balancedGroups });
+    arrangeWithFixedPair("s1", "s2");
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.querySelector(".seating-random-status")?.textContent).toMatch(/고정짝|충돌/);
+  });
+
+  it("swaps selected desks by click", () => {
+    renderEditor();
+    fireEvent.click(desk("공서희"));
+    fireEvent.click(desk("김병찬"));
+
+    expect(onChange.mock.calls[0][0]).toEqual([
+      { name: "1모둠", studentIds: ["s3", "s2"] },
+      { name: "2모둠", studentIds: ["s1"] },
+    ]);
+  });
+
+  it("swaps selected desks by keyboard activation", () => {
+    renderEditor();
+    fireEvent.keyDown(desk("공서희"), { key: "Enter" });
+    fireEvent.keyDown(desk("김병찬"), { key: "Enter" });
+
+    expect(onChange.mock.calls[0][0][0].studentIds).toEqual(["s3", "s2"]);
+    expect(onChange.mock.calls[0][0][1].studentIds).toEqual(["s1"]);
+  });
+
+  it("returns an unassigned student into an occupied desk without losing its occupant", () => {
+    const withUnassigned = [
+      ...students,
+      { id: "s5", name: "정하늘", number: 5, gender: "male" },
+    ];
+    renderEditor({ students: withUnassigned });
+    fireEvent.click(screen.getByRole("button", { name: "정하늘 미배정 학생" }));
+    fireEvent.click(desk("공서희"));
+
+    expect(onChange.mock.calls[0][0][0].studentIds).toEqual(["s5", "s1", "s2"]);
+  });
+
+  it("clears a ratio error as soon as the ratio condition is edited", () => {
+    renderEditor({ students: balancedStudents, groups: balancedGroups });
+    openAdvanced();
+    fireEvent.click(screen.getByRole("checkbox"));
+    const ratioInputs = screen.getAllByRole("spinbutton");
+    fireEvent.change(ratioInputs[0], { target: { value: "0" } });
+    fireEvent.change(ratioInputs[1], { target: { value: "0" } });
+    fireEvent.click(screen.getByRole("button", { name: "자리 섞기" }));
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.querySelector(".seating-random-status")?.textContent).toMatch(/성비/);
+    fireEvent.change(ratioInputs[0], { target: { value: "1" } });
+    fireEvent.change(ratioInputs[1], { target: { value: "1" } });
+    expect(document.querySelector(".seating-random-status")).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "자리 섞기" }));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    fireEvent.click(desk("공서희"));
+    fireEvent.click(desk("김병찬"));
+    expect(document.querySelector(".seating-random-status")).toBeNull();
+  });
+
+  it("reports an empty assigned roster without changing groups", () => {
+    renderEditor({
+      groups: [
+        { name: "1모둠", studentIds: [] },
+        { name: "2모둠", studentIds: [] },
+      ],
+    });
+    fireEvent.click(screen.getByRole("button", { name: "자리 섞기" }));
+
+    expect(onChange).not.toHaveBeenCalled();
+    expect(document.querySelector(".seating-random-status")?.textContent).toMatch(/배치할 학생이 없습니다/);
+  });
+
+  it("shows the actual group count and can remove an empty group", () => {
+    renderEditor({
+      groups: Array.from({ length: 6 }, (_, index) => ({
+        name: `${index + 1}모둠`,
+        studentIds: index === 0 ? ["s1"] : [],
+      })),
+    });
+
+    expect(screen.getByText("6", { selector: "output" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "분단 수 줄이기" }));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange.mock.calls[0][0]).toHaveLength(5);
+  });
+
+  it("does not select or move a desk from the keyboard while disabled", () => {
+    renderEditor({ disabled: true });
+    fireEvent.keyDown(desk("공서희"), { key: "Enter" });
+    fireEvent.keyDown(desk("김병찬"), { key: "Enter" });
+
+    expect(desk("공서희").getAttribute("aria-pressed")).toBe("false");
     expect(onChange).not.toHaveBeenCalled();
   });
 });

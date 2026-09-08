@@ -115,36 +115,3 @@ export function pairModeLabel(mode: PairMode): string {
       return "제한 없음";
   }
 }
-
-export function scaledGenderTargets(
-  size: number,
-  femaleTarget: number,
-  maleTarget: number,
-) {
-  const quotaTotal = femaleTarget + maleTarget;
-  if (size <= 0 || quotaTotal <= 0)
-    return { female: 0, male: 0, scaled: false };
-  if (quotaTotal <= size) {
-    return { female: femaleTarget, male: maleTarget, scaled: false };
-  }
-
-  const femaleExact = (femaleTarget / quotaTotal) * size;
-  let female = Math.floor(femaleExact);
-  let male = Math.floor((maleTarget / quotaTotal) * size);
-  let remaining = size - female - male;
-
-  const femaleRemainder = femaleExact - female;
-  const maleRemainder = (maleTarget / quotaTotal) * size - male;
-  while (remaining > 0) {
-    if (femaleRemainder >= maleRemainder && female < femaleTarget) {
-      female += 1;
-    } else if (male < maleTarget) {
-      male += 1;
-    } else {
-      female += 1;
-    }
-    remaining -= 1;
-  }
-
-  return { female, male, scaled: true };
-}

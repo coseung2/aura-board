@@ -1,0 +1,183 @@
+.library {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #d9dfd4;
+  border-radius: 16px;
+  background: #fffdf7;
+}
+
+.header,
+.saveForm,
+.renameForm,
+.itemActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.header {
+  align-items: flex-start;
+  flex-direction: column;
+}
+
+.title {
+  margin: 0;
+  color: #344e43;
+  font-family: "Jua", "Noto Sans KR", sans-serif;
+  font-size: 16px;
+  font-weight: 400;
+}
+
+.saveForm,
+.renameForm {
+  width: 100%;
+}
+
+.saveForm {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.input {
+  min-width: 0;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid #d9dfd4;
+  border-radius: 10px;
+  background: #fff;
+  color: #344e43;
+  font: inherit;
+  font-size: 12px;
+}
+
+.input:focus {
+  border-color: #416c53;
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+}
+
+.primaryButton,
+.rowButton,
+.retryButton {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid #d9dfd4;
+  border-radius: 10px;
+  background: #fff;
+  color: #344e43;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.primaryButton {
+  width: 100%;
+  min-height: 38px;
+  border-color: #f3bd69;
+  border-radius: 12px;
+  background: #f3bd69;
+  color: #503f2c;
+  font-family: "Jua", "Noto Sans KR", sans-serif;
+  font-size: 14px;
+}
+
+.primaryButton:disabled,
+.rowButton:disabled,
+.retryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.rowButton:hover:not(:disabled),
+.rowButton:focus-visible,
+.retryButton:hover:not(:disabled),
+.retryButton:focus-visible {
+  background: #f2f5eb;
+  border-color: #aabca9;
+}
+
+.deleteButton {
+  color: #9c3d3d;
+}
+
+.error,
+.empty {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.error {
+  color: #9c3d3d;
+}
+
+.empty {
+  color: #768277;
+}
+
+.list {
+  display: grid;
+  gap: 6px;
+  max-height: 250px;
+  margin: 0;
+  padding: 0 2px 0 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 8px;
+  border-radius: 12px;
+  background: #f2f5eb;
+}
+
+.itemMain {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemMain strong {
+  overflow: hidden;
+  color: #344e43;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemMain span {
+  color: #768277;
+  font-size: 10px;
+}
+
+.itemActions {
+  flex-wrap: wrap;
+}
+
+.renameForm .input {
+  flex: 1 1 100%;
+}
+
+.retryButton {
+  justify-self: start;
+}
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

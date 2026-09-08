@@ -51,6 +51,46 @@ creating overlapping testing-notes documents.
   sessions. Investigate historical URL logs/session misuse operationally before
   deciding on targeted revocation; do not silently revoke all users.
 
+## Seating redesign handoff — 2026-09-08 KST
+
+- Implemented the approved classroom + tools + saved-list layout inside
+  `/classroom/[id]/groups`, without a second page header or instructional copy.
+  Figma reference: https://www.figma.com/design/fJ8AmpdkWJ0srOerq8w8Bl?node-id=1-2.
+- `classroom-seating-arrange.ts` applies fixed partners, visible adjacent
+  desk pairs, and female:male ratio together. Each group's count and the class
+  total may round only to floor/ceil of the requested ratio. Unsatisfiable
+  conditions keep the previous arrangement; unassigned students stay excluded.
+- `ClassroomSeatingEditor` supports drag, click and keyboard moves, including
+  return from the unassigned tray. Changing rules or manually moving students
+  clears stale arrangement status. Jua is loaded from Google Fonts with a
+  sans-serif fallback.
+- `ClassroomGroupsTab` separates applying the active classroom groups from
+  named layout storage. A newly generated default arrangement can be applied.
+  Restoring a snapshot changes the draft only. The library supports inline
+  rename, rejects duplicate names with HTTP 409, and ignores stale list reads.
+  Rename preserves the same administrator and classroom ownership checks.
+  No schema migration is required.
+- Passed: `npx tsc --noEmit`, `npm run check:lines`, and 52 tests across six
+  seating/editor/library/groups/API test files:
+  `npm run test -- src/components/classroom/__tests__/classroom-seating-arrange.vitest.ts src/components/classroom/__tests__/ClassroomSeatingEditor.vitest.tsx src/components/classroom/__tests__/SeatingLayoutLibrary.vitest.tsx src/components/classroom/__tests__/ClassroomGroupsTab.vitest.tsx src/app/api/classroom/[id]/seating-layouts`.
+  The solver tests include exhaustive small-class identity permutations across
+  pair modes, fixed partners, and 1:1, 2:1, 1:2, 0:1, 1:0 ratios.
+- Browser verification used real components and styles with a temporary
+  in-memory API and fictional students. Checked desktop and 390px width,
+  mixed pairs plus fixed partners, 2:1 rejection for a 12F/12M class without
+  changing seats, named storage, rename, apply and reload. This is not proof
+  of real database persistence or an authenticated Next.js page.
+- Remaining on the next computer: restore the authorized development SSH
+  tunnel to port 15434; run `infisical.exe run --env=dev -- npm run dev:check`
+  and then start development through Infisical. Verify the actual admin-owned
+  groups page, POST storage / PATCH rename / DELETE and PUT active apply,
+  persisted database state and reload, plus the new-board grouping snapshot.
+  Preserve the existing access guards and unrelated work.
+- The local DB preflight failed because that tunnel was absent. The
+  `npm run typecheck` Prisma prehook also hit a Windows engine DLL lock from
+  an existing process; direct TypeScript checking passed. Authenticated DB
+  roundtrip, production build and deployment were not verified in this pass.
+
 ## Save And Publish Flows
 
 - Do not treat optimistic UI as proof that a save worked.
