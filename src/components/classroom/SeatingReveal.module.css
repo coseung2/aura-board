@@ -1,0 +1,24 @@
+.dialog { box-sizing: border-box; width: min(1100px, calc(100vw - 24px)); max-height: 92dvh; padding: 28px; border: 0; border-radius: 24px; background: #f1f4e8; color: #334b3a; box-shadow: 0 24px 100px #0005; }
+.dialog::backdrop { background: #102a20cc; backdrop-filter: blur(5px); }
+.header { position: sticky; top: -1px; z-index: 1; background: #f1f4e8; padding-bottom: 12px; display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 24px; }
+.header h2 { margin: 0; font-size: clamp(20px, 3vw, 32px); }
+.header p { font-size: 26px; font-weight: 800; margin: 10px 0 0; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.actions button { min-height: 44px; padding: 8px 14px; border: 1px solid #416c53; border-radius: 12px; background: #fffdf7; color: #334b3a; cursor: pointer; }
+.actions button:focus-visible { outline: 3px solid #d19229; outline-offset: 3px; }
+.groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+.group { background: #dfe8d5; padding: 16px; border-radius: 18px; }
+.group h3 { margin: 0 0 12px; }
+.seats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.seat { min-height: 70px; display: grid; place-items: center; padding: 10px; border-radius: 12px; background: #416c53; color: #fff7dc; font-size: 20px; font-weight: 700; text-align: center; overflow-wrap: anywhere; }
+.revealed { background: #fffdf7; color: #334b3a; animation: reveal 400ms ease-out both; }
+.shuffling { animation: shuffle 220ms ease-in-out infinite alternate; }
+.shuffling:nth-child(even) { animation-direction: alternate-reverse; }
+@keyframes shuffle { from { transform: translateY(-5px) rotate(-3deg); } to { transform: translateY(5px) rotate(3deg); } }
+@keyframes reveal { from { transform: perspective(400px) rotateY(90deg) scale(.85); } to { transform: perspective(400px) rotateY(0) scale(1); } }
+.reduced .seat { animation: none; }
+@media (prefers-reduced-motion: reduce) { .seat { animation: none; } }
+@media (max-width: 600px) { .dialog { padding: 18px; } .header { align-items: start; flex-direction: column; } .groups { grid-template-columns: 1fr; } }
+.inline { padding: 12px 0; color: #334b3a; }
+.countdown { position: fixed; inset: 50% auto auto 50%; transform: translate(-50%, -50%); z-index: 60; pointer-events: none; color: #416c53; font: 800 clamp(80px, 14vw, 160px)/1 sans-serif; text-shadow: 0 2px 12px #fff; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }

@@ -10,15 +10,21 @@ vi.mock("../ClassroomSeatingEditor", () => ({
     classroomName,
     groups,
     sidebarFooter,
+    toolbarActions,
+    boardStatus,
   }: {
     classroomName?: string;
     groups: GroupEditorDraft[];
     sidebarFooter?: ReactNode;
+    toolbarActions?: ReactNode;
+    boardStatus?: ReactNode;
   }) => (
     <div>
       <span data-testid="editor-classroom-name">{classroomName}</span>
       <span data-testid="editor-groups">{JSON.stringify(groups)}</span>
       {sidebarFooter}
+      {toolbarActions}
+      {boardStatus}
     </div>
   ),
 }));
@@ -55,6 +61,25 @@ describe("ClassroomGroupsTab save separation", () => {
     vi.stubGlobal("fetch", fetchMock);
   });
 
+  it("renames legacy numbered groups without overwriting custom names or saving automatically", () => {
+    render(
+      <ClassroomGroupsTab
+        classroomId="classroom-1"
+        classroomName="햇살반"
+        students={students}
+        initialGroups={[
+          { name: "1분단", studentIds: ["s1"] },
+          { name: "우리 분단", studentIds: ["s2"] },
+        ]}
+      />,
+    );
+    expect(JSON.parse(screen.getByTestId("editor-groups").textContent!)).toEqual([
+      { name: "1모둠", studentIds: ["s1"] },
+      { name: "우리 분단", studentIds: ["s2"] },
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("keeps restore in the editor until the explicit classroom apply", async () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
@@ -79,7 +104,7 @@ describe("ClassroomGroupsTab save separation", () => {
       JSON.stringify([{ name: "복원", studentIds: ["s1"] }]),
     );
 
-    const applyButton = screen.getByRole("button", { name: "학급에 적용" });
+    const applyButton = screen.getByRole("button", { name: "자리배치 저장" });
     expect((applyButton as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(applyButton);
 
@@ -96,7 +121,7 @@ describe("ClassroomGroupsTab save separation", () => {
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        groups: [{ name: "1분단", studentIds: ["s1", "s2"] }],
+        groups: [{ name: "1모둠", studentIds: ["s1", "s2"] }],
       }),
     });
     render(
@@ -108,13 +133,13 @@ describe("ClassroomGroupsTab save separation", () => {
       />,
     );
 
-    const applyButton = screen.getByRole("button", { name: "학급에 적용" });
+    const applyButton = screen.getByRole("button", { name: "자리배치 저장" });
     expect((applyButton as HTMLButtonElement).disabled).toBe(false);
     fireEvent.click(applyButton);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
-      groups: [{ name: "1분단", studentIds: ["s1", "s2"] }],
+      groups: [{ name: "1모둠", studentIds: ["s1", "s2"] }],
     });
   });
 });

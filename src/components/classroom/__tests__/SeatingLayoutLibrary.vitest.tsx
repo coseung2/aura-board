@@ -47,7 +47,7 @@ describe("SeatingLayoutLibrary", () => {
     renderLibrary();
 
     expect(await screen.findByText("1학기 1차")).toBeTruthy();
-    expect(screen.getByText(/1분단 · 2명/)).toBeTruthy();
+    expect(screen.getByText(/1모둠 · 2명/)).toBeTruthy();
   });
 
   it("saves the current arrangement under the typed name", async () => {

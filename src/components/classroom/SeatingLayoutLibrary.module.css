@@ -2,10 +2,10 @@
   display: grid;
   gap: 10px;
   min-width: 0;
-  padding: 12px;
-  border: 1px solid #d9dfd4;
-  border-radius: 16px;
-  background: #fffdf7;
+  margin-top: 10px;
+  padding: 20px 0 0;
+  border-top: 1px solid #d9dfd4;
+  background: transparent;
 }
 
 .header,
@@ -56,7 +56,7 @@
 .input:focus {
   border-color: #416c53;
   outline: none;
-  box-shadow: 0 0 0 3px rgba(0, 117, 222, 0.15);
+  box-shadow: 0 0 0 3px rgba(65, 108, 83, 0.15);
 }
 
 .primaryButton,
@@ -77,12 +77,12 @@
 
 .primaryButton {
   width: 100%;
-  min-height: 38px;
-  border-color: #f3bd69;
+  min-height: 44px;
+  border-color: #d9dfd4;
   border-radius: 12px;
-  background: #f3bd69;
-  color: #503f2c;
-  font-family: "Jua", "Noto Sans KR", sans-serif;
+  background: #f2f5eb;
+  color: #536052;
+  font-family: inherit;
   font-size: 14px;
 }
 
@@ -94,6 +94,8 @@
 }
 
 .rowButton:hover:not(:disabled),
+.primaryButton:hover:not(:disabled),
+.primaryButton:focus-visible,
 .rowButton:focus-visible,
 .retryButton:hover:not(:disabled),
 .retryButton:focus-visible {

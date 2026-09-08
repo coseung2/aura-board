@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { isAdminEmail } from "@/lib/admin";
 
 const RenameSchema = z.object({
   name: z.string().trim().min(1).max(60),
@@ -31,9 +30,6 @@ export async function PATCH(
   const user = await getCurrentUser().catch(() => null);
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  if (!isAdminEmail(user.email)) {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
   const { id, layoutId } = await params;
 
@@ -82,9 +78,6 @@ export async function DELETE(
   const user = await getCurrentUser().catch(() => null);
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  if (!isAdminEmail(user.email)) {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
   const { id, layoutId } = await params;
 

@@ -25,16 +25,28 @@ vi.mock("@/lib/db", () => ({
 
 import { DELETE, PATCH } from "./route";
 
-describe("admin-only seating layout deletion", () => {
+describe("owner-only seating layout mutation", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mocks.getCurrentUser.mockResolvedValue({
       id: "teacher-1",
       email: "teacher@example.com",
     });
   });
 
-  it("hides the endpoint from a non-admin teacher", async () => {
+  it.each(["PATCH", "DELETE"])("allows an ordinary owner to %s an owned layout", async method => {
+    mocks.classroomFind.mockResolvedValueOnce({ teacherId: "teacher-1" });
+    mocks.layoutFindFirst.mockResolvedValueOnce({ id: "layout-1" });
+    mocks.updateLayout.mockResolvedValueOnce({ id: "layout-1", name: "새 이름" });
+    mocks.deleteLayouts.mockResolvedValueOnce({ count: 1 });
+    const response = await (method === "PATCH" ? PATCH : DELETE)(
+      new Request("http://localhost/api/classroom/classroom-1/seating-layouts/layout-1", { method, ...(method === "PATCH" ? { body: JSON.stringify({ name: "새 이름" }) } : {}) }),
+      { params: Promise.resolve({ id: "classroom-1", layoutId: "layout-1" }) },
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it("hides deletion for a classroom the teacher does not own", async () => {
     const response = await DELETE(
       new Request(
         "http://localhost/api/classroom/classroom-1/seating-layouts/layout-1",
@@ -46,11 +58,11 @@ describe("admin-only seating layout deletion", () => {
     );
 
     expect(response.status).toBe(404);
-    expect(mocks.classroomFind).not.toHaveBeenCalled();
+    expect(mocks.classroomFind).toHaveBeenCalled();
     expect(mocks.deleteLayouts).not.toHaveBeenCalled();
   });
 
-  it("hides renaming from a non-admin teacher", async () => {
+  it("hides renaming for a classroom the teacher does not own", async () => {
     const response = await PATCH(
       new Request(
         "http://localhost/api/classroom/classroom-1/seating-layouts/layout-1",
@@ -64,7 +76,7 @@ describe("admin-only seating layout deletion", () => {
     );
 
     expect(response.status).toBe(404);
-    expect(mocks.classroomFind).not.toHaveBeenCalled();
+    expect(mocks.classroomFind).toHaveBeenCalled();
     expect(mocks.layoutFindFirst).not.toHaveBeenCalled();
   });
 

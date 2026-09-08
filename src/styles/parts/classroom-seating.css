@@ -4,14 +4,38 @@
   width: 100%;
 }
 
+.seating-reveal-covered { justify-content: center; background: #416c53; color: #fff7dc; }
+.seating-reveal-shuffling { animation: seating-shuffle 180ms ease-in-out infinite alternate; }
+.seating-reveal-open { animation: seating-open 200ms ease-out !important; animation-delay: 0ms !important; }
+@keyframes seating-shuffle { from { transform: translateY(-3px) rotate(-2deg); } to { transform: translateY(3px) rotate(2deg); } }
+@keyframes seating-open { from { transform: scale(.85); opacity: .3; } to { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .seating-reveal-shuffling, .seating-reveal-open { animation: none !important; } }
+
 .seating-workspace {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 292px;
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   align-items: stretch;
 }
 
+.seating-toolbar { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-bottom: 24px; }
+.seating-tools-toggle, .seating-drawer-heading button { min-height: 44px; padding: 8px 16px; border: 1px solid #aabca9; border-radius: 12px; background: #fffdf7; color: #416c53; font: inherit; cursor: pointer; }
+.seating-tools-toggle:focus-visible, .seating-drawer-heading button:focus-visible { outline: 2px solid #416c53; outline-offset: 2px; }
+.seating-sidebar.seating-tools-drawer { position: fixed; z-index: 40; inset: 0 auto 0 0; width: min(320px, 85vw); box-sizing: border-box; min-height: 0; height: 100dvh; overflow-y: auto; overscroll-behavior: contain; border: 0; border-right: 1px solid var(--color-border); border-radius: 0; box-shadow: 8px 0 24px #00000014; transform: translateX(-100%); visibility: hidden; transition: transform 260ms cubic-bezier(.32,.72,0,1), visibility 260ms; }
+.seating-sidebar.seating-tools-drawer.is-open { transform: translateX(0); visibility: visible; }
+.seating-sidebar.seating-tools-drawer { z-index: var(--z-modal-top, 2147483600); }
+.seating-drawer-backdrop.seating-drawer-backdrop { z-index: calc(var(--z-modal-top, 2147483600) - 1); }
+.seating-drawer-backdrop { position: fixed; inset: 0; z-index: 39; background: #0000001f; opacity: 0; pointer-events: none; transition: opacity 200ms ease; }
+.seating-drawer-backdrop.is-open { opacity: 1; pointer-events: auto; }
+.seating-tools-drawer[hidden] { display: none; }
+.seating-drawer-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; position: sticky; top: -24px; background: #fff; z-index: 1; padding: 8px 0; }
+.seating-drawer-heading h2 { margin: 0; font-size: 20px; color: #344e43; }
+@keyframes seating-drawer-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .seating-sidebar.seating-tools-drawer, .seating-drawer-backdrop { animation: none; transition: none; } }
+
 .seating-classroom {
+  position: relative;
   display: flex;
   min-width: 0;
   flex-direction: column;
@@ -34,6 +58,9 @@
   color: #fff7dc;
   box-shadow: inset 0 2px 6px rgba(20, 53, 34, 0.22);
 }
+
+.seating-board-status { position: absolute; top: 4px; left: 24px; right: 24px; height: 24px; overflow: auto; display: flex; align-items: center; justify-content: center; gap: 12px; text-align: center; white-space: nowrap; }
+.seating-board-status p { margin: 0; }
 
 .seating-board strong {
   font-family: "Jua", sans-serif;
@@ -117,7 +144,7 @@
 }
 
 .seating-slot {
-  min-height: 74px;
+  min-height: 54px;
   border: 2px dashed transparent;
   border-radius: 14px;
   transition: background 120ms ease, border-color 120ms ease;
@@ -172,8 +199,10 @@
 
 .seating-desk-num {
   flex-shrink: 0;
+  flex-basis: 30px;
+  text-align: center;
   color: #768277;
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 800;
 }
 
@@ -183,14 +212,17 @@
   overflow: hidden;
   color: #495348;
   font-family: "Jua", sans-serif;
-  font-size: 15px;
+  font-size: 19px;
   font-weight: 400;
+  text-align: center;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .seating-gender {
   flex-shrink: 0;
+  box-sizing: border-box;
+  flex-basis: 30px;
   min-width: 20px;
   padding: 2px 4px;
   border-radius: 999px;
@@ -272,12 +304,22 @@
 .seating-tool-card--pair > span { flex-shrink: 0; }
 .seating-tool-card--pair select {
   min-width: 0;
-  border: 0;
-  background: transparent;
+  min-height: 44px;
+  width: 100%;
+  appearance: none;
+  border: 1px solid #d7ddcf;
+  border-radius: 10px;
+  padding: 10px 34px 10px 12px;
+  background: #fffdf7 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23416c53' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center;
   color: #344e43;
   font: inherit;
-  text-align: right;
+  text-align: left;
+  cursor: pointer;
 }
+.seating-tool-card--pair { flex-direction: column; align-items: stretch; gap: 8px; }
+.seating-tool-card--pair select:hover { border-color: #416c53; }
+.seating-tool-card--pair select:focus-visible { outline: 2px solid #416c53; outline-offset: 2px; }
+.seating-tool-card--pair select:disabled { opacity: .55; cursor: default; }
 
 .seating-stepper {
   display: flex;
@@ -397,19 +439,21 @@
 }
 
 .seating-random-action {
-  min-height: 58px;
+  min-height: 44px;
   padding: 0 16px;
-  border: 0;
-  border-radius: 16px;
-  background: #f3bd69;
-  color: #503f2c;
-  font-family: "Jua", sans-serif;
-  font-size: 19px;
+  border: 1px solid #aabca9;
+  border-radius: 12px;
+  background: #fffdf7;
+  color: #416c53;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
 }
 
 .seating-random-action:hover:not(:disabled),
-.seating-random-action:focus-visible { background: #efb45a; outline: none; }
+.seating-random-action:focus-visible { background: #edf2e8; border-color: #416c53; }
+.seating-random-action:focus-visible { outline: 2px solid #416c53; outline-offset: 2px; }
 .seating-random-action:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .seating-random-status {
@@ -421,7 +465,7 @@
 
 .seating-random-status.is-error { color: #9c3d3d; }
 
-.seating-sidebar-footer { margin-top: auto; min-width: 0; }
+.seating-sidebar-footer { margin-top: 0; min-width: 0; }
 .seating-sidebar-footer .seating-library { margin-top: 8px; padding-top: 16px; }
 .seating-sidebar-footer .seating-library-save { flex-direction: column; align-items: stretch; }
 .seating-sidebar-footer .seating-library-input { min-width: 0; width: 100%; }

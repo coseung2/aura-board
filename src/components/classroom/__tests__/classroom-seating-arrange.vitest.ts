@@ -100,6 +100,18 @@ function success(options: SeatingOptions) {
 }
 
 describe("seating conditions", () => {
+  it.each([
+    [13, 11, 0, "mixed", 1],
+    [12, 12, 0, "male_male", 6],
+    [12, 12, 0, "female_female", 6],
+    [11, 13, 0, "same", 1],
+    [10, 12, 2, "mixed", 2],
+  ] as const)("minimizes exceptions for %iF/%iM/%i unspecified in %s mode", (female, male, unknown, pairMode, expected) => {
+    const input = { ...fixture(female, male, 6, unknown), pairMode };
+    const result = arrangeSeating(input);
+    expect(result).toMatchObject({ ok: true, pairExceptions: expected });
+    if (result.ok) check({ ...input, pairMode: "any" }, result.groups);
+  });
   it("applies ratio and visible adjacent mixed pairs even with fixed partners", () => {
     const input = fixture();
     input.useGenderQuota = true;
@@ -145,13 +157,13 @@ describe("seating conditions", () => {
     expect(input.groups).toEqual(before);
   });
 
-  it("rejects a fixed partner conflicting with the selected pair mode", () => {
+  it("preserves fixed partners with the minimum pair exceptions", () => {
     const input = fixture();
     input.pairMode = "mixed";
     input.fixedPairs = [{ id: "a", studentIds: ["s0", "s1"] }];
     expect(arrangeSeating(input)).toMatchObject({
-      ok: false,
-      error: expect.stringContaining("충돌"),
+      ok: true,
+      pairExceptions: 2,
     });
   });
 
@@ -217,7 +229,7 @@ describe("seating conditions", () => {
     ).toMatchObject({ ok: false });
     expect(
       arrangeSeating({ ...fixture(13, 11), pairMode: "mixed" }),
-    ).toMatchObject({ ok: false });
+    ).toMatchObject({ ok: true, pairExceptions: 1 });
   });
 
   it("does not turn a 2:1 request into 1:1 by rounding every group down", () => {
@@ -381,8 +393,11 @@ describe("seating conditions", () => {
                   femaleTarget,
                   maleTarget,
                 }),
-              ).toBe(feasible(input));
-              if (actual.ok) check(input, actual.groups);
+              ).toBe(feasible({ ...input, pairMode: "any" }));
+              if (actual.ok) {
+                check({ ...input, pairMode: actual.pairExceptions ? "any" : pairMode }, actual.groups);
+                expect(actual.pairExceptions === 0).toBe(feasible(input));
+              }
             }
           }
         }

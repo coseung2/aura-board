@@ -3,7 +3,6 @@ import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { loadClassroomDefaultGroups } from "@/lib/default-groups";
 import { ClassroomGroupsTab } from "@/components/classroom/ClassroomGroupsTab";
-import { isAdminEmail } from "@/lib/admin";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -12,7 +11,7 @@ type Props = {
 export default async function ClassroomGroupsPage({ params }: Props) {
   const { id } = await params;
   const user = await getCurrentUser().catch(() => null);
-  if (!user || !isAdminEmail(user.email)) {
+  if (!user) {
     notFound();
   }
 

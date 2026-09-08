@@ -1,7 +1,6 @@
 import type { GroupEditorDraft, GroupEditorStudent } from "./GroupRosterEditor";
 import {
   genderOf,
-  pairMatches,
   type FixedPair,
   type PairMode,
 } from "./classroom-seating-model";
@@ -18,7 +17,7 @@ export type SeatingOptions = {
 };
 
 export type SeatingResult =
-  | { ok: true; groups: GroupEditorDraft[] }
+  | { ok: true; groups: GroupEditorDraft[]; pairExceptions: number }
   | { ok: false; error: string };
 
 type Gender = 0 | 1 | 2; // female, male, unspecified
@@ -82,7 +81,7 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
     );
   }
   if (!groups.length || groups.length > ids.length)
-    return fail("분단 수를 배치할 학생 수 이하로 줄여 주세요.");
+    return fail("모둠 수를 배치할 학생 수 이하로 줄여 주세요.");
   if (
     useGenderQuota &&
     (![femaleTarget, maleTarget].every(
@@ -125,26 +124,10 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
       totals[0] > ranges.reduce((n, r) => n + r[1], 0))
   ) {
     return fail(
-      `현재 여 ${totals[0]}명·남 ${totals[1]}명으로 분단별 ${femaleTarget}:${maleTarget} 성비를 맞출 수 없습니다.`,
+      `현재 여 ${totals[0]}명·남 ${totals[1]}명으로 모둠별 ${femaleTarget}:${maleTarget} 성비를 맞출 수 없습니다.`,
     );
   }
   const pairSlots = sizes.reduce((sum, size) => sum + Math.floor(size / 2), 0);
-  const singleSlots = ids.length - pairSlots * 2;
-  if (pairMode !== "any" && totals[2] > singleSlots)
-    return fail(
-      "성별 미지정 학생의 짝 조건을 확인할 수 없습니다. 성별을 설정하거나 짝 조건을 해제해 주세요.",
-    );
-  if (
-    (pairMode === "mixed" && Math.min(totals[0], totals[1]) < pairSlots) ||
-    (pairMode === "female_female" && totals[0] < pairSlots * 2) ||
-    (pairMode === "male_male" && totals[1] < pairSlots * 2) ||
-    (pairMode === "same" &&
-      Math.floor(totals[0] / 2) + Math.floor(totals[1] / 2) < pairSlots)
-  ) {
-    return fail(
-      "현재 학생 구성으로 모든 짝 조건을 맞출 수 없습니다. 짝 조건이나 분단 수를 바꿔 주세요.",
-    );
-  }
 
   const fixedIds = new Set<string>();
   const fixedPools: string[][][] = PAIR_TYPES.map(() => []);
@@ -156,10 +139,6 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
       );
     if (a === b || fixedIds.has(a) || fixedIds.has(b))
       return fail("고정짝에 같은 학생이 중복 지정되어 있습니다.");
-    if (!pairMatches(studentMap.get(a), studentMap.get(b), pairMode))
-      return fail(
-        "고정짝과 짝 조건이 충돌합니다. 고정짝 또는 짝 조건을 바꿔 주세요.",
-      );
     fixedIds.add(a);
     fixedIds.add(b);
     const genders = [
@@ -173,7 +152,7 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
   }
   if (fixedPairs.length > pairSlots)
     return fail(
-      "고정짝을 함께 앉힐 자리가 부족합니다. 분단 수를 줄이거나 고정짝을 해제해 주세요.",
+      "고정짝을 함께 앉힐 자리가 부족합니다. 모둠 수를 줄이거나 고정짝을 해제해 주세요.",
     );
   const singlePools: string[][] = [[], [], []];
   members
@@ -196,6 +175,7 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
     index: number,
     groupFemale: number,
     groupFilled: number,
+    budget: number,
   ): boolean {
     if (index === slots.length) return true;
     if (++visited > 150_000) {
@@ -203,7 +183,7 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
       return false;
     }
     const { group, size } = slots[index];
-    const key = `${index}|${groupFemale}|${singles}|${fixed}`;
+    const key = `${index}|${groupFemale}|${singles}|${fixed}|${budget}`;
     if (memo.has(key)) return false;
     const candidates: Unit[] = [];
     if (size === 2) {
@@ -214,8 +194,7 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
       for (const [a, b] of PAIR_TYPES) {
         if (
           singles[a] >= (a === b ? 2 : 1) &&
-          singles[b] > 0 &&
-          matches(a, b, pairMode)
+          singles[b] > 0
         )
           candidates.push({ genders: [a, b] });
       }
@@ -225,6 +204,8 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
       });
     }
     for (const candidate of shuffled(candidates, random)) {
+      const cost = candidate.genders.length === 2 && !matches(candidate.genders[0], candidate.genders[1], pairMode) ? 1 : 0;
+      if (cost > budget) continue;
       const nextFemale =
         groupFemale + candidate.genders.filter((g) => g === 0).length;
       const nextFilled = groupFilled + size;
@@ -239,7 +220,7 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
       plan.push(candidate);
       const endsGroup = remaining === 0;
       if (
-        solve(index + 1, endsGroup ? 0 : nextFemale, endsGroup ? 0 : nextFilled)
+        solve(index + 1, endsGroup ? 0 : nextFemale, endsGroup ? 0 : nextFilled, budget - cost)
       )
         return true;
       plan.pop();
@@ -251,11 +232,18 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
     return false;
   }
 
-  if (!solve(0, 0, 0)) {
+  let solved = false;
+  let pairExceptions = 0;
+  for (; pairExceptions <= pairSlots; pairExceptions++) {
+    memo.clear();
+    if (solve(0, 0, 0, pairExceptions)) { solved = true; break; }
+    if (limited) break;
+  }
+  if (!solved) {
     return fail(
       limited
         ? "조건 조합이 많아 배치를 완료하지 못했습니다. 조건을 줄이거나 다시 시도해 주세요."
-        : "고정짝·짝 조건·성비를 동시에 맞출 수 없습니다. 조건이나 분단 수를 바꿔 주세요.",
+        : "고정짝·짝 조건·성비를 동시에 맞출 수 없습니다. 조건이나 모둠 수를 바꿔 주세요.",
     );
   }
   const result = groups.map((group) => ({
@@ -271,5 +259,5 @@ export function arrangeSeating(options: SeatingOptions): SeatingResult {
         : unit.genders.map((g) => shuffledSingles[g].pop()!);
     result[slots[index].group].studentIds.push(...shuffled(unitIds, random));
   });
-  return { ok: true, groups: result };
+  return { ok: true, groups: result, pairExceptions };
 }

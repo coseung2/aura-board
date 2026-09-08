@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { flushSync } from "react-dom";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { createPortal, flushSync } from "react-dom";
+import { Volume2, VolumeX, Sparkles, CircleOff, SkipForward } from "lucide-react";
 import type { DragEvent, KeyboardEvent, MouseEvent, ReactNode } from "react";
 import {
   type GroupEditorDraft,
   type GroupEditorStudent,
 } from "./GroupRosterEditor";
 import { arrangeSeating } from "./classroom-seating-arrange";
+import { SeatingReveal } from "./SeatingReveal";
 import {
   GROUP_SIZE,
   MIN_GROUP_COUNT,
@@ -30,6 +32,8 @@ type Props = {
   onChange: (groups: GroupEditorDraft[]) => void;
   classroomName?: string;
   sidebarFooter?: ReactNode;
+  toolbarActions?: ReactNode;
+  boardStatus?: ReactNode;
 };
 
 const PAIR_OPTIONS: Array<{ value: PairMode; label: string }> = [
@@ -55,8 +59,24 @@ export function ClassroomSeatingEditor({
   onChange,
   classroomName,
   sidebarFooter,
+  toolbarActions,
+  boardStatus,
 }: Props) {
   const [pairMode, setPairMode] = useState<PairMode>("any");
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [animationEnabled, setAnimationEnabled] = useState(true);
+  useEffect(() => {
+    setMounted(true);
+    try {
+      setMuted(localStorage.getItem("seating-reveal-muted") === "true");
+      setAnimationEnabled(localStorage.getItem("seating-animation-enabled") !== "false");
+    } catch {}
+  }, []);
+  const [pendingReveal, setPendingReveal] = useState<GroupEditorDraft[] | null>(null);
+  const [revealProgress, setRevealProgress] = useState({ count: 0, shuffling: false });
+  const updateReveal = useCallback((count: number, shuffling: boolean) => setRevealProgress({ count, shuffling }), []);
   const [useGenderQuota, setUseGenderQuota] = useState(false);
   const [maleTarget, setMaleTarget] = useState(1);
   const [femaleTarget, setFemaleTarget] = useState(1);
@@ -296,7 +316,7 @@ export function ClassroomSeatingEditor({
       const studentIds = orderedStudentIds.slice(cursor, cursor + size);
       cursor += size;
       return {
-        name: groups[groupIndex]?.name?.trim() || `${groupIndex + 1}분단`,
+        name: groups[groupIndex]?.name?.trim() || `${groupIndex + 1}모둠`,
         studentIds,
       };
     });
@@ -316,7 +336,7 @@ export function ClassroomSeatingEditor({
   }
 
   function randomArrange() {
-    if (disabled) return;
+    if (disabled || pendingReveal) return;
     const result = arrangeSeating({
       students: assignedStudents,
       groups,
@@ -334,13 +354,18 @@ export function ClassroomSeatingEditor({
     }
     setRandomStatusKind("success");
     setRandomStatus(
-      `${pairModeLabel(pairMode)} 조건으로 자리 배치했어요.${
+      `${pairModeLabel(pairMode)} 조건으로 자리 배치했어요.${result.pairExceptions ? ` 짝 조건 예외 ${result.pairExceptions}쌍 (고정 짝 유지).` : ""}${
         unassigned.length > 0 ? ` 미배정 ${unassigned.length}명은 그대로 두었어요.` : ""
       }`,
     );
-    setPlacementRunId((current) => current + 1);
     setSelectedStudentId(null);
-    changeGroups(result.groups);
+    if (!animationEnabled || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      changeGroups(result.groups);
+    } else {
+      setRevealProgress({ count: 0, shuffling: false });
+      setPendingReveal(result.groups);
+    }
+    setToolsOpen(false);
   }
 
   function addFixedPair() {
@@ -368,8 +393,29 @@ export function ClassroomSeatingEditor({
 
   return (
     <div className="seating-editor">
-      <div className="seating-workspace">
+      <div className="seating-toolbar">
+        <button type="button" className="seating-tools-toggle" aria-label="연출 건너뛰기" title="연출 건너뛰기" disabled={!pendingReveal} onClick={() => { if (pendingReveal) { onChange(pendingReveal); setPendingReveal(null); } }}><SkipForward size={18} /></button>
+        <button type="button" className="seating-tools-toggle" aria-label={muted ? "소리 켜기" : "소리 끄기"} title={muted ? "소리 켜기" : "소리 끄기"} aria-pressed={!muted} onClick={() => { setMuted(!muted); try { localStorage.setItem("seating-reveal-muted", String(!muted)); } catch {} }}>{muted ? <VolumeX size={18} /> : <Volume2 size={18} />}</button>
+        <button type="button" className="seating-tools-toggle" aria-label={animationEnabled ? "애니메이션 끄기" : "애니메이션 켜기"} title={animationEnabled ? "애니메이션 끄기" : "애니메이션 켜기"} aria-pressed={animationEnabled} onClick={() => {
+          setAnimationEnabled(!animationEnabled);
+          try { localStorage.setItem("seating-animation-enabled", String(!animationEnabled)); } catch {}
+          if (pendingReveal) { onChange(pendingReveal); setPendingReveal(null); }
+        }}>{animationEnabled ? <Sparkles size={18} /> : <CircleOff size={18} />}</button>
+        <button type="button" className="seating-random-action" onClick={randomArrange} disabled={disabled || !!pendingReveal}>자리 섞기</button>
+        <button type="button" className="seating-tools-toggle" aria-expanded={toolsOpen} aria-controls="seating-tools-drawer" disabled={!!pendingReveal} onClick={() => setToolsOpen(open => !open)}>도구함</button>
+        <div inert={pendingReveal ? true : undefined}>{toolbarActions}</div>
+      </div>
+      {pendingReveal && <SeatingReveal groups={pendingReveal} students={students} muted={muted} onProgress={updateReveal} onComplete={() => {
+        onChange(pendingReveal);
+        setPendingReveal(null);
+        setPlacementRunId(0);
+      }} />}
+      <div className="seating-workspace" inert={pendingReveal ? true : undefined}>
         <section className="seating-classroom" aria-label="교실 자리 배치">
+          <div className="seating-board-status">
+            {boardStatus}
+            {randomStatus && <p className={`seating-random-status is-${randomStatusKind}`} role="status" aria-live="polite">{randomStatus}</p>}
+          </div>
           <div className="seating-board">
             <strong>{classroomName?.trim() || "우리 교실"}</strong>
             <span className="seating-board-label">칠판</span>
@@ -377,7 +423,7 @@ export function ClassroomSeatingEditor({
 
           <div className="seating-chart-wrap">
             <div className={`seating-chart ${draggingStudentId ? "is-dragging" : ""}`}>
-              {groups.map((group, groupIndex) => (
+              {(pendingReveal ?? groups).map((group, groupIndex) => (
                 <section
                   className={`seating-area seating-area--tone-${groupIndex % 6} ${
                     draggingStudentId ? "is-dragging" : ""
@@ -387,7 +433,7 @@ export function ClassroomSeatingEditor({
                       : ""
                   }`}
                   key={`${group.name}-${groupIndex}`}
-                  aria-label={`${group.name || `${groupIndex + 1}분단`} 자리`}
+                  aria-label={`${group.name || `${groupIndex + 1}모둠`} 자리`}
                   onDragOver={(event) => {
                     if (disabled) return;
                     event.preventDefault();
@@ -406,7 +452,7 @@ export function ClassroomSeatingEditor({
                   }}
                 >
                   <div className="seating-area-head">
-                    <h2>{group.name || `${groupIndex + 1}분단`}</h2>
+                    <h2>{group.name || `${groupIndex + 1}모둠`}</h2>
                     <span>{group.studentIds.length}명</span>
                   </div>
                   <div className="seating-area-grid">
@@ -415,6 +461,10 @@ export function ClassroomSeatingEditor({
                     }).map((_, seatIndex) => {
                       const studentId = group.studentIds[seatIndex];
                       const student = studentId ? studentMap.get(studentId) : null;
+                      const revealIndex = (pendingReveal ?? groups).slice(0, groupIndex).reduce((sum, item) => sum + item.studentIds.length, 0) + seatIndex;
+                      if (student && pendingReveal && revealIndex >= revealProgress.count) {
+                        return <div key={`covered-${groupIndex}-${seatIndex}`} className={`seating-desk seating-reveal-covered ${revealProgress.shuffling ? "seating-reveal-shuffling" : ""}`} aria-label="공개 대기">?</div>;
+                      }
                       const isSeatTarget =
                         dropTarget?.kind === "seat" &&
                         dropTarget.groupIndex === groupIndex &&
@@ -426,7 +476,7 @@ export function ClassroomSeatingEditor({
                             key={`empty-${groupIndex}-${seatIndex}`}
                             role={selectedStudentId ? "button" : undefined}
                             tabIndex={selectedStudentId ? 0 : -1}
-                            aria-label={`${group.name || `${groupIndex + 1}분단`} ${seatIndex + 1}번 자리`}
+                            aria-label={`${group.name || `${groupIndex + 1}모둠`} ${seatIndex + 1}번 자리`}
                             onClick={(event) => activateSeat(event, groupIndex, seatIndex)}
                             onKeyDown={(event) => {
                               if (isActivationKey(event)) activateSeat(event, groupIndex, seatIndex);
@@ -448,7 +498,7 @@ export function ClassroomSeatingEditor({
                       }
                       return (
                         <div
-                          className={`seating-desk ${
+                          className={`seating-desk ${pendingReveal ? "seating-reveal-open" : ""} ${
                             draggingStudentId === student.id ? "is-dragging-card" : ""
                           } ${placementRunId > 0 ? "is-placing" : ""} ${
                             selectedStudentId === student.id ? "is-selected" : ""
@@ -575,14 +625,18 @@ export function ClassroomSeatingEditor({
           </div>
         </section>
 
-        <aside className="seating-sidebar" aria-label="자리 배치 도구">
-          <h2>도구함</h2>
+        {mounted && createPortal(<>
+        <div className={`seating-drawer-backdrop ${toolsOpen ? "is-open" : ""}`} aria-hidden="true" onClick={() => setToolsOpen(false)} />
+        <aside id="seating-tools-drawer" className={`seating-sidebar seating-tools-drawer ${toolsOpen ? "is-open" : ""}`} inert={!toolsOpen ? true : undefined} aria-hidden={!toolsOpen} aria-label="자리 배치 도구" onKeyDown={event => {
+          if (event.key === "Escape") { setToolsOpen(false); document.querySelector<HTMLButtonElement>('.seating-tools-toggle')?.focus(); }
+        }}>
+          <div className="seating-drawer-heading"><h2>도구함</h2><button type="button" aria-label="도구함 닫기" onClick={() => { setToolsOpen(false); document.querySelector<HTMLButtonElement>('.seating-tools-toggle')?.focus(); }}>닫기</button></div>
           <div className="seating-tool-card seating-tool-card--count">
-            <span>분단 수</span>
+            <span>모둠 수</span>
             <div className="seating-stepper">
               <button
                 type="button"
-                aria-label="분단 수 줄이기"
+                aria-label="모둠 수 줄이기"
                 onClick={() => resizeGroups(groupCount - 1)}
                 disabled={disabled || groupCount <= MIN_GROUP_COUNT}
               >
@@ -591,7 +645,7 @@ export function ClassroomSeatingEditor({
               <output aria-live="polite">{groupCount}</output>
               <button
                 type="button"
-                aria-label="분단 수 늘리기"
+                aria-label="모둠 수 늘리기"
                 onClick={() => resizeGroups(groupCount + 1)}
                 disabled={disabled || groupCount >= maxGroupCount}
               >
@@ -630,7 +684,7 @@ export function ClassroomSeatingEditor({
                   }}
                   disabled={disabled}
                 />
-                <span>분단별 성비 (여 : 남)</span>
+                <span>모둠별 성비 (여 : 남)</span>
               </label>
               <div className="seating-ratio-inputs">
                 <label>
@@ -736,21 +790,9 @@ export function ClassroomSeatingEditor({
             </div>
           </details>
 
-          {randomStatus && (
-            <p className={`seating-random-status is-${randomStatusKind}`} role="status" aria-live="polite">
-              {randomStatus}
-            </p>
-          )}
-          <button
-            type="button"
-            className="seating-random-action"
-            onClick={randomArrange}
-            disabled={disabled}
-          >
-            자리 섞기
-          </button>
           {sidebarFooter ? <div className="seating-sidebar-footer">{sidebarFooter}</div> : null}
         </aside>
+        </>, document.body)}
       </div>
     </div>
   );

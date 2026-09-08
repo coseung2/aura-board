@@ -41,16 +41,13 @@ export function ClassroomHomeFeatureGrid({
           metric: `${students}명`,
           note: "명단 · QR · 학부모 현황",
         },
-        ...(isAdmin
-          ? [{
+        {
               key: "groups",
               href: classroomHref("groups"),
               title: "자리·모둠",
               metric: `모둠 ${summary.groups.groupCount}개`,
               note: `자리 배정 ${summary.groups.seatedCount}/${students}명`,
-              badge: "관리자",
-            }]
-          : []),
+        },
         {
           key: "boards",
           href: classroomHref("boards"),

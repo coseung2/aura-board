@@ -327,7 +327,7 @@ export function SeatingLayoutLibrary({
                   <div className={styles.itemMain}>
                     <strong>{layout.name}</strong>
                     <span>
-                      {layout.groups.length}분단 ·{" "}
+                      {layout.groups.length}모둠 ·{" "}
                       {countStudents(layout.groups)}명
                       {formatUpdatedAt(layout.updatedAt)
                         ? ` · ${formatUpdatedAt(layout.updatedAt)}`

@@ -45,7 +45,7 @@ function chunkIntoSeatGroups(
 
   const count = Math.max(1, Math.ceil((normalizedIds.length || 1) / 4));
   const groups = Array.from({ length: count }, (_, index) => ({
-    name: `${index + 1}분단`,
+    name: `${index + 1}모둠`,
     studentIds: [] as string[],
   }));
 
@@ -68,12 +68,12 @@ function restoreSavedGroups(
       return true;
     });
     return {
-      name: group.name.trim() || `${index + 1}분단`,
+      name: group.name.trim().replace(/^(\d+)분단$/, "$1모둠") || `${index + 1}모둠`,
       studentIds,
     };
   });
 
-  return groups.length > 0 ? groups : [{ name: "1분단", studentIds: [] }];
+  return groups.length > 0 ? groups : [{ name: "1모둠", studentIds: [] }];
 }
 
 function groupsMatch(
@@ -92,7 +92,7 @@ function serverErrorMessage(error: string | undefined): string {
     case "student_not_in_classroom":
       return "학급에 없는 학생이 포함되어 있어요. 새로고침 후 다시 시도해 주세요.";
     case "empty_group":
-      return "빈 분단은 삭제하거나 학생을 배정해 주세요.";
+      return "빈 모둠은 삭제하거나 학생을 배정해 주세요.";
     default:
       return "자리 배치 저장에 실패했어요.";
   }
@@ -161,12 +161,12 @@ export function ClassroomGroupsTab({
       return { canSave: false, message: "학생을 먼저 추가하세요." };
     }
     if (groups.length === 0) {
-      return { canSave: false, message: "분단을 하나 이상 만들어 주세요." };
+      return { canSave: false, message: "모둠을 하나 이상 만들어 주세요." };
     }
     if (unnamedGroupIndex >= 0) {
       return {
         canSave: false,
-        message: `${unnamedGroupIndex + 1}분단 이름을 입력해 주세요.`,
+        message: `${unnamedGroupIndex + 1}모둠 이름을 입력해 주세요.`,
       };
     }
     if (invalidStudentId) {
@@ -187,7 +187,7 @@ export function ClassroomGroupsTab({
     if (emptyGroup) {
       return {
         canSave: false,
-        message: "빈 분단은 삭제하거나 학생을 배정해 주세요.",
+        message: "빈 모둠은 삭제하거나 학생을 배정해 주세요.",
       };
     }
     if (unassigned.length > 0) {
@@ -225,10 +225,10 @@ export function ClassroomGroupsTab({
       setAppliedGroups(data.groups);
       if (draftVersion.current === versionAtStart) {
         setGroups(data.groups);
-        setStatus({ message: "학급에 적용했어요.", kind: "success" });
+        setStatus({ message: "자리배치를 저장했어요.", kind: "success" });
       } else {
         setStatus({
-          message: "학급에 적용했어요. 이후에 바꾼 초안은 유지했어요.",
+          message: "자리배치를 저장했어요. 이후에 바꾼 초안은 유지했어요.",
           kind: "success",
         });
       }
@@ -269,14 +269,9 @@ export function ClassroomGroupsTab({
         groups={groups}
         onChange={handleGroupsChange}
         disabled={saving || libraryBusy}
-        sidebarFooter={
-          <div className={styles.sidebarFooter}>
+        toolbarActions={
+          <div className={styles.toolbarSave}>
             <div className={styles.applyRow}>
-              {isDirty ? (
-                <span className={styles.dirty}>변경 있음</span>
-              ) : (
-                <span aria-hidden="true" />
-              )}
               <button
                 type="button"
                 className={styles.applyButton}
@@ -285,9 +280,14 @@ export function ClassroomGroupsTab({
                   saving || libraryBusy || !validation.canSave || !isDirty
                 }
               >
-                {saving ? "적용 중..." : "학급에 적용"}
+                {saving ? "저장 중..." : "자리배치 저장"}
               </button>
             </div>
+          </div>
+        }
+        boardStatus={
+          <>
+            {isDirty && <span className={styles.dirty}>변경 있음</span>}
             {validation.message && (
               <p className={styles.validation} role="status" aria-live="polite">
                 {validation.message}
@@ -302,6 +302,9 @@ export function ClassroomGroupsTab({
                 {status.message}
               </p>
             )}
+          </>
+        }
+        sidebarFooter={
             <SeatingLayoutLibrary
               classroomId={classroomId}
               currentGroups={groups}
@@ -309,7 +312,6 @@ export function ClassroomGroupsTab({
               onBusyChange={setLibraryBusy}
               disabled={saving}
             />
-          </div>
         }
       />
     </section>

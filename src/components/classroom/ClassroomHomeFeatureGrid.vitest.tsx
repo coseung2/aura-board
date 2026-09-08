@@ -53,7 +53,7 @@ describe("ClassroomHomeFeatureGrid", () => {
       const link = screen.getByRole("link", { name: new RegExp(label) });
       expect(link.getAttribute("href")).toBe(href);
     }
-    expect(screen.queryByRole("link", { name: /자리·모둠/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /자리·모둠/ })).toBeTruthy();
 
     for (const label of ["청소·당번", "제출 체크", "QR결제", "매점"]) {
       expect(screen.queryByRole("link", { name: new RegExp(label) })).toBeNull();
@@ -91,7 +91,7 @@ describe("ClassroomHomeFeatureGrid", () => {
 
     const link = screen.getByRole("link", { name: /자리·모둠/ });
     expect(link.getAttribute("href")).toBe("/classroom/classroom-1/groups");
-    expect(link.querySelector(".classroom-home-summary-badge")?.textContent).toBe("관리자");
+    expect(link.querySelector(".classroom-home-summary-badge")).toBeNull();
   });
 
   it("does not render decorative emoji in feature cards", () => {
@@ -107,7 +107,7 @@ describe("ClassroomHomeFeatureGrid", () => {
       <ClassroomHomeFeatureGrid classroomId="classroom-1" summary={summary} />,
     );
 
-    expect(container.querySelectorAll(".classroom-home-summary-head")).toHaveLength(10);
+    expect(container.querySelectorAll(".classroom-home-summary-head")).toHaveLength(11);
     expect(container.querySelector(".classroom-home-summary-arrow")).toBeNull();
     expect(container.querySelector(".classroom-home-summary-body")).toBeNull();
   });

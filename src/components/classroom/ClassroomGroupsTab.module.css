@@ -5,40 +5,40 @@
 }
 
 .applyRow {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  gap: 8px;
 }
 
 .applyButton {
   flex: 1;
-  min-height: 44px;
+  width: 100%;
+  min-height: 48px;
   padding: 0 16px;
   border: 0;
-  border-radius: 14px;
-  background: #f3bd69;
-  color: #503f2c;
-  font-family: "Jua", "Noto Sans KR", sans-serif;
-  font-size: 16px;
-  font-weight: 400;
+  border-radius: 12px;
+  background: #416c53;
+  color: #fff;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
 }
 
 .applyButton:hover:not(:disabled),
 .applyButton:focus-visible {
-  background: #efb45a;
+  background: #345941;
   outline: 2px solid rgba(65, 108, 83, 0.28);
   outline-offset: 2px;
 }
 
 .applyButton:disabled {
   cursor: not-allowed;
-  opacity: 0.5;
+  background: #e1e7de;
+  color: #657362;
 }
 
 .dirty {
-  color: #416c53;
+  color: #657362;
   font-size: 12px;
   font-weight: 700;
 }
@@ -62,3 +62,7 @@
 .status-error {
   color: #9c3d3d;
 }
+.toolbarSave { position: relative; min-width: 155px; }
+.toolbarSave .applyRow { display: flex; align-items: center; }
+.toolbarSave .dirty { white-space: nowrap; }
+.toolbarSave .status, .toolbarSave .validation { position: absolute; right: 0; top: 100%; width: max-content; max-width: min(360px, 85vw); padding: 4px 0; }

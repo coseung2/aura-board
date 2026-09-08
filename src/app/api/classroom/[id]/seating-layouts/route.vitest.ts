@@ -22,9 +22,9 @@ import { GET, POST } from "./route";
 
 const context = { params: Promise.resolve({ id: "classroom-1" }) };
 
-describe("admin-only seating layout API", () => {
+describe("owner-only seating layout API", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mocks.getCurrentUser.mockResolvedValue({
       id: "teacher-1",
       email: "teacher@example.com",
@@ -32,8 +32,11 @@ describe("admin-only seating layout API", () => {
   });
 
   it.each(["GET", "POST"])(
-    "hides %s from a non-admin teacher",
+    "allows %s from the ordinary classroom owner",
     async (method) => {
+      mocks.classroomFind.mockResolvedValueOnce({ id: "classroom-1", teacherId: "teacher-1" });
+      mocks.layoutFindMany.mockResolvedValueOnce([]);
+      mocks.layoutCreate.mockResolvedValueOnce({ id: "layout-1" });
       const request = new Request(
         "http://localhost/api/classroom/classroom-1/seating-layouts",
         {
@@ -54,8 +57,8 @@ describe("admin-only seating layout API", () => {
           ? await GET(request, context)
           : await POST(request, context);
 
-      expect(response.status).toBe(404);
-      expect(mocks.classroomFind).not.toHaveBeenCalled();
+      expect(response.status).toBe(method === "GET" ? 200 : 201);
+      expect(mocks.classroomFind).toHaveBeenCalled();
     },
   );
 

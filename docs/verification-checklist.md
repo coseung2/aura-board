@@ -126,6 +126,40 @@ creating overlapping testing-notes documents.
 
 ## Seating redesign handoff — 2026-09-08 KST
 
+- Teacher release (23:27 KST): classroom-home and top-navigation seating links
+  are visible without administrator badges. Page and groups/layout APIs require
+  a teacher session and ownership of the classroom, not an administrator email.
+  Ordinary owners can read/save current seating and list/create/rename/delete
+  their stored layouts. Anonymous and foreign-classroom access remain denied.
+  Student/parent entry points and existing-board fallback policies are unchanged.
+- Verification: 101 tests across 13 seating/navigation/API files passed; two
+  further ordinary-owner PATCH/DELETE cases passed in a 16-case API rerun.
+  TypeScript and line-limit checks passed. Live teacher login, persistence and
+  production deployment must be verified separately from these mocked API tests.
+- Current controls: save stays outside the drawer, status copy occupies existing
+  space above the chalkboard, and the drawer portals to body above mega navigation.
+
+- Updated 23:12 KST: tools use the DJ board's left-edge fixed drawer pattern,
+  viewport-height internal scrolling and click-outside dismissal. Persistent
+  icon buttons control sound, animation and skip; preferences survive reload.
+  Countdown is a centered fixed number, with no in-flow reveal header.
+  Chromium component fixture: chart bounds before/during shuffle both
+  x=32,y=222,width=1216,height=224.9375; countdown centered at (640,360)
+  for a 1280x720 viewport, drawer fixed height 720. TypeScript and 18 targeted
+  tests passed. This is visual/component verification, not authenticated save QA.
+
+- Seating reveal: click 자리 섞기 with motion enabled. Verify 3/2/1 countdown,
+  covered shuffling cards, one-at-a-time names and completion; no draft update
+  before completion, and skip/Escape applies the same result only once.
+- Verify saved mute silences the first cue, mute stops current audio, and
+  closing/unmounting clears timers/audio. Reduced-motion users retain immediate
+  arrangement. Actual database application remains the separate 학급에 적용 action.
+- 2026-09-08: reveal/editor tests 17 passed, TypeScript and line checks passed.
+  Chromium fixture with fictional students verified normal completion, mobile
+  mute/skip and successful playback of countdown/shuffle/reveal/completion OGGs.
+  Real classroom persistence and physical-speaker volume were not tested.
+  Kenney CC0 provenance is recorded in public/sounds/seating/SOURCE.md.
+
 - Implemented the approved classroom + tools + saved-list layout inside
   `/classroom/[id]/groups`, without a second page header or instructional copy.
   Figma reference: https://www.figma.com/design/fJ8AmpdkWJ0srOerq8w8Bl?node-id=1-2.

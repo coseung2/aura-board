@@ -38,7 +38,7 @@ function renderEditor(
     disabled?: boolean;
   } = {},
 ) {
-  return render(
+  const view = render(
     <ClassroomSeatingEditor
       students={overrides.students ?? students}
       groups={overrides.groups ?? groups}
@@ -46,6 +46,8 @@ function renderEditor(
       onChange={onChange}
     />,
   );
+  fireEvent.click(screen.getByRole("button", { name: "도구함" }));
+  return view;
 }
 
 /** jsdom has no DataTransfer, so pass a minimal stub. */
@@ -119,8 +121,34 @@ describe("ClassroomSeatingEditor interactions", () => {
   });
 
   function openAdvanced() {
+    if (screen.getByRole("button", { name: "도구함" }).getAttribute("aria-expanded") === "false") {
+      fireEvent.click(screen.getByRole("button", { name: "도구함" }));
+    }
     fireEvent.click(screen.getByText("고급 조건"));
   }
+
+  it("closes the drawer without removing the seating chart or shuffle action", () => {
+    renderEditor();
+    fireEvent.click(screen.getByRole("button", { name: "도구함 닫기" }));
+    expect(screen.getByRole("button", { name: "도구함" }).getAttribute("aria-expanded")).toBe("false");
+    expect(screen.queryByRole("complementary", { name: "자리 배치 도구" })).toBeNull();
+    expect(screen.getByRole("button", { name: "자리 섞기" })).toBeTruthy();
+    expect(desk("공서희")).toBeTruthy();
+  });
+
+  it("uses group terminology and keeps the empty fourth seat in a three-student group", () => {
+    const { container } = renderEditor({
+      groups: [{ name: "", studentIds: ["s1", "s2", "s3"] }],
+    });
+    expect(screen.getByRole("heading", { name: "1모둠" })).toBeTruthy();
+    expect(screen.getByRole("button", { name: "모둠 수 늘리기" })).toBeTruthy();
+    const grid = container.querySelector(".seating-area-grid")!;
+    expect(grid.children).toHaveLength(4);
+    expect(grid.children[2].classList.contains("seating-desk")).toBe(true);
+    expect(grid.children[3].classList.contains("is-empty")).toBe(true);
+    openAdvanced();
+    expect(screen.getByText("모둠별 성비 (여 : 남)")).toBeTruthy();
+  });
 
   function arrangeWithFixedPair(first: string, second: string) {
     openAdvanced();
@@ -157,12 +185,12 @@ describe("ClassroomSeatingEditor interactions", () => {
     );
   });
 
-  it("keeps the seating unchanged when a fixed pair conflicts with the pair mode", () => {
+  it("preserves fixed partners and reports pair exceptions instead of blocking", () => {
     renderEditor({ students: balancedStudents, groups: balancedGroups });
     arrangeWithFixedPair("s1", "s2");
 
-    expect(onChange).not.toHaveBeenCalled();
-    expect(document.querySelector(".seating-random-status")?.textContent).toMatch(/고정짝|충돌/);
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(document.querySelector(".seating-random-status")?.textContent).toMatch(/예외 2쌍/);
   });
 
   it("swaps selected desks by click", () => {
@@ -241,7 +269,7 @@ describe("ClassroomSeatingEditor interactions", () => {
     });
 
     expect(screen.getByText("6", { selector: "output" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "분단 수 줄이기" }));
+    fireEvent.click(screen.getByRole("button", { name: "모둠 수 줄이기" }));
     expect(onChange).toHaveBeenCalledTimes(1);
     expect(onChange.mock.calls[0][0]).toHaveLength(5);
   });

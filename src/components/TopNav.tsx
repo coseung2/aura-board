@@ -44,7 +44,7 @@ const EMPTY_NAV_DATA: TeacherNavData = {
 const CLASSROOM_MANAGEMENT_TABS = [
   { key: "dashboard", label: "학급 홈" },
   { key: "students", label: "학생 명단" },
-  { key: "groups", label: "자리·모둠", badge: "관리자" },
+  { key: "groups", label: "자리·모둠" },
   { key: "boards", label: "보드 연결" },
 ] as const;
 
@@ -295,9 +295,7 @@ export function TopNav({ showAdmin = false }: Props) {
         ];
 
   const selectedClassroomManagementLinks = classroomTabLinks(
-    showAdmin
-      ? CLASSROOM_MANAGEMENT_TABS
-      : CLASSROOM_MANAGEMENT_TABS.filter((tab) => tab.key !== "groups"),
+    CLASSROOM_MANAGEMENT_TABS,
   );
   const selectedClassroomOperationLinks = classroomTabLinks(
     CLASSROOM_OPERATION_TABS,

@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
-import { isAdminEmail } from "@/lib/admin";
 
 /**
  * Saved seating layouts (2026-07-27). A teacher can keep several named
@@ -50,9 +49,6 @@ export async function GET(
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  if (!isAdminEmail(user.email)) {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
-  }
   const { id } = await params;
   if (!(await requireClassroom(id, user.id))) {
     return NextResponse.json({ error: "not_found" }, { status: 404 });
@@ -74,9 +70,6 @@ export async function POST(
   const user = await getCurrentUser().catch(() => null);
   if (!user) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-  }
-  if (!isAdminEmail(user.email)) {
-    return NextResponse.json({ error: "not_found" }, { status: 404 });
   }
   const { id } = await params;
   if (!(await requireClassroom(id, user.id))) {
