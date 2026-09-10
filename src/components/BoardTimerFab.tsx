@@ -11,6 +11,12 @@ import {
 import { createPortal } from "react-dom";
 import { CloseIcon } from "./icons/UiIcons";
 import {
+  StudentRandomPickerPanel,
+  type PickerGenderFilter,
+  type ToolkitClassroom,
+  type ToolkitStudent,
+} from "./toolkit/StudentRandomPickerPanel";
+import {
   fetchClassroomStudents,
   fetchToolkitClassrooms,
   onClassroomListChanged,
@@ -24,21 +30,6 @@ const PANEL_MARGIN = 12;
 const MIN_PANEL_WIDTH = 280;
 const MIN_PANEL_HEIGHT = 320;
 const DEFAULT_PANEL_SIZE = { width: 320, height: 360 };
-
-type ToolkitStudent = {
-  id: string;
-  name: string;
-  number: number | null;
-  gender?: "male" | "female" | null;
-};
-
-type ToolkitClassroom = {
-  id: string;
-  name: string;
-  studentCount: number | null;
-};
-
-type PickerGenderFilter = "all" | "male" | "female";
 
 type BoardToolkitFabProps = {
   classroomId?: string | null;
@@ -302,10 +293,6 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
     if (pickerFilter === "all") return students;
     return students.filter((student) => student.gender === pickerFilter);
   }, [pickerFilter, students]);
-  const pickedStudentIds = useMemo(
-    () => new Set(pickedStudents.map((student) => student.id)),
-    [pickedStudents],
-  );
 
   const safePickerCount = Math.min(
     Math.max(1, pickerCount),
@@ -362,6 +349,15 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
     setStudentsLoaded(false);
     setStudentsClassroomId(null);
     setStudentsError("");
+    setPickedStudents([]);
+    setHighlightedStudentId(null);
+    setDrawingStudents(false);
+  };
+
+  const choosePickerFilter = (nextFilter: PickerGenderFilter) => {
+    drawTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
+    drawTimeoutsRef.current = [];
+    setPickerFilter(nextFilter);
     setPickedStudents([]);
     setHighlightedStudentId(null);
     setDrawingStudents(false);
@@ -549,145 +545,26 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
   );
 
   const pickerPanel = (
-    <section
-      className="board-toolkit-panel board-student-picker-panel"
-      role="dialog"
-      aria-label="학생 랜덤뽑기"
-    >
-      <div className="board-timer-header">
-        <div>
-          <p className="board-timer-kicker">툴킷</p>
-          <strong className="board-timer-status">학생 랜덤뽑기</strong>
-        </div>
-        <button
-          type="button"
-          className="board-timer-close"
-          onClick={() => setPickerOpen(false)}
-          aria-label="학생 랜덤뽑기 닫기"
-        >
-          <CloseIcon size={18} />
-        </button>
-      </div>
-
-      <div className="board-picker-content">
-        {classroomsError ? (
-          <p className="board-toolkit-empty">{classroomsError}</p>
-        ) : !classroomsLoaded ? (
-          <p className="board-toolkit-empty">학급 목록을 불러오는 중...</p>
-        ) : classrooms.length === 0 ? (
-          <p className="board-toolkit-empty">선택할 수 있는 학급이 없어요.</p>
-        ) : (
-          <label className="board-classroom-picker">
-            <span>학급</span>
-            <select
-              value={activeClassroomId ?? ""}
-              onChange={(event) => chooseClassroom(event.target.value)}
-            >
-              <option value="" disabled>
-                학급 선택
-              </option>
-              {classrooms.map((classroom) => (
-                <option key={classroom.id} value={classroom.id}>
-                  {classroom.name}
-                  {typeof classroom.studentCount === "number"
-                    ? ` · ${classroom.studentCount}명`
-                    : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-
-        {!activeClassroomId ? (
-          classroomsLoaded && classrooms.length > 0 ? (
-            <p className="board-toolkit-empty">학급을 선택하면 학생 명단을 불러와요.</p>
-          ) : null
-        ) : studentsError ? (
-          <p className="board-toolkit-empty">{studentsError}</p>
-        ) : !studentsLoaded ? (
-          <p className="board-toolkit-empty">학생 명단을 불러오는 중...</p>
-        ) : students.length === 0 ? (
-          <p className="board-toolkit-empty">뽑을 학생이 없어요.</p>
-        ) : (
-          <>
-            <div className="board-picker-controls">
-              <label>
-                <span>인원</span>
-                <input
-                  type="number"
-                  min={1}
-                  max={Math.max(1, eligibleStudents.length)}
-                  value={safePickerCount}
-                  onChange={(event) =>
-                    setPickerCount(Math.max(1, Number(event.target.value) || 1))
-                  }
-                />
-              </label>
-              <label>
-                <span>대상</span>
-                <select
-                  value={pickerFilter}
-                  onChange={(event) => {
-                    drawTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
-                    drawTimeoutsRef.current = [];
-                    setPickerFilter(event.target.value as PickerGenderFilter);
-                    setPickedStudents([]);
-                    setHighlightedStudentId(null);
-                    setDrawingStudents(false);
-                  }}
-                >
-                  <option value="all">전체</option>
-                  <option value="female">여</option>
-                  <option value="male">남</option>
-                </select>
-              </label>
-            </div>
-
-            <button
-              type="button"
-              className="board-timer-primary board-picker-draw"
-              onClick={drawStudents}
-              disabled={eligibleStudents.length === 0 || drawingStudents}
-            >
-              {drawingStudents ? "뽑는 중..." : "뽑기"}
-            </button>
-
-            {eligibleStudents.length === 0 ? (
-              <p className="board-toolkit-empty">조건에 맞는 학생이 없어요.</p>
-            ) : (
-              <>
-                <div className="board-picker-roster" aria-live="polite">
-                  {eligibleStudents.map((student) => {
-                    const isPicked = pickedStudentIds.has(student.id);
-                    const isHighlighted = highlightedStudentId === student.id;
-                    return (
-                      <div
-                        key={student.id}
-                        className={[
-                          "board-picker-student-card",
-                          isPicked ? "is-picked" : "",
-                          isHighlighted ? "is-highlighted" : "",
-                        ].filter(Boolean).join(" ")}
-                      >
-                        <span>{student.number ?? "-"}</span>
-                        <strong>{student.name}</strong>
-                      </div>
-                    );
-                  })}
-                </div>
-                {pickedStudents.length > 0 ? (
-                  <p className="board-picker-summary">
-                    {pickedStudents.map((student) => student.name).join(", ")}
-                  </p>
-                ) : (
-                  <p className="board-toolkit-empty">뽑기를 누르면 카드 위에서 순서대로 표시돼요.</p>
-                )}
-              </>
-            )}
-          </>
-        )}
-      </div>
-    </section>
+    <StudentRandomPickerPanel
+      classrooms={classrooms}
+      classroomsLoaded={classroomsLoaded}
+      classroomsError={classroomsError}
+      activeClassroomId={activeClassroomId}
+      students={students}
+      studentsLoaded={studentsLoaded}
+      studentsError={studentsError}
+      eligibleStudents={eligibleStudents}
+      pickerFilter={pickerFilter}
+      pickerCount={safePickerCount}
+      pickedStudents={pickedStudents}
+      highlightedStudentId={highlightedStudentId}
+      drawingStudents={drawingStudents}
+      onClose={() => setPickerOpen(false)}
+      onChooseClassroom={chooseClassroom}
+      onChooseFilter={choosePickerFilter}
+      onChangePickerCount={setPickerCount}
+      onDraw={drawStudents}
+    />
   );
 
   const toolMenu = (
