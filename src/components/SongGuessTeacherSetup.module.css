@@ -213,6 +213,46 @@
   opacity: 0.55;
 }
 
+.answerMode {
+  display: grid;
+  gap: 12px;
+  margin: 20px 0 0;
+  padding: 18px;
+  border: 1px solid var(--song-teacher-line);
+  border-radius: 14px;
+  background: var(--song-teacher-surface-strong);
+}
+
+.answerMode legend {
+  padding: 0 6px;
+  color: var(--song-teacher-muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.answerMode label {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.answerMode input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--song-teacher-accent);
+}
+
+.answerMode p {
+  margin: 0;
+  color: var(--song-teacher-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .setupActions {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(220px, 244px);
@@ -295,6 +335,28 @@
 .advancedButton:hover:not(:disabled) {
   border-color: var(--song-teacher-accent);
   color: var(--song-teacher-text);
+}
+
+.removeButton {
+  min-height: 44px;
+  border: 1px solid rgb(255 154 170 / 35%);
+  border-radius: 10px;
+  background: rgb(185 50 71 / 18%);
+  color: #ffb6c2;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.removeButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.removeButton:focus-visible {
+  outline: 3px solid rgb(255 154 170 / 35%);
+  outline-offset: 2px;
 }
 
 @media (max-width: 1080px) {

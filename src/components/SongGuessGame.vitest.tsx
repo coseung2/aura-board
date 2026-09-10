@@ -1,10 +1,25 @@
 import "@testing-library/jest-dom/vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
-import type { SongGuessSnapshot } from "@/lib/song-guess/contracts";
+import type { SongGuessClipSnapshot, SongGuessSnapshot } from "@/lib/song-guess/contracts";
 import { SongGuessGame } from "./SongGuessGame";
 
-vi.mock("./SongGuessPlayer", () => ({ SongGuessPlayer: () => <div>음원 플레이어</div> }));
+vi.mock("./SongGuessPlayer", () => ({
+  SongGuessPlayer: ({
+    teacher,
+    clip,
+  }: {
+    teacher?: boolean;
+    clip: SongGuessClipSnapshot;
+  }) => (
+    <div>
+      음원 플레이어
+      {teacher && clip.mimeType.startsWith("audio/") && (
+        <div role="timer" aria-label="남은 응답 시간">플레이어 타이머</div>
+      )}
+    </div>
+  ),
+}));
 vi.mock("./SongGuessScoreboard", () => ({ SongGuessScoreboard: () => <div>점수판</div> }));
 vi.mock("./use-song-guess-sounds", () => ({ useSongGuessSounds: () => ({ unlock: vi.fn(), toggleMuted: vi.fn(), onMusicPlaying: vi.fn(), muted: false }) }));
 
@@ -103,5 +118,43 @@ describe("SongGuessGame answer modes", () => {
     expect(screen.queryByRole("group", { name: "노래 제목 보기" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "정답 제출" }));
     expect(onIntent).toHaveBeenCalledWith({ type: "guess", text: "달리반피카소" });
+  });
+
+  it.each([
+    { label: "missing", clip: null },
+    {
+      label: "non-audio",
+      clip: {
+        assetId: "legacy-video",
+        tierMs: 15000 as const,
+        mimeType: "video/youtube" as const,
+        durationMs: 15000,
+        sizeBytes: 0,
+      },
+    },
+  ])("keeps the teacher timer visible for a $label clip", ({ clip }) => {
+    const state = snapshot();
+    state.viewer.role = "host";
+    state.currentRound.currentClip = clip;
+    renderGame(state, { remainingSeconds: 17 });
+    const timer = screen.getByRole("timer", { name: "남은 응답 시간" });
+    expect(timer).toHaveTextContent("17");
+  });
+
+  it("renders only the player timer for a teacher audio clip", () => {
+    const state = snapshot();
+    state.viewer.role = "host";
+    state.currentRound.currentClip = {
+      assetId: "audio-clip",
+      tierMs: 15000,
+      mimeType: "audio/wav",
+      durationMs: 15000,
+      sizeBytes: 100,
+    };
+    renderGame(state, { remainingSeconds: 17 });
+    expect(screen.getAllByRole("timer", { name: "남은 응답 시간" })).toHaveLength(1);
+    expect(screen.getByRole("timer", { name: "남은 응답 시간" })).toHaveTextContent(
+      "플레이어 타이머",
+    );
   });
 });

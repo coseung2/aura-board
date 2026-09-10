@@ -7,8 +7,17 @@
   --picker-sun: #ffd966;
   --picker-mint: #7edfc9;
   --picker-line: #ded8f4;
+  /* Panel bottom offset comes from .board-toolkit-panel:
+     var(--fab-bottom-safe) + 72px. Mirror it here so the height cap also
+     reserves the 24px top margin instead of overflowing above the viewport. */
+  --picker-bottom-offset: calc(var(--fab-bottom-safe, 32px) + 72px);
+  --picker-top-margin: 24px;
+  bottom: var(--picker-bottom-offset);
   width: min(640px, calc(100vw - 32px));
-  max-height: min(760px, calc(100vh - 96px));
+  max-height: min(
+    760px,
+    calc(100dvh - var(--picker-bottom-offset) - var(--picker-top-margin))
+  );
   padding: 0;
   border: 1px solid rgba(73, 56, 144, 0.18);
   border-radius: 28px;
@@ -92,6 +101,11 @@
   position: relative;
   z-index: 2;
   flex: 0 0 auto;
+  /* .board-timer-close is 32px square; the picker close needs a 44px target. */
+  min-width: var(--tap-min, 44px);
+  min-height: var(--tap-min, 44px);
+  width: var(--tap-min, 44px);
+  height: var(--tap-min, 44px);
   border-color: rgba(81, 57, 207, 0.12);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.72);
@@ -248,12 +262,13 @@
 
 .board-picker-stepper {
   display: grid;
-  grid-template-columns: 38px minmax(64px, 1fr) 38px;
+  grid-template-columns: var(--tap-min, 44px) minmax(64px, 1fr) var(--tap-min, 44px);
   align-items: stretch;
   gap: 6px;
 }
 
 .board-picker-stepper button {
+  min-height: var(--tap-min, 44px);
   border: 1px solid #ddd7ef;
   border-radius: 11px;
   background: #f8f6ff;
@@ -273,7 +288,7 @@
   align-items: baseline;
   justify-content: center;
   gap: 3px;
-  min-height: 42px;
+  min-height: var(--tap-min, 44px);
   padding: 5px 8px;
   border-radius: 11px;
   background: var(--picker-primary);
@@ -288,7 +303,7 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 5px;
-  min-height: 42px;
+  min-height: calc(var(--tap-min, 44px) + 8px);
   padding: 4px;
   border-radius: 12px;
   background: #f1eef8;
@@ -296,6 +311,7 @@
 
 .board-picker-segments button {
   min-width: 0;
+  min-height: var(--tap-min, 44px);
   border: 0;
   border-radius: 9px;
   background: transparent;
@@ -570,12 +586,32 @@
 @keyframes boardPickerSpin { to { transform: rotate(360deg); } }
 @keyframes boardPickerPulse { from { transform: scale(0.985); } to { transform: scale(1.025); } }
 
+@media (prefers-reduced-motion: reduce) {
+  /* The draw itself stays random; only the moving feedback is stilled. */
+  .board-picker-loading-dot,
+  .board-student-picker-panel.is-drawing .board-picker-spotlight > strong {
+    animation: none;
+  }
+
+  .board-picker-loading-dot { border-top-color: var(--picker-primary); }
+
+  .board-picker-student-card { transition: none; }
+
+  /* The JS spotlight cycles every 95ms, so the highlighted card would jump
+     repeatedly. Keep the highlight legible without moving or scaling it. */
+  .board-picker-student-card.is-highlighted { transform: none; }
+
+  .board-picker-draw { transition: none; }
+  .board-picker-draw:hover:not(:disabled) { transform: none; }
+  .board-picker-draw:active:not(:disabled) { transform: none; }
+}
+
 @media (max-width: 640px) {
   .board-student-picker-panel {
+    --picker-bottom-offset: calc(var(--fab-bottom-safe, 32px) + 66px);
+    --picker-top-margin: 20px;
     right: 12px;
-    bottom: calc(var(--fab-bottom-safe, 24px) + 66px);
     width: calc(100vw - 24px);
-    max-height: calc(100vh - 92px);
     border-radius: 22px;
   }
 

@@ -15,6 +15,8 @@
 .setupError { composes: setupError from "./SongGuessTeacherSetup.module.css"; }
 .retryButton { composes: retryButton from "./SongGuessTeacherSetup.module.css"; }
 .advancedButton { composes: advancedButton from "./SongGuessTeacherSetup.module.css"; }
+.answerMode { composes: answerMode from "./SongGuessTeacherSetup.module.css"; }
+.removeButton { composes: removeButton from "./SongGuessTeacherSetup.module.css"; }
 .teacherGame { composes: teacherGame from "./SongGuessTeacherGame.module.css"; }
 .teacherQuestion { composes: teacherQuestion from "./SongGuessTeacherGame.module.css"; }
 .teacherPlayer { composes: teacherPlayer from "./SongGuessTeacherGame.module.css"; }

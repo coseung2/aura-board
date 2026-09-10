@@ -14,6 +14,7 @@ import {
 import { SongGuessPlayer } from "./SongGuessPlayer";
 import { SongGuessScoreboard } from "./SongGuessScoreboard";
 import { SongGuessEntrance } from "./SongGuessEntrance";
+import { SongGuessTeacherTimer } from "./SongGuessTeacherTimer";
 import { useSongGuessSounds } from "./use-song-guess-sounds";
 import controls from "./SongGuessBoard.module.css";
 import styles from "./SongGuessGame.module.css";
@@ -172,6 +173,14 @@ export function SongGuessGame({
                 roundDurationSeconds={roundDuration}
               />
             )}
+            {isHost &&
+              (!currentRound.currentClip ||
+                !currentRound.currentClip.mimeType.startsWith("audio/")) && (
+                <SongGuessTeacherTimer
+                  remainingSeconds={remainingSeconds}
+                  roundDurationSeconds={roundDuration}
+                />
+              )}
             {currentRound.accessibilityClue && (
               <p className={styles.clue}>{currentRound.accessibilityClue}</p>
             )}

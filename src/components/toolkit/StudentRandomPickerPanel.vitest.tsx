@@ -98,6 +98,51 @@ describe("StudentRandomPickerPanel", () => {
     expect(screen.getByRole("button", { name: "두구두구... 뽑는 중" })).toBeDisabled();
   });
 
+  it("keeps the rapidly changing spotlight name out of live regions", () => {
+    const { rerender } = render(
+      <StudentRandomPickerPanel
+        {...makeProps({ drawingStudents: true, highlightedStudentId: "s2" })}
+      />,
+    );
+
+    const spotlightName = screen
+      .getByText("두구두구...")
+      .parentElement?.querySelector("strong");
+    expect(spotlightName).toBeTruthy();
+    expect(spotlightName?.closest("[aria-live]")).toBeNull();
+
+    const announcement = screen.getByText("학생을 뽑고 있어요.");
+    expect(announcement).toHaveAttribute("aria-live", "polite");
+    expect(announcement).toHaveAttribute("role", "status");
+
+    rerender(
+      <StudentRandomPickerPanel
+        {...makeProps({ drawingStudents: true, highlightedStudentId: "s3" })}
+      />,
+    );
+
+    // The spotlight name changed, but the announced text did not.
+    expect(screen.getByText("학생을 뽑고 있어요.")).toBeInTheDocument();
+    for (const node of screen.getAllByText("다온")) {
+      expect(node.closest("[aria-live]")).toBeNull();
+    }
+  });
+
+  it("announces the confirmed result once through a single live region", () => {
+    render(
+      <StudentRandomPickerPanel
+        {...makeProps({ pickedStudents: [students[0], students[2]] })}
+      />,
+    );
+
+    const announcement = screen.getByText("1번 가온, 3번 다온 뽑혔어요.");
+    expect(announcement).toHaveAttribute("aria-live", "polite");
+
+    // The visual summary and spotlight must not double-announce the result.
+    expect(screen.getByText("2명 선택 완료").closest("[aria-live]")).toBeNull();
+    expect(screen.getByText("1번 가온").closest("[aria-live]")).toBeNull();
+  });
+
   it("renders confirmed winners and supports another draw", () => {
     const onDraw = vi.fn();
     render(

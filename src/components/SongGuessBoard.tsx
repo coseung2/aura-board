@@ -23,7 +23,6 @@ import {
 } from "@/lib/song-guess/browser-client";
 import {
   isSongGuessSnapshot,
-  SONG_GUESS_ANSWER_TARGET_LABELS,
   type SongGuessAnswerTarget,
   mergeSongGuessSnapshot,
   type SongGuessCommandRequest,
@@ -50,6 +49,7 @@ import { SongGuessPoolPicker } from "./SongGuessPoolPicker";
 import { SongGuessGame } from "./SongGuessGame";
 import { SongGuessAnswerGuide } from "./SongGuessAnswerGuide";
 import { SongGuessImportPanel } from "./SongGuessImportPanel";
+import { SongGuessSetupControls } from "./SongGuessSetupControls";
 import {
   BoardHeading,
   SongGuessRoundEditor,
@@ -94,7 +94,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   const [hasPending, setHasPending] = useState(false);
   const [failedJoinSessionId, setFailedJoinSessionId] = useState<string | null>(null);
   const [customEditor, setCustomEditor] = useState(false);
-  const [answerMode, setAnswerMode] = useState<"text" | "multiple-choice">("multiple-choice");
+  const [answerMode, setAnswerMode] = useState<"text" | "multiple-choice">("text");
   const [answerTarget, setAnswerTarget] = useState<SongGuessAnswerTarget>("title");
   const sessionSequence = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -310,25 +310,13 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     }
   }
 
-  async function prepareAutoGame(prepared: SongGuessTeacherSetup) {
+  function prepareAutoGame(prepared: SongGuessTeacherSetup) {
     revokeDraftUrls(draftsRef.current);
     setSetup(prepared);
     setDrafts(draftsFromSetup(prepared));
-    setAnswerMode("multiple-choice");
-    setAnswerTarget("title");
     setError(null);
     setSetupError(null);
     setNotice(null);
-    try {
-      const response = await createSongGuessSession(boardId, "multiple-choice", "title");
-      setSnapshot(response.snapshot);
-    } catch (cause) {
-      if (cause instanceof SongGuessClientError && cause.status === 409) {
-        await refreshSession();
-        return;
-      }
-      setError(messageForError(cause));
-    }
   }
 
   async function handleSourceFile(roundId: string, event: ChangeEvent<HTMLInputElement>) {
@@ -521,6 +509,26 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
               onPreparingChange={setBusy}
               onPrepared={prepareAutoGame}
             />
+            {setup && (
+              <>
+                <SongGuessAnswerGuide
+                  key={boardId}
+                  setup={setup}
+                  answerTarget={answerTarget}
+                />
+                <SongGuessSetupControls
+                  boardId={boardId}
+                  setup={setup}
+                  busy={busy}
+                  answerMode={answerMode}
+                  answerTarget={answerTarget}
+                  onAnswerModeChange={setAnswerMode}
+                  onAnswerTargetChange={setAnswerTarget}
+                  onCreate={() => void createSession()}
+                  onRemove={() => void removeSetup()}
+                />
+              </>
+            )}
             <button
               type="button"
               className={teacherStyles.advancedButton}
@@ -605,82 +613,21 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
               </main>
 
               <aside className={styles.editorSidebar}>
-                <div className={styles.sidebarCard}>
-                  <h2>저장 및 시작</h2>
-                  {setup && <p>{setup.rounds.length}문제</p>}
-                  <label className={styles.field}>
-                    <span>출제 모드</span>
-                    <select
-                      value={answerTarget}
-                      disabled={busy}
-                      onChange={(event) =>
-                        setAnswerTarget(event.target.value as SongGuessAnswerTarget)
-                      }
-                    >
-                      {Object.entries(SONG_GUESS_ANSWER_TARGET_LABELS).map(
-                        ([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ),
-                      )}
-                    </select>
-                  </label>
-                  <fieldset disabled={busy} className={styles.answerMode}>
-                    <legend>답변 방식</legend>
-                    <label>
-                      <input
-                        type="radio"
-                        name={`answer-mode-${boardId}`}
-                        value="text"
-                        checked={answerMode === "text"}
-                        onChange={() => setAnswerMode("text")}
-                      />{" "}
-                      서술형
-                    </label>
-                    <label>
-                      <input
-                        type="radio"
-                        name={`answer-mode-${boardId}`}
-                        value="multiple-choice"
-                        checked={answerMode === "multiple-choice"}
-                        onChange={() => setAnswerMode("multiple-choice")}
-                      />{" "}
-                      객관식 (4지선다)
-                    </label>
-                    <p>
-                      {answerMode === "text"
-                        ? "노래 제목을 직접 입력해요. 등록된 별칭도 정답으로 인정돼요."
-                        : "정답과 오답 보기 3개를 자동으로 채워요. 문제마다 한 번만 제출할 수 있어요."}
-                    </p>
-                  </fieldset>
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    disabled={busy || drafts.length === 0}
-                    onClick={() => void savePack()}
-                  >
-                    {busy ? "저장 중…" : "라운드 팩 저장"}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    disabled={busy || !setup?.rounds.length}
-                    onClick={() => void createSession()}
-                  >
-                    게임 만들기
-                  </button>
-                  {setup && (
-                    <button
-                      type="button"
-                      className={styles.dangerButton}
-                      disabled={busy}
-                      onClick={() => void removeSetup()}
-                    >
-                      저장 구성 삭제
-                    </button>
-                  )}
-                </div>
+                <SongGuessSetupControls
+                  boardId={boardId}
+                  setup={setup}
+                  busy={busy}
+                  answerMode={answerMode}
+                  answerTarget={answerTarget}
+                  compact
+                  showSave
+                  saveDisabled={drafts.length === 0}
+                  onAnswerModeChange={setAnswerMode}
+                  onAnswerTargetChange={setAnswerTarget}
+                  onSave={() => void savePack()}
+                  onCreate={() => void createSession()}
+                  onRemove={() => void removeSetup()}
+                />
                 <StatusMessages error={error ?? setupError} notice={notice} />
               </aside>
             </div>

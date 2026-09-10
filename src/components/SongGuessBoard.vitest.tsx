@@ -113,6 +113,7 @@ describe("SongGuessBoard authoritative web flow", () => {
 
   afterEach(() => {
     window.localStorage.clear();
+    vi.unstubAllGlobals();
   });
 
   it.each(["text", "multiple-choice"] as const)("creates a game using the selected %s answer mode", async (answerMode) => {
@@ -133,6 +134,136 @@ describe("SongGuessBoard authoritative web flow", () => {
     fireEvent.click(screen.getByRole("radio", { name: "객관식 (4지선다)" }));
     fireEvent.click(screen.getByRole("button", { name: "게임 만들기" }));
     await waitFor(() => expect(mocks.createSession).toHaveBeenCalledWith("board-1", "multiple-choice", target));
+  });
+
+  it("reviews an automatically prepared pack before creating it with the selected settings", async () => {
+    mocks.fetchSetup.mockResolvedValue(null);
+    const prepared = setup();
+    const catalog = {
+      categories: [
+        { id: "k-pop", label: "가요", counts: { intro: 1, highlight: 1 } },
+      ],
+      songs: [
+        {
+          id: "song-1",
+          title: "비밀 정답",
+          artist: "가수",
+          aliases: ["별칭"],
+          categories: ["k-pop"],
+          sourceUrl: null,
+          segments: { intro: true, highlight: true },
+        },
+      ],
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify(catalog), { status: 200 }))
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ setup: prepared }), { status: 201 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+    mocks.createSession.mockResolvedValue({
+      snapshot: snapshot("host", {
+        phase: "lobby",
+        answerMode: "multiple-choice",
+        answerTarget: "artist-title",
+      }),
+    });
+
+    render(
+      <SongGuessBoard
+        boardId="board-1"
+        boardTitle="우리 반 음악"
+        viewer="teacher"
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "1문제 준비하기" }));
+    const guideButton = await screen.findByRole("button", {
+      name: "교사용 정답 목록",
+    });
+    expect(mocks.createSession).not.toHaveBeenCalled();
+    fireEvent.click(guideButton);
+    expect(screen.getByText("비밀 정답")).toBeVisible();
+    fireEvent.change(screen.getByRole("combobox", { name: "출제 모드" }), {
+      target: { value: "artist-title" },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "객관식 (4지선다)" }));
+    fireEvent.click(screen.getByRole("button", { name: "게임 만들기" }));
+
+    await waitFor(() =>
+      expect(mocks.createSession).toHaveBeenCalledWith(
+        "board-1",
+        "multiple-choice",
+        "artist-title",
+      ),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/song-guess/boards/board-1/catalog",
+      expect.objectContaining({ method: "POST" }),
+    );
+  });
+
+  it("keeps the selected creation settings available after a creation failure", async () => {
+    mocks.createSession
+      .mockRejectedValueOnce(new TypeError("Network request failed"))
+      .mockResolvedValueOnce({
+        snapshot: snapshot("host", {
+          phase: "lobby",
+          answerMode: "multiple-choice",
+          answerTarget: "artist",
+        }),
+      });
+    render(
+      <SongGuessBoard
+        boardId="board-1"
+        boardTitle="우리 반 음악"
+        viewer="teacher"
+      />,
+    );
+    fireEvent.change(await screen.findByRole("combobox", { name: "출제 모드" }), {
+      target: { value: "artist" },
+    });
+    fireEvent.click(screen.getByRole("radio", { name: "객관식 (4지선다)" }));
+    fireEvent.click(screen.getByRole("button", { name: "게임 만들기" }));
+    expect(await screen.findByRole("alert")).toBeVisible();
+
+    const retry = screen.getByRole("button", { name: "게임 만들기" });
+    expect(retry).toBeEnabled();
+    expect(screen.getByRole("combobox", { name: "출제 모드" })).toHaveValue("artist");
+    expect(screen.getByRole("radio", { name: "객관식 (4지선다)" })).toBeChecked();
+    fireEvent.click(retry);
+
+    await waitFor(() => expect(mocks.createSession).toHaveBeenCalledTimes(2));
+    expect(mocks.createSession).toHaveBeenNthCalledWith(
+      2,
+      "board-1",
+      "multiple-choice",
+      "artist",
+    );
+    await screen.findByText("시작 대기");
+  });
+
+  it("shows validation feedback when saving the initial empty manual draft", async () => {
+    mocks.fetchSetup.mockResolvedValue(null);
+    render(
+      <SongGuessBoard
+        boardId="board-1"
+        boardTitle="우리 반 음악"
+        viewer="teacher"
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "직접 음원 구성" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "라운드 팩 저장" }));
+
+    expect(
+      await screen.findByText("모든 라운드의 대표 정답을 입력해 주세요."),
+    ).toHaveAttribute("role", "alert");
+    expect(mocks.saveSetup).not.toHaveBeenCalled();
   });
 
   it.each([null, "draft", "guessing"] as const)("lets teachers inspect saved answers in %s without revealing them to the game", async (phase) => {

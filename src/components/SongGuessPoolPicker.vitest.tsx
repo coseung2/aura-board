@@ -74,6 +74,41 @@ describe("SongGuessPoolPicker", () => {
     await waitFor(() => expect(onPrepared).toHaveBeenCalledWith({ rounds: [{ id: "round-1" }] }));
   });
 
+  it("keeps preparation busy until the prepared callback finishes", async () => {
+    let finishPrepared!: () => void;
+    const callbackPending = new Promise<void>((resolve) => {
+      finishPrepared = resolve;
+    });
+    const onPrepared = vi.fn(() => callbackPending);
+    const onPreparingChange = vi.fn();
+    fetchMock
+      .mockResolvedValueOnce(response(catalog))
+      .mockResolvedValueOnce(
+        response({ setup: { rounds: [{ id: "round-1" }] } }, 201),
+      );
+    render(
+      <SongGuessPoolPicker
+        boardId="board-1"
+        busy={false}
+        onPrepared={onPrepared}
+        onPreparingChange={onPreparingChange}
+      />,
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "1문제 준비하기" }),
+    );
+    await waitFor(() => expect(onPrepared).toHaveBeenCalledOnce());
+    expect(screen.getByRole("button", { name: "노래 준비 중…" })).toBeDisabled();
+    expect(onPreparingChange).toHaveBeenCalledWith(true);
+    expect(onPreparingChange).not.toHaveBeenCalledWith(false);
+
+    finishPrepared();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "1문제 준비하기" })).toBeEnabled(),
+    );
+    expect(onPreparingChange).toHaveBeenLastCalledWith(false);
+  });
+
   it("offers a retry after catalog loading fails", async () => {
     fetchMock
       .mockRejectedValueOnce(new Error("offline"))

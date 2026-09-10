@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Music2, Pause, Play, RotateCcw } from "lucide-react";
 import type { SongGuessClipSnapshot } from "@/lib/song-guess/contracts";
 import { songGuessClipUrl } from "@/lib/song-guess/browser-client";
+import { SongGuessTeacherTimer } from "./SongGuessTeacherTimer";
 import styles from "./SongGuessGame.module.css";
 import teacherStyles from "./SongGuessTeacher.module.css";
 
@@ -42,11 +43,6 @@ export function SongGuessPlayer({
   const hasAudio = clip.mimeType.startsWith("audio/");
   const clipDurationSeconds = Math.max(1, clip.tierMs / 1000);
   const audioProgress = Math.max(0, Math.min(1, currentTime / clipDurationSeconds));
-  const timerProgress = Math.max(
-    0,
-    Math.min(1, (remainingSeconds ?? 0) / Math.max(1, roundDurationSeconds)),
-  );
-
   useEffect(() => {
     active.current = true;
     const media = audio.current;
@@ -182,16 +178,10 @@ export function SongGuessPlayer({
           )}
         </div>
 
-        <div className={teacherStyles.timerBox} role="timer" aria-label="남은 응답 시간">
-          <span>남은 시간</span>
-          <strong className={teacherStyles.timerNumber}>
-            {remainingSeconds === null ? "—" : Math.max(0, remainingSeconds)}
-          </strong>
-          <span className={teacherStyles.timerUnit}>초</span>
-          <div className={teacherStyles.timerTrack} aria-hidden="true">
-            <div className={teacherStyles.timerFill} style={{ width: `${timerProgress * 100}%` }} />
-          </div>
-        </div>
+        <SongGuessTeacherTimer
+          remainingSeconds={remainingSeconds}
+          roundDurationSeconds={roundDurationSeconds}
+        />
         {media}
       </div>
     );

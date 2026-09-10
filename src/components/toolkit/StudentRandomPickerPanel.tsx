@@ -65,6 +65,17 @@ export function StudentRandomPickerPanel({
     : drawingStudents || pickedStudents.length > 0
       ? 3
       : 2;
+  // The spotlight name changes every 95ms while drawing, so it must not sit in
+  // a live region. Announce stable stage text instead.
+  const drawAnnouncement = drawingStudents
+    ? "학생을 뽑고 있어요."
+    : pickedStudents.length > 0
+      ? `${pickedStudents
+          .map((student) =>
+            student.number ? `${student.number}번 ${student.name}` : student.name,
+          )
+          .join(", ")} 뽑혔어요.`
+      : "";
 
   return (
     <section
@@ -277,7 +288,7 @@ export function StudentRandomPickerPanel({
             ) : (
               <>
                 <div className="board-picker-arena">
-                  <div className="board-picker-spotlight" aria-live="polite">
+                  <div className="board-picker-spotlight">
                     <span
                       className="board-picker-spark board-picker-spark-one"
                       aria-hidden="true"
@@ -371,8 +382,12 @@ export function StudentRandomPickerPanel({
                   <span aria-hidden="true">✦</span>
                 </button>
 
+                <p className="sr-only" role="status" aria-live="polite">
+                  {drawAnnouncement}
+                </p>
+
                 {pickedStudents.length > 0 ? (
-                  <div className="board-picker-summary" aria-live="polite">
+                  <div className="board-picker-summary">
                     <span>선택 결과</span>
                     <div>
                       {pickedStudents.map((student) => (
