@@ -1,4 +1,3 @@
-
 "use client";
 
 import {
@@ -44,6 +43,7 @@ import {
   type SongGuessRoundSaveDraft,
 } from "@/lib/song-guess/teacher-workflow";
 import styles from "./SongGuessBoard.module.css";
+import teacherStyles from "./SongGuessTeacher.module.css";
 import type { RoundDraft } from "./song-guess-board-model";
 import { useSongGuessClock } from "./use-song-guess-clock";
 import { SongGuessPoolPicker } from "./SongGuessPoolPicker";
@@ -94,7 +94,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   const [hasPending, setHasPending] = useState(false);
   const [failedJoinSessionId, setFailedJoinSessionId] = useState<string | null>(null);
   const [customEditor, setCustomEditor] = useState(false);
-  const [answerMode, setAnswerMode] = useState<"text" | "multiple-choice">("text");
+  const [answerMode, setAnswerMode] = useState<"text" | "multiple-choice">("multiple-choice");
   const [answerTarget, setAnswerTarget] = useState<SongGuessAnswerTarget>("title");
   const sessionSequence = useRef(0);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -104,7 +104,10 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   const commandInFlight = useRef(false);
   const storageKey = `aura-song-guess-pending:${boardId}`;
   const { remainingSeconds, expired } = useSongGuessClock(snapshot);
-  const entryFailed = failedJoinSessionId === snapshot?.sessionId && snapshot?.viewer.joined === false && !busy;
+  const entryFailed =
+    failedJoinSessionId === snapshot?.sessionId &&
+    snapshot?.viewer.joined === false &&
+    !busy;
 
   draftsRef.current = drafts;
 
@@ -229,7 +232,9 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
         if (response.result) setLastGuessResult(response.result);
         clearPending();
       } catch (cause) {
-        if (pending.request.command.type === "join") setFailedJoinSessionId(pending.sessionId);
+        if (pending.request.command.type === "join") {
+          setFailedJoinSessionId(pending.sessionId);
+        }
         if (cause instanceof SongGuessClientError) {
           const recovered = cause.body.snapshot;
           if (cause.status === 409 && isSongGuessSnapshot(recovered)) {
@@ -255,7 +260,6 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     if (!snapshot || busy) return;
     const pending = readPending();
     if (
-
       !pending ||
       pending.sessionId !== snapshot.sessionId ||
       autoRetriedRequest.current === pending.request.requestId
@@ -268,8 +272,16 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
 
   const sendIntent = useCallback(
     (command: SongGuessIntent) => {
-      if (!snapshot || busy || (command.type === "guess" && (expired ||
-        (snapshot.answerMode === "multiple-choice" && (hasPending || snapshot.viewer.answeredCurrentRound))))) return;
+      if (
+        !snapshot ||
+        busy ||
+        (command.type === "guess" &&
+          (expired ||
+            (snapshot.answerMode === "multiple-choice" &&
+              (hasPending || snapshot.viewer.answeredCurrentRound))))
+      ) {
+        return;
+      }
       void executeCommand({
         sessionId: snapshot.sessionId,
         request: makeSongGuessCommand(snapshot, command),
@@ -295,6 +307,27 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
       setError(messageForError(cause));
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function prepareAutoGame(prepared: SongGuessTeacherSetup) {
+    revokeDraftUrls(draftsRef.current);
+    setSetup(prepared);
+    setDrafts(draftsFromSetup(prepared));
+    setAnswerMode("multiple-choice");
+    setAnswerTarget("title");
+    setError(null);
+    setSetupError(null);
+    setNotice(null);
+    try {
+      const response = await createSongGuessSession(boardId, "multiple-choice", "title");
+      setSnapshot(response.snapshot);
+    } catch (cause) {
+      if (cause instanceof SongGuessClientError && cause.status === 409) {
+        await refreshSession();
+        return;
+      }
+      setError(messageForError(cause));
     }
   }
 
@@ -335,7 +368,9 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
         }),
       );
     } catch (cause) {
-      setError(messageForAudioError(cause instanceof Error ? cause.message : "decode_failed"));
+      setError(
+        messageForAudioError(cause instanceof Error ? cause.message : "decode_failed"),
+      );
     } finally {
       setDecodingRoundId(null);
     }
@@ -367,17 +402,17 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
       return;
     }
     try {
-      const generated = [createSongGuessHighlight(draft.sourceBuffer, draft.startSeconds)].map(
-        (clip) => {
-          const bytes = clip.bytes.slice();
-          const blob = new Blob([bytes], { type: clip.mimeType });
-          return {
-            tierMs: clip.tierMs,
-            blob,
-            url: URL.createObjectURL(blob),
-          };
-        },
-      );
+      const generated = [
+        createSongGuessHighlight(draft.sourceBuffer, draft.startSeconds),
+      ].map((clip) => {
+        const bytes = clip.bytes.slice();
+        const blob = new Blob([bytes], { type: clip.mimeType });
+        return {
+          tierMs: clip.tierMs,
+          blob,
+          url: URL.createObjectURL(blob),
+        };
+      });
       setDrafts((current) =>
         current.map((candidate) => {
           if (candidate.clientId !== roundId) return candidate;
@@ -388,7 +423,11 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
       setError(null);
       setNotice(null);
     } catch (cause) {
-      setError(messageForAudioError(cause instanceof Error ? cause.message : "clip_generation_failed"));
+      setError(
+        messageForAudioError(
+          cause instanceof Error ? cause.message : "clip_generation_failed",
+        ),
+      );
     }
   }
 
@@ -405,10 +444,11 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
         accessibilityClue: draft.accessibilityClue,
         rightsConfirmed: draft.rightsConfirmed,
         existingClipAssetIds: draft.existingClipAssetIds,
-        generatedClips: draft.generatedClips?.map((clip) => ({
-          tierMs: clip.tierMs,
-          blob: clip.blob,
-        })) ?? null,
+        generatedClips:
+          draft.generatedClips?.map((clip) => ({
+            tierMs: clip.tierMs,
+            blob: clip.blob,
+          })) ?? null,
         sourceSelected: draft.sourceBuffer !== null,
       }));
       const saved = await persistSongGuessRoundPack(boardId, workflowDrafts, {
@@ -457,98 +497,195 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   if (loading) {
     return (
       <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
-        <div className={styles.panel} role="status">음악 퀴즈를 불러오는 중이에요…</div>
+        <div className={styles.panel} role="status">
+          음악 퀴즈를 불러오는 중이에요…
+        </div>
       </section>
     );
   }
 
   if (!snapshot && viewer === "teacher") {
     return (
-      <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
+      <section
+        className={`${styles.shell} ${teacherStyles.teacherShell}`}
+        data-viewer={viewer}
+        aria-label={boardTitle}
+      >
         <BoardHeading title={boardTitle} />
-        {setup && <SongGuessAnswerGuide key={boardId} setup={setup} answerTarget={answerTarget} />}
-        <div className={styles.editorLayout}>
-          <main className={styles.editorMain}>
-            <SongGuessImportPanel boardId={boardId} disabled={busy || drafts.length >= 50} onBusyChange={setBusy} onAdd={({ title, artist, clip }) => {
-              setCustomEditor(true);
-              setDrafts(current => {
-                const next = { ...emptyRoundDraft(), representativeAnswer: title, artist, existingClipAssetIds: [clip.id], existingClipSummary: [clip] };
-                const empty = current.length === 1 && !current[0]!.representativeAnswer && !current[0]!.sourceBuffer && !current[0]!.existingClipAssetIds;
-                return empty ? [next] : [...current, next];
-              });
-            }} />
-            <SongGuessPoolPicker boardId={boardId} busy={busy} onPreparingChange={setBusy} onPrepared={(prepared) => {
-              revokeDraftUrls(draftsRef.current);
-              setSetup(prepared);
-              setDrafts(draftsFromSetup(prepared));
-              setError(null);
-              setSetupError(null);
-              setNotice(`${prepared.rounds.length}문제 준비됨`);
-            }} />
-            <button type="button" className={styles.secondaryButton} disabled={busy} onClick={() => setCustomEditor((value) => !value)}>
-              {customEditor ? "직접 구성 닫기" : "직접 음원 구성"}
+
+        {!customEditor ? (
+          <main className={teacherStyles.autoSetupMain}>
+            <SongGuessPoolPicker
+              boardId={boardId}
+              busy={busy}
+              onPreparingChange={setBusy}
+              onPrepared={prepareAutoGame}
+            />
+            <button
+              type="button"
+              className={teacherStyles.advancedButton}
+              disabled={busy}
+              onClick={() => setCustomEditor(true)}
+            >
+              직접 음원 구성
             </button>
-            {customEditor && <>
-            <div className={styles.sectionHeading}>
-              <div>
-                <h2>라운드 음원 준비</h2>
-              </div>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={() => setDrafts((current) => [...current, emptyRoundDraft()])}
-                disabled={busy || drafts.length >= 50}
-              >
-                노래 추가
-              </button>
-            </div>
-
-            {drafts.map((draft, index) => (
-              <SongGuessRoundEditor key={draft.clientId} draft={draft} index={index} draftCount={drafts.length} busy={busy} decodingRoundId={decodingRoundId} setDrafts={setDrafts} onSourceFile={handleSourceFile} onPreviewSource={previewSource} onGenerateClips={generateClips} />
-            ))}
-            </>}
-          </main>
-
-          <aside className={styles.editorSidebar}>
-            <div className={styles.sidebarCard}>
-              <h2>저장 및 시작</h2>
-              {setup && <p>{setup.rounds.length}문제</p>}
-              <label className={styles.field}><span>출제 모드</span>
-                <select value={answerTarget} disabled={busy} onChange={(event) => setAnswerTarget(event.target.value as SongGuessAnswerTarget)}>
-                  {Object.entries(SONG_GUESS_ANSWER_TARGET_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                </select>
-              </label>
-              <fieldset disabled={busy} className={styles.answerMode}>
-                <legend>답변 방식</legend>
-                <label><input type="radio" name={`answer-mode-${boardId}`} value="text" checked={answerMode === "text"} onChange={() => setAnswerMode("text")} /> 서술형</label>
-                <label><input type="radio" name={`answer-mode-${boardId}`} value="multiple-choice" checked={answerMode === "multiple-choice"} onChange={() => setAnswerMode("multiple-choice")} /> 객관식 (4지선다)</label>
-                <p>{answerMode === "text" ? "노래 제목을 직접 입력해요. 등록된 별칭도 정답으로 인정돼요." : "정답과 오답 보기 3개를 자동으로 채워요. 문제마다 한 번만 제출할 수 있어요."}</p>
-              </fieldset>
-              {customEditor && <button
-                type="button"
-                className={styles.primaryButton}
-                disabled={busy || drafts.length === 0}
-                onClick={() => void savePack()}
-              >
-                {busy ? "저장 중…" : "라운드 팩 저장"}
-              </button>}
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                disabled={busy || !setup?.rounds.length}
-                onClick={() => void createSession()}
-              >
-                게임 만들기
-              </button>
-              {setup && (
-                <button type="button" className={styles.dangerButton} disabled={busy} onClick={() => void removeSetup()}>
-                  저장 구성 삭제
-                </button>
-              )}
-            </div>
             <StatusMessages error={error ?? setupError} notice={notice} />
-          </aside>
-        </div>
+          </main>
+        ) : (
+          <>
+            {setup && (
+              <SongGuessAnswerGuide
+                key={boardId}
+                setup={setup}
+                answerTarget={answerTarget}
+              />
+            )}
+            <div className={styles.editorLayout}>
+              <main className={styles.editorMain}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  disabled={busy}
+                  onClick={() => setCustomEditor(false)}
+                >
+                  자동 출제로 돌아가기
+                </button>
+                <SongGuessImportPanel
+                  boardId={boardId}
+                  disabled={busy || drafts.length >= 50}
+                  onBusyChange={setBusy}
+                  onAdd={({ title, artist, clip }) => {
+                    setDrafts((current) => {
+                      const next = {
+                        ...emptyRoundDraft(),
+                        representativeAnswer: title,
+                        artist,
+                        existingClipAssetIds: [clip.id],
+                        existingClipSummary: [clip],
+                      };
+                      const empty =
+                        current.length === 1 &&
+                        !current[0]!.representativeAnswer &&
+                        !current[0]!.sourceBuffer &&
+                        !current[0]!.existingClipAssetIds;
+                      return empty ? [next] : [...current, next];
+                    });
+                  }}
+                />
+                <div className={styles.sectionHeading}>
+                  <div>
+                    <h2>라운드 음원 준비</h2>
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() =>
+                      setDrafts((current) => [...current, emptyRoundDraft()])
+                    }
+                    disabled={busy || drafts.length >= 50}
+                  >
+                    노래 추가
+                  </button>
+                </div>
+
+                {drafts.map((draft, index) => (
+                  <SongGuessRoundEditor
+                    key={draft.clientId}
+                    draft={draft}
+                    index={index}
+                    draftCount={drafts.length}
+                    busy={busy}
+                    decodingRoundId={decodingRoundId}
+                    setDrafts={setDrafts}
+                    onSourceFile={handleSourceFile}
+                    onPreviewSource={previewSource}
+                    onGenerateClips={generateClips}
+                  />
+                ))}
+              </main>
+
+              <aside className={styles.editorSidebar}>
+                <div className={styles.sidebarCard}>
+                  <h2>저장 및 시작</h2>
+                  {setup && <p>{setup.rounds.length}문제</p>}
+                  <label className={styles.field}>
+                    <span>출제 모드</span>
+                    <select
+                      value={answerTarget}
+                      disabled={busy}
+                      onChange={(event) =>
+                        setAnswerTarget(event.target.value as SongGuessAnswerTarget)
+                      }
+                    >
+                      {Object.entries(SONG_GUESS_ANSWER_TARGET_LABELS).map(
+                        ([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </label>
+                  <fieldset disabled={busy} className={styles.answerMode}>
+                    <legend>답변 방식</legend>
+                    <label>
+                      <input
+                        type="radio"
+                        name={`answer-mode-${boardId}`}
+                        value="text"
+                        checked={answerMode === "text"}
+                        onChange={() => setAnswerMode("text")}
+                      />{" "}
+                      서술형
+                    </label>
+                    <label>
+                      <input
+                        type="radio"
+                        name={`answer-mode-${boardId}`}
+                        value="multiple-choice"
+                        checked={answerMode === "multiple-choice"}
+                        onChange={() => setAnswerMode("multiple-choice")}
+                      />{" "}
+                      객관식 (4지선다)
+                    </label>
+                    <p>
+                      {answerMode === "text"
+                        ? "노래 제목을 직접 입력해요. 등록된 별칭도 정답으로 인정돼요."
+                        : "정답과 오답 보기 3개를 자동으로 채워요. 문제마다 한 번만 제출할 수 있어요."}
+                    </p>
+                  </fieldset>
+                  <button
+                    type="button"
+                    className={styles.primaryButton}
+                    disabled={busy || drafts.length === 0}
+                    onClick={() => void savePack()}
+                  >
+                    {busy ? "저장 중…" : "라운드 팩 저장"}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    disabled={busy || !setup?.rounds.length}
+                    onClick={() => void createSession()}
+                  >
+                    게임 만들기
+                  </button>
+                  {setup && (
+                    <button
+                      type="button"
+                      className={styles.dangerButton}
+                      disabled={busy}
+                      onClick={() => void removeSetup()}
+                    >
+                      저장 구성 삭제
+                    </button>
+                  )}
+                </div>
+                <StatusMessages error={error ?? setupError} notice={notice} />
+              </aside>
+            </div>
+          </>
+        )}
       </section>
     );
   }
@@ -558,7 +695,12 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
       <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
         <div className={styles.panel}>
           <h2>{error ? "게임을 불러오지 못했어요" : "게임 준비 중"}</h2>
-          <button className={styles.secondaryButton} type="button" onClick={() => void refreshSession()} disabled={syncing}>
+          <button
+            className={styles.secondaryButton}
+            type="button"
+            onClick={() => void refreshSession()}
+            disabled={syncing}
+          >
             최신 상태 확인
           </button>
           <StatusMessages error={error ?? setupError} notice={notice} />
@@ -568,27 +710,76 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   }
 
   return (
-    <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
+    <section
+      className={`${styles.shell} ${viewer === "teacher" ? teacherStyles.teacherShell : ""}`}
+      data-viewer={viewer}
+      aria-label={boardTitle}
+    >
       <BoardHeading title={boardTitle} />
-      {viewer === "teacher" && snapshot.viewer.role === "host" && setup &&
-        <SongGuessAnswerGuide key={`${boardId}:${snapshot.sessionId}`} setup={setup} answerTarget={snapshot.answerTarget} currentRoundId={snapshot.currentRound.roundId} />}
-      <SongGuessGame snapshot={snapshot} totalRounds={setup?.rounds.length ?? null}
-        canInteract={!busy && !(hasPending && snapshot.answerMode === "multiple-choice")} remainingSeconds={remainingSeconds} expired={expired}
+      <SongGuessGame
+        snapshot={snapshot}
+        totalRounds={setup?.rounds.length ?? null}
+        canInteract={!busy && !(hasPending && snapshot.answerMode === "multiple-choice")}
+        remainingSeconds={remainingSeconds}
+        expired={expired}
         entryFailed={entryFailed}
-        guessText={guessText} onGuessText={setGuessText} onIntent={sendIntent}
-        result={lastGuessResult} onReloadSetup={() => void reloadSetup()}
-        status={<>
-          <StatusMessages error={error ?? setupError} notice={notice} />
-          {(error || hasPending || entryFailed) && <div>
-            <button className={styles.secondaryButton} type="button" disabled={busy || syncing} onClick={() => void refreshSession()}>최신 상태 확인</button>
-            {entryFailed && !hasPending && snapshot.phase === "lobby" && snapshot.viewer.role === "participant" &&
-              <button className={styles.secondaryButton} type="button" disabled={busy || syncing} onClick={() => sendIntent({ type: "join" })}>다시 시도</button>}
-            {hasPending && <button className={styles.secondaryButton} type="button" disabled={busy} onClick={() => {
-              const pending = readPending();
-              if (pending) void executeCommand(pending, false);
-            }}>다시 보내기</button>}
-          </div>}
-        </>} />
+        guessText={guessText}
+        onGuessText={setGuessText}
+        onIntent={sendIntent}
+        result={lastGuessResult}
+        onReloadSetup={() => void reloadSetup()}
+        status={
+          <>
+            <StatusMessages error={error ?? setupError} notice={notice} />
+            {viewer === "teacher" && snapshot.viewer.role === "host" && setup && (
+              <SongGuessAnswerGuide
+                key={`${boardId}:${snapshot.sessionId}`}
+                setup={setup}
+                answerTarget={snapshot.answerTarget}
+                currentRoundId={snapshot.currentRound.roundId}
+              />
+            )}
+            {(error || hasPending || entryFailed) && (
+              <div>
+                <button
+                  className={styles.secondaryButton}
+                  type="button"
+                  disabled={busy || syncing}
+                  onClick={() => void refreshSession()}
+                >
+                  최신 상태 확인
+                </button>
+                {entryFailed &&
+                  !hasPending &&
+                  snapshot.phase === "lobby" &&
+                  snapshot.viewer.role === "participant" && (
+                    <button
+                      className={styles.secondaryButton}
+                      type="button"
+                      disabled={busy || syncing}
+                      onClick={() => sendIntent({ type: "join" })}
+                    >
+                      다시 시도
+                    </button>
+                  )}
+                {hasPending && (
+                  <button
+                    className={styles.secondaryButton}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      const pending = readPending();
+                      if (pending) void executeCommand(pending, false);
+                    }}
+                  >
+                    다시 보내기
+                  </button>
+                )}
+              </div>
+            )}
+          </>
+        }
+      />
     </section>
   );
 }
