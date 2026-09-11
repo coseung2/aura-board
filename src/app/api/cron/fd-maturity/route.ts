@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { isAuthorizedCronRequest } from "@/lib/cron-auth";
 
 /**
- * Daily maturity sweep. Scheduled via vercel.json at 00:05 KST (15:05 UTC).
+ * Hourly maturity sweep, at minute zero via the Oracle application cron.
  *
  * Vercel invokes cron GETs with an `Authorization: Bearer <CRON_SECRET>`
  * header. We verify it to reject random callers.

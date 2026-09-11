@@ -7,7 +7,7 @@ CRON_TZ=UTC
 * * * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh reading-feedback POST
 * * * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh song-guess-imports POST
 0 0 * * 1 aura-app /opt/aura-board-app/bin/run-app-cron.sh parent-weekly-digest GET
-5 15 * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh fd-maturity GET
+0 * * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh fd-maturity GET
 10 15 * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh role-salary-payout GET
 30 15 * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh parent-anonymize GET
 0 17 * * * aura-app /opt/aura-board-app/bin/run-app-cron.sh expire-pending-links GET
