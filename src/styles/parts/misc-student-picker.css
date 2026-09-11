@@ -54,6 +54,17 @@
   outline-offset: -4px;
 }
 
+.board-picker-sound-toggle {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 1px solid var(--picker-line);
+  border-radius: 12px;
+  background: white;
+  color: var(--picker-ink);
+  font: inherit;
+  cursor: pointer;
+}
+
 .board-picker-hero {
   position: relative;
   display: flex;

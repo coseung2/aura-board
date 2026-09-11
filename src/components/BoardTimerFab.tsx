@@ -10,6 +10,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { CloseIcon } from "./icons/UiIcons";
+import { usePickerSound } from "./toolkit/usePickerSound";
 import {
   StudentRandomPickerPanel,
   type PickerGenderFilter,
@@ -108,6 +109,7 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
   const [toolMenuOpen, setToolMenuOpen] = useState(false);
   const [timerOpen, setTimerOpen] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerSound = usePickerSound(pickerOpen);
   const [minutes, setMinutes] = useState(5);
   const [remainingSeconds, setRemainingSeconds] = useState(5 * 60);
   const [running, setRunning] = useState(false);
@@ -301,6 +303,8 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
 
   const drawStudents = () => {
     if (eligibleStudents.length === 0 || drawingStudents) return;
+    pickerSound.prepare();
+    pickerSound.stop();
     drawTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
     drawTimeoutsRef.current = [];
     setDrawingStudents(true);
@@ -326,6 +330,7 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
     sequence.forEach((studentId, index) => {
       const timeoutId = window.setTimeout(() => {
         setHighlightedStudentId(studentId);
+        pickerSound.play(index === sequence.length - 1 ? "complete" : "tick");
         const winnerIndex = winners.findIndex((student) => student.id === studentId);
         if (index >= sequence.length - winners.length && winnerIndex >= 0) {
           setPickedStudents(winners.slice(0, winnerIndex + 1));
@@ -342,6 +347,7 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
   };
 
   const chooseClassroom = (nextClassroomId: string) => {
+    pickerSound.stop();
     drawTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
     drawTimeoutsRef.current = [];
     setSelectedClassroomId(nextClassroomId || null);
@@ -355,6 +361,7 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
   };
 
   const choosePickerFilter = (nextFilter: PickerGenderFilter) => {
+    pickerSound.stop();
     drawTimeoutsRef.current.forEach((timeoutId) => window.clearTimeout(timeoutId));
     drawTimeoutsRef.current = [];
     setPickerFilter(nextFilter);
@@ -369,6 +376,7 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
       setTimerOpen(true);
       setPickerOpen(false);
     } else {
+      pickerSound.prepare();
       setPickerOpen(true);
       setTimerOpen(false);
     }
@@ -569,6 +577,8 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
       pickedStudents={pickedStudents}
       highlightedStudentId={highlightedStudentId}
       drawingStudents={drawingStudents}
+      soundEnabled={pickerSound.enabled}
+      onToggleSound={pickerSound.toggle}
       onClose={() => setPickerOpen(false)}
       onChooseClassroom={chooseClassroom}
       onChooseFilter={choosePickerFilter}

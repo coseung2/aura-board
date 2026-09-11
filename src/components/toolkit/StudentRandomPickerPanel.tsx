@@ -35,6 +35,8 @@ export type StudentRandomPickerPanelProps = {
   onChooseFilter: (filter: PickerGenderFilter) => void;
   onChangePickerCount: (count: number) => void;
   onDraw: () => void;
+  soundEnabled?: boolean;
+  onToggleSound?: () => void;
 };
 
 export function StudentRandomPickerPanel({
@@ -56,6 +58,8 @@ export function StudentRandomPickerPanel({
   onChooseFilter,
   onChangePickerCount,
   onDraw,
+  soundEnabled = true,
+  onToggleSound,
 }: StudentRandomPickerPanelProps) {
   const movement = useToolkitMovement();
   const pickedStudentIds = new Set(pickedStudents.map((student) => student.id));
@@ -139,6 +143,11 @@ export function StudentRandomPickerPanel({
       </div>
 
       <div className="board-picker-content">
+        {onToggleSound ? (
+          <button type="button" className="board-picker-sound-toggle" aria-label="학생 뽑기 효과음" aria-pressed={soundEnabled} onClick={onToggleSound}>
+            효과음 {soundEnabled ? "켜짐" : "꺼짐"}
+          </button>
+        ) : null}
         {classroomsError ? (
           <div className="board-picker-message is-error">
             <strong>학급을 불러오지 못했어요.</strong>
