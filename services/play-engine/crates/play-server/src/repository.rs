@@ -114,6 +114,18 @@ pub trait PlayRepository: Send + Sync {
         now_ms: i64,
     ) -> Result<Execution<SongGuessSessionResponse>, RepositoryError>;
 
+    async fn list_song_guess_sessions(
+        &self,
+        board_id: &str,
+    ) -> Result<Vec<SongGuessSessionRecord>, RepositoryError>;
+
+    async fn advance_song_guess_session(
+        &self,
+        actor: &ActorContext,
+        session_id: &str,
+        now_ms: i64,
+    ) -> Result<SongGuessSessionRecord, RepositoryError>;
+
     async fn current_song_guess_session(
         &self,
         board_id: &str,

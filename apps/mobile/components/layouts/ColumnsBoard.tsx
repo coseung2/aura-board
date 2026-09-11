@@ -1,11 +1,18 @@
+import { useRouter } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
+import { withBoardAnonymousAuthors } from "../../lib/card-privacy";
+import {
+  buildMobileSectionSummaries,
+  type MobileSectionSummary,
+} from "../../lib/mobile-board-overview";
+import { isWideViewport } from "../../lib/responsive";
+import type { BoardCard, BoardDetailResponse } from "../../lib/types";
+import {
+  BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+  useBoardRealtime,
+} from "../../lib/use-board-realtime";
 import {
   borders,
   colors,
@@ -17,31 +24,15 @@ import {
   tapMin,
   typography,
 } from "../../theme/tokens";
-import { CardComposer } from "../CardComposer";
-import { nextCardOrder } from "./cards-board-utils";
 import { CardAuthorBottomSheet } from "../CardAuthorBottomSheet";
-import { CardEditModal } from "../CardEditModal";
 import { CommentBottomSheet } from "../CommentBottomSheet";
-import {
-  PostModerationOverlay,
-  type PostAnchor,
-} from "../PostModerationOverlay";
-import type { BoardDetailResponse, BoardCard } from "../../lib/types";
-import {
-  buildMobileSectionSummaries,
-  type MobileSectionSummary,
-} from "../../lib/mobile-board-overview";
-import {
-  withBoardAnonymousAuthor,
-  withBoardAnonymousAuthors,
-} from "../../lib/card-privacy";
-import { ControlPressable, Fab, SurfaceCard } from "../ui";
 import { SectionNav, SectionNavItem } from "../NavigationTabs";
 import {
-  BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
-  useBoardRealtime,
-} from "../../lib/use-board-realtime";
-import { isWideViewport } from "../../lib/responsive";
+  type PostAnchor,
+  PostModerationOverlay,
+} from "../PostModerationOverlay";
+import { ControlPressable, Fab, SurfaceCard } from "../ui";
+import { nextCardOrder } from "./cards-board-utils";
 import { StreamFeedPost } from "./ColumnsStreamFeedPost";
 
 export { StreamFeedPost } from "./ColumnsStreamFeedPost";
@@ -70,6 +61,7 @@ export function ColumnsBoard({
   selectedSectionKey?: string | null;
   onSelectedSectionKeyChange?: (key: string | null) => void;
 }) {
+  const router = useRouter();
   const { width } = useSafeWindowDimensions();
   const useReadableLayout = isWideViewport(width);
   const [cards, setCards] = useState<BoardCard[]>(() =>
@@ -84,10 +76,6 @@ export function ColumnsBoard({
       : selectedSectionKeyProp;
   const setSelectedSectionKey =
     onSelectedSectionKeyChange ?? setUncontrolledSectionKey;
-  const [composerSectionId, setComposerSectionId] = useState<string | null>(
-    null,
-  );
-  const [composerOpen, setComposerOpen] = useState(false);
   const [commentCard, setCommentCard] = useState<BoardCard | null>(null);
   const [authorCard, setAuthorCard] = useState<BoardCard | null>(null);
   const [moderationTarget, setModerationTarget] = useState<{
@@ -95,7 +83,6 @@ export function ColumnsBoard({
     anchor: PostAnchor;
     owner: boolean;
   } | null>(null);
-  const [editingCard, setEditingCard] = useState<BoardCard | null>(null);
   const [topicFilter, setTopicFilter] = useState<TopicFilter>("all");
   const writableSections = useMemo(
     () =>
@@ -105,10 +92,11 @@ export function ColumnsBoard({
 
   useEffect(() => {
     const ids = new Set(data.cards.map((card) => card.id));
-    setCommentCard((card) => card && !ids.has(card.id) ? null : card);
-    setAuthorCard((card) => card && !ids.has(card.id) ? null : card);
-    setEditingCard((card) => card && !ids.has(card.id) ? null : card);
-    setModerationTarget((target) => target && !ids.has(target.card.id) ? null : target);
+    setCommentCard((card) => (card && !ids.has(card.id) ? null : card));
+    setAuthorCard((card) => (card && !ids.has(card.id) ? null : card));
+    setModerationTarget((target) =>
+      target && !ids.has(target.card.id) ? null : target,
+    );
     setCards(
       withBoardAnonymousAuthors(
         [...data.cards].sort((a, b) => {
@@ -174,21 +162,27 @@ export function ColumnsBoard({
     }
   }, [selectedSectionKey, summaries]);
 
-  function handleCreated(card: BoardCard) {
-    setCards((prev) => [...prev, withBoardAnonymousAuthor(card, data.board)]);
-    onMutate();
-  }
-
   function openComposer(sectionId: string | null) {
-    setComposerSectionId(sectionId);
-    setComposerOpen(true);
+    router.push({
+      pathname: "/(student)/board/[slug]/compose",
+      params: {
+        slug: data.board.slug || data.board.id,
+        ...(sectionId ? { sectionId } : {}),
+        order: String(nextCardOrder(cards, sectionId)),
+      },
+    });
   }
 
   function selectSection(sectionId: string | null) {
     setSelectedSectionKey(sectionKey(sectionId));
   }
 
-  useBoardRealtime({ slug: data.board.id, onReload: onMutate, enabled: !realtimeManaged, fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS });
+  useBoardRealtime({
+    slug: data.board.id,
+    onReload: onMutate,
+    enabled: !realtimeManaged,
+    fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+  });
 
   const canWriteSelected =
     selectedSummary?.id !== null &&
@@ -301,14 +295,6 @@ export function ColumnsBoard({
         </Fab>
       ) : null}
 
-      <CardComposer
-        visible={composerOpen}
-        boardId={data.board.id}
-        sectionId={composerSectionId}
-        order={nextCardOrder(cards, composerSectionId)}
-        onClose={() => setComposerOpen(false)}
-        onCreated={handleCreated}
-      />
       <CommentBottomSheet
         cardId={commentCard?.id ?? null}
         boardId={data.board.id}
@@ -329,36 +315,6 @@ export function ColumnsBoard({
                 : card,
             ),
           );
-        }}
-      />
-      <CardEditModal
-        card={editingCard}
-        visible={editingCard !== null}
-        onClose={() => setEditingCard(null)}
-        onSaved={(updated) => {
-          setCards((current) =>
-            current.map((card) =>
-              card.id === updated.id
-                ? withBoardAnonymousAuthor(
-                    {
-                      ...card,
-                      ...updated,
-                      isMine: card.isMine,
-                      canEdit: card.canEdit,
-                      canDelete: card.canDelete,
-                    },
-                    data.board,
-                  )
-                : card,
-            ),
-          );
-          setCommentCard((current) =>
-            current?.id === updated.id ? updated : current,
-          );
-          setAuthorCard((current) =>
-            current?.id === updated.id ? updated : current,
-          );
-          onMutate();
         }}
       />
       <CardAuthorBottomSheet
@@ -399,7 +355,14 @@ export function ColumnsBoard({
           onClose={() => setModerationTarget(null)}
           onEdit={
             moderationTarget.owner && moderationTarget.card.canEdit === true
-              ? () => setEditingCard(moderationTarget.card)
+              ? () =>
+                  router.push({
+                    pathname: "/(student)/board/[slug]/compose",
+                    params: {
+                      slug: data.board.slug || data.board.id,
+                      cardId: moderationTarget.card.id,
+                    },
+                  })
               : undefined
           }
           onHidden={(cardId) => {

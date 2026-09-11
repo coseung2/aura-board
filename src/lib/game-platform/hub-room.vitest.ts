@@ -29,6 +29,12 @@ const existingRoom = {
 };
 
 describe("resolveOrCreateCanonicalGameRoom", () => {
+  it("does not provision a teacher-only game on student entry", async () => {
+    mocks.findFirst.mockResolvedValue(null);
+    await expect(resolveOrCreateCanonicalGameRoom({ classroomId: "classroom-1" }, "speed-game", { allowCreate: false }))
+      .rejects.toThrow("teacher_room_not_open");
+    expect(mocks.create).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     mocks.findFirst.mockReset();
     mocks.create.mockReset();

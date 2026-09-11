@@ -1,5 +1,7 @@
 # Mobile Android Build Pipeline
 
+테스트/운영 버전과 출시 전후 확인 방법: [모바일 출시 기록](mobile-release-tracking.md).
+
 Updated: 2026-09-07
 
 Aura Board 모바일 앱의 Android APK/AAB 빌드는 Expo 소스를 직접 네이티브

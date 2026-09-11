@@ -324,8 +324,8 @@ export function AppModal({
         ]}
       >
         <KeyboardAvoidingView
-          enabled={keyboardAvoiding ?? false}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          enabled={Platform.OS === "ios" && (keyboardAvoiding ?? false)}
+          behavior="padding"
           style={styles.modalKeyboardWrap}
         >
           <View
@@ -477,8 +477,8 @@ export function AppBottomSheet({
           }
         />
         <KeyboardAvoidingView
-          enabled={keyboardAvoiding ?? false}
-          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          enabled={Platform.OS === "ios" && (keyboardAvoiding ?? false)}
+          behavior="padding"
           style={styles.bottomSheetKeyboardWrap}
           pointerEvents="box-none"
         >

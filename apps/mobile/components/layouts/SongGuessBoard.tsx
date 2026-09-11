@@ -2,6 +2,8 @@ import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
+  BackHandler,
   AppState,
   Keyboard,
   ScrollView,
@@ -19,7 +21,7 @@ import {
 } from "../../lib/song-guess-contract";
 import {
   clearPendingSongGuessCommand,
-  fetchCurrentSongGuessSession,
+  fetchSongGuessSnapshot,
   loadPendingSongGuessCommand,
   loadSongGuessAudioSource,
   formatClipLabel,
@@ -43,6 +45,8 @@ import { SongGuessLobbyStatus } from "../song-guess/SongGuessLobbyStatus";
 import { SongGuessAnswer } from "../song-guess/SongGuessAnswer";
 import { songGuessBoardStyles as styles } from "../song-guess/songGuessBoardStyles";
 import { AppButton } from "../ui";
+import { SongGuessRooms } from "../song-guess/song-guess-rooms";
+import { useNavigation } from "expo-router";
 type SongGuessSound =
   | "correct"
   | "join"
@@ -53,6 +57,8 @@ type SongGuessSound =
 export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const boardId = data.board.id;
   const [snapshot, setSnapshot] = useState<SongGuessSnapshot | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -157,7 +163,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     const sequence = ++sequenceRef.current;
     setSyncing(true);
     try {
-      const next = await fetchCurrentSongGuessSession(boardId);
+      const next = selectedSessionId ? await fetchSongGuessSnapshot(selectedSessionId) : null;
       if (sequence !== sequenceRef.current) return;
       setSnapshot((current) => {
         if (!next) return null;
@@ -176,13 +182,18 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         setSyncing(false);
       }
     }
-  }, [boardId]);
+  }, [boardId, selectedSessionId]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
   const realtime = useBoardRealtime({ slug: boardId, onReload: refresh });
+  useEffect(() => {
+    if (snapshot?.roomMode !== "student-free" || snapshot.phase === "finished") return;
+    const timer = setInterval(() => void refresh(), 2000);
+    return () => clearInterval(timer);
+  }, [refresh, snapshot?.roomMode, snapshot?.phase]);
   useEffect(() => {
     if (!shouldUseBoardFallbackPolling(realtime.status)) return;
     const timer = setInterval(
@@ -222,6 +233,9 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         await clearPendingSongGuessCommand(boardId).catch(() => undefined);
         if (pending.request.command.type === "join") setFailedJoinSessionId(null);
         setHasPending(false);
+        if (pending.request.command.type === "leave" || pending.request.command.type === "finish") {
+          ++sequenceRef.current; setSelectedSessionId(null); setSnapshot(null); autoJoinedSessionRef.current = null;
+        }
         setGuess("");
         Keyboard.dismiss();
       } catch (cause) {
@@ -444,6 +458,26 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     playerStatus.isLoaded,
   ]);
 
+  const exitRoom = useCallback(() => {
+    if (busy || hasPending) { setError("처리 중인 요청을 확인한 뒤 나가 주세요."); return; }
+    if (!snapshot || snapshot.phase === "finished" || (snapshot.viewer.joined === false && !snapshot.viewer.isRoomHost && snapshot.viewer.role !== "host") || (snapshot.viewer.role === "host" && snapshot.roomMode === "student-free")) {
+      ++sequenceRef.current; setSelectedSessionId(null); setSnapshot(null); autoJoinedSessionRef.current = null; return;
+    }
+    const finish = snapshot.viewer.isRoomHost === true || snapshot.viewer.role === "host";
+    Alert.alert(finish ? "게임을 끝내고 나갈까요?" : "방에서 나갈까요?", finish ? "모든 참여자의 게임이 종료돼요." : undefined, [
+      { text: "취소", style: "cancel" },
+      { text: finish ? "게임 끝내기" : "나가기", style: "destructive", onPress: () => void executePending({ sessionId: snapshot.sessionId, request: makeSongGuessCommand(snapshot, { type: finish ? "finish" : "leave" }) }) },
+    ]);
+  }, [busy, hasPending, snapshot, executePending]);
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => { exitRoom(); return true; });
+    const unsubscribe = navigation.addListener("beforeRemove", (event) => { event.preventDefault(); exitRoom(); });
+    return () => { subscription.remove(); unsubscribe(); };
+  }, [selectedSessionId, exitRoom, navigation]);
+
+  if (!selectedSessionId) return <SongGuessRooms boardId={boardId} onSelect={(id) => { setSnapshot(null); setLoading(true); setSelectedSessionId(id); }} />;
+
   if (loading) {
     return (
       <View style={styles.center} accessibilityLiveRegion="polite">
@@ -456,6 +490,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.questionText}>연결할 수 없어요.</Text>
+        <AppButton variant="secondary" onPress={exitRoom}>방 목록</AppButton>
         <Text style={styles.muted}>네트워크를 확인한 뒤 다시 시도해 주세요.</Text>
         <Text style={styles.errorText} accessibilityRole="alert">
           {error}
@@ -527,6 +562,9 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       keyboardDismissMode="interactive"
       style={styles.scroll}
     >
+      <AppButton variant="secondary" disabled={busy || hasPending} onPress={exitRoom}>{snapshot.phase === "finished" ? "방 목록" : "방 나가기"}</AppButton>
+      {snapshot.viewer.canStart && snapshot.phase === "lobby" ? <AppButton disabled={busy || hasPending} onPress={() => void executePending({ sessionId: snapshot.sessionId, request: makeSongGuessCommand(snapshot, { type: "start" }) })}>음악 퀴즈 시작</AppButton> : null}
+      {snapshot.viewer.canFinish && snapshot.phase !== "finished" ? <AppButton variant="secondary" disabled={busy || hasPending} onPress={() => Alert.alert("게임을 끝낼까요?", "모든 참여자의 게임이 종료돼요.", [{ text: "취소", style: "cancel" }, { text: "게임 끝내기", style: "destructive", onPress: () => void executePending({ sessionId: snapshot.sessionId, request: makeSongGuessCommand(snapshot, { type: "finish" }) }) }])}>게임 끝내기</AppButton> : null}
       <View style={styles.phaseRow} accessibilityLiveRegion="polite">
         <Text style={styles.phaseLabel}>
           {snapshot.phase === "guessing" ? `${snapshot.currentRound.order + 1}라운드` : phaseLabel(snapshot.phase)}

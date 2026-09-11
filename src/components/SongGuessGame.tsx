@@ -360,7 +360,11 @@ export function SongGuessGame({
 
         {finished && <SongGuessScoreboard participants={participants} podium />}
 
-        {isHost && !finished && (
+        {snapshot.roomMode === "student-free" && !finished && <div className={styles.hostActions}>
+          {snapshot.viewer.canStart && phase === "lobby" && <button type="button" className={controls.primaryButton} disabled={!canInteract} onClick={() => onIntent({ type: "start" })}>음악 퀴즈 시작</button>}
+          {snapshot.viewer.canFinish && <button type="button" className={controls.secondaryButton} disabled={!canInteract} onClick={() => onIntent({ type: "finish" })}>게임 끝내기</button>}
+        </div>}
+        {isHost && snapshot.roomMode !== "student-free" && !finished && (
           <div className={styles.hostActions} data-song-host-actions>
             {phase === "draft" && (
               <button

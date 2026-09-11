@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { resolvePlayActor } from "@/lib/play-platform/actor";
+import { resolveSongGuessActorForSession } from "@/lib/play-platform/actor";
 import { playEngineFetch } from "@/lib/play-platform/server-client";
 import { playRouteError } from "@/lib/play-platform/route-utils";
 import { SONG_GUESS_COMMAND_SCHEMA_VERSION } from "@/lib/song-guess/contracts";
@@ -12,6 +12,7 @@ export const runtime = "nodejs";
 type Params = { params: Promise<{ sessionId: string }> };
 const RequestIdSchema = z.string().min(1).max(128).regex(/^[A-Za-z0-9._-]+$/);
 const CommandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("leave") }),
   z.object({ type: z.literal("open_lobby") }),
   z.object({ type: z.literal("join") }),
   z.object({ type: z.literal("start") }),
@@ -35,7 +36,7 @@ export async function POST(request: Request, { params }: Params) {
     if (!parsed.success) {
       return NextResponse.json({ error: "invalid_request", issues: parsed.error.issues }, { status: 400 });
     }
-    const actor = await resolvePlayActor();
+    const actor = await resolveSongGuessActorForSession(sessionId);
     const response = await playEngineFetch(
       `/v1/song-guess/sessions/${encodeURIComponent(sessionId)}/commands`,
       { actor, method: "POST", body: parsed.data },

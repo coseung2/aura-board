@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { isSongGuessSnapshot as isMobileSongGuessSnapshot } from "../../../apps/mobile/lib/song-guess-contract";
 import {
   isSongGuessSnapshot,
   mergeSongGuessSnapshot,
@@ -40,6 +41,15 @@ function snapshot(overrides: Partial<SongGuessSnapshot> = {}): SongGuessSnapshot
 }
 
 describe("song-guess authoritative wire contract", () => {
+  it("accepts an unstarted cancelled room without exposing its answer or choices", () => {
+    const base = snapshot();
+    const ended = { ...base, phase: "finished", rulesVersion: 2, stateSchemaVersion: 2, answerMode: "multiple-choice",
+      currentRound: { ...base.currentRound, startedAtMs: null, deadlineAtMs: null, maxScore: 1000, currentClip: null, accessibilityClue: null, revealedAnswer: null } };
+    expect(isSongGuessSnapshot(ended)).toBe(true);
+    expect(isMobileSongGuessSnapshot(ended)).toBe(true);
+    expect(isSongGuessSnapshot({ ...ended, currentRound: { ...ended.currentRound, revealedAnswer: "hidden" } })).toBe(false);
+    expect(isMobileSongGuessSnapshot({ ...ended, currentRound: { ...ended.currentRound, revealedAnswer: "hidden" } })).toBe(false);
+  });
   it("validates optional MC fields and rejects correctness hints, future options and peer selections", () => {
     const base = snapshot();
     const choices = ["a", "b", "c", "d"].map((id) => ({ id, label: id.toUpperCase() }));

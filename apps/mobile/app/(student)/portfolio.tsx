@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -6,10 +7,20 @@ import {
   Text,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { CommentBottomSheet } from "../../components/CommentBottomSheet";
 import { StreamFeedPost } from "../../components/layouts/ColumnsBoard";
+import { StudentHeaderActions } from "../../components/StudentHeaderActions";
+import { AppHeader, SurfaceCard } from "../../components/ui";
+import { ApiError, apiFetch, getApiBase } from "../../lib/api";
+import { getPortfolioCardThumbnailUrl } from "../../lib/portfolio-card";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
+import type {
+  BoardCard,
+  MeResponse,
+  PortfolioCardDTO,
+  PortfolioStudentDTO,
+} from "../../lib/types";
 import {
   borders,
   colors,
@@ -18,17 +29,6 @@ import {
   spacing,
   typography,
 } from "../../theme/tokens";
-import { apiFetch, ApiError, getApiBase } from "../../lib/api";
-import { getPortfolioCardThumbnailUrl } from "../../lib/portfolio-card";
-import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
-import { AppHeader, SurfaceCard } from "../../components/ui";
-import { StudentHeaderActions } from "../../components/StudentHeaderActions";
-import type {
-  BoardCard,
-  MeResponse,
-  PortfolioCardDTO,
-  PortfolioStudentDTO,
-} from "../../lib/types";
 
 export default function StudentPortfolioScreen() {
   const router = useRouter();
@@ -72,20 +72,21 @@ export default function StudentPortfolioScreen() {
     [handleAuthError],
   );
 
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        const meRes = await apiFetch<MeResponse>("/api/student/me");
-        await loadPortfolio(meRes.student.id);
-      } catch (e) {
-        if (await handleAuthError(e)) return;
-        setError("포트폴리오를 불러올 수 없어요.");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [handleAuthError, loadPortfolio]);
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        try {
+          const meRes = await apiFetch<MeResponse>("/api/student/me");
+          await loadPortfolio(meRes.student.id);
+        } catch (e) {
+          if (await handleAuthError(e)) return;
+          setError("포트폴리오를 불러올 수 없어요.");
+        } finally {
+          setLoading(false);
+        }
+      })();
+    }, [handleAuthError, loadPortfolio]),
+  );
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -112,7 +113,7 @@ export default function StudentPortfolioScreen() {
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
-          {portfolioLoading ? (
+          {portfolioLoading && !portfolio ? (
             <View style={styles.inlineLoading}>
               <ActivityIndicator color={colors.accent} />
             </View>

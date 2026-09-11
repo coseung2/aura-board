@@ -27,7 +27,7 @@ vi.mock("@/lib/song-guess/browser-client", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/song-guess/browser-client")>();
   return {
     ...original,
-    fetchCurrentSongGuessSession: mocks.fetchCurrent,
+    fetchSongGuessSnapshot: mocks.fetchCurrent,
     fetchSongGuessTeacherSetup: mocks.fetchSetup,
     submitSongGuessCommand: mocks.submitCommand,
     createSongGuessSession: mocks.createSession,
@@ -36,6 +36,19 @@ vi.mock("@/lib/song-guess/browser-client", async (importOriginal) => {
     uploadSongGuessClip: mocks.uploadClip,
     deleteSongGuessClip: mocks.deleteClip,
   };
+});
+
+// These existing gameplay tests enter a chosen room; room discovery is covered separately.
+vi.mock("./song-guess-rooms", async () => {
+  const { useEffect } = await import("react");
+  return { SongGuessRooms: ({ onSelect, onTeacherSetup }: { onSelect: (id: string) => void; onTeacherSetup: () => void }) => {
+    useEffect(() => {
+      void Promise.resolve(mocks.fetchCurrent.getMockImplementation()?.()).then((value) => {
+        if (value) onSelect(value.sessionId); else onTeacherSetup();
+      });
+    }, []);
+    return null;
+  } };
 });
 
 import { SongGuessBoard } from "./SongGuessBoard";

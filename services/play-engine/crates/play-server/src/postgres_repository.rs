@@ -249,15 +249,20 @@ impl PlayRepository for PostgresRepository {
         now_ms: i64,
     ) -> Result<Execution<SongGuessSessionResponse>, RepositoryError> {
         validate_request_id(&request.request_id)?;
-        if actor.role != ActorRole::Host || board_id.is_empty() {
+        if board_id.is_empty() {
             return Err(ModelError::Forbidden.into());
         }
         let payload_hash = request_hash(SONG_GUESS_CREATE_SCOPE, board_id, actor, request)?;
+        let receipt_scope = if request.room_mode == crate::model::SongGuessRoomMode::StudentFree {
+            format!("{SONG_GUESS_CREATE_SCOPE}:{}", actor.subject)
+        } else {
+            SONG_GUESS_CREATE_SCOPE.to_owned()
+        };
         let mut tx = self.pool.begin().await.map_err(storage)?;
         lock_scope(&mut tx, board_id).await?;
         if let Some(replay) = lookup_receipt::<SongGuessSessionResponse>(
             &mut tx,
-            SONG_GUESS_CREATE_SCOPE,
+            &receipt_scope,
             board_id,
             &request.request_id,
             &payload_hash,
@@ -267,20 +272,27 @@ impl PlayRepository for PostgresRepository {
             tx.commit().await.map_err(storage)?;
             return Ok(replay);
         }
-        if has_current_session_in_tx(&mut tx, board_id).await? {
-            return Err(RepositoryError::SessionAlreadyExists);
+        if request.room_mode == crate::model::SongGuessRoomMode::StudentFree {
+            let exists: bool = sqlx::query_scalar(r#"SELECT EXISTS(SELECT 1 FROM "PlaySession" WHERE "boardId" = $1 AND "gameKind" = 'song-guess' AND "hostSubject" = $2 AND "state"->'state'->>'phase' <> 'finished')"#)
+                .bind(board_id).bind(&actor.subject).fetch_one(&mut *tx).await.map_err(storage)?;
+            if exists {
+                return Err(RepositoryError::SessionAlreadyExists);
+            }
         }
-        let record = SongGuessSessionRecord::new(
+        if request.room_mode == crate::model::SongGuessRoomMode::TeacherLed {
+            sqlx::query(r#"UPDATE "PlaySession" SET "current" = FALSE WHERE "boardId" = $1 AND "gameKind" = 'song-guess' AND "state"->'state'->>'phase' = 'finished'"#)
+                .bind(board_id).execute(&mut *tx).await.map_err(storage)?;
+            if has_current_session_in_tx(&mut tx, board_id).await? {
+                return Err(RepositoryError::SessionAlreadyExists);
+            }
+        }
+        let record = SongGuessSessionRecord::from_request(
             Uuid::new_v4().to_string(),
             board_id.to_owned(),
-            actor.subject.clone(),
-            request.participants.clone(),
-            request.rounds.clone(),
-            None,
+            actor,
+            request,
             now_ms,
-        )?
-        .with_answer_mode(request.answer_mode)?
-        .with_answer_target(request.answer_target);
+        )?;
         let response = SongGuessSessionResponse {
             request_id: request.request_id.clone(),
             snapshot: record.snapshot(actor, now_ms)?,
@@ -289,7 +301,7 @@ impl PlayRepository for PostgresRepository {
         insert_song_guess_outbox(&mut tx, &record, "session_created").await?;
         insert_receipt(
             &mut tx,
-            SONG_GUESS_CREATE_SCOPE,
+            &receipt_scope,
             board_id,
             &request.request_id,
             &payload_hash,
@@ -301,6 +313,37 @@ impl PlayRepository for PostgresRepository {
             value: response,
             replayed: false,
         })
+    }
+
+    async fn list_song_guess_sessions(
+        &self,
+        board_id: &str,
+    ) -> Result<Vec<SongGuessSessionRecord>, RepositoryError> {
+        let values = sqlx::query_scalar::<_, Json<SongGuessSessionRecord>>(r#"SELECT "state" FROM "PlaySession" WHERE "boardId" = $1 AND "gameKind" = 'song-guess' ORDER BY "createdAtMs" DESC, "id" ASC LIMIT 100"#)
+            .bind(board_id).fetch_all(&self.pool).await.map_err(storage)?;
+        values
+            .into_iter()
+            .map(|Json(record)| checked_song_guess(record))
+            .collect()
+    }
+
+    async fn advance_song_guess_session(
+        &self,
+        actor: &ActorContext,
+        session_id: &str,
+        now_ms: i64,
+    ) -> Result<SongGuessSessionRecord, RepositoryError> {
+        let mut tx = self.pool.begin().await.map_err(storage)?;
+        let mut record = lock_song_guess_session(&mut tx, session_id).await?;
+        record.authorize(actor)?;
+        if record.advance_due(now_ms)? {
+            sqlx::query(r#"UPDATE "PlaySession" SET "version" = $2, "state" = $3, "updatedAt" = NOW() WHERE "id" = $1 AND "gameKind" = 'song-guess'"#)
+                .bind(session_id).bind(as_i64(record.version)?).bind(Json(&record))
+                .execute(&mut *tx).await.map_err(storage)?;
+            insert_song_guess_outbox(&mut tx, &record, "session_changed").await?;
+        }
+        tx.commit().await.map_err(storage)?;
+        Ok(record)
     }
 
     async fn current_song_guess_session(
@@ -344,6 +387,8 @@ impl PlayRepository for PostgresRepository {
         now_ms: i64,
     ) -> Result<Execution<SongGuessCommandResponse>, RepositoryError> {
         validate_request_id(&request.request_id)?;
+        self.advance_song_guess_session(actor, session_id, now_ms)
+            .await?;
         if request.command_schema_version != crate::model::COMMAND_SCHEMA_VERSION {
             return Err(RepositoryError::UnsupportedSchema);
         }

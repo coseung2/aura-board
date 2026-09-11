@@ -20,8 +20,16 @@ on:
       expected_version:
         description: App version that must be present in app.config.ts
         required: true
-        default: 1.0.12
+        default: 1.0.14
         type: string
+      android_track:
+        description: Google Play submission track (alpha for testing)
+        required: true
+        default: alpha
+        type: choice
+        options:
+          - alpha
+          - production
       release_notes:
         description: App Store What's New text; required for ios-submit
         required: false
@@ -85,6 +93,9 @@ jobs:
 
       - name: Install mobile dependencies
         run: npm ci --legacy-peer-deps
+
+      - name: Record current store and testing versions
+        run: node ../../.github/scripts/inspect-mobile-releases.mjs >> "$GITHUB_STEP_SUMMARY"
 
       - name: Verify app identity and version
         env:
@@ -183,7 +194,7 @@ jobs:
         run: rm -f "$RUNNER_TEMP/google-services.json"
 
   android:
-    name: Android AAB build and optional production submission
+    name: Android AAB build and optional store submission
     environment: Production
     if: ${{ inputs.platform == 'all' || inputs.platform == 'android-build' || inputs.platform == 'android' }}
     needs: validate
@@ -279,9 +290,15 @@ jobs:
             --track production \
             --version-code "${{ steps.build.outputs.build_number }}"
 
-      - name: Submit AAB to Google Play production
+      - name: Submit AAB to selected Google Play track
         if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
-        run: eas submit --platform android --profile production --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
+        env:
+          SUBMIT_PROFILE: ${{ inputs.android_track == 'production' && 'production' || 'closed' }}
+        run: eas submit --platform android --profile "$SUBMIT_PROFILE" --path "${{ steps.build.outputs.aab_path }}" --wait --non-interactive
+
+      - name: Record store versions after Android submission
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'android' }}
+        run: node ../../.github/scripts/inspect-mobile-releases.mjs >> "$GITHUB_STEP_SUMMARY"
 
       - name: Preserve built AAB
         if: ${{ always() && steps.build.outcome == 'success' }}
@@ -303,7 +320,7 @@ jobs:
             if [ "${{ inputs.platform }}" = "android-build" ]; then
               echo "- Submission: skipped (build-only)"
             else
-              echo "- Play track: production"
+              echo "- Play track: ${{ inputs.android_track }}"
             fi
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -409,6 +426,10 @@ jobs:
       - name: Submit IPA to App Store Connect
         if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
         run: eas submit --platform ios --profile production --path "${{ steps.build.outputs.ipa_path }}" --wait --non-interactive
+
+      - name: Record store versions after iOS upload
+        if: ${{ inputs.platform == 'all' || inputs.platform == 'ios' }}
+        run: node ../../.github/scripts/inspect-mobile-releases.mjs >> "$GITHUB_STEP_SUMMARY"
 
       - name: Preserve built IPA
         if: ${{ always() && steps.build.outcome == 'success' }}

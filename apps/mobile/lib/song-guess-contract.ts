@@ -36,6 +36,9 @@ export type SongGuessRepresentativePet = {
 };
 
 export type SongGuessSnapshot = {
+  roomMode?: "teacher-led" | "student-free";
+  hostDisplayName?: string | null;
+  nextTransitionAtMs?: number | null;
   answerMode?: "text" | "multiple-choice";
   answerTarget?: "title" | "artist" | "artist-title";
   sessionId: string;
@@ -77,6 +80,9 @@ export type SongGuessSnapshot = {
     representativePet?: SongGuessRepresentativePet | null;
   }>;
   viewer: {
+    canStart?: boolean;
+    canFinish?: boolean;
+    isRoomHost?: boolean;
     answeredCurrentRound?: boolean;
     selectedChoiceId?: string | null;
     role: "host" | "participant";
@@ -87,6 +93,7 @@ export type SongGuessSnapshot = {
 };
 
 export type SongGuessIntent =
+  | { type: "start" | "finish" | "leave" }
   | { type: "guess"; text: string; roundId?: string }
   | { type: "guess"; choiceId: string; roundId?: string }
   | { type: "join" };
@@ -139,7 +146,7 @@ function isMimeType(value: unknown): value is SongGuessMimeType {
 /** Also validates commands restored from the on-device retry queue. */
 export function isSongGuessIntent(value: unknown): value is SongGuessIntent {
   if (!isRecord(value)) return false;
-  if (value.type === "join") return true;
+  if (["join", "start", "finish", "leave"].includes(String(value.type))) return true;
   if (value.type !== "guess") return false;
   if (value.roundId !== undefined &&
       (typeof value.roundId !== "string" || !value.roundId.trim())) return false;
@@ -236,8 +243,10 @@ export function isSongGuessSnapshot(
     return false;
 
   const choices = currentRound.choices;
+  const endedBeforeStart = value.rulesVersion === 2 && value.phase === "finished" && currentRound.startedAtMs === null && currentRound.deadlineAtMs === null;
+  if (endedBeforeStart && (currentRound.revealedAnswer !== null || currentRound.accessibilityClue !== null)) return false;
   const showChoices = value.answerMode === "multiple-choice" &&
-    value.phase !== "draft" && value.phase !== "lobby";
+    value.phase !== "draft" && value.phase !== "lobby" && !endedBeforeStart;
   if (showChoices) {
     if (!Array.isArray(choices) || choices.length !== 4 || choices.some((choice) =>
       !isRecord(choice) || Array.isArray(choice) ||
@@ -269,7 +278,7 @@ export function isSongGuessSnapshot(
   )
     return false;
   if (
-    (value.phase === "reveal" || value.phase === "finished") &&
+    (value.phase === "reveal" || (value.phase === "finished" && !(value.rulesVersion === 2 && currentRound.startedAtMs === null && currentRound.deadlineAtMs === null))) &&
     (typeof currentRound.revealedAnswer !== "string" ||
       !currentRound.revealedAnswer.trim())
   )
@@ -307,7 +316,7 @@ export function isSongGuessSnapshot(
   // for the score and deadline.
   if (value.rulesVersion === SONG_GUESS_RULES_VERSION) {
     const { startedAtMs, deadlineAtMs, maxScore } = currentRound;
-    const waiting = value.phase === "draft" || value.phase === "lobby";
+    const waiting = value.phase === "draft" || value.phase === "lobby" || (value.phase === "finished" && startedAtMs === null && deadlineAtMs === null);
     if (maxScore !== SONG_GUESS_MAX_SCORE) return false;
     if (waiting) {
       if (startedAtMs !== null || deadlineAtMs !== null) return false;

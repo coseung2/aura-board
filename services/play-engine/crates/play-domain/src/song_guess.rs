@@ -404,6 +404,17 @@ impl SongGuessState {
         Ok(())
     }
 
+    pub fn leave(&mut self, actor_subject: &str) -> DomainResult<()> {
+        self.validate()?;
+        let participant = self
+            .participants
+            .iter_mut()
+            .find(|participant| participant.actor_subject == actor_subject)
+            .ok_or(DomainError::UnknownParticipant)?;
+        participant.joined = false;
+        Ok(())
+    }
+
     pub fn unlock_clip(&mut self) -> DomainResult<u32> {
         self.validate()?;
         if self.phase != SongGuessPhase::Guessing {

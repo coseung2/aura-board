@@ -1,19 +1,15 @@
-import { KeyboardAvoidingView, Platform, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { FeedComposerForm } from "../../../components/FeedComposerForm";
-import { AppHeader } from "../../../components/ui";
+import { useInputFeedback } from "../../../components/input-feedback-provider";
+import { InputPage } from "../../../components/input-page";
 import { ApiError, apiFetch } from "../../../lib/api";
 import { feedApiMessage, type FeedDraft } from "../../../lib/feed";
-import {
-  clearSessionToken,
-  getUnifiedLoginRoute,
-} from "../../../lib/session";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../../lib/session";
 import { clearStudentFeedCache } from "../../../lib/student-feed-cache";
-import { colors } from "../../../theme/tokens";
 
 export default function StudentFeedComposeScreen() {
   const router = useRouter();
+  const notify = useInputFeedback();
 
   async function submit(draft: FeedDraft) {
     try {
@@ -30,20 +26,11 @@ export default function StudentFeedComposeScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.page}>
-      <AppHeader
-        title="새 게시물"
-        onBack={() => router.back()}
-        showDailyBanner={false}
+    <InputPage title="새 게시물" onBack={() => router.back()}>
+      <FeedComposerForm
+        onSubmit={submit}
+        onSuccess={() => notify("게시물을 등록했어요.")}
       />
-      <KeyboardAvoidingView style={styles.keyboard} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-        <FeedComposerForm onSubmit={submit} onSuccess={() => router.back()} />
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+    </InputPage>
   );
 }
-
-const styles = StyleSheet.create({
-  keyboard: { flex: 1 },
-  page: { flex: 1, backgroundColor: colors.bg },
-});

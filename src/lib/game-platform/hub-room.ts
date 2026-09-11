@@ -91,6 +91,7 @@ async function findCanonicalRoom(
 export async function resolveOrCreateCanonicalGameRoom(
   scope: GameHubClassroomScope,
   gameKind: OfficialGameKind,
+  options: { allowCreate?: boolean } = {},
 ): Promise<CanonicalGameRoom> {
   const teacherId = await loadClassroomTeacherId(scope.classroomId);
   const existing = await findCanonicalRoom(scope.classroomId, gameKind);
@@ -98,6 +99,8 @@ export async function resolveOrCreateCanonicalGameRoom(
     await ensureTeacherOwnership(existing.id, teacherId);
     return existing;
   }
+
+  if (options.allowCreate === false) throw new Error("teacher_room_not_open");
 
   const catalog = OFFICIAL_GAME_CATALOG[gameKind];
   try {

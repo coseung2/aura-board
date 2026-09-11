@@ -9,7 +9,7 @@ import {
 import { Image } from "expo-image";
 import { type Href, useFocusEffect, useRouter } from "expo-router";
 import { AlertCircle, CirclePlay } from "lucide-react-native";
-import { apiFetch, getApiUrl } from "../../lib/api";
+import { ApiError, apiFetch, getApiUrl } from "../../lib/api";
 import {
   MOBILE_GAME_CATALOG,
   MOBILE_GAME_HUB_ORDER,
@@ -77,10 +77,11 @@ export function GameHubCatalog() {
       router.push(
         `/(student)/board/${encodeURIComponent(response.boardSlug)}?layout=${gameKind}` as Href,
       );
-    } catch {
+    } catch (error) {
       setErrors((current) => ({
         ...current,
-        [gameKind]: "입장에 실패했어요.",
+        [gameKind]: error instanceof ApiError && (error.body as { error?: string } | null)?.error === "teacher_room_not_open"
+          ? "선생님이 방을 열면 참여할 수 있어요." : "입장에 실패했어요.",
       }));
     } finally {
       // Navigation can unmount this screen before focus returns. Always clear

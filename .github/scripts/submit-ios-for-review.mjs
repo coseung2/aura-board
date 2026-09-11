@@ -84,7 +84,7 @@ function loadPrivateKey(env = process.env) {
   );
 }
 
-function loadCredentials(env = process.env) {
+export function loadCredentials(env = process.env) {
   const keyId = env.APPLE_API_KEY_ID ?? env.APPLE_KEY_ID;
   const issuerId =
     env.APPLE_API_KEY_ISSUER_ID ?? env.APPLE_API_ISSUER_ID ?? env.APPLE_ISSUER_ID;

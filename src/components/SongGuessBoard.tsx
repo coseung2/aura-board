@@ -13,7 +13,7 @@ import {
   createSongGuessSession,
   deleteSongGuessClip,
   deleteSongGuessTeacherSetup,
-  fetchCurrentSongGuessSession,
+  fetchSongGuessSnapshot,
   fetchSongGuessTeacherSetup,
   makeSongGuessCommand,
   saveSongGuessTeacherSetup,
@@ -50,6 +50,7 @@ import { SongGuessGame } from "./SongGuessGame";
 import { SongGuessAnswerGuide } from "./SongGuessAnswerGuide";
 import { SongGuessImportPanel } from "./SongGuessImportPanel";
 import { SongGuessSetupControls } from "./SongGuessSetupControls";
+import { SongGuessRooms } from "./song-guess-rooms";
 import {
   BoardHeading,
   SongGuessRoundEditor,
@@ -80,6 +81,8 @@ type PendingCommand = {
 
 export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   const [snapshot, setSnapshot] = useState<SongGuessSnapshot | null>(null);
+  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [teacherSetup, setTeacherSetup] = useState(false);
   const [setup, setSetup] = useState<SongGuessTeacherSetup | null>(null);
   const [drafts, setDrafts] = useState<RoundDraft[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +100,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   const [answerMode, setAnswerMode] = useState<"text" | "multiple-choice">("text");
   const [answerTarget, setAnswerTarget] = useState<SongGuessAnswerTarget>("title");
   const sessionSequence = useRef(0);
+  const historySession = useRef<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
   const draftsRef = useRef<RoundDraft[]>([]);
@@ -145,7 +149,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     const sequence = ++sessionSequence.current;
     setSyncing(true);
     try {
-      const next = await fetchCurrentSongGuessSession(boardId);
+      const next = selectedSessionId ? await fetchSongGuessSnapshot(selectedSessionId) : null;
       if (sequence !== sessionSequence.current) return;
       setSnapshot((current) => {
         if (!next) return null;
@@ -160,7 +164,13 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     } finally {
       if (sequence === sessionSequence.current) setSyncing(false);
     }
-  }, [boardId, readPending]);
+  }, [selectedSessionId, readPending]);
+
+  useEffect(() => {
+    if (snapshot?.roomMode !== "student-free" || snapshot.phase === "finished") return;
+    const timer = setInterval(() => void refreshSession(), 2000);
+    return () => clearInterval(timer);
+  }, [snapshot?.roomMode, snapshot?.phase, refreshSession]);
 
   const reloadSetup = useCallback(async () => {
     if (viewer !== "teacher") return;
@@ -231,6 +241,10 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
         );
         if (response.result) setLastGuessResult(response.result);
         clearPending();
+        if (pending.request.command.type === "leave" || (pending.request.command.type === "finish" && response.snapshot.roomMode === "student-free")) {
+          ++sessionSequence.current;
+          setSelectedSessionId(null); setSnapshot(null); setTeacherSetup(false);
+        }
       } catch (cause) {
         if (pending.request.command.type === "join") {
           setFailedJoinSessionId(pending.sessionId);
@@ -272,6 +286,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
 
   const sendIntent = useCallback(
     (command: SongGuessIntent) => {
+      if (command.type === "finish" && !window.confirm("게임을 끝낼까요? 모든 참여자의 게임이 종료돼요.")) return;
       if (
         !snapshot ||
         busy ||
@@ -297,6 +312,8 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     setNotice(null);
     try {
       const response = await createSongGuessSession(boardId, answerMode, answerTarget);
+      ++sessionSequence.current;
+      setSelectedSessionId(response.snapshot.sessionId);
       setSnapshot(response.snapshot);
       setNotice(null);
     } catch (cause) {
@@ -482,6 +499,26 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     }
   }
 
+  const exitRoom = useCallback(() => {
+    if (busy || hasPending) { setError("처리 중인 요청을 확인한 뒤 나가 주세요."); return; }
+    if (!snapshot || snapshot.phase === "finished" || (snapshot.viewer.joined === false && !snapshot.viewer.isRoomHost && snapshot.viewer.role !== "host") || (snapshot.viewer.role === "host" && snapshot.roomMode === "student-free")) {
+      ++sessionSequence.current; setSelectedSessionId(null); setSnapshot(null); setTeacherSetup(false); return;
+    }
+    const finish = snapshot.viewer.isRoomHost === true || snapshot.viewer.role === "host";
+    if (!window.confirm(finish ? "게임을 끝내고 나갈까요? 모든 참여자의 게임이 종료돼요." : "방에서 나갈까요?")) return;
+    void executeCommand({ sessionId: snapshot.sessionId, request: makeSongGuessCommand(snapshot, { type: finish ? "finish" : "leave" }) });
+  }, [busy, hasPending, snapshot, executeCommand]);
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    if (historySession.current !== selectedSessionId) { window.history.pushState({ songGuessRoom: selectedSessionId }, ""); historySession.current = selectedSessionId; }
+    const back = () => { window.history.pushState({ songGuessRoom: selectedSessionId }, ""); exitRoom(); };
+    const unload = (event: BeforeUnloadEvent) => { if (snapshot && snapshot.phase !== "finished" && (snapshot.viewer.joined || snapshot.viewer.isRoomHost || snapshot.viewer.role === "host")) { event.preventDefault(); event.returnValue = ""; } };
+    const navigate = (event: MouseEvent) => { const link = event.target instanceof Element ? event.target.closest("a[href]") : null; if (link && !event.ctrlKey && !event.metaKey && !event.shiftKey && event.button === 0 && link.getAttribute("target") !== "_blank") { event.preventDefault(); event.stopPropagation(); exitRoom(); } };
+    document.addEventListener("click", navigate, true);
+    window.addEventListener("popstate", back); window.addEventListener("beforeunload", unload);
+    return () => { window.removeEventListener("popstate", back); window.removeEventListener("beforeunload", unload); document.removeEventListener("click", navigate, true); };
+  }, [selectedSessionId, exitRoom, snapshot?.viewer.joined, snapshot?.phase]);
+
   if (loading) {
     return (
       <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
@@ -492,7 +529,9 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     );
   }
 
-  if (!snapshot && viewer === "teacher") {
+  if (!selectedSessionId && !teacherSetup) return <section className={styles.shell} aria-label={boardTitle}><BoardHeading title={boardTitle} /><SongGuessRooms boardId={boardId} teacher={viewer === "teacher"} onSelect={(id) => { setSnapshot(null); setSelectedSessionId(id); }} onTeacherSetup={() => setTeacherSetup(true)} /></section>;
+
+  if (!snapshot && viewer === "teacher" && teacherSetup) {
     return (
       <section
         className={`${styles.shell} ${teacherStyles.teacherShell}`}
@@ -500,6 +539,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
         aria-label={boardTitle}
       >
         <BoardHeading title={boardTitle} />
+        <button type="button" className={styles.secondaryButton} disabled={busy} onClick={() => setTeacherSetup(false)}>방 목록</button>
 
         {!customEditor ? (
           <main className={teacherStyles.autoSetupMain}>
@@ -642,6 +682,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
       <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
         <div className={styles.panel}>
           <h2>{error ? "게임을 불러오지 못했어요" : "게임 준비 중"}</h2>
+          <button type="button" className={styles.secondaryButton} onClick={exitRoom}>방 목록</button>
           <button
             className={styles.secondaryButton}
             type="button"
@@ -663,6 +704,8 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
       aria-label={boardTitle}
     >
       <BoardHeading title={boardTitle} />
+      <button type="button" className={styles.secondaryButton} disabled={busy || hasPending} onClick={exitRoom}>{snapshot.phase === "finished" ? "방 목록" : "방 나가기"}</button>
+      {snapshot.phase === "finished" && viewer === "teacher" && snapshot.roomMode !== "student-free" && <button type="button" className={styles.primaryButton} onClick={() => { setSelectedSessionId(null); setSnapshot(null); setTeacherSetup(true); }}>다시 구성하기</button>}
       <SongGuessGame
         snapshot={snapshot}
         totalRounds={setup?.rounds.length ?? null}

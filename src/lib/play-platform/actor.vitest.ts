@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getCurrentStudentIdentityRaw: vi.fn(),
   boardFindUnique: vi.fn(),
   boardMemberFindFirst: vi.fn(),
+  sessionFindUnique: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({ getCurrentUser: async () => {
@@ -19,6 +20,7 @@ vi.mock("@/lib/db", () => ({
   db: {
     board: { findUnique: mocks.boardFindUnique },
     boardMember: { findFirst: mocks.boardMemberFindFirst },
+    playSession: { findUnique: mocks.sessionFindUnique },
   },
 }));
 
@@ -26,9 +28,22 @@ import {
   PlayAccessError,
   resolvePlayActorForBoard,
   resolveSongGuessActorForBoard,
+  resolveSongGuessActorForSession,
 } from "./actor";
 
 describe("song-guess board ownership", () => {
+  it("checks current classroom ownership again for an existing session", async () => {
+    mocks.sessionFindUnique.mockResolvedValue({ boardId: "board-1", gameKind: "song-guess" });
+    mocks.getCurrentUser.mockResolvedValue({ id: "other-teacher" });
+    await expect(resolveSongGuessActorForSession("session-1")).rejects.toMatchObject({ status: 403 });
+    mocks.getCurrentUser.mockResolvedValue({ id: "teacher-1" });
+    await expect(resolveSongGuessActorForSession("session-1")).resolves.toMatchObject({ subject: "teacher:teacher-1" });
+  });
+  it("rejects wrong-game session IDs before board authorization", async () => {
+    mocks.sessionFindUnique.mockResolvedValue({ boardId: "board-1", gameKind: "omok" });
+    await expect(resolveSongGuessActorForSession("session-1")).rejects.toMatchObject({ status: 404 });
+    expect(mocks.boardFindUnique).not.toHaveBeenCalled();
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubEnv("AURA_ADMIN_EMAILS", "pilot@example.com");

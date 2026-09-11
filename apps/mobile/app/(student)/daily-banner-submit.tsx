@@ -1,27 +1,25 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router";
+import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  Alert,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router";
-import { ChevronLeft, ChevronRight, X } from "lucide-react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { apiFetch, ApiError } from "../../lib/api";
 import {
-  clearSessionToken,
-  getUnifiedLoginRoute,
-} from "../../lib/session";
-import { uploadMobileImage } from "../../lib/upload";
+  AppButton,
+  AppHeader,
+  ControlPressable,
+  IconButton,
+} from "../../components/ui";
+import { ApiError, apiFetch } from "../../lib/api";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import {
   borders,
   colors,
-  composer,
   layout,
   pageChrome,
   radii,
@@ -29,23 +27,8 @@ import {
   tapMin,
   typography,
 } from "../../theme/tokens";
-import {
-  AppButton,
-  AppHeader,
-  AppModal,
-  ControlPressable,
-  IconButton,
-  TextField,
-} from "../../components/ui";
-import { DailyBannerPreview } from "../../components/DailyBanner";
 
 type BannerMode = "marquee" | "image";
-
-type SelectedImage = {
-  uri: string;
-  url: string;
-  name: string;
-};
 
 type Submission = {
   id: string;
@@ -176,24 +159,14 @@ function submissionStatusLabel(status: string | null | undefined) {
   }
 }
 
-async function uploadImage(uri: string, name: string, mimeType: string) {
-  return (await uploadMobileImage({ uri, name, mimeType })).url;
-}
-
 export default function DailyBannerSubmitScreen() {
   const router = useRouter();
   const [month, setMonth] = useState(() => todayIso().slice(0, 7));
-  const [date, setDate] = useState<string | null>(null);
-  const [text, setText] = useState("");
-  const [image, setImage] = useState<SelectedImage | null>(null);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [occupiedDays, setOccupiedDays] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [calendarLoading, setCalendarLoading] = useState(true);
   const [calendarError, setCalendarError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   const loadSubmissions = useCallback(async () => {
     try {
@@ -237,13 +210,12 @@ export default function DailyBannerSubmitScreen() {
     [router],
   );
 
-  useEffect(() => {
-    void loadSubmissions();
-  }, [loadSubmissions]);
-
-  useEffect(() => {
-    void loadCalendar(month);
-  }, [loadCalendar, month]);
+  useFocusEffect(
+    useCallback(() => {
+      void loadSubmissions();
+      void loadCalendar(month);
+    }, [loadSubmissions, loadCalendar, month]),
+  );
 
   const calendarWeeks = useMemo(() => buildMonthWeeks(month), [month]);
   const occupiedSet = useMemo(() => new Set(occupiedDays), [occupiedDays]);
@@ -277,98 +249,10 @@ export default function DailyBannerSubmitScreen() {
   );
 
   function openEditor(targetDay: string) {
-    setDate(targetDay);
-    setError(null);
-    setSuccess(false);
-  }
-
-  function closeEditor() {
-    if (busy) return;
-    setDate(null);
-    setError(null);
-  }
-
-  async function pickImage() {
-    try {
-      const permission =
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert(
-          "권한 필요",
-          "사진을 선택하려면 사진 보관함 권한을 허용해 주세요.",
-        );
-        return;
-      }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        quality: 0.8,
-      });
-      if (result.canceled || !result.assets[0]) return;
-      const asset = result.assets[0];
-      setBusy(true);
-      setError(null);
-      const name = asset.fileName ?? `daily-banner-${Date.now()}.jpg`;
-      const url = await uploadImage(
-        asset.uri,
-        name,
-        asset.mimeType ?? "image/jpeg",
-      );
-      setImage({ uri: asset.uri, url, name });
-    } catch (nextError) {
-      setError(
-        nextError instanceof Error
-          ? nextError.message
-          : "이미지를 준비하지 못했어요.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function submit() {
-    const normalizedDate = date;
-    const normalizedText = text.trim();
-    if (!normalizedDate) {
-      setError("캘린더에서 게시할 날짜를 선택해 주세요.");
-      return;
-    }
-    if (!normalizedText) {
-      setError("문구를 입력해 주세요.");
-      return;
-    }
-
-    setBusy(true);
-    setError(null);
-    setSuccess(false);
-    try {
-      await apiFetch("/api/student/daily-banner", {
-        method: "POST",
-        json: image
-          ? {
-              targetDay: normalizedDate,
-              kind: "image",
-              text: normalizedText,
-              imageUrl: image.url,
-            }
-          : { targetDay: normalizedDate, kind: "text", text: normalizedText },
-      });
-      setSuccess(true);
-      setText("");
-      setImage(null);
-      setDate(null);
-      await Promise.all([loadSubmissions(), loadCalendar(month)]);
-    } catch (nextError) {
-      if (nextError instanceof ApiError && nextError.status === 401) {
-        await clearSessionToken();
-        router.replace(getUnifiedLoginRoute("student"));
-        return;
-      }
-      setError(
-        nextError instanceof Error ? nextError.message : "제출하지 못했어요.",
-      );
-    } finally {
-      setBusy(false);
-    }
+    router.push({
+      pathname: "/(student)/daily-banner/compose",
+      params: { date: targetDay },
+    });
   }
 
   return (
@@ -506,16 +390,6 @@ export default function DailyBannerSubmitScreen() {
           ) : null}
         </View>
 
-        {success ? (
-          <Text
-            style={styles.success}
-            accessibilityLiveRegion="polite"
-            selectable
-          >
-            제안이 접수됐어요. 승인 결과를 기다려 주세요.
-          </Text>
-        ) : null}
-
         <View style={styles.historySection}>
           <Text style={styles.sectionTitle}>내 제안</Text>
           {loading ? (
@@ -549,96 +423,6 @@ export default function DailyBannerSubmitScreen() {
           )}
         </View>
       </ScrollView>
-
-      <AppModal
-        visible={date !== null}
-        onClose={closeEditor}
-        keyboardAvoiding
-        closeOnBackdropPress={!busy}
-        accessibilityLabel="배너 제안 작성"
-        sheetStyle={styles.modalSheet}
-      >
-        <View style={styles.modalHeader}>
-          <View style={styles.modalTitleGroup}>
-            <Text style={styles.modalTitle} selectable>
-              배너 제안 작성
-            </Text>
-            {date ? (
-              <Text style={styles.modalDate} selectable>
-                {selectedDateLabel(date)}
-              </Text>
-            ) : null}
-          </View>
-          <IconButton
-            onPress={closeEditor}
-            disabled={busy}
-            accessibilityLabel="닫기"
-          >
-            <X size={20} color={colors.textMuted} />
-          </IconButton>
-        </View>
-
-        <ScrollView
-          style={styles.modalScroll}
-          contentContainerStyle={styles.modalContent}
-          keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
-          showsVerticalScrollIndicator={false}
-        >
-          <View style={styles.form}>
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>미리보기</Text>
-              <DailyBannerPreview
-                text={text.trim() || undefined}
-                imageUrl={image?.uri}
-              />
-              {image ? (
-                <Text style={styles.fileName} numberOfLines={1} selectable>
-                  {image.name}
-                </Text>
-              ) : null}
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>문구</Text>
-              <TextField
-                value={text}
-                onChangeText={(value) => setText(value.slice(0, 120))}
-                placeholder="친구들에게 전할 짧은 소식"
-                maxLength={120}
-                multiline
-                editable={!busy}
-                accessibilityLabel="배너 문구"
-              />
-              <Text style={styles.hint}>{text.length}/120</Text>
-            </View>
-
-            <View style={styles.fieldGroup}>
-              <Text style={styles.label}>이미지</Text>
-              <Text style={styles.imageGuide} selectable>
-                권장 제작 크기: 1500 × 500px (가로 3:1)
-              </Text>
-              <AppButton
-                variant="secondary"
-                onPress={() => void pickImage()}
-                disabled={busy}
-              >
-                {image ? "이미지 변경" : "이미지 추가"}
-              </AppButton>
-            </View>
-
-            {error ? (
-              <Text style={styles.fieldError} accessibilityRole="alert">
-                {error}
-              </Text>
-            ) : null}
-            <AppButton onPress={() => void submit()} loading={busy}>
-              제안 제출
-            </AppButton>
-          </View>
-        </ScrollView>
-      </AppModal>
     </SafeAreaView>
   );
 }
@@ -719,35 +503,7 @@ const styles = StyleSheet.create({
   calendarFallback: { gap: spacing.xs },
   calendarFallbackNote: { ...typography.micro, color: colors.textMuted },
   retryButton: { alignSelf: "center" },
-  modalSheet: {
-    maxHeight: "100%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
-  },
-  modalTitleGroup: { flex: 1, minWidth: 0, gap: spacing.xxs },
-  modalTitle: { ...typography.title, color: colors.text },
-  modalDate: { ...typography.body, color: colors.textMuted },
-  modalScroll: { flexShrink: 1 },
-  modalContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
-  },
-  form: { gap: spacing.lg },
-  fieldGroup: { gap: spacing.sm },
-  label: { ...typography.label, color: colors.text },
-  hint: { ...typography.micro, color: colors.textMuted, textAlign: "right" },
-  imageGuide: { ...typography.micro, color: colors.textMuted },
-  fileName: { ...typography.micro, color: colors.textMuted },
   fieldError: { ...typography.body, color: colors.danger },
-  success: { ...typography.body, color: colors.plantActive },
   historySection: { gap: spacing.md },
   sectionTitle: { ...typography.section, color: colors.text },
   muted: { ...typography.body, color: colors.textMuted },

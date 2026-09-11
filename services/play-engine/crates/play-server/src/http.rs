@@ -65,7 +65,7 @@ pub fn router(state: AppState) -> Router {
         )
         .route(
             "/v1/boards/{board_id}/song-guess/sessions",
-            post(create_song_guess_session),
+            post(create_song_guess_session).get(list_song_guess_sessions),
         )
         .route(
             "/v1/boards/{board_id}/song-guess/sessions/current",
@@ -160,6 +160,36 @@ async fn create_song_guess_session(
     Ok(execution_response(StatusCode::CREATED, result))
 }
 
+async fn list_song_guess_sessions(
+    State(state): State<AppState>,
+    Path(board_id): Path<String>,
+    headers: HeaderMap,
+) -> Result<Json<serde_json::Value>, ApiError> {
+    let actor = actor(&state, &headers)?;
+    let records = state
+        .repository
+        .list_song_guess_sessions(&board_id)
+        .await
+        .map_err(|e| ApiError::from_repository(e, &actor, state.now_ms()))?;
+    let mut sessions = Vec::new();
+    for record in records {
+        if record.authorize(&actor).is_err() {
+            continue;
+        }
+        let record = state
+            .repository
+            .advance_song_guess_session(&actor, &record.session_id, state.now_ms())
+            .await
+            .map_err(|e| ApiError::from_repository(e, &actor, state.now_ms()))?;
+        sessions.push(
+            record
+                .snapshot(&actor, state.now_ms())
+                .map_err(ApiError::from_model)?,
+        );
+    }
+    Ok(Json(serde_json::json!({ "sessions": sessions })))
+}
+
 async fn current_song_guess_session(
     State(state): State<AppState>,
     Path(board_id): Path<String>,
@@ -172,6 +202,11 @@ async fn current_song_guess_session(
         .await
         .map_err(|error| ApiError::from_repository(error, &actor, state.now_ms()))?
         .ok_or_else(ApiError::not_found)?;
+    let record = state
+        .repository
+        .advance_song_guess_session(&actor, &record.session_id, state.now_ms())
+        .await
+        .map_err(|e| ApiError::from_repository(e, &actor, state.now_ms()))?;
     Ok(Json(
         record
             .snapshot(&actor, state.now_ms())
@@ -205,7 +240,7 @@ async fn song_guess_session_snapshot(
     let actor = actor(&state, &headers)?;
     let record = state
         .repository
-        .get_song_guess_session(&session_id)
+        .advance_song_guess_session(&actor, &session_id, state.now_ms())
         .await
         .map_err(|error| ApiError::from_repository(error, &actor, state.now_ms()))?;
     Ok(Json(

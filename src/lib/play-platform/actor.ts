@@ -136,6 +136,12 @@ export async function loadSongGuessTeacherBoard(boardId: string) {
   return { actor, board };
 }
 
+export async function resolveSongGuessActorForSession(sessionId: string): Promise<PlayActor> {
+  const session = await db.playSession.findUnique({ where: { id: sessionId }, select: { boardId: true, gameKind: true } });
+  if (!session || session.gameKind !== "song-guess") throw new PlayAccessError(404, "song_guess_session_not_found");
+  return (await resolveSongGuessActorForBoard(session.boardId)).actor;
+}
+
 export async function resolveSongGuessParticipantSeeds(
   boardId: string,
   studentIds?: readonly string[],

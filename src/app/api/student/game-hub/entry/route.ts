@@ -31,6 +31,7 @@ async function POSTHandler(request: Request) {
     const room = await resolveOrCreateCanonicalGameRoom(
       { id: student.id, classroomId: student.classroomId },
       parsed.data.gameKind,
+      { allowCreate: ["omok", "song-guess"].includes(parsed.data.gameKind) },
     );
     return jsonPrivateNoStore({
       gameKind: parsed.data.gameKind,
@@ -39,6 +40,9 @@ async function POSTHandler(request: Request) {
       href: `/board/${encodeURIComponent(room.slug)}?view=student`,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "teacher_room_not_open") {
+      return jsonPrivateNoStore({ error: "teacher_room_not_open" }, { status: 409 });
+    }
     console.error("[POST /api/student/game-hub/entry]", error);
     return jsonPrivateNoStore({ error: "entry_unavailable" }, { status: 503 });
   }

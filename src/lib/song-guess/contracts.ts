@@ -56,6 +56,9 @@ export type SongGuessRepresentativePet = {
 };
 
 export type SongGuessSnapshot = {
+  roomMode?: "teacher-led" | "student-free";
+  hostDisplayName?: string | null;
+  nextTransitionAtMs?: number | null;
   sessionId: string;
   boardId: string;
   gameKind: "song-guess";
@@ -91,6 +94,9 @@ export type SongGuessSnapshot = {
     representativePet?: SongGuessRepresentativePet | null;
   }>;
   viewer: {
+    canStart?: boolean;
+    canFinish?: boolean;
+    isRoomHost?: boolean;
     answeredCurrentRound?: boolean;
     selectedChoiceId?: string | null;
     role: SongGuessActorRole;
@@ -101,6 +107,7 @@ export type SongGuessSnapshot = {
 };
 
 export type SongGuessIntent =
+  | { type: "leave" }
   | { type: "open_lobby" }
   | { type: "join" }
   | { type: "start" }
@@ -421,7 +428,9 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
   if (value.answerMode !== undefined && value.answerMode !== "text" && value.answerMode !== "multiple-choice") return false;
   if (value.answerTarget !== undefined && !["title", "artist", "artist-title"].includes(String(value.answerTarget))) return false;
   const choices = currentRound.choices;
-  const showChoices = value.answerMode === "multiple-choice" && value.phase !== "draft" && value.phase !== "lobby";
+  const endedBeforeStart = value.rulesVersion === 2 && value.phase === "finished" && currentRound.startedAtMs === null && currentRound.deadlineAtMs === null;
+  if (endedBeforeStart && (currentRound.revealedAnswer !== null || currentRound.accessibilityClue !== null)) return false;
+  const showChoices = value.answerMode === "multiple-choice" && value.phase !== "draft" && value.phase !== "lobby" && !endedBeforeStart;
   if (showChoices) {
     if (!Array.isArray(choices) || choices.length !== 4 || choices.some((choice) =>
       !isRecord(choice) || Object.keys(choice).some((key) => key !== "id" && key !== "label") ||
@@ -438,7 +447,7 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
     ("selectedChoiceId" in participant || "answeredCurrentRound" in participant))) return false;
   if (value.rulesVersion === 2) {
     const { startedAtMs, deadlineAtMs, maxScore } = currentRound;
-    const waiting = value.phase === "draft" || value.phase === "lobby";
+    const waiting = value.phase === "draft" || value.phase === "lobby" || (value.phase === "finished" && startedAtMs === null && deadlineAtMs === null);
     if (maxScore !== 1000) return false;
     if (waiting) {
       if (startedAtMs !== null || deadlineAtMs !== null) return false;
@@ -453,7 +462,7 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
     currentRound.revealedAnswer !== null
   ) return false;
   if (
-    (value.phase === "reveal" || value.phase === "finished") &&
+    (value.phase === "reveal" || (value.phase === "finished" && !(value.rulesVersion === 2 && currentRound.startedAtMs === null && currentRound.deadlineAtMs === null))) &&
     (typeof currentRound.revealedAnswer !== "string" || !currentRound.revealedAnswer.trim())
   ) return false;
   if (

@@ -1,34 +1,36 @@
-import { ActivityIndicator } from "react-native";
+import { ChevronDown, ChevronUp } from "lucide-react-native";
 import { useMemo } from "react";
-import { FeedbackToast } from "../../components/FeedbackToast";
-import { AppButton } from "../../components/ui";
-import { AppHeader } from "../../components/ui";
-import { AppModal } from "../../components/ui";
-import { ChevronDown } from "lucide-react-native";
-import { ChevronUp } from "lucide-react-native";
-import { ClassroomTopFive } from "../../components/ClassroomTopFive";
-import { ContentTab } from "../../components/NavigationTabs";
-import { ContentTabs } from "../../components/NavigationTabs";
-import { ControlPressable } from "../../components/ui";
-import { KeyboardAvoidingView } from "react-native";
-import { Platform } from "react-native";
-import { ReadingWeeklyMissionPanel } from "./student-reading-presentation";
+import {
+  ActivityIndicator,
+  Platform,
+  ScrollView,
+  Text,
+  View,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { ScrollView } from "react-native";
-import { SectionHeader } from "../../components/ui";
-import { SectionNav } from "../../components/NavigationTabs";
-import { SectionNavItem } from "../../components/NavigationTabs";
-import { StudentHeaderActions } from "../../components/StudentHeaderActions";
-import { SummaryRow } from "./student-reading-presentation";
-import { Text } from "react-native";
-import { TextField } from "../../components/ui";
-import { TitleCollection } from "../../components/TitleCollection";
-import { View } from "react-native";
-import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
-import { X } from "lucide-react-native";
-import { colors } from "../../theme/tokens";
-import { iconSizes } from "../../theme/tokens";
+import { ClassroomTopFive } from "../../components/ClassroomTopFive";
+import { FeedbackToast } from "../../components/FeedbackToast";
+import {
+  ContentTab,
+  ContentTabs,
+  SectionNav,
+  SectionNavItem,
+} from "../../components/NavigationTabs";
 import { styles } from "../../components/student-screens/student-reading.styles";
+import { StudentHeaderActions } from "../../components/StudentHeaderActions";
+import { TitleCollection } from "../../components/TitleCollection";
+import {
+  AppButton,
+  AppHeader,
+  ControlPressable,
+  SectionHeader,
+} from "../../components/ui";
+import { WalkingAttendanceCalendar } from "../../components/walking-attendance-calendar";
+import { colors } from "../../theme/tokens";
+import {
+  ReadingWeeklyMissionPanel,
+  SummaryRow,
+} from "./student-reading-presentation";
 import type { StudentReadingScreenViewModel } from "./use-student-reading-screen-model";
 
 export function StudentReadingScreenView({
@@ -36,15 +38,17 @@ export function StudentReadingScreenView({
 }: {
   model: StudentReadingScreenViewModel;
 }) {
-  const toastNotice = useMemo(() => model.notice ? { message: model.notice, variant: "info" as const } : null, [model.notice]);
+  const toastNotice = useMemo(
+    () =>
+      model.notice ? { message: model.notice, variant: "info" as const } : null,
+    [model.notice],
+  );
   const {
-    title,
     activeTab,
     setActiveTab,
     isLandscape,
     summary,
     entries,
-    notice,
     openComposer,
     openEditor,
     loading,
@@ -53,11 +57,7 @@ export function StudentReadingScreenView({
     readingCounts,
     visibleEntries,
     expandedEntryId,
-    bookType,
     setExpandedEntryId,
-    author,
-    reflection,
-    requestFeedback,
     classroomTopFive,
     classroomRankRewards,
     rankResetAt,
@@ -80,23 +80,6 @@ export function StudentReadingScreenView({
     titles,
     claimingTitleKey,
     claimReadingTitle,
-    composerVisible,
-    setComposerVisible,
-    composerScrollRef,
-    setBookType,
-    composerFieldOffsets,
-    composerFieldKeys,
-    titleInputRef,
-    setTitle,
-    focusComposerField,
-    focusNextComposerField,
-    authorInputRef,
-    setAuthor,
-    reflectionInputRef,
-    setReflection,
-    saving,
-    save,
-    editingEntryId,
   } = model;
   return (
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
@@ -124,10 +107,7 @@ export function StudentReadingScreenView({
           칭호
         </ContentTab>
       </ContentTabs>
-      <KeyboardAvoidingView
-        behavior={Platform.select({ ios: "padding", android: "height" })}
-        style={styles.keyboardWrap}
-      >
+      <View style={styles.keyboardWrap}>
         <ScrollView
           contentContainerStyle={[
             styles.content,
@@ -137,7 +117,6 @@ export function StudentReadingScreenView({
             Platform.OS === "ios" ? "interactive" : "on-drag"
           }
           keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets={Platform.OS === "ios"}
         >
           <View style={styles.tabContent}>
             {activeTab === "records" ? (
@@ -164,7 +143,6 @@ export function StudentReadingScreenView({
                     />
                   </View>
                 </View>
-
 
                 <AppButton onPress={openComposer}>독서 기록 작성</AppButton>
 
@@ -421,36 +399,36 @@ export function StudentReadingScreenView({
                       </Text>
                       <ReadingWeeklyMissionPanel
                         reward={
-                        weeklyMissionReward ?? {
-                          weekStart: "",
-                          weekEnd: "",
-                          amount:
-                            missions.reduce(
-                              (sum, mission) => sum + (mission.amount || 0),
-                              0,
-                            ) || 50,
-                          completedCount: missions.filter(
-                            (mission) => mission.completed,
-                          ).length,
-                          totalCount: Math.max(1, missions.length || 3),
-                          achieved:
-                            missions.length > 0 &&
-                            missions.every((mission) => mission.completed),
-                          claimed:
-                            missions.length > 0 &&
-                            missions.every((mission) => mission.claimed),
-                          claimable: missions.some(
-                            (mission) => mission.claimable,
-                          ),
-                          missions,
+                          weeklyMissionReward ?? {
+                            weekStart: "",
+                            weekEnd: "",
+                            amount:
+                              missions.reduce(
+                                (sum, mission) => sum + (mission.amount || 0),
+                                0,
+                              ) || 50,
+                            completedCount: missions.filter(
+                              (mission) => mission.completed,
+                            ).length,
+                            totalCount: Math.max(1, missions.length || 3),
+                            achieved:
+                              missions.length > 0 &&
+                              missions.every((mission) => mission.completed),
+                            claimed:
+                              missions.length > 0 &&
+                              missions.every((mission) => mission.claimed),
+                            claimable: missions.some(
+                              (mission) => mission.claimable,
+                            ),
+                            missions,
+                          }
                         }
-                      }
-                      representativeSlime={representativeSlime}
-                      claiming={claimingMissionReward}
-                      claimError={missionClaimError}
-                      onClaim={(missionKey, unit) =>
-                        void claimWeeklyMissionReward(missionKey, unit)
-                      }
+                        representativeSlime={representativeSlime}
+                        claiming={claimingMissionReward}
+                        claimError={missionClaimError}
+                        onClaim={(missionKey, unit) =>
+                          void claimWeeklyMissionReward(missionKey, unit)
+                        }
                       />
                     </View>
                   )}
@@ -466,141 +444,8 @@ export function StudentReadingScreenView({
             )}
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      </View>
 
-      <AppModal
-        visible={composerVisible}
-        onClose={() => setComposerVisible(false)}
-        keyboardAvoiding
-        closeOnBackdropPress
-        align="center"
-        accessibilityLabel={editingEntryId ? "독서 기록 수정" : "독서 기록 작성"}
-        sheetStyle={styles.composerSheet}
-      >
-        <View style={styles.composerHeader}>
-          <ControlPressable
-            style={styles.composerClose}
-            onPress={() => setComposerVisible(false)}
-            accessibilityRole="button"
-            accessibilityLabel={`${editingEntryId ? "독서 기록 수정" : "독서 기록 작성"} 닫기`}
-          >
-            <X
-              size={iconSizes.md}
-              color={colors.textMuted}
-              strokeWidth={2}
-              accessible={false}
-            />
-          </ControlPressable>
-        </View>
-
-        <ScrollView
-          ref={composerScrollRef}
-          style={styles.composerScroll}
-          contentContainerStyle={styles.composerContent}
-          keyboardDismissMode={
-            Platform.OS === "ios" ? "interactive" : "on-drag"
-          }
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
-          showsVerticalScrollIndicator={false}
-        >
-          <Text style={styles.composerTitle}>
-            {editingEntryId ? "독서 기록 수정" : "독서 기록 작성"}
-          </Text>
-          <SectionNav accessibilityLabel="책 종류">
-            <SectionNavItem
-              selected={bookType === "story"}
-              onPress={() => setBookType("story")}
-              accessibilityLabel="이야기책"
-            >
-              이야기책
-            </SectionNavItem>
-            <SectionNavItem
-              selected={bookType === "comic"}
-              onPress={() => setBookType("comic")}
-              accessibilityLabel="만화책"
-            >
-              만화책
-            </SectionNavItem>
-          </SectionNav>
-
-          <View
-            style={styles.fieldGroup}
-            onLayout={(event) => {
-              composerFieldOffsets.current.title = event.nativeEvent.layout.y;
-            }}
-          >
-            <Text style={styles.fieldLabel}>책 제목</Text>
-            <TextField
-              key={composerFieldKeys.title}
-              ref={titleInputRef}
-              value={title}
-              onChangeText={setTitle}
-              placeholder="책 제목을 입력해 주세요"
-              accessibilityLabel="책 제목"
-              returnKeyType="next"
-              onFocus={() => focusComposerField("title")}
-              onSubmitEditing={() => focusNextComposerField("title")}
-              maxLength={80}
-            />
-          </View>
-
-          <View
-            style={styles.fieldGroup}
-            onLayout={(event) => {
-              composerFieldOffsets.current.author = event.nativeEvent.layout.y;
-            }}
-          >
-            <Text style={styles.fieldLabel}>지은이</Text>
-            <TextField
-              key={composerFieldKeys.author}
-              ref={authorInputRef}
-              value={author}
-              onChangeText={setAuthor}
-              placeholder="지은이를 입력해 주세요"
-              accessibilityLabel="지은이"
-              returnKeyType="next"
-              onFocus={() => focusComposerField("author")}
-              onSubmitEditing={() => focusNextComposerField("author")}
-              maxLength={60}
-            />
-          </View>
-
-          <View
-            style={styles.fieldGroup}
-            onLayout={(event) => {
-              composerFieldOffsets.current.reflection =
-                event.nativeEvent.layout.y;
-            }}
-          >
-            <Text style={styles.fieldLabel}>독서 감상</Text>
-            <TextField
-              key={composerFieldKeys.reflection}
-              ref={reflectionInputRef}
-              style={styles.reflectionInput}
-              value={reflection}
-              onChangeText={setReflection}
-              placeholder="재미있었던 점이나 느낀 점"
-              accessibilityLabel="독서 감상"
-              multiline
-              onFocus={() => focusComposerField("reflection")}
-              maxLength={600}
-            />
-          </View>
-
-          {error ? (
-            <Text style={styles.error} accessibilityRole="alert">
-              {error}
-            </Text>
-          ) : null}
-        </ScrollView>
-
-        <View style={styles.composerFooter}>
-          <AppButton loading={saving} onPress={() => void save()}>
-            {editingEntryId ? "수정하기" : "저장하기"}
-          </AppButton>
-        </View>
-      </AppModal>
       <FeedbackToast notice={toastNotice} />
     </SafeAreaView>
   );

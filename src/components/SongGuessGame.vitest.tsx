@@ -20,7 +20,7 @@ vi.mock("./SongGuessPlayer", () => ({
     </div>
   ),
 }));
-vi.mock("./SongGuessScoreboard", () => ({ SongGuessScoreboard: () => <div>점수판</div> }));
+vi.mock("./SongGuessScoreboard", () => ({ SongGuessScoreboard: () => <div>점수판</div>, SongGuessParticipantPet: () => null }));
 vi.mock("./use-song-guess-sounds", () => ({ useSongGuessSounds: () => ({ unlock: vi.fn(), toggleMuted: vi.fn(), onMusicPlaying: vi.fn(), muted: false }) }));
 
 function snapshot(): SongGuessSnapshot {
@@ -45,6 +45,17 @@ function renderGame(state = snapshot(), overrides = {}) {
 }
 
 describe("SongGuessGame answer modes", () => {
+  it("lets the student room host start and finish without manual round controls", () => {
+    const state = snapshot(); state.roomMode = "student-free"; state.phase = "lobby";
+    state.viewer.canStart = true; state.viewer.canFinish = true; state.viewer.isRoomHost = true;
+    const { onIntent, rerender, props } = renderGame(state);
+    fireEvent.click(screen.getByRole("button", { name: "음악 퀴즈 시작" }));
+    expect(onIntent).toHaveBeenCalledWith({ type: "start" });
+    fireEvent.click(screen.getByRole("button", { name: "게임 끝내기" }));
+    expect(onIntent).toHaveBeenCalledWith({ type: "finish" });
+    rerender(<SongGuessGame {...props} snapshot={{ ...state, phase: "guessing", viewer: { ...state.viewer, role: "host" } }} />);
+    expect(screen.queryByRole("button", { name: "정답 공개" })).not.toBeInTheDocument();
+  });
   it.each(["artist", "artist-title"] as const)("uses the persisted %s target for student prompts", (target) => {
     const state = snapshot();
     state.answerTarget = target;

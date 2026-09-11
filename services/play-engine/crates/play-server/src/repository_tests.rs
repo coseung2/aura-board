@@ -5,6 +5,8 @@ use super::*;
 
 #[path = "repository_song_guess_choices_tests.rs"]
 mod choices;
+#[path = "repository_song_guess_rooms_tests.rs"]
+mod rooms;
 use crate::model::{
     CreateSongGuessSessionRequest, OmokIntent, ParticipantSeed, SongGuessCommandRequest,
     SongGuessIntent,
@@ -56,6 +58,8 @@ async fn setup() -> (MemoryRepository, String) {
 
 fn song_guess_request(id: &str) -> CreateSongGuessSessionRequest {
     CreateSongGuessSessionRequest {
+        room_mode: crate::model::SongGuessRoomMode::TeacherLed,
+        classroom_teacher_subject: None,
         answer_target: crate::model::SongGuessAnswerTarget::Title,
         answer_mode: Default::default(),
         request_id: id.to_owned(),

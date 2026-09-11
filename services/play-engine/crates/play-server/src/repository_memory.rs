@@ -195,36 +195,54 @@ impl PlayRepository for MemoryRepository {
         now_ms: i64,
     ) -> Result<Execution<SongGuessSessionResponse>, RepositoryError> {
         validate_request_id(&request.request_id)?;
-        if actor.role != ActorRole::Host || board_id.is_empty() {
+        if board_id.is_empty() {
             return Err(ModelError::Forbidden.into());
         }
         let payload_hash = request_hash(SONG_GUESS_CREATE_SCOPE, board_id, actor, request)?;
-        let key = receipt_key(SONG_GUESS_CREATE_SCOPE, board_id, &request.request_id);
+        let receipt_scope = if request.room_mode == crate::model::SongGuessRoomMode::StudentFree {
+            format!("{SONG_GUESS_CREATE_SCOPE}:{}", actor.subject)
+        } else {
+            SONG_GUESS_CREATE_SCOPE.to_owned()
+        };
+        let key = receipt_key(&receipt_scope, board_id, &request.request_id);
         let mut state = self.state.lock().await;
         if let Some(receipt) = state.receipts.get(&key) {
             return replay(receipt, &payload_hash);
         }
-        if state.current_by_board.contains_key(board_id) {
+        if request.room_mode == crate::model::SongGuessRoomMode::StudentFree
+            && state.song_guess_sessions.values().any(|r| {
+                r.board_id == board_id
+                    && r.host_subject == actor.subject
+                    && r.state.phase != play_domain::song_guess::SongGuessPhase::Finished
+            })
+        {
             return Err(RepositoryError::SessionAlreadyExists);
         }
-        let record = SongGuessSessionRecord::new(
+        if request.room_mode == crate::model::SongGuessRoomMode::TeacherLed {
+            if let Some(id) = state.current_by_board.get(board_id) {
+                if !state.song_guess_sessions.get(id).is_some_and(|r| {
+                    r.state.phase == play_domain::song_guess::SongGuessPhase::Finished
+                }) {
+                    return Err(RepositoryError::SessionAlreadyExists);
+                }
+            }
+        }
+        let record = SongGuessSessionRecord::from_request(
             Uuid::new_v4().to_string(),
             board_id.to_owned(),
-            actor.subject.clone(),
-            request.participants.clone(),
-            request.rounds.clone(),
-            None,
+            actor,
+            request,
             now_ms,
-        )?
-        .with_answer_mode(request.answer_mode)?
-        .with_answer_target(request.answer_target);
+        )?;
         let response = SongGuessSessionResponse {
             request_id: request.request_id.clone(),
             snapshot: record.snapshot(actor, now_ms)?,
         };
-        state
-            .current_by_board
-            .insert(board_id.to_owned(), record.session_id.clone());
+        if record.room_mode == crate::model::SongGuessRoomMode::TeacherLed {
+            state
+                .current_by_board
+                .insert(board_id.to_owned(), record.session_id.clone());
+        }
         state
             .song_guess_sessions
             .insert(record.session_id.clone(), record.clone());
@@ -234,6 +252,48 @@ impl PlayRepository for MemoryRepository {
             value: response,
             replayed: false,
         })
+    }
+
+    async fn list_song_guess_sessions(
+        &self,
+        board_id: &str,
+    ) -> Result<Vec<SongGuessSessionRecord>, RepositoryError> {
+        let state = self.state.lock().await;
+        let mut records: Vec<_> = state
+            .song_guess_sessions
+            .values()
+            .filter(|r| r.board_id == board_id)
+            .cloned()
+            .collect();
+        records.sort_by(|a, b| {
+            b.created_at_ms
+                .cmp(&a.created_at_ms)
+                .then_with(|| a.session_id.cmp(&b.session_id))
+        });
+        records.truncate(100);
+        Ok(records)
+    }
+
+    async fn advance_song_guess_session(
+        &self,
+        actor: &ActorContext,
+        session_id: &str,
+        now_ms: i64,
+    ) -> Result<SongGuessSessionRecord, RepositoryError> {
+        let mut state = self.state.lock().await;
+        let mut record = state
+            .song_guess_sessions
+            .get(session_id)
+            .cloned()
+            .ok_or(RepositoryError::NotFound)?;
+        record.authorize(actor)?;
+        if record.advance_due(now_ms)? {
+            state
+                .song_guess_sessions
+                .insert(session_id.to_owned(), record.clone());
+            insert_song_guess_outbox(&mut state, &record, "session_changed");
+        }
+        Ok(record)
     }
 
     async fn current_song_guess_session(
@@ -269,6 +329,8 @@ impl PlayRepository for MemoryRepository {
         now_ms: i64,
     ) -> Result<Execution<SongGuessCommandResponse>, RepositoryError> {
         validate_request_id(&request.request_id)?;
+        self.advance_song_guess_session(actor, session_id, now_ms)
+            .await?;
         if request.command_schema_version != crate::model::COMMAND_SCHEMA_VERSION {
             return Err(RepositoryError::UnsupportedSchema);
         }

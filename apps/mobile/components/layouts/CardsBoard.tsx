@@ -1,11 +1,14 @@
+import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import {
-  FlatList,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
+import { withBoardAnonymousAuthors } from "../../lib/card-privacy";
+import { isWideViewport } from "../../lib/responsive";
+import type { BoardCard, BoardDetailResponse } from "../../lib/types";
+import {
+  BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+  useBoardRealtime,
+} from "../../lib/use-board-realtime";
 import {
   colors,
   controls,
@@ -15,25 +18,13 @@ import {
   spacing,
   typography,
 } from "../../theme/tokens";
-import { CardComposer } from "../CardComposer";
 import { CardAuthorBottomSheet } from "../CardAuthorBottomSheet";
-import { CardEditModal } from "../CardEditModal";
 import { CommentBottomSheet } from "../CommentBottomSheet";
 import {
-  PostModerationOverlay,
   type PostAnchor,
+  PostModerationOverlay,
 } from "../PostModerationOverlay";
-import type { BoardDetailResponse, BoardCard } from "../../lib/types";
-import {
-  withBoardAnonymousAuthor,
-  withBoardAnonymousAuthors,
-} from "../../lib/card-privacy";
 import { Fab } from "../ui";
-import {
-  BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
-  useBoardRealtime,
-} from "../../lib/use-board-realtime";
-import { isWideViewport } from "../../lib/responsive";
 import { StreamFeedPost } from "./ColumnsBoard";
 import {
   nextCardOrder,
@@ -52,9 +43,9 @@ export function CardsBoard({
   onMutate: () => void;
   realtimeManaged?: boolean;
 }) {
+  const router = useRouter();
   const { width } = useSafeWindowDimensions();
   const useReadableLayout = isWideViewport(width);
-  const [composerOpen, setComposerOpen] = useState(false);
   const [commentCard, setCommentCard] = useState<BoardCard | null>(null);
   const [authorCard, setAuthorCard] = useState<BoardCard | null>(null);
   const [moderationTarget, setModerationTarget] = useState<{
@@ -62,7 +53,6 @@ export function CardsBoard({
     anchor: PostAnchor;
     owner: boolean;
   } | null>(null);
-  const [editingCard, setEditingCard] = useState<BoardCard | null>(null);
   // 서버 정렬이 order asc 로 바뀌었지만 클라이언트에서 한번 더 안정화한다.
   const [cards, setCards] = useState<BoardCard[]>(() =>
     withBoardAnonymousAuthors(sortCards(data.cards), data.board),
@@ -70,22 +60,21 @@ export function CardsBoard({
   useEffect(() => {
     setCards(withBoardAnonymousAuthors(sortCards(data.cards), data.board));
     const ids = new Set(data.cards.map((card) => card.id));
-    setCommentCard((card) => card && !ids.has(card.id) ? null : card);
-    setAuthorCard((card) => card && !ids.has(card.id) ? null : card);
-    setEditingCard((card) => card && !ids.has(card.id) ? null : card);
-    setModerationTarget((target) => target && !ids.has(target.card.id) ? null : target);
-  }, [data.cards, data.board]);
-
-  function handleCreated(card: BoardCard) {
-    setCards((prev) =>
-      sortCards([...prev, withBoardAnonymousAuthor(card, data.board)]),
+    setCommentCard((card) => (card && !ids.has(card.id) ? null : card));
+    setAuthorCard((card) => (card && !ids.has(card.id) ? null : card));
+    setModerationTarget((target) =>
+      target && !ids.has(target.card.id) ? null : target,
     );
-    onMutate();
-  }
+  }, [data.cards, data.board]);
 
   // realtime: broadcast 가 도착하면 부모에서 board 데이터를 다시 받게 한다.
   // 서버 broadcast channel key 가 board.id 기준이므로 id 로 구독한다.
-  useBoardRealtime({ slug: data.board.id, onReload: onMutate, enabled: !realtimeManaged, fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS });
+  useBoardRealtime({
+    slug: data.board.id,
+    onReload: onMutate,
+    enabled: !realtimeManaged,
+    fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+  });
 
   const emptyState = (
     <View style={styles.empty}>
@@ -136,18 +125,19 @@ export function CardsBoard({
 
       <Fab
         style={styles.fab}
-        onPress={() => setComposerOpen(true)}
+        onPress={() =>
+          router.push({
+            pathname: "/(student)/board/[slug]/compose",
+            params: {
+              slug: data.board.slug || data.board.id,
+              order: String(nextCardOrder(cards)),
+            },
+          })
+        }
         accessibilityLabel="카드 추가"
       >
         <Text style={styles.fabPlus}>＋</Text>
       </Fab>
-      <CardComposer
-        visible={composerOpen}
-        boardId={data.board.id}
-        order={nextCardOrder(cards)}
-        onClose={() => setComposerOpen(false)}
-        onCreated={handleCreated}
-      />
       <CommentBottomSheet
         cardId={commentCard?.id ?? null}
         boardId={data.board.id}
@@ -158,36 +148,6 @@ export function CardsBoard({
           setCards((current) =>
             updateCardCommentCount(current, commentCard.id, change),
           );
-        }}
-      />
-      <CardEditModal
-        card={editingCard}
-        visible={editingCard !== null}
-        onClose={() => setEditingCard(null)}
-        onSaved={(updated) => {
-          setCards((current) =>
-            current.map((card) =>
-              card.id === updated.id
-                ? withBoardAnonymousAuthor(
-                    {
-                      ...card,
-                      ...updated,
-                      isMine: card.isMine,
-                      canEdit: card.canEdit,
-                      canDelete: card.canDelete,
-                    },
-                    data.board,
-                  )
-                : card,
-            ),
-          );
-          setCommentCard((current) =>
-            current?.id === updated.id ? updated : current,
-          );
-          setAuthorCard((current) =>
-            current?.id === updated.id ? updated : current,
-          );
-          onMutate();
         }}
       />
       <CardAuthorBottomSheet
@@ -228,7 +188,14 @@ export function CardsBoard({
           onClose={() => setModerationTarget(null)}
           onEdit={
             moderationTarget.owner && moderationTarget.card.canEdit === true
-              ? () => setEditingCard(moderationTarget.card)
+              ? () =>
+                  router.push({
+                    pathname: "/(student)/board/[slug]/compose",
+                    params: {
+                      slug: data.board.slug || data.board.id,
+                      cardId: moderationTarget.card.id,
+                    },
+                  })
               : undefined
           }
           onHidden={(cardId) => {

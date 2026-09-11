@@ -34,6 +34,7 @@ import { enrichSongGuessSnapshot } from "./participant-identity";
 import { buildSongGuessChoices } from "./choices";
 import type { SongGuessAnswerMode, SongGuessAnswerTarget } from "./contracts";
 import { resolveSongGuessArtist, transformSongGuessAnswer } from "./answer-target";
+import { loadCatalogSessionClip } from "./student-room-audio";
 
 export type {
   SongGuessTeacherClip,
@@ -63,7 +64,7 @@ export async function saveSongGuessSetup(
   const requestedAssetIds = normalized.rounds.flatMap((round) => round.clipAssetIds);
   const saved = await db.$transaction(async (tx) => {
     const currentSession = await tx.playSession.findFirst({
-      where: { boardId, current: true, gameKind: "song-guess" },
+      where: { boardId, current: true, gameKind: "song-guess", NOT: { state: { path: ["state", "phase"], equals: "finished" } } },
       select: { id: true },
     });
     if (currentSession) throw new PlayAccessError(409, "song_guess_setup_locked");
@@ -171,7 +172,7 @@ export async function deleteSongGuessSetup(boardId: string): Promise<boolean> {
   if (!actor.userId) throw new PlayAccessError(403, "forbidden");
   const deleted = await db.$transaction(async (tx) => {
     const currentSession = await tx.playSession.findFirst({
-      where: { boardId, current: true, gameKind: "song-guess" },
+      where: { boardId, current: true, gameKind: "song-guess", NOT: { state: { path: ["state", "phase"], equals: "finished" } } },
       select: { id: true },
     });
     if (currentSession) throw new PlayAccessError(409, "song_guess_setup_locked");
@@ -405,7 +406,7 @@ export async function loadSongGuessClipResponse(
     where: { id: assetId },
     include: { round: { select: { id: true, gameId: true } } },
   });
-  if (!asset?.round) throw new PlayAccessError(404, "song_guess_clip_not_found");
+  if (!asset?.round) return loadCatalogSessionClip(sessionId, assetId);
   if (asset.mimeType === "video/youtube") {
     throw new PlayAccessError(409, "song_guess_audio_clip_missing");
   }

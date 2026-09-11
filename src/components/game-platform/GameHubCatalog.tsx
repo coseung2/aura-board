@@ -129,14 +129,15 @@ export function GameHubCatalog({
       );
       const body = (await response.json().catch(() => null)) as EntryResponse | null;
       if (!response.ok || !body?.href || body.gameKind !== gameKind) {
+        if ((body as { error?: string } | null)?.error === "teacher_room_not_open") throw new Error("teacher_room_not_open");
         throw new Error("game_hub_entry_failed");
       }
       setClassroomPickerKind(null);
       router.push(body.href);
-    } catch {
+    } catch (error) {
       setErrors((current) => ({
         ...current,
-        [gameKind]: teacherMode
+        [gameKind]: error instanceof Error && error.message === "teacher_room_not_open" ? "선생님이 방을 열면 참여할 수 있어요." : teacherMode
           ? "게임방을 열지 못했어요."
           : "입장에 실패했어요.",
       }));

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 vi.mock("react", async (importOriginal) => ({
-  ...await importOriginal<typeof import("react")>(),
+  ...(await importOriginal<typeof import("react")>()),
   useState: () => [null, vi.fn()],
 }));
 vi.mock("react-native", () => ({
@@ -15,7 +15,10 @@ vi.mock("react-native", () => ({
   Pressable: "Pressable",
   ScrollView: "ScrollView",
   useWindowDimensions: () => ({ width: 1280, height: 800 }),
-  StyleSheet: { create: (value: unknown) => value, flatten: (value: unknown) => value },
+  StyleSheet: {
+    create: (value: unknown) => value,
+    flatten: (value: unknown) => value,
+  },
   Text: "Text",
   TextInput: "TextInput",
   View: "View",
@@ -36,6 +39,7 @@ type ElementLike = {
   props: {
     children?: ElementLike | ElementLike[] | string | null;
     onStartShouldSetResponder?: () => boolean;
+    enabled?: boolean;
   };
 };
 
@@ -47,8 +51,24 @@ function sheetElement(modal: ElementLike): ElementLike {
 }
 
 describe("AppModal touch routing", () => {
+  it("does not add Android height avoidance on top of native resize", () => {
+    const modal = AppModal({
+      visible: true,
+      onClose: vi.fn(),
+      keyboardAvoiding: true,
+      children: null,
+    }) as unknown as ElementLike;
+    const backdrop = modal.props.children as ElementLike;
+    expect((backdrop.props.children as ElementLike).props.enabled).toBe(false);
+  });
   it("keeps the action footer outside the scrolling dialog body", () => {
-    const modal = AppModal({ visible: true, onClose: vi.fn(), children: "long body", scrollable: true, footer: "submit" }) as unknown as ElementLike;
+    const modal = AppModal({
+      visible: true,
+      onClose: vi.fn(),
+      children: "long body",
+      scrollable: true,
+      footer: "submit",
+    }) as unknown as ElementLike;
     const surface = sheetElement(modal).props.children as ElementLike;
     const fragment = surface.props.children as ElementLike;
     const [body, footer] = fragment.props.children as ElementLike[];
@@ -59,7 +79,13 @@ describe("AppModal touch routing", () => {
   });
 
   it("unmounts hidden native inputs and actions without owning the caller draft", () => {
-    const modal = AppModal({ visible: false, onClose: vi.fn(), children: "draft", scrollable: true, footer: "submit" }) as unknown as ElementLike;
+    const modal = AppModal({
+      visible: false,
+      onClose: vi.fn(),
+      children: "draft",
+      scrollable: true,
+      footer: "submit",
+    }) as unknown as ElementLike;
     const surface = sheetElement(modal).props.children as ElementLike;
     expect(surface.props.children).toBeNull();
   });

@@ -98,6 +98,26 @@ export async function fetchCurrentSongGuessSession(
   }
 }
 
+export type SongGuessRoomCategory = { id: string; label: string; counts: { intro: number; highlight: number } };
+export async function fetchSongGuessRooms(boardId: string): Promise<SongGuessSnapshot[]> {
+  const value = await apiFetch<{ sessions: unknown[] }>(`/api/song-guess/boards/${encodeURIComponent(boardId)}/rooms`);
+  if (!Array.isArray(value.sessions) || !value.sessions.every(isSongGuessSnapshot)) throw new Error("invalid_song_guess_rooms");
+  return value.sessions;
+}
+export async function fetchSongGuessRoomCatalog(boardId: string): Promise<SongGuessRoomCategory[]> {
+  return (await apiFetch<{ categories: SongGuessRoomCategory[] }>(`/api/song-guess/boards/${encodeURIComponent(boardId)}/rooms?catalog=1`)).categories;
+}
+export async function fetchSongGuessSnapshot(sessionId: string): Promise<SongGuessSnapshot> {
+  const value = await apiFetch<unknown>(`/api/song-guess/sessions/${encodeURIComponent(sessionId)}`, { timeoutMs: 10_000 });
+  if (!isSongGuessSnapshot(value)) throw new Error("invalid_song_guess_snapshot");
+  return value;
+}
+export async function createSongGuessRoom(boardId: string, input: { requestId: string; categories: string[]; segment: "intro" | "highlight"; count: number }): Promise<SongGuessSnapshot> {
+  const value = await apiFetch<{ requestId: string; snapshot: unknown }>(`/api/song-guess/boards/${encodeURIComponent(boardId)}/rooms`, { method: "POST", json: input, timeoutMs: 10_000 });
+  if (value.requestId !== input.requestId || !isSongGuessSnapshot(value.snapshot)) throw new Error("invalid_song_guess_session_response");
+  return value.snapshot;
+}
+
 export async function submitSongGuessCommand(
   sessionId: string,
   request: SongGuessCommandRequest,

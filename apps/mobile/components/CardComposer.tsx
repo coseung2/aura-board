@@ -1,3 +1,5 @@
+import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import {
   Alert,
@@ -7,8 +9,10 @@ import {
   Text,
   View,
 } from "react-native";
-import * as DocumentPicker from "expo-document-picker";
-import * as ImagePicker from "expo-image-picker";
+import { useInputPageExit } from "../hooks/use-input-page-exit";
+import { apiFetch } from "../lib/api";
+import type { BoardCard } from "../lib/types";
+import { uploadMobileFile } from "../lib/upload";
 import {
   borders,
   colors,
@@ -17,20 +21,18 @@ import {
   spacing,
   typography,
 } from "../theme/tokens";
-import { apiFetch } from "../lib/api";
-import { uploadMobileFile } from "../lib/upload";
-import type { BoardCard } from "../lib/types";
-import { AppButton, AppModal, IconButton, TextField } from "./ui";
+import { useInputFeedback } from "./input-feedback-provider";
+import { InputPage } from "./input-page";
+import { AppButton, TextField } from "./ui";
 
 // 카드 작성 모달. 제목 + 본문 + 이미지/파일 첨부.
 // POST /api/cards 는 이미 학생 bearer 를 받으니 그대로 사용.
 
 type Props = {
-  visible: boolean;
+  initialCard?: BoardCard;
   boardId: string;
   sectionId?: string | null;
   order?: number;
-  onClose: () => void;
   onCreated: (card: BoardCard) => void;
 };
 
@@ -42,19 +44,30 @@ type UploadResult = {
 };
 
 export function CardComposer({
-  visible,
+  initialCard,
   boardId,
   sectionId,
   order,
-  onClose,
   onCreated,
 }: Props) {
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [linkUrl, setLinkUrl] = useState("");
+  const notify = useInputFeedback();
+  const [title, setTitle] = useState(initialCard?.title ?? "");
+  const [content, setContent] = useState(initialCard?.content ?? "");
+  const [linkUrl, setLinkUrl] = useState(initialCard?.linkUrl ?? "");
   const [image, setImage] = useState<UploadResult | null>(null);
   const [file, setFile] = useState<UploadResult | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const exit = useInputPageExit(
+    Boolean(
+      title !== (initialCard?.title ?? "") ||
+      content !== (initialCard?.content ?? "") ||
+      linkUrl !== (initialCard?.linkUrl ?? "") ||
+      image ||
+      file,
+    ),
+    submitting,
+  );
 
   function reset() {
     setTitle("");
@@ -64,7 +77,11 @@ export function CardComposer({
     setFile(null);
   }
 
-  async function uploadAsset(uri: string, name: string, mime: string): Promise<UploadResult> {
+  async function uploadAsset(
+    uri: string,
+    name: string,
+    mime: string,
+  ): Promise<UploadResult> {
     const body = await uploadMobileFile({ uri, name, mimeType: mime });
     return {
       url: body.url,
@@ -123,8 +140,21 @@ export function CardComposer({
   }
 
   async function handleSubmit() {
+    if (submitting) return;
     const normalizedLink = linkUrl.trim();
-    if (!title.trim() && !content.trim() && !normalizedLink && !image && !file) {
+    if (
+      !title.trim() &&
+      !content.trim() &&
+      !normalizedLink &&
+      !image &&
+      !file &&
+      !(
+        initialCard?.attachments?.length ||
+        initialCard?.imageUrl ||
+        initialCard?.fileUrl ||
+        initialCard?.videoUrl
+      )
+    ) {
       Alert.alert("비어있어요", "제목·본문·링크·첨부 중 하나는 있어야 해요.");
       return;
     }
@@ -173,13 +203,25 @@ export function CardComposer({
         payload.fileSize = file.fileSize;
         payload.fileMimeType = file.mimeType;
       }
-      const res = await apiFetch<{ card: BoardCard }>("/api/cards", {
-        method: "POST",
-        json: payload,
-      });
+      const res = await apiFetch<{ card: BoardCard }>(
+        initialCard
+          ? `/api/cards/${encodeURIComponent(initialCard.id)}`
+          : "/api/cards",
+        {
+          method: initialCard ? "PATCH" : "POST",
+          json: initialCard
+            ? {
+                title: title.trim(),
+                content: content.trim(),
+                linkUrl: normalizedLink || null,
+              }
+            : payload,
+        },
+      );
       onCreated(res.card);
+      notify(initialCard ? "게시물을 수정했어요." : "게시물을 등록했어요.");
       reset();
-      onClose();
+      exit.finish();
     } catch (e) {
       Alert.alert("오류", e instanceof Error ? e.message : String(e));
     } finally {
@@ -188,31 +230,15 @@ export function CardComposer({
   }
 
   return (
-    <AppModal
-      visible={visible}
-      onClose={onClose}
-      keyboardAvoiding
-      sheetStyle={styles.sheet}
+    <InputPage
+      title={initialCard ? "게시글 수정" : "새 카드"}
+      onBack={exit.back}
     >
-      <View style={styles.sheetHead}>
-        <Text style={styles.sheetTitle}>새 카드</Text>
-        <IconButton
-          onPress={() => {
-            reset();
-            onClose();
-          }}
-          style={styles.closeBtn}
-        >
-          <Text style={styles.closeText}>✕</Text>
-        </IconButton>
-      </View>
-
       <ScrollView
         style={styles.formScroll}
         contentContainerStyle={styles.formBody}
         keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "none"}
         keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
       >
         <TextField
           style={styles.titleInput}
@@ -240,60 +266,73 @@ export function CardComposer({
           editable={!submitting}
         />
 
-        <View style={styles.sectionGroup}>
-          <Text style={styles.sectionLabel}>첨부</Text>
-          <View style={styles.attachRow}>
-            <AppButton
-              variant="secondary"
-              style={[styles.attachBtn, image && styles.attachBtnSelected]}
-              textStyle={[styles.attachText, image && styles.attachTextSelected]}
-              onPress={handlePickImage}
-              disabled={submitting}
-            >
-              이미지{image ? " 선택됨" : ""}
-            </AppButton>
-            <AppButton
-              variant="secondary"
-              style={[styles.attachBtn, file && styles.attachBtnSelected]}
-              textStyle={[styles.attachText, file && styles.attachTextSelected]}
-              onPress={handlePickFile}
-              disabled={submitting}
-            >
-              파일{file ? " 선택됨" : ""}
-            </AppButton>
-          </View>
-
-          {image || file ? (
-            <View style={styles.attachmentList}>
-              {image ? (
-                <AttachmentRow
-                  label="이미지"
-                  name={image.fileName}
-                  onRemove={() => setImage(null)}
-                  disabled={submitting}
-                />
-              ) : null}
-              {file ? (
-                <AttachmentRow
-                  label="파일"
-                  name={file.fileName}
-                  onRemove={() => setFile(null)}
-                  disabled={submitting}
-                />
-              ) : null}
+        {initialCard ? (
+          initialCard.attachments?.length ? (
+            <Text style={styles.sectionLabel}>
+              기존 첨부파일은 유지돼요. 첨부 변경은 웹에서 할 수 있어요.
+            </Text>
+          ) : null
+        ) : (
+          <View style={styles.sectionGroup}>
+            <Text style={styles.sectionLabel}>첨부</Text>
+            <View style={styles.attachRow}>
+              <AppButton
+                variant="secondary"
+                style={[styles.attachBtn, image && styles.attachBtnSelected]}
+                textStyle={[
+                  styles.attachText,
+                  image && styles.attachTextSelected,
+                ]}
+                onPress={handlePickImage}
+                disabled={submitting}
+              >
+                이미지{image ? " 선택됨" : ""}
+              </AppButton>
+              <AppButton
+                variant="secondary"
+                style={[styles.attachBtn, file && styles.attachBtnSelected]}
+                textStyle={[
+                  styles.attachText,
+                  file && styles.attachTextSelected,
+                ]}
+                onPress={handlePickFile}
+                disabled={submitting}
+              >
+                파일{file ? " 선택됨" : ""}
+              </AppButton>
             </View>
-          ) : null}
-        </View>
-      </ScrollView>
 
-      <AppButton
-        style={styles.submitBtn}
-        onPress={handleSubmit}
-        loading={submitting}
-      >
-        등록하기
-      </AppButton>
-    </AppModal>
+            {image || file ? (
+              <View style={styles.attachmentList}>
+                {image ? (
+                  <AttachmentRow
+                    label="이미지"
+                    name={image.fileName}
+                    onRemove={() => setImage(null)}
+                    disabled={submitting}
+                  />
+                ) : null}
+                {file ? (
+                  <AttachmentRow
+                    label="파일"
+                    name={file.fileName}
+                    onRemove={() => setFile(null)}
+                    disabled={submitting}
+                  />
+                ) : null}
+              </View>
+            ) : null}
+          </View>
+        )}
+        <AppButton
+          style={styles.submitBtn}
+          onPress={handleSubmit}
+          loading={submitting}
+        >
+          {initialCard ? "저장하기" : "등록하기"}
+        </AppButton>
+      </ScrollView>
+    </InputPage>
   );
 }
 
@@ -329,27 +368,8 @@ function AttachmentRow({
 }
 
 const styles = StyleSheet.create({
-  sheet: {
-    maxHeight: "100%",
-  },
-  sheetHead: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.xl,
-    paddingBottom: spacing.md,
-    borderBottomWidth: borders.hairline,
-    borderBottomColor: colors.border,
-  },
-  sheetTitle: { ...typography.title, color: colors.text },
-  closeBtn: {
-    backgroundColor: colors.surfaceAlt,
-  },
-  closeText: { ...typography.subtitle, color: colors.textMuted },
   formScroll: {
-    flexShrink: 1,
-    maxHeight: composer.formMaxHeight,
+    flex: 1,
   },
   formBody: {
     padding: spacing.xl,

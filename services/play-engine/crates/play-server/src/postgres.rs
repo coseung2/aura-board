@@ -183,7 +183,7 @@ async fn insert_song_guess_session(
            ("id", "boardId", "hostSubject", "gameKind", "version", "rulesVersion",
             "stateSchemaVersion", "previousSessionId", "current", "createdAtMs",
             "state", "createdAt", "updatedAt")
-           VALUES ($1, $2, $3, 'song-guess', $4, $5, $6, $7, TRUE, $8, $9, NOW(), NOW())"#,
+           VALUES ($1, $2, $3, 'song-guess', $4, $5, $6, $7, $10, $8, $9, NOW(), NOW())"#,
     )
     .bind(&record.session_id)
     .bind(&record.board_id)
@@ -194,6 +194,7 @@ async fn insert_song_guess_session(
     .bind(&record.previous_session_id)
     .bind(record.created_at_ms)
     .bind(Json(record))
+    .bind(record.room_mode == crate::model::SongGuessRoomMode::TeacherLed)
     .execute(&mut **tx)
     .await
     .map_err(storage)?;

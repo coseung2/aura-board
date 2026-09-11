@@ -34,7 +34,6 @@ import {
   EmptyState,
   Pill,
   SectionHeader,
-  SurfaceCard,
   SurfacePressable,
 } from "../../components/ui";
 
@@ -370,7 +369,7 @@ function RosterPanel({
   if (!task) return null;
 
   return (
-    <SurfaceCard style={styles.rosterCard}>
+    <>
       <View style={styles.rosterHeader}>
         <View style={styles.rosterTitleBlock}>
           <Text style={styles.rosterTitle} numberOfLines={2}>
@@ -474,7 +473,7 @@ function RosterPanel({
           </View>
         </>
       )}
-    </SurfaceCard>
+    </>
   );
 }
 
@@ -575,10 +574,6 @@ const styles = StyleSheet.create({
   taskMeta: {
     ...typography.badge,
     color: colors.textMuted,
-  },
-  rosterCard: {
-    padding: spacing.lg,
-    gap: spacing.lg,
   },
   rosterHeader: {
     gap: spacing.md,

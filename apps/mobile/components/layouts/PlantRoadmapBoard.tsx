@@ -1,6 +1,24 @@
+import { useRouter } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Alert, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import {
+  Alert,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  advanceStage,
+  deleteObservation as apiDeleteObservation,
+  fetchStudentPlant,
+  updateNickname,
+} from "../../lib/plant-api";
+import type {
+  BoardDetailResponse,
+  ObservationDTO,
+  StudentPlantDTO,
+} from "../../lib/types";
 import {
   colors,
   iconSizes,
@@ -10,30 +28,15 @@ import {
 } from "../../theme/tokens";
 import { ImageLightbox } from "../plant/ImageLightbox";
 import { NoPhotoReasonModal } from "../plant/NoPhotoReasonModal";
-import { ObservationEditor } from "../plant/ObservationEditor";
-import { PlantHero } from "../plant/PlantHero";
-import { PlantRoadmapTimeline } from "../plant/PlantRoadmapTimeline";
-import { RoadmapStagePicker } from "../plant/RoadmapStagePicker";
-import type {
-  BoardDetailResponse,
-  ObservationDTO,
-  StudentPlantDTO,
-} from "../../lib/types";
-import {
-  advanceStage,
-  createObservation,
-  deleteObservation as apiDeleteObservation,
-  fetchStudentPlant,
-  updateNickname,
-  updateObservation as apiUpdateObservation,
-  uploadImage,
-} from "../../lib/plant-api";
 import {
   calculateProgressPercent,
   computeDaysSinceLastObs,
   groupObservationsByStage,
   normalizePlant,
 } from "../plant/plant-roadmap-utils";
+import { PlantHero } from "../plant/PlantHero";
+import { PlantRoadmapTimeline } from "../plant/PlantRoadmapTimeline";
+import { RoadmapStagePicker } from "../plant/RoadmapStagePicker";
 
 /**
  * Mobile plant journal board. Data normalisation and the timeline/picker
@@ -47,6 +50,7 @@ export function PlantRoadmapBoard({
   data: BoardDetailResponse;
   onMutate: () => void;
 }) {
+  const router = useRouter();
   const primaryRaw = data.layoutData.plantRoadmap?.plants?.[0];
   const normalizedPrimary = useMemo(
     () => normalizePlant(primaryRaw),
@@ -61,10 +65,6 @@ export function PlantRoadmapBoard({
 
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const [busyAdvance, setBusyAdvance] = useState(false);
-  const [editorVisible, setEditorVisible] = useState(false);
-  const [editorStageId, setEditorStageId] = useState<string | null>(null);
-  const [editingObservation, setEditingObservation] =
-    useState<ObservationDTO | null>(null);
   const [reasonModalVisible, setReasonModalVisible] = useState(false);
   const [reasonBusy, setReasonBusy] = useState(false);
 
@@ -112,19 +112,19 @@ export function PlantRoadmapBoard({
     }
   }, [plant]);
 
-  const closeEditor = useCallback(() => {
-    setEditorVisible(false);
-    setEditingObservation(null);
-    setEditorStageId(null);
-  }, []);
-
   const handleOpenEditor = useCallback(
     (stageId: string, observation?: ObservationDTO) => {
-      setEditorStageId(stageId);
-      setEditingObservation(observation ?? null);
-      setEditorVisible(true);
+      if (!plant) return;
+      router.push({
+        pathname: "/(student)/plant/[id]/compose",
+        params: {
+          id: plant.id,
+          stageId,
+          ...(observation ? { observationId: observation.id } : {}),
+        },
+      });
     },
-    [],
+    [plant, router],
   );
 
   const handleNicknameSave = useCallback(
@@ -136,42 +136,6 @@ export function PlantRoadmapBoard({
     },
     [onMutate, plant],
   );
-
-  const handleEditorSubmit = useCallback(
-    async (payload: { memo: string; images: Array<{ url: string }> }) => {
-      if (!plant || !editorStageId) return;
-      if (editingObservation) {
-        await apiUpdateObservation(plant.id, editingObservation.id, payload);
-      } else {
-        await createObservation(plant.id, {
-          stageId: editorStageId,
-          ...payload,
-        });
-      }
-      closeEditor();
-      await refreshPlant();
-      onMutate();
-    },
-    [closeEditor, editingObservation, editorStageId, onMutate, plant, refreshPlant],
-  );
-
-  const handlePickImage = useCallback(async (): Promise<string | null> => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert(
-        "사진 권한 필요",
-        "관찰 사진을 올리려면 사진 접근 권한이 필요해요.",
-      );
-      return null;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.82,
-      allowsMultipleSelection: false,
-    });
-    if (result.canceled || !result.assets[0]?.uri) return null;
-    return uploadImage(result.assets[0].uri);
-  }, []);
 
   const handleDeleteObservation = useCallback(
     (observation: ObservationDTO) => {
@@ -265,12 +229,6 @@ export function PlantRoadmapBoard({
     );
   }
 
-  const editorTitle = editingObservation
-    ? "관찰 기록 수정"
-    : editorStageId
-      ? `${stages.find((stage) => stage.id === editorStageId)?.order ?? ""}단계 · 관찰 기록 추가`
-      : "관찰 기록 추가";
-
   return (
     <View style={styles.root}>
       <ScrollView
@@ -305,14 +263,6 @@ export function PlantRoadmapBoard({
       </ScrollView>
 
       <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
-      <ObservationEditor
-        visible={editorVisible}
-        title={editorTitle}
-        initial={editingObservation}
-        onCancel={closeEditor}
-        onSubmit={handleEditorSubmit}
-        onPickImage={handlePickImage}
-      />
       <NoPhotoReasonModal
         visible={reasonModalVisible}
         onCancel={() => {

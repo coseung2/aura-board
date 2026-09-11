@@ -1,38 +1,33 @@
+import { useRouter } from "expo-router";
 import {
+  type ElementRef,
   useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type ElementRef,
 } from "react";
-import { ScrollView, useWindowDimensions } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { apiFetch, ApiError } from "../../lib/api";
-import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
-import { spacing } from "../../theme/tokens";
+import { useWindowDimensions } from "react-native";
+import { readingFeedbackNotice } from "../../lib/reading-feedback-notice";
 import { TextField } from "../../components/ui";
+import { ApiError, apiFetch } from "../../lib/api";
+import {
+  EMPTY_READING_COMPOSER_DRAFT,
+  type ReadingComposerBookType,
+} from "../../lib/reading-composer-draft";
+import { clearSessionToken, getUnifiedLoginRoute } from "../../lib/session";
 import { claimStudentAttendanceReward } from "../../lib/student-attendance";
 import { claimTitle, type TitleProgress } from "../../lib/titles";
 import {
-  fetchWalkingSnapshot,
   type ClassroomRankReward,
+  fetchWalkingSnapshot,
   type WalkingMonthlyAttendanceReward,
   type WalkingRepresentativeSlime,
 } from "../../lib/walking-health";
 import { studentRewardNumberFormatter as numberFormatter } from "./student-reward-format";
-import { readingFeedbackNotice } from "../../../../src/lib/reading-feedback-notice";
-import {
-  EMPTY_READING_COMPOSER_DRAFT,
-  nextReadingComposerInstanceId,
-  presentReadingComposerDraft,
-  type ReadingComposerBookType,
-  type ReadingComposerField,
-} from "../../lib/reading-composer-draft";
 
 type BookType = ReadingComposerBookType;
 type ReadingTab = "records" | "missions" | "titles";
-type ComposerField = ReadingComposerField;
 type ReadingRank = {
   studentId: string;
   studentNumber: number | null;
@@ -121,31 +116,17 @@ const RETRYABLE_FEEDBACK_STATUSES = new Set([408, 409, 429]);
 
 export function useStudentReadingScreenModel() {
   const router = useRouter();
-  const params = useLocalSearchParams<{ view?: string | string[] }>();
-  const requestedView = Array.isArray(params.view)
-    ? params.view[0]
-    : params.view;
   const { width, height } = useWindowDimensions();
   const isLandscape = width > height;
   const [bookType, setBookType] = useState<BookType>("story");
-  const [activeTab, setActiveTab] = useState<ReadingTab>(
-    requestedView === "missions" ? "missions" : "records",
-  );
-  const [composerVisible, setComposerVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<ReadingTab>("records");
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null);
-  const [composerInstanceId, setComposerInstanceId] = useState(0);
   const [title, setTitle] = useState(EMPTY_READING_COMPOSER_DRAFT.title);
   const [author, setAuthor] = useState(EMPTY_READING_COMPOSER_DRAFT.author);
   const [reflection, setReflection] = useState(
     EMPTY_READING_COMPOSER_DRAFT.reflection,
   );
-  const composerScrollRef = useRef<ScrollView>(null);
-  const composerFieldOffsets = useRef<Record<ComposerField, number>>({
-    title: 0,
-    author: 0,
-    reflection: 0,
-  });
-  const titleInputRef = useRef<ElementRef<typeof TextField>>(null);
+  const newDraft = useRef({ ...EMPTY_READING_COMPOSER_DRAFT });
   const authorInputRef = useRef<ElementRef<typeof TextField>>(null);
   const reflectionInputRef = useRef<ElementRef<typeof TextField>>(null);
   const [entries, setEntries] = useState<ReadingEntry[]>([]);
@@ -190,15 +171,6 @@ export function useStudentReadingScreenModel() {
     [entries],
   );
 
-  useEffect(() => {
-    if (
-      requestedView === "records" ||
-      requestedView === "missions" ||
-      requestedView === "titles"
-    ) {
-      setActiveTab(requestedView);
-    }
-  }, [requestedView]);
   const visibleEntries = useMemo(
     () => entries.filter((entry) => entry.bookType === historyBookType),
     [entries, historyBookType],
@@ -456,9 +428,7 @@ export function useStudentReadingScreenModel() {
             : evaluation;
         setEntries((current) =>
           current.map((entry) =>
-            entry.id === readingLogId
-              ? { ...entry, ...safeEvaluation }
-              : entry,
+            entry.id === readingLogId ? { ...entry, ...safeEvaluation } : entry,
           ),
         );
       };
@@ -467,10 +437,7 @@ export function useStudentReadingScreenModel() {
         feedbackPollersRef.current.add(readingLogId);
         const deadline = Date.now() + FEEDBACK_POLL_WINDOW_MS;
         try {
-          while (
-            isMountedRef.current &&
-            Date.now() < deadline
-          ) {
+          while (isMountedRef.current && Date.now() < deadline) {
             await new Promise((resolve) =>
               setTimeout(resolve, FEEDBACK_POLL_INTERVAL_MS),
             );
@@ -583,9 +550,10 @@ export function useStudentReadingScreenModel() {
   }, [entries, loading, requestFeedback]);
 
   async function save() {
+    if (saving) return false;
     if (!title.trim() || !author.trim() || !reflection.trim()) {
       setError("책 제목, 지은이, 독서 감상을 모두 입력해 주세요.");
-      return;
+      return false;
     }
     setSaving(true);
     setError(null);
@@ -616,15 +584,21 @@ export function useStudentReadingScreenModel() {
       setTitle(EMPTY_READING_COMPOSER_DRAFT.title);
       setAuthor(EMPTY_READING_COMPOSER_DRAFT.author);
       setReflection(EMPTY_READING_COMPOSER_DRAFT.reflection);
-      setComposerInstanceId((current) => nextReadingComposerInstanceId(current));
       const wasEditing = editingEntryId !== null;
+      if (wasEditing) {
+        setBookType(newDraft.current.bookType);
+        setTitle(newDraft.current.title);
+        setAuthor(newDraft.current.author);
+        setReflection(newDraft.current.reflection);
+      } else {
+        newDraft.current = { ...EMPTY_READING_COMPOSER_DRAFT };
+      }
       setEditingEntryId(null);
       setNotice(
         wasEditing
           ? "수정했어요. 피드백을 기다리는 중..."
           : "저장했어요. 피드백을 기다리는 중...",
       );
-      setComposerVisible(false);
       feedbackResumeAttemptedRef.current.add(payload.entry.id);
       void requestFeedback(
         payload.entry.id,
@@ -632,62 +606,41 @@ export function useStudentReadingScreenModel() {
           ? { forceReevaluation: true, reflection: payload.entry.reflection }
           : undefined,
       );
+      return true;
     } catch (nextError) {
       if (!(await handleError(nextError)))
         setError("독서 기록을 저장하지 못했어요.");
+      return false;
     } finally {
       setSaving(false);
     }
   }
 
-  function focusComposerField(field: ComposerField) {
-    const scrollToField = () => {
-      const y = Math.max(0, composerFieldOffsets.current[field] - spacing.sm);
-      composerScrollRef.current?.scrollTo({ y, animated: true });
-    };
-
-    // Android resizes the modal after focus. Scroll once immediately and once
-    // after that resize so every field remains above the keyboard.
-    requestAnimationFrame(scrollToField);
-    setTimeout(scrollToField, 120);
-  }
-
-  function focusNextComposerField(field: ComposerField) {
-    if (field === "title") authorInputRef.current?.focus();
-    if (field === "author") reflectionInputRef.current?.focus();
-  }
-
   function openComposer() {
     setError(null);
     setNotice(null);
+    if (editingEntryId !== null) {
+      setBookType(newDraft.current.bookType);
+      setTitle(newDraft.current.title);
+      setAuthor(newDraft.current.author);
+      setReflection(newDraft.current.reflection);
+    }
     setEditingEntryId(null);
-    // Remount TextInputs on every open so controlled draft values always win
-    // over any native TextInput cache left from a previous close/clear.
-    setComposerInstanceId((current) => nextReadingComposerInstanceId(current));
-    setComposerVisible(true);
+    router.push("/(student)/reading/compose");
   }
 
   function openEditor(entry: ReadingEntry) {
     setError(null);
     setNotice(null);
+    if (editingEntryId === null)
+      newDraft.current = { bookType, title, author, reflection };
     setEditingEntryId(entry.id);
     setBookType(entry.bookType);
     setTitle(entry.title);
     setAuthor(entry.author);
     setReflection(entry.reflection);
-    setComposerInstanceId((current) => nextReadingComposerInstanceId(current));
-    setComposerVisible(true);
+    router.push("/(student)/reading/compose");
   }
-
-  const composerFieldKeys = presentReadingComposerDraft(
-    {
-      bookType,
-      title,
-      author,
-      reflection,
-    },
-    composerInstanceId,
-  ).fieldKeys;
 
   return {
     title,
@@ -732,17 +685,9 @@ export function useStudentReadingScreenModel() {
     titles,
     claimingTitleKey,
     claimReadingTitle,
-    composerVisible,
     editingEntryId,
-    setComposerVisible,
-    composerScrollRef,
     setBookType,
-    composerFieldOffsets,
-    composerFieldKeys,
-    titleInputRef,
     setTitle,
-    focusComposerField,
-    focusNextComposerField,
     authorInputRef,
     setAuthor,
     reflectionInputRef,

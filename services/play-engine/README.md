@@ -148,3 +148,26 @@ service networking and secrets, run the lifecycle and recovery matrix in
 `docs/verification-checklist.md`, inspect outbox lag and failures, and complete
 web plus physical-device Expo smoke tests. Production deployment remains a
 separate operator action.
+# Student song rooms
+
+Song-guess creation accepts `roomMode: "student-free"` and a trusted
+`classroomTeacherSubject` from the authenticated application adapter. The
+default remains `teacher-led`. The student host must be included in the
+participant seeds. Student rooms open in the lobby with their host joined,
+and do not replace the teacher's `/current` session.
+
+`GET /v1/boards/{board_id}/song-guess/sessions` returns `{ "sessions": [...] }`
+with up to 100 recent, actor-accessible redacted snapshots. Session snapshots
+include `roomMode`, `nextTransitionAtMs`, and viewer `canStart`, `canFinish`,
+and `isRoomHost`. A participant may issue `leave`; hosts use `finish` instead.
+Only the room host starts a student room. The host or configured classroom
+teacher can finish it. Student room hosts play using the participant role.
+
+Student rooms advance at the server deadline, reveal for five seconds, then
+start the next round or finish. Advancement is caught up and persisted on
+authorized snapshot/list reads and commands, under the repository lock or
+database transaction. Each elapsed transition increments the version; the
+usual outbox publishes the resulting state. There is no background timer:
+clients should poll while a room is active, and rooms with no readers catch
+up at their next access. Replayed commands retain their original response;
+clients must keep the existing monotonic snapshot merge behavior.

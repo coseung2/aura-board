@@ -542,7 +542,6 @@ export function DJQueueBoard({
           contentContainerStyle={styles.queueSheetContent}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}
         >
         <View style={styles.sheetHeader}>

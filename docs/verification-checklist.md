@@ -82,6 +82,26 @@ creating overlapping testing-notes documents.
 
 ## Baseline checks
 
+- 2026-09-11 KST game rooms: student entry only provisions Omok/song-guess hubs;
+  Kordle, speed-game and shadow-alliance require an existing teacher-opened hub.
+  Song-guess now lists separate teacher/student sessions. Student room creation
+  accepts catalog categories/segment/count only, derives its roster and classroom
+  teacher on the server, and keeps answers and choice ordering private. The
+  student host plays, starts and ends; classmates leave; the classroom teacher
+  may end a student room. Only one unfinished student room per host/board is
+  allowed. Existing teacher sessions retain the current-session contract.
+  Both clients keep the selected session, confirm exit/end and retry failed
+  commands without silently joining another room. Started student rounds advance
+  under repository locks on reads/commands (30-second guessing, 5-second reveal);
+  active clients poll every two seconds. With no readers, elapsed transitions are
+  persisted on the next read, not by a background scheduler. Browser close/reload
+  only gives the native exit warning and cannot guarantee a completed leave.
+  Root suite passed 439 files / 2,653 tests, mobile 25 files / 145 tests, Rust 72
+  tests; subsequent room API tests passed separately. Root/mobile TypeScript,
+  mobile design, production Next build, line limits and diff checks passed. Verify actual PostgreSQL
+  transactions, two students plus teacher, device back gestures/audio, and web
+  layouts before rollout. Deploy the engine and matching web API before the app.
+
 - Run `npm run check:lines` for source changes. Code, styles, tests, scripts,
   native modules, and generated source files must each stay at or below 800
   physical lines; split the owning generator when generated output exceeds the
@@ -631,6 +651,27 @@ Android/iPad two-client verification remain separate acceptance gates; this
 change's unit tests do not measure production propagation latency.
 
 ## Test Fixtures
+
+### Native student input pages (2026-09-11)
+
+- Installed Expo app only: reading, board post create/edit, feed create/edit,
+  card/feed comments, assignment submission, plant observations and daily banner
+  composition use full-screen input routes. Short contextual sheets remain.
+- On an Android tablet and iPad, open each route in landscape, focus the final
+  field, rotate with the keyboard visible and submit without hiding the keyboard.
+  Confirm fields and actions remain reachable, with no repeated viewport jumps.
+  Android uses native resize; iOS has one keyboard-avoidance owner.
+- Verify hardware/header Back and discard confirmation, upload/save navigation
+  protection, validation/network failure draft retention and successful return
+  with the existing toast. Reopen a new reading draft after editing a saved entry
+  and confirm the two drafts remain separate.
+- Verify saved content after returning and reloading; check comment audience,
+  reward feedback, feed counts, assignment deadline/locked explanations and
+  asynchronous reading feedback after leaving the input route.
+- Automated checks cover native route contracts, exit guards, reading draft
+  transitions and parity of mobile reward/reading notices with shared behavior.
+  Android bundle export is not an installed-device keyboard acceptance check.
+  No connected device was available for this change's physical-device checks.
 
 ### Canva reviewer credentials
 

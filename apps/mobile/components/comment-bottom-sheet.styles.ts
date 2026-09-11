@@ -1,11 +1,13 @@
 import { StyleSheet } from "react-native";
-import { borders } from "../theme/tokens";
-import { colors } from "../theme/tokens";
-import { controls } from "../theme/tokens";
-import { radii } from "../theme/tokens";
-import { spacing } from "../theme/tokens";
-import { tapMin } from "../theme/tokens";
-import { typography } from "../theme/tokens";
+import {
+  borders,
+  colors,
+  controls,
+  radii,
+  spacing,
+  tapMin,
+  typography,
+} from "../theme/tokens";
 
 export const styles = StyleSheet.create({
   sheet: {
@@ -27,6 +29,7 @@ export const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
     marginTop: -spacing.xxl,
   },
+  pageTabsInset: { marginTop: spacing.none, marginBottom: spacing.sm },
   familyThreadTitle: {
     ...typography.label,
     color: colors.textMuted,
@@ -143,6 +146,10 @@ export const styles = StyleSheet.create({
     borderTopWidth: borders.hairline,
     borderTopColor: colors.border,
   },
-  commentInput: { flex: 1, minHeight: controls.inputHeight },
+  commentInput: {
+    flex: 1,
+    minHeight: controls.inputHeight,
+    maxHeight: controls.inputHeight * 3,
+  },
   submitButton: { minWidth: tapMin },
 });

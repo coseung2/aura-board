@@ -11,6 +11,14 @@ pub const SONG_GUESS_STATE_SCHEMA_VERSION: u16 = DOMAIN_SONG_GUESS_STATE_SCHEMA_
 
 #[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+pub enum SongGuessRoomMode {
+    #[default]
+    TeacherLed,
+    StudentFree,
+}
+
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum SongGuessAnswerTarget {
     #[default]
     Title,
@@ -25,6 +33,12 @@ fn is_title_target(target: &SongGuessAnswerTarget) -> bool {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SongGuessSessionRecord {
+    #[serde(default)]
+    pub room_mode: SongGuessRoomMode,
+    #[serde(default)]
+    pub classroom_teacher_subject: Option<String>,
+    #[serde(default)]
+    pub next_transition_at_ms: Option<i64>,
     #[serde(default)]
     pub answer_target: SongGuessAnswerTarget,
     pub session_id: String,
@@ -83,6 +97,12 @@ pub struct SongGuessRoundSnapshot {
 #[serde(rename_all = "camelCase")]
 pub struct SongGuessViewer {
     #[serde(default)]
+    pub can_start: bool,
+    #[serde(default)]
+    pub can_finish: bool,
+    #[serde(default)]
+    pub is_room_host: bool,
+    #[serde(default)]
     pub answered_current_round: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selected_choice_id: Option<String>,
@@ -97,6 +117,12 @@ pub struct SongGuessViewer {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SongGuessSnapshot {
+    #[serde(default)]
+    pub host_display_name: Option<String>,
+    #[serde(default)]
+    pub room_mode: SongGuessRoomMode,
+    #[serde(default)]
+    pub next_transition_at_ms: Option<i64>,
     #[serde(default)]
     pub answer_target: SongGuessAnswerTarget,
     #[serde(default)]
@@ -124,6 +150,7 @@ pub struct SongGuessSnapshot {
 pub enum SongGuessIntent {
     OpenLobby,
     Join,
+    Leave,
     Start,
     UnlockClip,
     Guess {
@@ -142,6 +169,10 @@ pub enum SongGuessIntent {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSongGuessSessionRequest {
+    #[serde(default)]
+    pub room_mode: SongGuessRoomMode,
+    #[serde(default)]
+    pub classroom_teacher_subject: Option<String>,
     #[serde(default, skip_serializing_if = "is_title_target")]
     pub answer_target: SongGuessAnswerTarget,
     #[serde(default, skip_serializing_if = "is_text_mode")]
@@ -187,6 +218,113 @@ fn is_text_mode(mode: &SongGuessAnswerMode) -> bool {
 mod choice_tests;
 
 impl SongGuessSessionRecord {
+    pub fn from_request(
+        session_id: String,
+        board_id: String,
+        actor: &ActorContext,
+        request: &CreateSongGuessSessionRequest,
+        now_ms: i64,
+    ) -> Result<Self, ModelError> {
+        if request.room_mode == SongGuessRoomMode::TeacherLed && actor.role != ActorRole::Host {
+            return Err(ModelError::Forbidden);
+        }
+        if request.room_mode == SongGuessRoomMode::StudentFree
+            && (actor.role != ActorRole::Participant
+                || !request
+                    .participants
+                    .iter()
+                    .any(|p| p.actor_subject == actor.subject)
+                || !request
+                    .classroom_teacher_subject
+                    .as_deref()
+                    .is_some_and(|s| s.starts_with("teacher:") && s.len() > 8))
+        {
+            return Err(ModelError::Forbidden);
+        }
+        let mut record = Self {
+            room_mode: request.room_mode,
+            classroom_teacher_subject: request.classroom_teacher_subject.clone(),
+            next_transition_at_ms: None,
+            answer_target: request.answer_target,
+            session_id,
+            board_id,
+            host_subject: actor.subject.clone(),
+            version: 0,
+            rules_version: SONG_GUESS_RULES_VERSION,
+            state_schema_version: SONG_GUESS_STATE_SCHEMA_VERSION,
+            previous_session_id: None,
+            created_at_ms: now_ms,
+            state: SongGuessState::new(request.participants.clone(), request.rounds.clone())
+                .map_err(|error| ModelError::DomainRejected(error.to_string()))?,
+        };
+        record = record.with_answer_mode(request.answer_mode)?;
+        if record.room_mode == SongGuessRoomMode::StudentFree {
+            record
+                .state
+                .open_lobby()
+                .map_err(|e| ModelError::DomainRejected(e.to_string()))?;
+            record
+                .state
+                .join(&actor.subject)
+                .map_err(|e| ModelError::DomainRejected(e.to_string()))?;
+        }
+        record.validate()?;
+        Ok(record)
+    }
+
+    /// Catch up on a copy under the repository's lock; each scheduled transition
+    /// consumes a version, even when several elapsed while no client was reading.
+    pub fn advance_due(&mut self, now_ms: i64) -> Result<bool, ModelError> {
+        if self.room_mode != SongGuessRoomMode::StudentFree {
+            return Ok(false);
+        }
+        let mut changed = false;
+        for _ in 0..=100 {
+            let Some(due) = self.next_transition_at_ms else {
+                break;
+            };
+            if due > now_ms {
+                break;
+            }
+            match self.state.phase {
+                SongGuessPhase::Guessing => {
+                    self.state
+                        .reveal()
+                        .map_err(|e| ModelError::DomainRejected(e.to_string()))?;
+                    self.next_transition_at_ms = Some(due.saturating_add(5_000));
+                }
+                SongGuessPhase::Reveal => {
+                    if self.state.current_round_index as usize + 1 >= self.state.rounds.len() {
+                        self.state
+                            .finish()
+                            .map_err(|e| ModelError::DomainRejected(e.to_string()))?;
+                        self.next_transition_at_ms = None;
+                    } else {
+                        self.state
+                            .next_round_at(due)
+                            .map_err(|e| ModelError::DomainRejected(e.to_string()))?;
+                        self.next_transition_at_ms = self
+                            .state
+                            .current_round()
+                            .ok()
+                            .and_then(|r| r.deadline_at_ms);
+                    }
+                }
+                _ => {
+                    self.next_transition_at_ms = None;
+                    break;
+                }
+            }
+            self.version = self
+                .version
+                .checked_add(1)
+                .filter(|v| *v <= MAX_SAFE_VERSION)
+                .ok_or(ModelError::InvalidState)?;
+            changed = true;
+        }
+        self.validate()?;
+        Ok(changed)
+    }
     pub fn with_answer_target(mut self, target: SongGuessAnswerTarget) -> Self {
         self.answer_target = target;
         self
@@ -208,6 +346,9 @@ impl SongGuessSessionRecord {
         created_at_ms: i64,
     ) -> Result<Self, ModelError> {
         let record = Self {
+            room_mode: SongGuessRoomMode::TeacherLed,
+            classroom_teacher_subject: None,
+            next_transition_at_ms: None,
             answer_target: SongGuessAnswerTarget::Title,
             session_id,
             board_id,
@@ -225,6 +366,20 @@ impl SongGuessSessionRecord {
     }
 
     pub fn validate(&self) -> Result<(), ModelError> {
+        if self.room_mode == SongGuessRoomMode::StudentFree
+            && (!self.host_subject.starts_with("student:")
+                || !self
+                    .state
+                    .participants
+                    .iter()
+                    .any(|p| p.actor_subject == self.host_subject)
+                || !self
+                    .classroom_teacher_subject
+                    .as_deref()
+                    .is_some_and(|s| s.starts_with("teacher:") && s.len() > 8))
+        {
+            return Err(ModelError::InvalidState);
+        }
         if self.session_id.is_empty()
             || self.board_id.is_empty()
             || self.host_subject.is_empty()
@@ -237,11 +392,12 @@ impl SongGuessSessionRecord {
                         SONG_GUESS_LEGACY_STATE_SCHEMA_VERSION
                     )
             )
-            || self
-                .state
-                .participants
-                .iter()
-                .any(|participant| participant.actor_subject == self.host_subject)
+            || (self.room_mode == SongGuessRoomMode::TeacherLed
+                && self
+                    .state
+                    .participants
+                    .iter()
+                    .any(|participant| participant.actor_subject == self.host_subject))
         {
             return Err(ModelError::InvalidState);
         }
@@ -255,6 +411,11 @@ impl SongGuessSessionRecord {
     pub fn authorize(&self, actor: &ActorContext) -> Result<bool, ModelError> {
         match actor.role {
             ActorRole::Host if actor.subject == self.host_subject => Ok(true),
+            ActorRole::Host
+                if self.classroom_teacher_subject.as_deref() == Some(&actor.subject) =>
+            {
+                Ok(true)
+            }
             ActorRole::Participant
                 if self
                     .state
@@ -313,17 +474,29 @@ impl SongGuessSessionRecord {
         let round_is_revealed = matches!(
             self.state.phase,
             SongGuessPhase::Reveal | SongGuessPhase::Finished
-        );
-        let accessibility_clue = if matches!(
-            self.state.phase,
-            SongGuessPhase::Guessing | SongGuessPhase::Reveal | SongGuessPhase::Finished
-        ) {
+        ) && !(self.rules_version == SONG_GUESS_RULES_VERSION
+            && self.state.phase == SongGuessPhase::Finished
+            && round.started_at_ms.is_none());
+        let accessibility_clue = if (self.state.phase != SongGuessPhase::Finished
+            || round_is_revealed)
+            && matches!(
+                self.state.phase,
+                SongGuessPhase::Guessing | SongGuessPhase::Reveal | SongGuessPhase::Finished
+            ) {
             round.accessibility_clue.clone()
         } else {
             None
         };
 
         Ok(SongGuessSnapshot {
+            host_display_name: self
+                .state
+                .participants
+                .iter()
+                .find(|participant| participant.actor_subject == self.host_subject)
+                .map(|participant| participant.display_name.clone()),
+            room_mode: self.room_mode,
+            next_transition_at_ms: self.next_transition_at_ms,
             answer_target: self.answer_target,
             answer_mode: self.state.answer_mode,
             session_id: self.session_id.clone(),
@@ -337,6 +510,7 @@ impl SongGuessSessionRecord {
             phase: self.state.phase,
             current_round: SongGuessRoundSnapshot {
                 choices: (self.state.answer_mode == SongGuessAnswerMode::MultipleChoice
+                    && (self.state.phase != SongGuessPhase::Finished || round_is_revealed)
                     && !matches!(
                         self.state.phase,
                         SongGuessPhase::Draft | SongGuessPhase::Lobby
@@ -407,6 +581,13 @@ impl SongGuessSessionRecord {
                 })
                 .collect(),
             viewer: SongGuessViewer {
+                can_start: actor.subject == self.host_subject
+                    && self.state.phase == SongGuessPhase::Lobby,
+                can_finish: (actor.subject == self.host_subject
+                    || (actor.role == ActorRole::Host
+                        && self.classroom_teacher_subject.as_deref() == Some(&actor.subject)))
+                    && self.state.phase != SongGuessPhase::Finished,
+                is_room_host: actor.subject == self.host_subject,
                 answered_current_round: round
                     .selections
                     .iter()
@@ -441,9 +622,18 @@ impl SongGuessSessionRecord {
     ) -> Result<Option<SongGuessGuessResult>, ModelError> {
         self.validate()?;
         let is_host = self.authorize(actor)?;
+        let is_room_host = actor.subject == self.host_subject;
+        if self.room_mode == SongGuessRoomMode::StudentFree
+            && matches!(
+                intent,
+                SongGuessIntent::Reveal | SongGuessIntent::NextRound | SongGuessIntent::UnlockClip
+            )
+        {
+            return Err(ModelError::Forbidden);
+        }
         let result = match intent {
             SongGuessIntent::OpenLobby => {
-                require_host(is_host)?;
+                require_host(is_room_host)?;
                 self.state
                     .open_lobby()
                     .map_err(|error| ModelError::DomainRejected(error.to_string()))?;
@@ -459,7 +649,7 @@ impl SongGuessSessionRecord {
                 None
             }
             SongGuessIntent::Start => {
-                require_host(is_host)?;
+                require_host(is_room_host)?;
                 let transition = if self.rules_version == SONG_GUESS_RULES_VERSION {
                     self.state.start_at(now_ms)
                 } else {
@@ -535,13 +725,33 @@ impl SongGuessSessionRecord {
                 None
             }
             SongGuessIntent::Finish => {
-                require_host(is_host)?;
+                require_host(is_room_host || is_host)?;
+                self.state.phase = SongGuessPhase::Finished;
+                None
+            }
+            SongGuessIntent::Leave => {
+                if is_host || is_room_host {
+                    return Err(ModelError::Forbidden);
+                }
                 self.state
-                    .finish()
+                    .leave(&actor.subject)
                     .map_err(|error| ModelError::DomainRejected(error.to_string()))?;
                 None
             }
         };
+        if self.room_mode == SongGuessRoomMode::StudentFree {
+            self.next_transition_at_ms = match self.state.phase {
+                SongGuessPhase::Guessing => self
+                    .state
+                    .current_round()
+                    .ok()
+                    .and_then(|round| round.deadline_at_ms),
+                SongGuessPhase::Reveal => self
+                    .next_transition_at_ms
+                    .or(Some(now_ms.saturating_add(5_000))),
+                _ => None,
+            };
+        }
         self.validate()?;
         Ok(result)
     }

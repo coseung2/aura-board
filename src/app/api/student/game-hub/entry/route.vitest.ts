@@ -71,6 +71,7 @@ describe("POST /api/student/game-hub/entry", () => {
     expect(mocks.resolveOrCreateCanonicalGameRoom).toHaveBeenCalledWith(
       { id: "student-1", classroomId: "classroom-1" },
       "omok",
+      { allowCreate: true },
     );
     expect(await response.json()).toEqual({
       gameKind: "omok",
@@ -79,5 +80,12 @@ describe("POST /api/student/game-hub/entry", () => {
       href: "/board/game-hub-omok-classroom?view=student",
     });
     expect(response.headers.get("cache-control")).toContain("no-store");
+  });
+  it.each(["kordle", "speed-game", "shadow-alliance"])("waits for teacher creation for %s", async (gameKind) => {
+    mocks.resolveOrCreateCanonicalGameRoom.mockRejectedValue(new Error("teacher_room_not_open"));
+    const response = await POST(request({ gameKind }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "teacher_room_not_open" });
+    expect(mocks.resolveOrCreateCanonicalGameRoom).toHaveBeenCalledWith(expect.any(Object), gameKind, { allowCreate: false });
   });
 });

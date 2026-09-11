@@ -1,6 +1,7 @@
+import * as ImagePicker from "expo-image-picker";
 import { useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import { useInputPageExit } from "../hooks/use-input-page-exit";
 import type { FeedDraft, FeedMediaInput } from "../lib/feed";
 import { uploadMobileImage } from "../lib/upload";
 import {
@@ -31,13 +32,27 @@ async function uploadImage(uri: string, name: string, mimeType: string) {
  * Shared student feed composer. Used by the full-screen compose page; the
  * fields, media picker, and submit flow live here.
  */
-export function FeedComposerForm({ onSubmit, onSuccess, initialDraft, submitLabel = "게시하기" }: Props) {
+export function FeedComposerForm({
+  onSubmit,
+  onSuccess,
+  initialDraft,
+  submitLabel = "게시하기",
+}: Props) {
   const [title, setTitle] = useState(initialDraft?.title ?? "");
   const [body, setBody] = useState(initialDraft?.body ?? "");
   const [youtubeUrl, setYoutubeUrl] = useState("");
-  const [media, setMedia] = useState<FeedMediaInput[]>(initialDraft?.media ?? []);
+  const [media, setMedia] = useState<FeedMediaInput[]>(
+    initialDraft?.media ?? [],
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const exit = useInputPageExit(
+    title !== (initialDraft?.title ?? "") ||
+      body !== (initialDraft?.body ?? "") ||
+      Boolean(youtubeUrl) ||
+      JSON.stringify(media) !== JSON.stringify(initialDraft?.media ?? []),
+    busy,
+  );
 
   function reset() {
     setTitle("");
@@ -97,6 +112,7 @@ export function FeedComposerForm({ onSubmit, onSuccess, initialDraft, submitLabe
   }
 
   async function submit() {
+    if (busy) return;
     const normalizedTitle = title.trim();
     const normalizedBody = body.trim();
     if (!normalizedTitle && !normalizedBody && media.length === 0) {
@@ -113,6 +129,7 @@ export function FeedComposerForm({ onSubmit, onSuccess, initialDraft, submitLabe
       });
       reset();
       onSuccess();
+      exit.finish();
     } catch (nextError) {
       setError(
         nextError instanceof Error
@@ -181,9 +198,7 @@ export function FeedComposerForm({ onSubmit, onSuccess, initialDraft, submitLabe
           variant="secondary"
           onPress={addYoutube}
           disabled={
-            busy ||
-            !youtubeUrl.trim() ||
-            media.length >= MAX_MEDIA_ITEMS
+            busy || !youtubeUrl.trim() || media.length >= MAX_MEDIA_ITEMS
           }
         >
           추가
@@ -232,7 +247,13 @@ export function FeedComposerForm({ onSubmit, onSuccess, initialDraft, submitLabe
 }
 
 const styles = StyleSheet.create({
-  content: { width: "100%", maxWidth: composer.sheetMaxWidth, alignSelf: "center", padding: spacing.lg, gap: spacing.md },
+  content: {
+    width: "100%",
+    maxWidth: composer.sheetMaxWidth,
+    alignSelf: "center",
+    padding: spacing.lg,
+    gap: spacing.md,
+  },
   field: { gap: spacing.xs },
   label: { ...typography.label, color: colors.text },
   bodyInput: {
