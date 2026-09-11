@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { commentRequest, type CommentRequest } from "../../../../lib/comment-request";
 import {
   ActivityIndicator,
   Alert,
@@ -100,6 +101,10 @@ export default function StudentCardCommentsScreen() {
   } | null>(null);
   const commentRefs = useRef(new Map<string, View>());
   const requestVersion = useRef(0);
+  const pendingWrites = useRef(0);
+  const commentAttempt = useRef<CommentRequest | null>(null);
+  const replyAttempt = useRef<CommentRequest | null>(null);
+  const [retryWrite, setRetryWrite] = useState<"comment" | "reply" | null>(null);
 
   const handleAuthError = useCallback(
     async (nextError: unknown) => {
@@ -115,6 +120,7 @@ export default function StudentCardCommentsScreen() {
 
   const loadComments = useCallback(
     async (refresh = false, nextAudience: CommentAudience = audience) => {
+      if (pendingWrites.current > 0) return;
       if (!cardId) {
         setError("댓글을 열 게시글을 찾을 수 없어요.");
         setLoading(false);
@@ -160,6 +166,8 @@ export default function StudentCardCommentsScreen() {
   }, [loadComments]);
 
   function selectAudience(nextAudience: CommentAudience) {
+    if (pendingWrites.current > 0) return;
+    setRetryWrite(null);
     setModerationTarget(null);
     setReplyTarget(null);
     setReplyText("");
@@ -176,25 +184,35 @@ export default function StudentCardCommentsScreen() {
   async function submitComment() {
     const content = commentText.trim();
     if (!cardId || !content || submitting) return;
+    commentAttempt.current = commentRequest(commentAttempt.current, JSON.stringify([cardId, audience, content]));
     setSubmitting(true);
+    pendingWrites.current += 1;
+    requestVersion.current += 1;
     try {
       const response = await apiFetch<{
         item?: CommentItem;
         comment?: CommentItem;
       }>(commentsPath(cardId, audience), {
         method: "POST",
-        json: { content, audience },
+        json: { content, audience, clientRequestId: commentAttempt.current.id },
       });
       const nextItem = response.item ?? response.comment;
       if (!nextItem) throw new Error("missing comment");
       setItems((current) => [{ ...nextItem, replies: [] }, ...current]);
       setCommentText("");
+      setRetryWrite(null);
+      commentAttempt.current = null;
       setError(null);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("댓글을 등록하지 못했어요.");
+      setRetryWrite("comment");
     } finally {
       setSubmitting(false);
+      pendingWrites.current -= 1;
+      requestVersion.current += 1;
+      setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -237,6 +255,8 @@ export default function StudentCardCommentsScreen() {
   }
 
   function openReplyComposer(item: CommentItem) {
+    if (pendingWrites.current > 0) return;
+    setRetryWrite(null);
     setModerationTarget(null);
     setReplyText("");
     setReplyTarget({
@@ -249,14 +269,17 @@ export default function StudentCardCommentsScreen() {
   async function submitReply() {
     const content = replyText.trim();
     if (!cardId || !replyTarget || !content || replySubmitting) return;
+    replyAttempt.current = commentRequest(replyAttempt.current, JSON.stringify([cardId, audience, replyTarget.targetId, content]));
     setReplySubmitting(true);
+    pendingWrites.current += 1;
+    requestVersion.current += 1;
     try {
       const response = await apiFetch<{
         item?: CommentItem;
         comment?: CommentItem;
       }>(commentsPath(cardId, audience), {
         method: "POST",
-        json: { content, audience, parentCommentId: replyTarget.targetId },
+        json: { content, audience, parentCommentId: replyTarget.targetId, clientRequestId: replyAttempt.current.id },
       });
       const nextItem = response.item ?? response.comment;
       if (!nextItem) throw new Error("missing reply");
@@ -268,12 +291,19 @@ export default function StudentCardCommentsScreen() {
       );
       setReplyText("");
       setReplyTarget(null);
+      setRetryWrite(null);
+      replyAttempt.current = null;
       setError(null);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("답글을 등록하지 못했어요.");
+      setRetryWrite("reply");
     } finally {
       setReplySubmitting(false);
+      pendingWrites.current -= 1;
+      requestVersion.current += 1;
+      setLoading(false);
+      setRefreshing(false);
     }
   }
 
@@ -551,7 +581,7 @@ export default function StudentCardCommentsScreen() {
                 {!isFamilyAccessNotice ? (
                   <AppButton
                     variant="quiet"
-                    onPress={() => void loadComments(false, audience)}
+                    onPress={() => void (retryWrite === "comment" ? submitComment() : retryWrite === "reply" ? submitReply() : loadComments(false, audience))}
                   >
                     다시 시도
                   </AppButton>

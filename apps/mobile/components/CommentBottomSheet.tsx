@@ -62,6 +62,7 @@ import {
   typography,
 } from "../theme/tokens";
 import { styles } from "./comment-bottom-sheet.styles";
+import { commentRequest, type CommentRequest } from "../lib/comment-request";
 
 type CommentItem = MobileCommentItem;
 
@@ -119,6 +120,10 @@ export function CommentBottomSheet({
   );
   const [guardianAvailable, setGuardianAvailable] = useState(false);
   const requestVersion = useRef(0);
+  const pendingWrites = useRef(0);
+  const commentAttempt = useRef<CommentRequest | null>(null);
+  const replyAttempt = useRef<CommentRequest | null>(null);
+  const [retryWrite, setRetryWrite] = useState<"comment" | "reply" | null>(null);
   const feedResource = resourceKind === "feed";
   const commentTargetKind = feedResource ? "feed_comment" : "comment";
 
@@ -138,11 +143,11 @@ export function CommentBottomSheet({
 
   const loadComments = useCallback(
     async (nextAudience: CommentAudience, quiet = false) => {
-      if (!cardId) return;
+      if (!cardId || pendingWrites.current > 0) return;
       const version = ++requestVersion.current;
       if (!quiet) setLoading(true);
       try {
-        setError(null);
+        if (!quiet) setError(null);
         const request = viewer === "parent" ? parentApiFetch : apiFetch;
         const response = await request<{
           items: CommentItem[];
@@ -204,6 +209,8 @@ export function CommentBottomSheet({
   });
 
   function selectAudience(nextAudience: CommentAudience) {
+    if (pendingWrites.current > 0) return;
+    setRetryWrite(null);
     setModerationTarget(null);
     if (nextAudience === audience) return;
     setAudience(nextAudience);
@@ -225,7 +232,10 @@ export function CommentBottomSheet({
   async function submitComment() {
     const content = commentText.trim();
     if (!cardId || !content || submitting) return;
+    commentAttempt.current = commentRequest(commentAttempt.current, JSON.stringify([cardId, audience, content]));
     setSubmitting(true);
+    pendingWrites.current += 1;
+    requestVersion.current += 1;
     try {
       const request = viewer === "parent" ? parentApiFetch : apiFetch;
       const response = await request<{
@@ -233,7 +243,7 @@ export function CommentBottomSheet({
         comment?: CommentItem;
       }>(commentsResourcePath(cardId, audience, resourceKind), {
         method: "POST",
-        json: { content, audience },
+        json: { content, audience, clientRequestId: commentAttempt.current.id },
       });
       const item = response.item ?? response.comment;
       if (!item) throw new Error("missing comment");
@@ -251,13 +261,19 @@ export function CommentBottomSheet({
         ...current,
       ]);
       setCommentText("");
+      setRetryWrite(null);
+      commentAttempt.current = null;
       setError(null);
       if (audience === "public") onCommentCountChange?.(1);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("댓글을 등록하지 못했어요.");
+      setRetryWrite("comment");
     } finally {
       setSubmitting(false);
+      pendingWrites.current -= 1;
+      requestVersion.current += 1;
+      setLoading(false);
     }
   }
 
@@ -292,6 +308,8 @@ export function CommentBottomSheet({
   }
 
   function openReplyComposer(item: CommentItem) {
+    if (pendingWrites.current > 0) return;
+    setRetryWrite(null);
     setModerationTarget(null);
     setReplyText("");
     setReplyTarget({
@@ -304,7 +322,10 @@ export function CommentBottomSheet({
   async function submitReply() {
     const content = replyText.trim();
     if (!cardId || !replyTarget || !content || replySubmitting) return;
+    replyAttempt.current = commentRequest(replyAttempt.current, JSON.stringify([cardId, audience, replyTarget.targetId, content]));
     setReplySubmitting(true);
+    pendingWrites.current += 1;
+    requestVersion.current += 1;
     try {
       const request = viewer === "parent" ? parentApiFetch : apiFetch;
       const response = await request<{
@@ -316,6 +337,7 @@ export function CommentBottomSheet({
           content,
           audience,
           parentCommentId: replyTarget.targetId,
+          clientRequestId: replyAttempt.current.id,
         },
       });
       const item = response.item ?? response.comment;
@@ -328,13 +350,19 @@ export function CommentBottomSheet({
       );
       setReplyText("");
       setReplyTarget(null);
+      setRetryWrite(null);
+      replyAttempt.current = null;
       setError(null);
       if (audience === "public") onCommentCountChange?.(1);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("답글을 등록하지 못했어요.");
+      setRetryWrite("reply");
     } finally {
       setReplySubmitting(false);
+      pendingWrites.current -= 1;
+      requestVersion.current += 1;
+      setLoading(false);
     }
   }
 
@@ -636,7 +664,7 @@ export function CommentBottomSheet({
                 {!isFamilyAccessNotice ? (
                   <AppButton
                     variant="quiet"
-                    onPress={() => void loadComments(audience)}
+                    onPress={() => void (retryWrite === "comment" ? submitComment() : retryWrite === "reply" ? submitReply() : loadComments(audience))}
                   >
                     다시 시도
                   </AppButton>
