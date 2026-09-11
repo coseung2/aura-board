@@ -406,7 +406,13 @@ async function processCardCommentReward(
   if (!isMeaningfulRewardComment(
     event.normalizedContent,
     policy.commentMinMeaningfulLength,
-  )) return;
+  )) {
+    await db.notificationOutbox.updateMany({
+      where: { eventType: "comment_reward", sourceId },
+      data: { payload: { ...(rawPayload as Prisma.InputJsonObject), rewardOutcome: "too_short", minimumLength: policy.commentMinMeaningfulLength } },
+    });
+    return;
+  }
 
   if (student.account && student.account.classroomId !== student.classroomId) {
     throw new Error("Student account classroom mismatch");
@@ -427,7 +433,18 @@ async function processCardCommentReward(
       now: event.occurredAt,
       duplicateAlreadyClaimed: true,
     });
-    if (prepared.duplicate) return;
+    const excluded = prepared.duplicate ? "duplicate"
+      : policy.commentRewardAmount <= 0 || policy.commentDailyRewardCap <= 0 || policy.commentWeeklyRewardCap <= 0 ? "disabled"
+      : prepared.counts.daily >= policy.commentDailyRewardCap ? "daily_cap"
+      : prepared.counts.weekly >= policy.commentWeeklyRewardCap ? "weekly_cap"
+      : null;
+    if (excluded) {
+      await tx.notificationOutbox.updateMany({
+        where: { eventType: "comment_reward", sourceId },
+        data: { payload: { ...(rawPayload as Prisma.InputJsonObject), rewardOutcome: excluded } },
+      });
+      return;
+    }
     await awardCappedPolicyReward({
       tx,
       studentId: student.id,

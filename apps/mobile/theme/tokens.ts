@@ -325,6 +325,7 @@ export const iconSizes = {
 } as const;
 
 export const layout = {
+  toastMaxWidth: 480,
   readableMaxWidth: 960,
   roleCardWidth: 240,
   roleCardNarrowMaxWidth: 320,
@@ -425,6 +426,7 @@ export const loadingUx = {
 } as const;
 
 export const layers = {
+  toast: 100,
   spriteFloor: 0,
   spriteItem: 1,
   /** Prop actions (drinks, balls) must remain above every character/equipment layer. */

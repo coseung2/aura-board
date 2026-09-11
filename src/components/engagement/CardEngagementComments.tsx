@@ -10,6 +10,8 @@ import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { HiddenContentPlaceholder, StudentContentModerationControls, type HiddenReason } from "@/components/moderation/StudentContentModeration";
 import { appendThreadReply, removeThreadComment, studentViewerHeaders, updateThreadComments, type CommentAudience, type CommentItem } from "./card-engagement-comments-model";
 import { CommentsPoll } from "./CardEngagementPoll";
+import { FeedbackToast } from "../ui/FeedbackToast";
+import { useCommentRewardFeedback, type RewardFeedback } from "@/lib/use-comment-reward-feedback";
 
 export function CommentsModal({
   cardId,
@@ -116,6 +118,11 @@ export function CommentsBlock({
   );
   const [items, setItems] = useState<CommentItem[] | null>(null);
   const [content, setContent] = useState("");
+  const rewardFeedback = useCommentRewardFeedback(async (path) => {
+    const response = await fetch(path, { headers: studentViewerHeaders(isStudentViewer), cache: "no-store" });
+    if (!response.ok) throw new Error("reward_status_failed");
+    return response.json() as Promise<RewardFeedback>;
+  });
   const [submitting, setSubmitting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loadErr, setLoadErr] = useState<string | null>(null);
@@ -335,6 +342,7 @@ export function CommentsBlock({
           });
       if (!r.ok) {
         setErr("댓글 작성에 실패했어요");
+        rewardFeedback.show("댓글을 등록하지 못했어요. 입력한 내용은 남아 있어요.", "error");
         return;
       }
       const j = (await r.json()) as {
@@ -353,9 +361,12 @@ export function CommentsBlock({
         ...(prev ?? []),
       ]);
       setContent("");
+      if (isStudentViewer && !shareSession) void rewardFeedback.track(cardId, item.id);
+      else rewardFeedback.show("댓글을 등록했어요.", "success");
       onChange?.();
     } catch {
       setErr("댓글 작성에 실패했어요");
+      rewardFeedback.show("댓글을 등록하지 못했어요. 입력한 내용은 남아 있어요.", "error");
     } finally {
       setSubmitting(false);
     }
@@ -420,6 +431,7 @@ export function CommentsBlock({
       });
       if (!r.ok) {
         setReplyErr("답글을 등록하지 못했어요");
+        rewardFeedback.show("답글을 등록하지 못했어요. 다시 시도해 주세요.", "error");
         return;
       }
       const j = (await r.json()) as {
@@ -440,9 +452,12 @@ export function CommentsBlock({
           : current,
       );
       closeReplyComposer(true);
+      if (isStudentViewer && !shareSession) void rewardFeedback.track(cardId, item.id);
+      else rewardFeedback.show("답글을 등록했어요.", "success");
       onChange?.();
     } catch {
       setReplyErr("답글을 등록하지 못했어요");
+      rewardFeedback.show("답글을 등록하지 못했어요. 다시 시도해 주세요.", "error");
     } finally {
       setReplySubmitting(false);
     }
@@ -566,6 +581,7 @@ export function CommentsBlock({
 
   return (
     <div className="card-engagement-comments">
+      <FeedbackToast notice={rewardFeedback.notice} />
       {/* comment-area poll (2026-06-28): 댓글 입력/목록 위에 투표 UI. */}
       <CommentsPoll
         cardId={cardId}

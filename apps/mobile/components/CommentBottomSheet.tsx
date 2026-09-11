@@ -62,6 +62,8 @@ import {
   typography,
 } from "../theme/tokens";
 import { styles } from "./comment-bottom-sheet.styles";
+import { FeedbackToast } from "./FeedbackToast";
+import { useCommentRewardFeedback, type RewardFeedback } from "../../../src/lib/use-comment-reward-feedback";
 import { commentRequest, type CommentRequest } from "../lib/comment-request";
 
 type CommentItem = MobileCommentItem;
@@ -96,6 +98,7 @@ export function CommentBottomSheet({
   resourceKind = "card",
 }: Props) {
   const router = useRouter();
+  const rewardFeedback = useCommentRewardFeedback((path) => apiFetch<RewardFeedback>(path));
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const [items, setItems] = useState<CommentItem[]>([]);
@@ -241,6 +244,7 @@ export function CommentBottomSheet({
       const response = await request<{
         item?: CommentItem;
         comment?: CommentItem;
+        rewardNotice?: string | null;
       }>(commentsResourcePath(cardId, audience, resourceKind), {
         method: "POST",
         json: { content, audience, clientRequestId: commentAttempt.current.id },
@@ -263,11 +267,14 @@ export function CommentBottomSheet({
       setCommentText("");
       setRetryWrite(null);
       commentAttempt.current = null;
+      if (viewer === "student" && resourceKind === "card") void rewardFeedback.track(cardId, item.id);
+      else rewardFeedback.show("댓글을 등록했어요.", "success");
       setError(null);
       if (audience === "public") onCommentCountChange?.(1);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("댓글을 등록하지 못했어요.");
+      rewardFeedback.show("댓글을 등록하지 못했어요. 입력한 내용은 남아 있어요.", "error");
       setRetryWrite("comment");
     } finally {
       setSubmitting(false);
@@ -352,11 +359,14 @@ export function CommentBottomSheet({
       setReplyTarget(null);
       setRetryWrite(null);
       replyAttempt.current = null;
+      if (viewer === "student" && resourceKind === "card") void rewardFeedback.track(cardId, item.id);
+      else rewardFeedback.show("답글을 등록했어요.", "success");
       setError(null);
       if (audience === "public") onCommentCountChange?.(1);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("답글을 등록하지 못했어요.");
+      rewardFeedback.show("답글을 등록하지 못했어요. 다시 시도해 주세요.", "error");
       setRetryWrite("reply");
     } finally {
       setReplySubmitting(false);
@@ -753,6 +763,7 @@ export function CommentBottomSheet({
           </View>
         ) : null}
       </View>
+      <FeedbackToast notice={rewardFeedback.notice} />
     </AppBottomSheet>
   );
 }

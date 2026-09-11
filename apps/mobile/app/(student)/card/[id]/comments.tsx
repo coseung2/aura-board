@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { FeedbackToast } from "../../../../components/FeedbackToast";
+import { useCommentRewardFeedback, type RewardFeedback } from "../../../../../../src/lib/use-comment-reward-feedback";
 import { commentRequest, type CommentRequest } from "../../../../lib/comment-request";
 import {
   ActivityIndicator,
@@ -72,6 +74,7 @@ type Params = {
 
 export default function StudentCardCommentsScreen() {
   const router = useRouter();
+  const rewardFeedback = useCommentRewardFeedback((path) => apiFetch<RewardFeedback>(path));
   const params = useLocalSearchParams<Params>();
   const cardId = Array.isArray(params.id)
     ? (params.id[0] ?? "")
@@ -192,6 +195,7 @@ export default function StudentCardCommentsScreen() {
       const response = await apiFetch<{
         item?: CommentItem;
         comment?: CommentItem;
+        rewardNotice?: string | null;
       }>(commentsPath(cardId, audience), {
         method: "POST",
         json: { content, audience, clientRequestId: commentAttempt.current.id },
@@ -202,10 +206,12 @@ export default function StudentCardCommentsScreen() {
       setCommentText("");
       setRetryWrite(null);
       commentAttempt.current = null;
+      void rewardFeedback.track(cardId, nextItem.id);
       setError(null);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("댓글을 등록하지 못했어요.");
+      rewardFeedback.show("댓글을 등록하지 못했어요. 입력한 내용은 남아 있어요.", "error");
       setRetryWrite("comment");
     } finally {
       setSubmitting(false);
@@ -293,10 +299,12 @@ export default function StudentCardCommentsScreen() {
       setReplyTarget(null);
       setRetryWrite(null);
       replyAttempt.current = null;
+      void rewardFeedback.track(cardId, nextItem.id);
       setError(null);
     } catch (nextError) {
       if (await handleAuthError(nextError)) return;
       setError("답글을 등록하지 못했어요.");
+      rewardFeedback.show("답글을 등록하지 못했어요. 다시 시도해 주세요.", "error");
       setRetryWrite("reply");
     } finally {
       setReplySubmitting(false);
@@ -659,6 +667,7 @@ export default function StudentCardCommentsScreen() {
           onReport={() => confirmReportComment(moderationTarget.item)}
         />
       ) : null}
+      <FeedbackToast notice={rewardFeedback.notice} />
     </SafeAreaView>
   );
 }

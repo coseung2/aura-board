@@ -8,7 +8,8 @@ import { resolveHiddenReason } from "@/lib/content-safety";
 import { emptyHiddenLookup, loadHiddenLookup } from "@/lib/content-safety-service";
 import { scheduleBoardActivity } from "@/lib/board-activity-queue";
 import { scheduleEngagementBroadcast } from "@/lib/engagement-broadcast-queue";
-import { normalizeRewardComment } from "@/lib/reward-policy";
+import { normalizeRewardComment, isMeaningfulRewardComment } from "@/lib/reward-policy";
+import { loadRewardPolicyCached } from "@/lib/reward-service";
 
 // card-comments-likes (2026-04-26): GET list / POST create.
 
@@ -210,6 +211,7 @@ export async function POST(
 
   const isTeacher = actor.kind === "teacher";
   const studentActor = actor.kind === "student" ? actor : null;
+  const rewardPolicy = studentActor ? await loadRewardPolicyCached(studentActor.classroomId) : null;
   const parentActor = actor.kind === "parent" ? actor : null;
   const storedContent = parsed.data.content.trim();
   const normalizedContent = normalizeRewardComment(storedContent);
@@ -282,6 +284,9 @@ export async function POST(
   const rawName = actor.name;
   return NextResponse.json({
     reward: null,
+    rewardNotice: rewardPolicy && !isMeaningfulRewardComment(normalizedContent, rewardPolicy.commentMinMeaningfulLength)
+      ? `댓글은 등록됐어요. 보상은 글자·숫자 ${rewardPolicy.commentMinMeaningfulLength}자 이상인 댓글에 지급돼요. 공백과 이모지는 제외돼요.`
+      : null,
     item: {
       id: created.id,
       parentCommentId: created.parentCommentId ?? threadRootId,

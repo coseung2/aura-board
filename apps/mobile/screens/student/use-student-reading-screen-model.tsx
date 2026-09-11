@@ -21,6 +21,7 @@ import {
   type WalkingRepresentativeSlime,
 } from "../../lib/walking-health";
 import { studentRewardNumberFormatter as numberFormatter } from "./student-reward-format";
+import { readingFeedbackNotice } from "../../../../src/lib/reading-feedback-notice";
 import {
   EMPTY_READING_COMPOSER_DRAFT,
   nextReadingComposerInstanceId,
@@ -487,7 +488,7 @@ export function useStudentReadingScreenModel() {
               ) {
                 updateEvaluation(evaluation);
                 if (evaluation.aiFeedbackStatus === "generated") {
-                  setNotice("피드백이 완성되었어요.");
+                  setNotice(readingFeedbackNotice(evaluation.aiScore));
                   void load(true);
                 }
                 return;
@@ -530,7 +531,7 @@ export function useStudentReadingScreenModel() {
         );
         updateEvaluation(payload.evaluation);
         if (payload.evaluation.aiFeedbackStatus === "generated") {
-          setNotice("피드백이 완성되었어요.");
+          setNotice(readingFeedbackNotice(payload.evaluation.aiScore));
           void load(true);
         } else if (payload.evaluation.aiFeedbackStatus !== "failed") {
           await pollFeedback();

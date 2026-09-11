@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { FeedbackToast } from "@/components/ui/FeedbackToast";
+import { readingFeedbackNotice } from "@/lib/reading-feedback-notice";
 import {
   fetchReadingFeedback,
   fetchReadingEntries,
@@ -45,6 +47,7 @@ export function ReadingForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const toastNotice = useMemo(() => error ? { message: error, variant: "error" as const } : notice ? { message: notice, variant: "info" as const } : null, [error, notice]);
   const [editingId, setEditingId] = useState<string | null>(null);
   const activeFeedbackIds = useRef(new Set<string>());
   const mounted = useRef(true);
@@ -115,7 +118,10 @@ export function ReadingForm() {
       try {
         const { evaluation } = await fetchReadingFeedback(readingLogId);
         updateEvaluation(readingLogId, evaluation);
-        if (evaluation.aiFeedbackStatus === "generated") return "generated";
+        if (evaluation.aiFeedbackStatus === "generated") {
+          if (mounted.current) setNotice(readingFeedbackNotice(evaluation.aiScore));
+          return "generated";
+        }
         if (evaluation.aiFeedbackStatus === "failed") return "failed";
       } catch {
         // A status check is best-effort. The next interval or the retrying POST
@@ -144,7 +150,7 @@ export function ReadingForm() {
           const { evaluation } = await generateReadingFeedback(readingLogId, options);
           updateEvaluation(readingLogId, evaluation);
           if (mounted.current && evaluation.aiFeedbackStatus === "generated") {
-            setNotice("피드백이 완성되었어요.");
+            setNotice(readingFeedbackNotice(evaluation.aiScore));
           }
           return;
         } catch (err) {
@@ -165,7 +171,6 @@ export function ReadingForm() {
           }
           const pollResult = await pollFeedback(readingLogId);
           if (pollResult === "generated") {
-            if (mounted.current) setNotice("피드백이 완성되었어요.");
             return;
           }
           if (attempt === FEEDBACK_RETRY_COUNT) {
@@ -254,6 +259,7 @@ export function ReadingForm() {
 
   return (
     <div className="reading-page">
+      <FeedbackToast notice={toastNotice} />
       <section className="reading-form-card">
         <form className="reading-form" onSubmit={handleSubmit}>
           <div className="reading-form-row">
@@ -319,7 +325,6 @@ export function ReadingForm() {
           </label>
 
           {error && <p className="reading-form-error">{error}</p>}
-          {notice && <p className="reading-form-notice">{notice}</p>}
 
           <div className="reading-form-actions">
             <button

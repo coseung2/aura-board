@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { FeedbackToast } from "../../components/FeedbackToast";
 import { useFocusedRefresh } from "../../hooks/use-focused-refresh";
 import {
   ActivityIndicator,
@@ -41,6 +42,7 @@ export default function StudentWalletScreen() {
   const [error, setError] = useState<string | null>(null);
   const [fdPrincipal, setFdPrincipal] = useState("");
   const [fdBusy, setFdBusy] = useState(false);
+  const [notice, setNotice] = useState<{ message: string; variant: "success" | "error" | "info"; id: number } | null>(null);
 
   const handleAuthError = useCallback(
     async (e: unknown) => {
@@ -71,7 +73,7 @@ export default function StudentWalletScreen() {
   const cancelFd = useCallback(
     async (fdId: string) => {
       if (!wallet?.classroomId) {
-        Alert.alert("오류", "학급 정보를 찾을 수 없어요.");
+        setNotice({ message: "학급 정보를 찾을 수 없어요.", variant: "error", id: Date.now() });
         return;
       }
       try {
@@ -80,13 +82,11 @@ export default function StudentWalletScreen() {
           { method: "POST" },
         );
         // 통장/FD 다시 로드.
-        const res = await fetchWalletSnapshot();
-        setWallet(res);
+        setNotice({ message: "적금을 해지했어요.", variant: "success", id: Date.now() });
+        try { setWallet(await fetchWalletSnapshot()); }
+        catch { setNotice({ message: "적금은 해지됐어요. 잔액 갱신이 늦어지고 있어요. 잠시 후 통장을 다시 열어 주세요.", variant: "info", id: Date.now() }); }
       } catch (e) {
-        Alert.alert(
-          "해지 실패",
-          e instanceof Error ? e.message : "적금을 해지하지 못했어요.",
-        );
+        setNotice({ message: e instanceof Error ? e.message : "적금을 해지하지 못했어요.", variant: "error", id: Date.now() });
       }
     },
     [wallet?.classroomId],
@@ -96,7 +96,7 @@ export default function StudentWalletScreen() {
     if (!wallet?.classroomId || fdBusy) return;
     const principal = Number(fdPrincipal.replace(/,/g, ""));
     if (!Number.isInteger(principal) || principal <= 0) {
-      Alert.alert("가입 금액 확인", "1 이상의 정수 금액을 입력해 주세요.");
+      setNotice({ message: "1 이상의 정수 금액을 입력해 주세요.", variant: "info", id: Date.now() });
       return;
     }
     setFdBusy(true);
@@ -105,16 +105,13 @@ export default function StudentWalletScreen() {
         `/api/classrooms/${encodeURIComponent(wallet.classroomId)}/bank/fixed-deposits`,
         { method: "POST", json: { principal } },
       );
-      const res = await fetchWalletSnapshot();
-      setWallet(res);
       setFdPrincipal("");
-      Alert.alert("가입 완료", "적금에 가입했어요.");
+      setNotice({ message: "적금에 가입했어요. 만기 시각이 지난 뒤 매 정각에 자동 지급돼요.", variant: "success", id: Date.now() });
+      try { setWallet(await fetchWalletSnapshot()); }
+      catch { setNotice({ message: "적금 가입은 완료됐어요. 잔액 갱신이 늦어지고 있어요. 다시 가입하지 말고 잠시 후 통장을 확인해 주세요.", variant: "info", id: Date.now() }); }
     } catch (e) {
       if (await handleAuthError(e)) return;
-      Alert.alert(
-        "가입 실패",
-        e instanceof Error ? e.message : "적금에 가입하지 못했어요.",
-      );
+      setNotice({ message: e instanceof Error ? e.message : "적금에 가입하지 못했어요.", variant: "error", id: Date.now() });
     } finally {
       setFdBusy(false);
     }
@@ -284,6 +281,7 @@ export default function StudentWalletScreen() {
           )}
         </ScrollView>
       )}
+      <FeedbackToast notice={notice} />
     </SafeAreaView>
   );
 }

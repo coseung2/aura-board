@@ -1,4 +1,6 @@
 import { ActivityIndicator } from "react-native";
+import { useMemo } from "react";
+import { FeedbackToast } from "../../components/FeedbackToast";
 import { AppButton } from "../../components/ui";
 import { AppHeader } from "../../components/ui";
 import { AppModal } from "../../components/ui";
@@ -34,6 +36,7 @@ export function StudentReadingScreenView({
 }: {
   model: StudentReadingScreenViewModel;
 }) {
+  const toastNotice = useMemo(() => model.notice ? { message: model.notice, variant: "info" as const } : null, [model.notice]);
   const {
     title,
     activeTab,
@@ -162,7 +165,6 @@ export function StudentReadingScreenView({
                   </View>
                 </View>
 
-                {notice ? <Text style={styles.notice}>{notice}</Text> : null}
 
                 <AppButton onPress={openComposer}>독서 기록 작성</AppButton>
 
@@ -599,6 +601,7 @@ export function StudentReadingScreenView({
           </AppButton>
         </View>
       </AppModal>
+      <FeedbackToast notice={toastNotice} />
     </SafeAreaView>
   );
 }
