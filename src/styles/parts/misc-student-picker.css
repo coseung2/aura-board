@@ -29,6 +29,31 @@
   scrollbar-color: var(--picker-lilac-strong) transparent;
 }
 
+.board-toolkit-move-handle {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 44px;
+  border: 0;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #29234f);
+  font: inherit;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.board-toolkit-move-handle:active { cursor: grabbing; }
+.board-toolkit-move-handle:focus-visible {
+  outline: 2px solid var(--color-accent, #6d57e7);
+  outline-offset: -4px;
+}
+
 .board-picker-hero {
   position: relative;
   display: flex;

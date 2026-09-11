@@ -473,6 +473,16 @@ export function BoardToolkitFab(_props: BoardToolkitFabProps) {
           type="button"
           className="board-timer-drag-handle"
           onPointerDown={beginPanelDrag}
+          onKeyDown={(event) => {
+            const direction = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
+            const rect = panelRef.current?.getBoundingClientRect();
+            if (!direction || !rect) return;
+            event.preventDefault();
+            const step = event.shiftKey ? 40 : 10;
+            const next = clampPanelGeometry(rect.left + direction[0] * step, rect.top + direction[1] * step, rect.width, rect.height);
+            setPanelPosition({ left: next.left, top: next.top });
+            setPanelSize({ width: next.width, height: next.height });
+          }}
           aria-label="타이머 이동"
           title="타이머 이동"
         >

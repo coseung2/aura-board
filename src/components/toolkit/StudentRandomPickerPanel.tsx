@@ -1,4 +1,5 @@
 import { CloseIcon } from "../icons/UiIcons";
+import { useToolkitMovement } from "./useToolkitMovement";
 
 export type ToolkitStudent = {
   id: string;
@@ -56,6 +57,7 @@ export function StudentRandomPickerPanel({
   onChangePickerCount,
   onDraw,
 }: StudentRandomPickerPanelProps) {
+  const movement = useToolkitMovement();
   const pickedStudentIds = new Set(pickedStudents.map((student) => student.id));
   const highlightedStudent = highlightedStudentId
     ? eligibleStudents.find((student) => student.id === highlightedStudentId) ?? null
@@ -79,6 +81,8 @@ export function StudentRandomPickerPanel({
 
   return (
     <section
+      ref={movement.ref}
+      style={movement.style}
       className={[
         "board-toolkit-panel",
         "board-student-picker-panel",
@@ -90,6 +94,9 @@ export function StudentRandomPickerPanel({
       role="dialog"
       aria-label="학생 랜덤뽑기"
     >
+      <button type="button" className="board-toolkit-move-handle" aria-label="학생 랜덤뽑기 이동" title="드래그 또는 방향키로 이동" {...movement.handleProps}>
+        <span aria-hidden="true">⠿</span> 학생 랜덤뽑기
+      </button>
       <div className="board-picker-hero">
         <div className="board-picker-hero-copy">
           <span className="board-picker-eyebrow">

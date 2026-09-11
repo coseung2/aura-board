@@ -42,6 +42,25 @@ function makeProps(
 }
 
 describe("StudentRandomPickerPanel", () => {
+  it("moves with arrow keys and keeps the panel within the viewport", () => {
+    render(<StudentRandomPickerPanel {...makeProps()} />);
+    const panel = screen.getByRole("dialog", { name: "학생 랜덤뽑기" });
+    const handle = screen.getByRole("button", { name: "학생 랜덤뽑기 이동" });
+    vi.spyOn(panel, "getBoundingClientRect").mockImplementation(() => ({
+      left: Number.parseFloat(panel.style.left), top: Number.parseFloat(panel.style.top),
+      width: 320, height: 400, right: 0, bottom: 0, x: 0, y: 0, toJSON() {},
+    }));
+    fireEvent.keyDown(handle, { key: "ArrowRight" });
+    expect(panel.style.left).toBe("22px");
+    fireEvent.keyDown(handle, { key: "ArrowDown", shiftKey: true });
+    expect(panel.style.top).toBe("52px");
+    for (let index = 0; index < 100; index++) fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(panel.style.left).toBe("12px");
+    panel.style.top = "900px";
+    fireEvent(window, new Event("resize"));
+    expect(Number.parseFloat(panel.style.top)).toBeLessThanOrEqual(window.innerHeight - 412);
+  });
+
   it("guides the teacher from classroom selection into the picker", () => {
     const onChooseClassroom = vi.fn();
     render(
