@@ -547,6 +547,32 @@ Object payload replication or a documented media degraded-mode is a separate gat
   convergence pair. The authoritative version number was not independently
   queried in this pass.
 
+2026-09-12 rolling-contract follow-up:
+
+- The still-running pre-change Rust binary returned a valid version-16 snapshot
+  whose `viewer` omitted only `capabilities`. The Expo strict validator rejected
+  that HTTP 200 body and A20 stayed on `대국 준비 중 / 연결을 확인해 주세요`.
+- The mobile boundary now normalizes only that exact legacy omission to
+  `canRematch: false`. Current `true` is preserved; null, partial and malformed
+  capability values remain rejected. HTTP current-session/command/rematch and
+  all snapshot-bearing WebSocket frames share the same parser.
+- Mobile Vitest passed 59 tests across the compatibility, move-machine and
+  socket suites. Mobile TypeScript and `design:check` passed, as did scoped
+  `git diff --check`.
+- After an explicit React Native bundle reload from the current Metro project,
+  A20 restored the same session at version 16 with 16 stones and `상대 차례`.
+  No resign/command POST was sent. Baseline and recovery evidence are
+  `a20-legacy-contract-baseline.png` and `a20-after-rn-reload.png` in the
+  evidence directory above.
+- Do not treat that compatibility smoke as a fresh two-device convergence run.
+  Expo Go route history redirected later direct-link attempts to the ordinary
+  boards screen. The earlier S23/A20 WebSocket convergence remains the paired
+  evidence. The running Rust process was not restarted, and no deployment was
+  performed.
+- Remaining release gates: trustworthy RN native-paint p50/p95 instrumentation,
+  Rust/Postgres restart recovery, shaped slow/offline/ack-loss/slow-subscriber
+  tests, and limited-classroom rollout with rollback thresholds.
+
 - Create a session and confirm the server assigns unique `first` and `second` slots. Reload web and Expo before either student is ready; both must recover the same `waiting` snapshot.
 - Ready one participant, reload, and confirm only that participant is ready. Ready the second participant and confirm the session becomes `ready` but does not start automatically.
 - Start as the host. Confirm participants cannot start and the host cannot place a stone.

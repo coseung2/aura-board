@@ -119,3 +119,34 @@
 
 - 위 역할 기준으로 게임별 성공/실패를 기록한다.
 - 실패 항목은 원인과 재현 절차를 추가한 뒤 수정하고 재검증한다.
+
+## 구버전 Rust snapshot 롤링 호환 (16:40–17:06 KST)
+
+- 증상: A20은 matchmaking 200으로 기존 match board에 이동했지만
+  `대국 준비 중 / 연결을 확인해 주세요`에 머물렀다. 같은 시각 session GET은
+  약 3초마다 HTTP 200이었고 DB/Rust session은
+  `fabf8167-1399-4f2f-99e4-4d2bf56c9d66`, version 16, active였다.
+- 확정 원인: 실행 중 Rust는 최신 소스보다 먼저 시작된 바이너리라 snapshot의
+  `viewer`에 `role`, `slot`만 반환했다. 최신 Expo validator는
+  `viewer.capabilities.canRematch`를 필수로 검사해 그 응답을
+  `invalid_omok_snapshot`으로 거부했다. stale ticket이나 사라진 session은
+  원인이 아니었다.
+- 잘못된 초기 대응: matched GET마다 Rust current-session을 추가 조회해 404
+  ticket을 정리하는 `703c8725`는 이번 원인을 해결하지 않고 로비 지연과 엔진
+  의존성만 늘렸다. 검토 후 `2f0b7415`로 비파괴 revert했다.
+- 수정: Expo contract parser가 `capabilities` own property가 완전히 없을 때만
+  입력을 변이하지 않은 clone에 `{ canRematch: false }`를 넣고 strict validator를
+  다시 통과시킨다. HTTP current/command/rematch와 WebSocket ready,
+  command_committed, snapshot, command_rejected, session_replaced에 적용했다.
+  null·부분·잘못된 capabilities 및 다른 malformed field는 계속 거부한다.
+- 검증: compatibility/move/socket Vitest 59개, mobile typecheck,
+  `design:check`, scoped diff check가 통과했다. 현재 Metro bundle을 명시적으로
+  reload한 A20은 version 16, 16수, `상대 차례` 판을 복원했다. reload 과정에서
+  열린 기권 확인창은 취소했고 command/resign POST가 없음을 로그로 확인했다.
+- 증거: 같은 임시 증거 폴더의 `a20-legacy-contract-baseline.png`와
+  `a20-after-rn-reload.png`. 이후 S23/A20 direct-link 동시 캡처는 Expo Go route
+  history가 일반 보드 목록으로 복귀해 완료하지 못했으므로 새 양방향 검증으로
+  세지 않는다.
+- 영향 및 후속: session/DB 상태 손상은 없었다. 실행 중 Rust 재시작, 정밀
+  p50/p95, Postgres restart와 slow-network/ack-loss 장애 주입, 제한 학급 rollout은
+  남아 있다. 운영 배포는 하지 않았다.

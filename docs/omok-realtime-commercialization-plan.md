@@ -44,6 +44,21 @@
   `s23-after-final-white.png`, `a20-after-final-white.png`,
   `a20-final-white-selected.png`에 보존했다. 최종 session version 숫자는 별도
   인증 조회로 확인하지 않았으므로 화면 수렴만 검증된 사실로 기록한다.
+- 이후 실행 중이던 구버전 Rust가 `viewer.capabilities` 없이 반환한 정상
+  snapshot을 최신 Expo가 거부하는 롤링 계약 문제가 재현됐다. 모바일은 이
+  필드가 통째로 누락된 경우에만 권한을 올리지 않는
+  `{ canRematch: false }`를 보충하고, null·부분·잘못된 capability와 그 밖의
+  malformed snapshot은 계속 거부한다. current-session HTTP, command/rematch
+  응답과 모든 snapshot-bearing WebSocket frame이 같은 parser를 사용한다.
+- 새 번들을 명시적으로 reload한 A20은 같은 session의 version 16, 16수,
+  `상대 차례` 판을 복원했다. reload 전 `대국 준비 중 / 연결을 확인해 주세요`
+  화면은 `a20-legacy-contract-baseline.png`, 복원 화면은
+  `a20-after-rn-reload.png`에 남겼다. 화면에 열린 기권 확인창은 취소했으며
+  command/resign POST가 없음을 확인했다.
+- 이 호환 재검증에서 S23/A20의 새 동시 캡처는 Expo Go route history가 일반
+  보드 목록을 우선해 완료하지 못했다. 두 기기의 같은 판·양방향 WebSocket
+  착수는 위의 기존 검증을 근거로 하며, 이번 추가 패스가 그것을 새로
+  검증했다고 기록하지 않는다.
 
 ## 완료 기준
 
@@ -282,9 +297,11 @@ version 상승이 필요하다.
 
 ## 단계별 구현
 
-아래 0~2단계의 코드는 Kiro Opus·Sol 구현과 상호 리뷰, 통합 자동 검증 및
-S23/A20 실기기 왕복 착수까지 완료됐다. 3단계의 추가 상용 화면 정리와
-4단계 전체 장애 주입·점진 rollout은 계속 남아 있다.
+0~3단계 코드와 4단계의 복구·관측·롤백 기반 코드는 구현됐다. Sol 구현 뒤
+통합 diff를 독립 재검토했고 모바일 회귀 59개, typecheck, design check를
+통과했다. S23/A20 양방향 착수와 A20의 구버전 Rust snapshot 복구도 실기기로
+확인했다. 다만 4단계의 전체 장애 주입과 점진 rollout은 운영 절차이므로 아래
+항목이 끝나기 전 상용화 완료로 보지 않는다.
 
 ### 0. 계약과 계측
 
@@ -327,6 +344,13 @@ S23/A20 실기기 왕복 착수까지 완료됐다. 3단계의 추가 상용 화
 - 오류율이나 p95 기준을 넘으면 WebSocket command flag를 끄고 기존 HTTP와
   outbox 복구 경로로 되돌린다. DB schema와 receipt는 그대로이므로 rollback이
   상태를 손상하지 않는다.
+
+구현 완료 범위는 bounded reconnect/HTTP fallback, background catch-up,
+durable replay, stale async 차단, actor별 단일 소켓, latency metric 및 flag
+rollback 경계다. 남은 운영 게이트는 RN native paint timestamp를 포함한
+touch/pending/ack/peer-render p50·p95 측정, Postgres를 포함한 Rust 재시작,
+slow-network/ack-loss/slow-subscriber shaping, 제한 학급 rollout이다. 이번
+작업에서는 실행 중 서버를 재시작하거나 배포하지 않았다.
 
 ## 자동 검증
 
