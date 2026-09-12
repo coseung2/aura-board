@@ -16,6 +16,9 @@ export function OmokHud({ snapshot }: { snapshot: OmokSnapshot }) {
           <View
             key={participant.slot}
             style={[styles.player, isTurn ? styles.playerActive : null]}
+            accessibilityLabel={`${omokSlotLabel(participant.slot)} ${participant.displayName}${
+              isViewer ? ", 나" : ""
+            }${isTurn ? ", 현재 차례" : ""}`}
           >
             <View
               style={[
@@ -23,11 +26,20 @@ export function OmokHud({ snapshot }: { snapshot: OmokSnapshot }) {
                 participant.slot === "first" ? styles.blackStone : styles.whiteStone,
               ]}
             />
-            <Text style={styles.name} numberOfLines={1}>
-              {participant.displayName}
-              {isViewer ? " (나)" : ""}
-            </Text>
-            <Text style={styles.slot}>{omokSlotLabel(participant.slot)}</Text>
+            <View style={styles.identity}>
+              <Text style={styles.name} numberOfLines={1}>
+                {participant.displayName}
+                {isViewer ? " (나)" : ""}
+              </Text>
+              <View style={styles.meta}>
+                <Text style={styles.slot}>{omokSlotLabel(participant.slot)}</Text>
+                {isTurn ? (
+                  <View style={styles.turnBadge}>
+                    <Text style={styles.turnBadgeText}>차례</Text>
+                  </View>
+                ) : null}
+              </View>
+            </View>
           </View>
         );
       })}
@@ -72,8 +84,9 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: omokTokens.hudBorder,
     backgroundColor: omokTokens.hudSurface,
+    overflow: "hidden",
   },
-  /** Turn ownership is carried by weight and border, not colour alone. */
+  /** The visible badge carries turn ownership without relying on colour. */
   playerActive: {
     borderColor: omokTokens.myTurnSurface,
     borderWidth: omokTokens.lastMoveBorderWidth,
@@ -89,8 +102,20 @@ const styles = StyleSheet.create({
     borderWidth: omokTokens.hudStoneBorderWidth,
     borderColor: omokTokens.whiteStoneBorder,
   },
-  name: { ...typography.label, flex: 1, color: omokTokens.text },
+  identity: { flex: 1, minWidth: spacing.none },
+  name: { ...typography.label, color: omokTokens.text },
+  meta: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   slot: { ...typography.micro, color: omokTokens.statusLabel, fontWeight: "800" },
+  turnBadge: {
+    paddingHorizontal: spacing.xs,
+    borderRadius: radii.pill,
+    backgroundColor: omokTokens.turnBadgeSurface,
+  },
+  turnBadgeText: {
+    ...typography.micro,
+    color: omokTokens.turnBadgeText,
+    fontWeight: "800",
+  },
   turnBar: {
     minHeight: omokTokens.turnBarMinHeight,
     alignItems: "center",

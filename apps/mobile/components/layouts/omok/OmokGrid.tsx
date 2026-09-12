@@ -111,7 +111,10 @@ export function OmokGrid({
               left: omokIntersectionOffset(aim.column, frame) - frame.stoneSize / 2,
             },
           ]}
-        />
+        >
+          <View style={styles.aimHorizontal} />
+          <View style={styles.aimVertical} />
+        </View>
       ) : null}
 
       {board.map((cell, index) => {
@@ -137,7 +140,12 @@ export function OmokGrid({
               },
             ]}
           >
-            {isLast ? <View style={styles.lastMoveDot} /> : null}
+            {isPending ? <View style={styles.pendingCore} /> : null}
+            {isLast ? (
+              <View style={styles.lastMoveRing}>
+                <View style={styles.lastMoveDot} />
+              </View>
+            ) : null}
           </View>
         );
       })}
@@ -178,6 +186,18 @@ const styles = StyleSheet.create({
     borderColor: omokTokens.aimRing,
     backgroundColor: omokTokens.aimFill,
   },
+  aimHorizontal: {
+    position: "absolute",
+    width: omokTokens.aimCrosshairSize,
+    height: omokTokens.aimCrosshairStroke,
+    backgroundColor: omokTokens.aimRing,
+  },
+  aimVertical: {
+    position: "absolute",
+    width: omokTokens.aimCrosshairStroke,
+    height: omokTokens.aimCrosshairSize,
+    backgroundColor: omokTokens.aimRing,
+  },
   stone: {
     position: "absolute",
     alignItems: "center",
@@ -199,6 +219,21 @@ const styles = StyleSheet.create({
     borderWidth: omokTokens.pendingRingWidth,
     borderColor: omokTokens.pendingRing,
     borderStyle: "dashed",
+  },
+  pendingCore: {
+    width: omokTokens.pendingCoreWidth,
+    height: omokTokens.pendingCoreHeight,
+    borderRadius: radii.pill,
+    backgroundColor: omokTokens.pendingCore,
+  },
+  lastMoveRing: {
+    width: omokTokens.lastMoveRingSize,
+    height: omokTokens.lastMoveRingSize,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: radii.pill,
+    borderWidth: omokTokens.lastMoveRingWidth,
+    borderColor: omokTokens.lastMove,
   },
   lastMoveDot: {
     width: omokTokens.lastMoveDotSize,

@@ -1,5 +1,9 @@
 import { StyleSheet, Text, View } from "react-native";
-import { omokOutcomeReason, omokOutcomeTitle } from "../../../lib/omok-presentation";
+import {
+  omokOutcomeReason,
+  omokOutcomeTitle,
+  omokRematchMessage,
+} from "../../../lib/omok-presentation";
 import type { OmokSnapshot } from "../../../lib/omok-contract";
 import { omokTokens, radii, spacing, typography } from "../../../theme/tokens";
 import { AppButton } from "../../ui";
@@ -21,15 +25,24 @@ export function OmokTerminalPanel({
 }) {
   return (
     <View style={styles.panel} accessibilityLiveRegion="polite">
+      <Text style={styles.kicker}>대국 결과</Text>
       <Text style={styles.title}>{omokOutcomeTitle(snapshot)}</Text>
       <Text style={styles.reason}>{omokOutcomeReason(snapshot)}</Text>
+      <Text style={styles.rematchMessage}>
+        {omokRematchMessage(snapshot, canRematch)}
+      </Text>
       <View style={styles.actions}>
         {canRematch ? (
-          <AppButton disabled={busy} onPress={onRematch}>
+          <AppButton style={styles.action} disabled={busy} onPress={onRematch}>
             {busy ? "새 대국을 만드는 중…" : "다시 대국"}
           </AppButton>
         ) : null}
-        <AppButton variant="secondary" disabled={busy} onPress={onLeave}>
+        <AppButton
+          variant="secondary"
+          style={styles.action}
+          disabled={busy}
+          onPress={onLeave}
+        >
           나가기
         </AppButton>
       </View>
@@ -49,7 +62,19 @@ const styles = StyleSheet.create({
     borderColor: omokTokens.panelBorder,
     backgroundColor: omokTokens.panelSurface,
   },
-  title: { ...typography.title, color: omokTokens.text, textAlign: "center" },
+  kicker: {
+    ...typography.micro,
+    color: omokTokens.statusLabel,
+    textAlign: "center",
+    fontWeight: "800",
+  },
+  title: { ...typography.display, color: omokTokens.text, textAlign: "center" },
   reason: { ...typography.body, color: omokTokens.statusHint, textAlign: "center" },
-  actions: { gap: spacing.sm },
+  rematchMessage: {
+    ...typography.label,
+    color: omokTokens.statusHint,
+    textAlign: "center",
+  },
+  actions: { flexDirection: "row", gap: spacing.sm },
+  action: { flex: 1, minHeight: omokTokens.confirmMinHeight },
 });

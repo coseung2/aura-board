@@ -261,20 +261,25 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
     : null;
   const terminal = snapshot.roomStatus === "finished";
   const board = projectPendingBoard(state) ?? snapshot.game.board;
+  const notice = omokConnectionNotice(socketStatus, {
+    httpRecovering: offline,
+    offline,
+  });
+  const recoveryMessage = state.error ?? notice;
+  const reservedHeight = terminal
+    ? omokTokens.terminalReservedHeight
+    : omokTokens.reservedHeight;
   const frame = omokBoardFrame({
     width,
     height,
-    reservedHeight: omokTokens.reservedHeight,
+    reservedHeight:
+      reservedHeight + (recoveryMessage ? omokTokens.recoveryReservedHeight : spacing.none),
     horizontalPadding: spacing.md,
     maxEdge: omokTokens.boardMaxEdge,
     minEdge: omokTokens.boardMinEdge,
   });
   const banner = omokTurnBanner(state);
   const hint = omokHintText(state);
-  const notice = omokConnectionNotice(socketStatus, {
-    httpRecovering: offline,
-    offline,
-  });
   const boardEnabled = !terminal && !state.pending && canPlaceStone(snapshot);
 
   // No scroll view: the board and its chrome are sized to the viewport.
@@ -343,15 +348,22 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
         </View>
       )}
 
-      {notice ? (
-        <Text style={styles.notice} accessibilityLiveRegion="polite">
-          {notice}
-        </Text>
-      ) : null}
-      {state.error ? (
-        <Text style={styles.error} accessibilityRole="alert">
-          {state.error}
-        </Text>
+      {recoveryMessage ? (
+        <View
+          style={[styles.recovery, state.error ? styles.recoveryError : null]}
+          accessibilityLiveRegion={state.error ? "assertive" : "polite"}
+        >
+          <Text style={[styles.recoveryText, state.error ? styles.recoveryErrorText : null]}>
+            {recoveryMessage}
+          </Text>
+          <AppButton
+            variant="secondary"
+            style={styles.recoveryButton}
+            onPress={() => void runtime.refresh()}
+          >
+            다시 확인
+          </AppButton>
+        </View>
       ) : null}
     </View>
   );
@@ -370,16 +382,31 @@ const styles = StyleSheet.create({
     color: omokTokens.statusHint,
     textAlign: "center",
   },
-  notice: {
-    ...typography.label,
-    color: omokTokens.noticeText,
+  recovery: {
+    minHeight: omokTokens.recoveryMinHeight,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
     backgroundColor: omokTokens.noticeSurface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: omokTokens.noticeBorder,
     borderRadius: radii.control,
-    padding: spacing.sm,
-    textAlign: "center",
+    padding: spacing.xs,
     overflow: "hidden",
+  },
+  recoveryError: {
+    backgroundColor: omokTokens.errorBg,
+    borderColor: omokTokens.errorText,
+  },
+  recoveryText: {
+    ...typography.label,
+    flex: 1,
+    color: omokTokens.noticeText,
+  },
+  recoveryErrorText: { color: omokTokens.errorText },
+  recoveryButton: {
+    minWidth: omokTokens.recoveryButtonMinWidth,
+    minHeight: omokTokens.recoveryMinHeight,
   },
   actionRow: {
     flexDirection: "row",
