@@ -1,4 +1,4 @@
-import { isOmokSnapshot, type OmokIntent, type OmokSnapshot } from "./omok-contract";
+import { parseOmokSnapshot, type OmokIntent, type OmokSnapshot } from "./omok-contract";
 
 /** Authoritative Omok realtime wire protocol v1 (see the realtime plan).
  * Frames are validated here so the state reducer and socket lifecycle never
@@ -100,9 +100,13 @@ function isCommandType(value: unknown): value is OmokIntent["type"] {
   return value === "ready" || value === "place_stone" || value === "resign";
 }
 
-function isOptionalSnapshotForSession(value: unknown, sessionId: string): boolean {
-  return value === undefined || value === null ||
-    (isOmokSnapshot(value) && value.sessionId === sessionId);
+function parseOptionalSnapshotForSession(
+  value: unknown,
+  sessionId: string,
+): OmokSnapshot | null | undefined {
+  if (value === undefined || value === null) return null;
+  const snapshot = parseOmokSnapshot(value);
+  return snapshot?.sessionId === sessionId ? snapshot : undefined;
 }
 
 export function parseOmokServerFrame(raw: unknown): OmokServerFrame | null {
@@ -120,27 +124,28 @@ export function parseOmokServerFrame(raw: unknown): OmokServerFrame | null {
   if (!isRecord(value) || value.protocolVersion !== OMOK_PROTOCOL_VERSION) return null;
 
   switch (value.type) {
-    case "ready":
+    case "ready": {
+      const snapshot = parseOmokSnapshot(value.snapshot);
       return isNonEmptyString(value.sessionId) &&
-        isOmokSnapshot(value.snapshot) &&
-        value.snapshot.sessionId === value.sessionId
+        snapshot?.sessionId === value.sessionId
         ? {
             type: "ready",
             protocolVersion: 1,
             sessionId: value.sessionId,
-            snapshot: value.snapshot,
+            snapshot,
           }
         : null;
-    case "command_committed":
+    }
+    case "command_committed": {
+      const snapshot = parseOmokSnapshot(value.snapshot);
       return isNonEmptyString(value.sessionId) &&
         isNonEmptyString(value.requestId) &&
         isCommandType(value.commandType) &&
         Number.isSafeInteger(value.previousVersion) &&
         Number.isSafeInteger(value.version) &&
         typeof value.replayed === "boolean" &&
-        isOmokSnapshot(value.snapshot) &&
-        value.snapshot.sessionId === value.sessionId &&
-        value.snapshot.version === value.version
+        snapshot?.sessionId === value.sessionId &&
+        snapshot.version === value.version
         ? {
             type: "command_committed",
             protocolVersion: 1,
@@ -150,29 +155,34 @@ export function parseOmokServerFrame(raw: unknown): OmokServerFrame | null {
             previousVersion: Number(value.previousVersion),
             version: Number(value.version),
             replayed: value.replayed,
-            snapshot: value.snapshot,
+            snapshot,
           }
         : null;
-    case "snapshot":
+    }
+    case "snapshot": {
+      const snapshot = parseOmokSnapshot(value.snapshot);
       return isNonEmptyString(value.sessionId) &&
         value.reason === "session_changed" &&
-        isOmokSnapshot(value.snapshot) &&
-        value.snapshot.sessionId === value.sessionId
+        snapshot?.sessionId === value.sessionId
         ? {
             type: "snapshot",
             protocolVersion: 1,
             sessionId: value.sessionId,
             reason: "session_changed",
-            snapshot: value.snapshot,
+            snapshot,
           }
         : null;
-    case "command_rejected":
+    }
+    case "command_rejected": {
+      const snapshot = isNonEmptyString(value.sessionId)
+        ? parseOptionalSnapshotForSession(value.snapshot, value.sessionId)
+        : undefined;
       return isNonEmptyString(value.sessionId) &&
         isNonEmptyString(value.requestId) &&
         isCommandType(value.commandType) &&
         isNonEmptyString(value.error) &&
         typeof value.retryable === "boolean" &&
-        isOptionalSnapshotForSession(value.snapshot, value.sessionId)
+        snapshot !== undefined
         ? {
             type: "command_rejected",
             protocolVersion: 1,
@@ -184,9 +194,10 @@ export function parseOmokServerFrame(raw: unknown): OmokServerFrame | null {
             currentVersion: Number.isSafeInteger(value.currentVersion)
               ? Number(value.currentVersion)
               : null,
-            snapshot: isOmokSnapshot(value.snapshot) ? value.snapshot : null,
+            snapshot,
           }
         : null;
+    }
     case "connection_error":
       return isNonEmptyString(value.error) && typeof value.retryable === "boolean"
         ? {
@@ -196,23 +207,24 @@ export function parseOmokServerFrame(raw: unknown): OmokServerFrame | null {
             retryable: value.retryable,
           }
         : null;
-    case "session_replaced":
+    case "session_replaced": {
+      const snapshot = parseOmokSnapshot(value.snapshot);
       return value.reason === "rematch" &&
         isNonEmptyString(value.previousSessionId) &&
         isNonEmptyString(value.sessionId) &&
         value.sessionId !== value.previousSessionId &&
-        isOmokSnapshot(value.snapshot) &&
-        value.snapshot.sessionId === value.sessionId &&
-        value.snapshot.previousSessionId === value.previousSessionId
+        snapshot?.sessionId === value.sessionId &&
+        snapshot.previousSessionId === value.previousSessionId
         ? {
             type: "session_replaced",
             protocolVersion: 1,
             reason: "rematch",
             previousSessionId: value.previousSessionId,
             sessionId: value.sessionId,
-            snapshot: value.snapshot,
+            snapshot,
           }
         : null;
+    }
     default:
       return null;
   }

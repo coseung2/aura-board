@@ -181,6 +181,25 @@ export function isOmokSnapshot(value: unknown): value is OmokSnapshot {
   return true;
 }
 
+/** Accepts the current snapshot contract unchanged. During the rolling Rust
+ * transition, the immediately previous shape is accepted only when the
+ * viewer omitted `capabilities` entirely; the normalized clone must still
+ * pass the current validator. Untrusted input is never mutated. */
+export function parseOmokSnapshot(value: unknown): OmokSnapshot | null {
+  if (isOmokSnapshot(value)) return value;
+  if (!isPlainRecord(value) || !isPlainRecord(value.viewer)) return null;
+  if (Object.prototype.hasOwnProperty.call(value.viewer, "capabilities")) return null;
+
+  const normalized: unknown = {
+    ...value,
+    viewer: {
+      ...value.viewer,
+      capabilities: { canRematch: false },
+    },
+  };
+  return isOmokSnapshot(normalized) ? normalized : null;
+}
+
 export function isPlayCommandResponse(value: unknown): value is PlayCommandResponse {
   if (!value || typeof value !== "object") return false;
   const response = value as Partial<PlayCommandResponse>;
@@ -191,6 +210,26 @@ export function isPlayCommandResponse(value: unknown): value is PlayCommandRespo
     isOmokSnapshot(response.snapshot) &&
     response.version === response.snapshot.version
   );
+}
+
+/** Parses an HTTP command envelope while preserving request/version
+ * correlation and applying the same snapshot compatibility boundary. */
+export function parsePlayCommandResponse(value: unknown): PlayCommandResponse | null {
+  if (!isPlainRecord(value)) return null;
+  const snapshot = parseOmokSnapshot(value.snapshot);
+  if (
+    typeof value.requestId !== "string" ||
+    !Number.isSafeInteger(value.previousVersion) ||
+    !Number.isSafeInteger(value.version) ||
+    !snapshot ||
+    value.version !== snapshot.version
+  ) return null;
+  return {
+    requestId: value.requestId,
+    previousVersion: Number(value.previousVersion),
+    version: Number(value.version),
+    snapshot,
+  };
 }
 
 /** Parses the ticket route's documented union. Anything else — a partial body,

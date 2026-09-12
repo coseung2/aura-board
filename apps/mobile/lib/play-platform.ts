@@ -1,9 +1,9 @@
 import * as SecureStore from "expo-secure-store";
 import { apiFetch, ApiError } from "./api";
 import {
-  isOmokSnapshot,
-  isPlayCommandResponse,
   legacyPendingOmokKey,
+  parseOmokSnapshot,
+  parsePlayCommandResponse,
   parseOmokRealtimeTransport,
   parsePendingOmokCommand,
   pendingOmokKey,
@@ -31,8 +31,9 @@ export async function fetchCurrentOmokSession(
       `/api/play/boards/${encodeURIComponent(boardId)}/session`,
       { timeoutMs: 5_000 },
     );
-    if (!isOmokSnapshot(value)) throw new Error("invalid_omok_snapshot");
-    return value;
+    const snapshot = parseOmokSnapshot(value);
+    if (!snapshot) throw new Error("invalid_omok_snapshot");
+    return snapshot;
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) return null;
     throw error;
@@ -75,10 +76,11 @@ export async function submitOmokCommand(
     `/api/play/sessions/${encodeURIComponent(sessionId)}/commands`,
     { method: "POST", json: request, timeoutMs: 5_000 },
   );
-  if (!isPlayCommandResponse(value) || value.requestId !== request.requestId) {
+  const response = parsePlayCommandResponse(value);
+  if (!response || response.requestId !== request.requestId) {
     throw new Error("invalid_play_command_response");
   }
-  return value;
+  return response;
 }
 
 /** Host-only rematch. The engine replies with the replacement session. */
@@ -90,9 +92,12 @@ export async function requestOmokRematch(
     `/api/play/sessions/${encodeURIComponent(sessionId)}/rematch`,
     { method: "POST", json: { requestId }, timeoutMs: 8_000 },
   );
-  if (isOmokSnapshot(value)) return value;
-  const snapshot = (value as { snapshot?: unknown } | null)?.snapshot;
-  if (isOmokSnapshot(snapshot)) return snapshot;
+  const directSnapshot = parseOmokSnapshot(value);
+  if (directSnapshot) return directSnapshot;
+  const snapshot = parseOmokSnapshot(
+    (value as { snapshot?: unknown } | null)?.snapshot,
+  );
+  if (snapshot) return snapshot;
   throw new Error("invalid_omok_rematch_response");
 }
 
