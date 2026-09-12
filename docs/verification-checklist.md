@@ -792,3 +792,46 @@ change's unit tests do not measure production propagation latency.
 - Before a real batch: inspect `ready/review/warnings`, run with FFmpeg/FFprobe installed, then validate generated 15-second clips and the intended DB/storage environment. A skipped FFmpeg test does not verify real extraction. Production registration is a separate operation.
 
 - Student login code: `DCY366`
+
+## Omok native-paint and recovery qualification (2026-09-12 KST)
+
+- Fixture: board `cmtx9ttb50011vs30ai2j2pso`, session
+  `fabf8167-1399-4f2f-99e4-4d2bf56c9d66`. Baseline was active v16; final
+  authoritative state is active v24 with next turn first. S23 `R3CW50BW8KB` is
+  test/black; A20 `R59M904MEMY` is 공서희/white.
+- Instrumentation boundary: confirm touch, pending layout, requester ack/layout
+  and peer snapshot/layout markers correlate request/session/version and clear
+  stale probes. `useLayoutEffect` is a layout boundary, not native paint.
+- Normal two-device pass: exercise one move from each device and require one
+  version increment, one stone, requester pending feedback, and peer convergence.
+  The captured v18→19 and v19→20 moves passed. Layout/ack timings are recorded in
+  the plan and evidence bundle; do not call them paint timings.
+- Rust restart pass: restart only the task-owned Rust listener, require both
+  sockets to return to the same session, no healthy HTTP polling, and one clean
+  post-restart move. Captured v20→21 passed. The instantaneous restart input gate
+  was not directly sampled and remains unverified.
+- Slow network pass: apply one-device/one-socket delay only, then require one
+  command, one commit and both devices at the same version. Captured 650ms each
+  way, v21→22 passed.
+- Ack-loss pass: drop the requester's first committed frame, require retry with
+  the identical request ID, `replayed:true`, a single version increase and no
+  duplicate stone. Captured v22→23 passed.
+- Slow-reader pass: pause one device proxy's upstream read for 6 seconds while
+  the peer moves, then require one authoritative catch-up snapshot. Captured
+  v23→24 passed. Separately run
+  `cargo test -p play-server send_timeout_seam_drops_a_stalled_subscriber_deterministically`
+  for the Rust send-timeout/drop seam; do not equate that harness with the
+  physical delayed-reader result.
+- Native-paint gate remains blocked: S23 present timestamps could not be tied to
+  the target frame and A20 exposes no `DisplayPresentTime`. Native-paint count is
+  0 and p50/p95 are `unavailable`; never substitute layout, ADB or video values.
+- Postgres restart remains prohibited: PID 28800 owns an SSH forward from local
+  15434 to remote `100.120.114.62`; ownership, dependents and rollback authority
+  are not proven. Preserve the tunnel and database.
+- UI P1: occupied-intersection feedback must stay in the board hint line without
+  `다시 확인`; actual connection/server errors retain the recovery panel and
+  retry. `기권` remains a 44dp+ confirmed destructive action but is visually
+  secondary to the turn action. Preserve two-step aim → `여기에 두기`.
+- Evidence:
+  `C:\Users\coseung2\AppData\Local\Temp\aura-board-omok-device-current\qualification-2026-09-12`.
+  No deployment or Postgres restart is part of this qualification.

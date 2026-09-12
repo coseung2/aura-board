@@ -131,9 +131,10 @@ Next는 기존 세션 인증과 제품 접근 정책으로 actor를 해석하고
   전송하므로, 모바일은 모든 연결에 고정 sentinel Origin
   `https://mobile.aura-board.invalid`를 명시한다. Rust는 이 값을 환경 allowlist에
   정확히 설정한 경우에만 허용하며 코드에서 자동 추가하거나 wildcard로 완화하지
-  않는다. Origin이 없는 비브라우저 연결은 첫 프레임 ticket 인증을 통과해야만
-  사용할 수 있다. Origin은 identity가 아닌 defense-in-depth이며 browser와
-  native handshake를 두 실기기로 검증한다.
+  않는다. 모든 WebSocket handshake는 정확히 allowlist된 Origin을 포함해야 하며,
+  Origin 누락 또는 불일치는 Upgrade와 첫 프레임 ticket 인증 전에 403으로
+  거부한다. Origin은 identity가 아닌 defense-in-depth이며 browser와 native
+  handshake를 두 실기기로 검증한다.
 
 별도 티켓 테이블을 추가하지 않는 stateless v1을 우선한다. 이 선택은 30초
 안에 탈취된 티켓으로 병렬 소켓을 열 수 있는 잔여 위험을 가진다. 재사용을
@@ -150,8 +151,8 @@ Next, and `PLAY_ENGINE_REALTIME_ALLOWED_ORIGINS` is the Rust comma-separated
 Origin allowlist. It must explicitly include
 `https://mobile.aura-board.invalid` for the native client and every approved
 browser Origin. An empty allowlist disables realtime fail-closed; a present
-Origin must match exactly, while an absent Origin is accepted only subject to
-first-frame ticket authentication. Missing or invalid realtime configuration
+Origin must match exactly, while an absent Origin is rejected before upgrade
+and cannot be recovered by first-frame ticket authentication. Missing or invalid realtime configuration
 disables only `/v1/realtime` and ticket issuance with 503; existing HTTP play
 routes remain available. TLS terminates at the deployment ingress, not in the
 Rust process.
@@ -368,7 +369,7 @@ Next:
 
 - 익명, 비참가자, 다른 session, feature-disabled actor의 ticket 거부
 - ticket TTL과 actor/session binding, 원본 actor subject 및 비밀 미노출
-- bot session의 HTTP transport 선택, present/missing Origin 정책
+- bot session의 HTTP transport 선택, required/exact/missing Origin 거부 정책
 - 기존 HTTP snapshot/command와 status/error/header 계약 유지
 
 모바일:
@@ -402,3 +403,55 @@ Next:
 
 자동 테스트 통과만으로 이 승인 시나리오를 대체하지 않는다. 배포, 운영 DB
 변경, store release도 이 문서의 구현 완료와 별도 승인 대상이다.
+
+## 2026-09-12 native-paint·장애 복구 qualification 최종 결과
+
+상태는 `measured`, `instrumented`, `passed`, `failed`, `blocked`, `prohibited`로
+구분한다. 17:40 KST의 realtime-ticket 503은 이후 task-owned Next/Rust runtime에
+승인된 dev 설정을 주입해 복구했고, 아래 결과가 같은 날의 최종 판정이다.
+
+- **instrumented**: Expo Go 개발 번들에 confirm touch, pending layout,
+  requester ack/layout, peer snapshot/layout 경계 표식을 추가했다.
+  request/session/version을 결합하고 연속 touch, rejection, connection error,
+  입력 gate, HTTP 미확정, session 교체에서 active probe를 정리한다. 이 표식은
+  RN layout 경계이며 native paint 완료 시각이 아니다.
+- **measured — layout/ack boundary only**: 정상 양방향 착수에서 S23 v18→19는
+  pending 34ms, ack 1.106s, requester layout 1.144s, A20 peer layout 98ms였고,
+  A20 v19→20은 pending 109ms, ack 1.162s, requester layout 1.276s,
+  S23 peer layout 37ms였다. 장애 시나리오의 추가 layout/ack 수치는 아래와
+  원시 로그에 기록한다. 이 값은 native-paint p50/p95로 승격하지 않는다.
+- **blocked — native paint p50/p95**: S23 framestats의 `DisplayPresentTime`은
+  대상 착수 frame에서 오래된 값이 반복되어 같은 frame의 신뢰 가능한 present
+  timestamp로 사용할 수 없었고, A20 schema에는 해당 컬럼이 없다. 따라서
+  touch→pending native paint와 peer-device native render는 표본 0,
+  p50/p95 `unavailable`이다. layout 표식, ADB tap 반환, 영상 추정을 대체값으로
+  사용하지 않았다.
+- **passed — Rust-only restart**: Rust listener만 재시작한 뒤 양 기기 socket이
+  같은 session에 복구됐고 12초 healthy 구간의 `/session` HTTP poll 증가량은
+  0이었다. S23 v20→21 착수는 pending 24ms, ack 1.138s,
+  requester layout 1.157s, A20 peer layout 95ms였으며 duplicate가 없었다.
+  재시작 순간 input gate를 직접 샘플링하지 못한 항목은 미확인이다.
+- **passed — slow network**: A20 한 기기에 편도 650ms 지연을 주입한 v21→22
+  착수는 request `place_stone.mty867zo.lh3ghmeb1jk` 한 번으로 commit됐다.
+  pending 123ms, ack 2.527s, requester layout 2.631s, S23 peer layout 31ms였다.
+- **passed — requester ack loss**: S23의 첫 `command_committed`를 버린 뒤
+  동일 request `place_stone.mty89m2q.u23mobaowl`가 재전송됐다. 첫 v23 응답은
+  `replayed:false`, 재전송 응답은 `replayed:true`였고 판 version은 22→23 한 번만
+  증가했다. pending 93ms, replay ack 4.604s, requester layout 4.641s,
+  A20 peer layout 96ms였다.
+- **passed — delayed reader convergence**: S23 upstream read를 6초 중단하는 동안
+  A20 v23→24 착수가 성공했고, 중단 종료 직후 S23은 authoritative snapshot v24
+  하나로 따라잡았다. A20 pending 117ms, ack 1.114s,
+  requester layout 1.175s, S23 snapshot→layout 35ms였다. 이 실기기 결과는
+  Rust send-timeout/drop 자체의 물리 증거가 아니며, 그 경계는
+  `send_timeout_seam_drops_a_stalled_subscriber_deterministically` 테스트로 별도
+  확인한다.
+- **prohibited — Postgres restart**: 로컬 15434는 PID 28800의 SSH 포워드이며
+  원격 `100.120.114.62`로 향한다. 원격 DB의 disposable ownership, dependents,
+  rollback 권한이 증명되지 않아 DB와 터널을 재시작하지 않았다.
+
+최종 fixture는 board `cmtx9ttb50011vs30ai2j2pso`, session
+`fabf8167-1399-4f2f-99e4-4d2bf56c9d66`, active version 24, 다음 차례 first다.
+S23 `R3CW50BW8KB`는 test/흑, A20 `R59M904MEMY`는 공서희/백이다. 원시 증거는
+`C:\Users\coseung2\AppData\Local\Temp\aura-board-omok-device-current\qualification-2026-09-12`
+에 있으며, 이 qualification은 배포나 운영 Postgres 재시작을 포함하지 않는다.

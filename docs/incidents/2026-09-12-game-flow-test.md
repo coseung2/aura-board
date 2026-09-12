@@ -84,7 +84,7 @@
 - 위 양방향 착수는 실제 WebSocket 명령이 아니라 3초 HTTP 복구 경로로
   성공했다. 두 기기는 약 1 → 2 → 4 → 8 → 15초 backoff로 새 티켓을 계속
   발급받았고, healthy socket에서는 없어야 할 active polling도 유지됐다.
-- 동일 `/v1/realtime` Upgrade probe는 Origin이 없을 때 `101`,
+- 수정 전 동일 `/v1/realtime` Upgrade probe는 Origin이 없을 때 `101`,
   `Origin: http://127.0.0.1:8788` 등 present Origin에서 `403`을 반환했다.
   설치된 React Native Android WebSocket 모듈은 호출자가 Origin을 주지 않으면
   `ws://127.0.0.1:8788`에서 `Origin: http://127.0.0.1:8788`을 자동 생성한다.
@@ -93,6 +93,9 @@
 - 모바일은 고정 Origin `https://mobile.aura-board.invalid`를 명시하고, Rust는
   해당 값을 환경 allowlist에 정확히 설정한 경우에만 허용하도록 수정했다.
   빈 allowlist는 HTTP 플레이를 유지한 채 realtime만 fail-closed로 비활성화한다.
+  최종 hardening 재검증에서는 Origin 누락과 비허용 Origin이 모두 Upgrade 전에
+  `403`으로 거부됐고, 고정 mobile sentinel Origin은 ticket 인증 후 `ready`까지
+  성공했다.
 - 모바일은 ready 전 실패를 총 6회로 제한하고 이후 reconnect timer 없이
   HTTP-only degraded 상태로 전환한다. foreground 복귀와 session reset은 새
   bounded cycle을 연다. Rust는 인증된 `(session, role, actor)`별 소켓 하나만
@@ -150,3 +153,69 @@
 - 영향 및 후속: session/DB 상태 손상은 없었다. 실행 중 Rust 재시작, 정밀
   p50/p95, Postgres restart와 slow-network/ack-loss 장애 주입, 제한 학급 rollout은
   남아 있다. 운영 배포는 하지 않았다.
+
+## Realtime-ticket 503 및 qualification 중단 경계 (17:40–18:00 KST)
+
+- 증상: S23 `R3CW50BW8KB`와 A20 `R59M904MEMY` 모두 session
+  `fabf8167-1399-4f2f-99e4-4d2bf56c9d66`의 realtime-ticket POST에서 반복
+  503을 받았고 응답 body는 `{"error":"realtime_disabled"}`였다.
+- 확정 원인: Next ticket route가 Rust에 도달하기 전에 realtime disabled로
+  거부했다. Infisical dev 환경의 값이 아닌 존재 여부만 검사한 결과 enable,
+  ticket secret, public WS URL, allowed origins 네 설정이 모두 부재했다. 따라서
+  구버전 Rust PID 31788만 controlled restart하는 것으로 복구 가능한 설정
+  drift가 아니다.
+- 대응: 비밀값이나 환경을 변경하지 않았고 Next 35292, Metro 1628, Rust 31788을
+  모두 보존했다. ticket 200/socket-ready는 복구되지 않았다. PID 28800/15434는
+  원격 `100.120.114.62` Postgres로 향하는 SSH 포워드라 중지하지 않았다.
+- qualification 판정: touch→pending native paint, engine commit/ack,
+  peer-device native render는 모두 **blocked, count 0, p50/p95 unavailable**이다.
+  layout 표식만 instrumented 상태이며 native paint로 부르지 않는다. Rust restart,
+  slow-network, ack-loss, slow-subscriber도 ready socket 없이 최종 수렴을 증명할 수
+  없어 physically not run으로 남긴다. Postgres restart는 안전 경계 미증명으로
+  prohibited다.
+- 안전 사건: S23에서 재확인을 누르려다 기권 확인창이 열렸지만 기권 명령이나
+  `/commands` POST는 없었다. 취소 버튼을 눌렀고
+  `s23-after-resign-cancel.xml/png`에서 dialog가 닫힌 기존 16수 판을 재확인했다.
+- 증거: 원시 logcat, 양 기기 framestats, UI hierarchy/screenshots, process ledger,
+  0-sample JSON과 nearest-rank 계산 출력은
+  `C:\Users\coseung2\AppData\Local\Temp\aura-board-omok-device-current\qualification-2026-09-12`
+  에 보존했다.
+- 영향/잔여 조치: authoritative session/board를 변경하지 않았고 배포도 하지
+  않았다. 승인된 dev realtime 설정이 주입되어 ticket 200/socket-ready가 된 뒤
+  native frame-present 상관 측정과 scoped fault/restart 시나리오를 다시 수행해야
+  상용화 readiness를 판단할 수 있다.
+
+## Realtime 복구 및 장애 qualification 완료 (18:39–19:16 KST)
+
+- 복구: task-owned supervisor로 Next와 Rust에 승인된 dev realtime 설정을 주입했다.
+  양 기기는 같은 session `fabf8167-1399-4f2f-99e4-4d2bf56c9d66`에 WebSocket으로
+  재인증했고, 12초 healthy 구간에 `/session` HTTP poll 증가는 0이었다.
+- 정상 경로: S23 v18→19와 A20 v19→20 착수가 각각 한 번만 commit됐고 양 기기가
+  같은 판으로 수렴했다. requester pending layout은 34ms/109ms, ack는
+  1.106s/1.162s, requester layout은 1.144s/1.276s, peer layout은 98ms/37ms였다.
+- Rust-only restart: listener 재시작 후 socket 2개가 같은 session에 복구됐고
+  S23 v20→21 착수가 duplicate 없이 성공했다. pending 24ms, ack 1.138s,
+  requester layout 1.157s, A20 peer layout 95ms였다. restart 순간 input gate는
+  직접 샘플링하지 못했다.
+- 느린 네트워크: A20 WebSocket에 편도 650ms 지연을 주입했다. request
+  `place_stone.mty867zo.lh3ghmeb1jk`가 v21→22를 한 번만 commit했고 양 기기가
+  수렴했다. pending 123ms, ack 2.527s, requester layout 2.631s,
+  S23 peer layout 31ms였다.
+- ack 유실: S23의 첫 `command_committed`를 버렸다. 동일 request
+  `place_stone.mty89m2q.u23mobaowl`가 재전송되어 첫 응답 `replayed:false`,
+  재전송 응답 `replayed:true`를 확인했고 v22→23은 한 번만 증가했다.
+  pending 93ms, replay ack 4.604s, requester layout 4.641s,
+  A20 peer layout 96ms였다.
+- slow reader: S23 upstream read를 6초 중단한 동안 A20 v23→24가 성공했고,
+  stall 종료 직후 S23은 snapshot v24 하나로 따라잡았다. A20 pending 117ms,
+  ack 1.114s, requester layout 1.175s, S23 snapshot→layout 35ms였다. Rust의
+  send-timeout/drop seam은 deterministic test로 별도 통과했다.
+- 최종 상태: active v24, 다음 차례 first, proxy 8788/8789/8790은 모두 종료,
+  양 기기 reverse는 8787로 복원됐다. Metro PID 1628과 Postgres SSH PID 28800은
+  보존했다. Postgres restart는 소유권·rollback 경계 미증명으로 prohibited다.
+- 성능 판정: 위 값은 RN layout/ack 경계다. S23의 frame-present 값은 대상 frame과
+  신뢰성 있게 결합되지 않았고 A20에는 `DisplayPresentTime`이 없어 native-paint
+  표본은 0, p50/p95는 unavailable이다. layout 수치를 paint로 승격하지 않는다.
+- 증거: 같은 qualification 폴더의 `fault-slow-a20.jsonl`,
+  `fault-drop-ack-s23.jsonl`, `fault-stall-s23.jsonl`, 각 v21–v24 log/XML/PNG,
+  supervisor ledger와 framestats를 보존했다. 배포는 수행하지 않았다.
