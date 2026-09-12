@@ -271,8 +271,13 @@ describe("Omok matchmaking", () => {
     });
     const response = await GET(request, context);
     expect(await response.json()).toEqual({ status: "idle", playerCount: 0 });
-    expect(mocks.ticketUpdate).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "ticket-2" },
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "ticket-2",
+        status: "matched",
+        matchBoardId: "match-board-1",
+        sessionId: "session-1",
+      }),
       data: expect.objectContaining({ status: "idle", matchBoardId: null, sessionId: null }),
     }));
     expect(mocks.announceMatchmaking).toHaveBeenCalledWith("lobby-1");
@@ -306,9 +311,143 @@ describe("Omok matchmaking", () => {
       select: { completedAtMs: true, state: true },
     });
     expect(await response.json()).toEqual({ status: "idle", playerCount: 0 });
-    expect(mocks.ticketUpdate).toHaveBeenCalledWith(expect.objectContaining({
-      where: { id: "ticket-2" },
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "ticket-2",
+        status: "matched",
+        matchBoardId: "match-board-1",
+        sessionId: "session-1",
+      }),
       data: expect.objectContaining({ status: "idle", matchBoardId: null, sessionId: null }),
     }));
+  });
+
+  it("keeps a matched ticket when the authoritative engine still owns its session", async () => {
+    mocks.ticketFindUnique.mockResolvedValue({
+      id: "ticket-2",
+      status: "matched",
+      matchBoardId: "match-board-1",
+      sessionId: "session-1",
+    });
+    mocks.playEngineFetch.mockResolvedValueOnce(
+      engineResponse({ sessionId: "session-1", version: 3, roomStatus: "active" }),
+    );
+
+    const response = await GET(request, context);
+
+    expect(mocks.playEngineFetch).toHaveBeenCalledWith(
+      "/v1/boards/match-board-1/sessions/current",
+      expect.objectContaining({
+        actor: expect.objectContaining({
+          subject: "student:student-2",
+          role: "participant",
+        }),
+      }),
+    );
+    expect(mocks.ticketUpdate).not.toHaveBeenCalled();
+    expect(await response.json()).toEqual({
+      status: "matched",
+      playerCount: 2,
+      sessionId: "session-1",
+      boardSlug: "omok-match-room",
+      href: "/board/omok-match-room?view=student",
+    });
+  });
+
+  it("clears a stale matched ticket when the engine explicitly reports no current session", async () => {
+    mocks.ticketFindUnique.mockResolvedValue({
+      id: "ticket-2",
+      status: "matched",
+      matchBoardId: "match-board-1",
+      sessionId: "session-1",
+    });
+    mocks.playEngineFetch.mockResolvedValueOnce(engineResponse({ error: "not_found" }, 404));
+
+    const response = await GET(request, context);
+
+    expect(await response.json()).toEqual({ status: "idle", playerCount: 0 });
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        id: "ticket-2",
+        status: "matched",
+        matchBoardId: "match-board-1",
+        sessionId: "session-1",
+      }),
+      data: expect.objectContaining({ status: "idle", matchBoardId: null, sessionId: null }),
+    }));
+    expect(mocks.announceMatchmaking).toHaveBeenCalledWith("lobby-1");
+  });
+
+  it("does not let a stale engine response erase a newer match", async () => {
+    mocks.ticketFindUnique
+      .mockResolvedValueOnce({
+        id: "ticket-2",
+        status: "matched",
+        matchBoardId: "match-board-1",
+        sessionId: "session-1",
+      })
+      .mockResolvedValueOnce({
+        id: "ticket-2",
+        status: "matched",
+        matchBoardId: "match-board-2",
+        sessionId: "session-2",
+      });
+    mocks.boardFindUnique
+      .mockResolvedValueOnce({ slug: "omok-match-old" })
+      .mockResolvedValueOnce({ slug: "omok-match-new" });
+    mocks.playEngineFetch.mockResolvedValueOnce(engineResponse({ error: "not_found" }, 404));
+    mocks.ticketUpdateMany.mockResolvedValueOnce({ count: 0 });
+
+    const response = await GET(request, context);
+
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({
+        matchBoardId: "match-board-1",
+        sessionId: "session-1",
+      }),
+    }));
+    expect(mocks.announceMatchmaking).not.toHaveBeenCalled();
+    expect(await response.json()).toEqual({
+      status: "matched",
+      playerCount: 2,
+      sessionId: "session-2",
+      boardSlug: "omok-match-new",
+      href: "/board/omok-match-new?view=student",
+    });
+  });
+
+  it("preserves the matched ticket during a temporary engine error", async () => {
+    mocks.ticketFindUnique.mockResolvedValue({
+      id: "ticket-2",
+      status: "matched",
+      matchBoardId: "match-board-1",
+      sessionId: "session-1",
+    });
+    mocks.playEngineFetch.mockResolvedValueOnce(
+      engineResponse({ error: "temporarily_unavailable" }, 503),
+    );
+
+    const response = await GET(request, context);
+
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "play_engine_unavailable" });
+    expect(mocks.ticketUpdate).not.toHaveBeenCalled();
+    expect(mocks.announceMatchmaking).not.toHaveBeenCalled();
+  });
+
+  it("preserves the matched ticket when the engine request cannot be completed", async () => {
+    mocks.ticketFindUnique.mockResolvedValue({
+      id: "ticket-2",
+      status: "matched",
+      matchBoardId: "match-board-1",
+      sessionId: "session-1",
+    });
+    mocks.playEngineFetch.mockRejectedValueOnce(new Error("connection refused"));
+
+    const response = await GET(request, context);
+
+    expect(response.status).toBe(503);
+    expect(mocks.ticketUpdate).not.toHaveBeenCalled();
+    expect(mocks.announceMatchmaking).not.toHaveBeenCalled();
   });
 });

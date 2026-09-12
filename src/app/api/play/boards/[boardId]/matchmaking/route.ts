@@ -23,6 +23,7 @@ const MatchmakingRequestSchema = z
   .strict();
 
 type ParticipantSeed = { actorSubject: string; displayName: string };
+type EngineSessionState = "live" | "missing" | "unavailable";
 type MatchReservation =
   | {
       kind: "human";
@@ -136,11 +137,61 @@ function findTicketSession(ticket: {
   });
 }
 
+async function engineSessionState(
+  ticket: { matchBoardId: string; sessionId: string },
+  studentId: string,
+): Promise<EngineSessionState> {
+  let response: Response;
+  try {
+    response = await playEngineFetch(
+      `/v1/boards/${encodeURIComponent(ticket.matchBoardId)}/sessions/current`,
+      {
+        actor: {
+          subject: `student:${studentId}`,
+          role: "participant",
+          userId: null,
+          studentId,
+        },
+      },
+    );
+  } catch {
+    return "unavailable";
+  }
+  if (response.status === 404) return "missing";
+  if (!response.ok) return "unavailable";
+  const snapshot = await engineJson(response);
+  if (typeof snapshot?.sessionId !== "string") return "unavailable";
+  return snapshot.sessionId === ticket.sessionId ? "live" : "missing";
+}
+
+async function clearMatchedTicket(
+  boardId: string,
+  studentId: string,
+  ticket: { id: string; matchBoardId: string; sessionId: string },
+): Promise<Response> {
+  const cleared = await db.omokMatchTicket.updateMany({
+    where: {
+      id: ticket.id,
+      status: "matched",
+      matchBoardId: ticket.matchBoardId,
+      sessionId: ticket.sessionId,
+    },
+    data: { status: "idle", opponentStudentId: null, matchBoardId: null, sessionId: null },
+  });
+  if (cleared.count === 0) {
+    // The ticket advanced while the engine check was in flight. Return the new
+    // state instead of letting an old 404 erase a newly-created match.
+    return responseFor(boardId, studentId);
+  }
+  await announceOmokMatchmakingChange(boardId);
+  return jsonPrivateNoStore({ status: "idle", playerCount: 0 });
+}
+
 async function responseFor(
   boardId: string,
   studentId: string,
-  options: { heartbeatWaiting?: boolean } = {},
-) {
+  options: { heartbeatWaiting?: boolean; validateEngineMatched?: boolean } = {},
+): Promise<Response> {
   const ticket = await db.omokMatchTicket.findUnique({
     where: { lobbyBoardId_studentId: { lobbyBoardId: boardId, studentId } },
   });
@@ -156,12 +207,27 @@ async function responseFor(
       findTicketSession(ticket, studentId),
     ]);
     if (!board || isFinishedSession(session)) {
-      await db.omokMatchTicket.update({
-        where: { id: ticket.id },
-        data: { status: "idle", opponentStudentId: null, matchBoardId: null, sessionId: null },
+      return clearMatchedTicket(boardId, studentId, {
+        id: ticket.id,
+        matchBoardId: ticket.matchBoardId,
+        sessionId: ticket.sessionId,
       });
-      await announceOmokMatchmakingChange(boardId);
-      return jsonPrivateNoStore({ status: "idle", playerCount: 0 });
+    }
+    if (options.validateEngineMatched) {
+      const engineState = await engineSessionState(
+        { matchBoardId: ticket.matchBoardId, sessionId: ticket.sessionId },
+        studentId,
+      );
+      if (engineState === "missing") {
+        return clearMatchedTicket(boardId, studentId, {
+          id: ticket.id,
+          matchBoardId: ticket.matchBoardId,
+          sessionId: ticket.sessionId,
+        });
+      }
+      if (engineState === "unavailable") {
+        return jsonPrivateNoStore({ error: "play_engine_unavailable" }, { status: 503 });
+      }
     }
     return jsonPrivateNoStore({
       status: "matched",
@@ -365,7 +431,10 @@ export async function GET(_request: Request, { params }: Params) {
   if (!(await resolveLobby(boardId, student.classroomId))) {
     return jsonPrivateNoStore({ error: "board_not_found" }, { status: 404 });
   }
-  return responseFor(boardId, student.id, { heartbeatWaiting: true });
+  return responseFor(boardId, student.id, {
+    heartbeatWaiting: true,
+    validateEngineMatched: true,
+  });
 }
 
 export async function POST(request: Request, { params }: Params) {
@@ -386,7 +455,9 @@ export async function POST(request: Request, { params }: Params) {
   });
   if (existing?.status === "matched" && existing.matchBoardId) {
     const session = await findTicketSession(existing, student.id);
-    if (!isFinishedSession(session)) return responseFor(boardId, student.id);
+    if (!isFinishedSession(session)) {
+      return responseFor(boardId, student.id, { validateEngineMatched: true });
+    }
   }
 
   let reservation: MatchReservation | null;
