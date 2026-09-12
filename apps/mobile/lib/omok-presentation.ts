@@ -1,5 +1,8 @@
 import type { OmokMachineState } from "./omok-move-machine";
-import { canPlaceStone } from "./omok-move-machine";
+import {
+  canPlaceStone,
+  OMOK_OCCUPIED_INTERSECTION_ERROR,
+} from "./omok-move-machine";
 import type { OmokSocketStatus } from "./omok-socket";
 import type { OmokSlot, OmokSnapshot } from "./omok-contract";
 import { omokCoordinateLabel } from "./omok-geometry";
@@ -111,4 +114,17 @@ export function omokConnectionNotice(
     return "최신 판을 다시 확인하는 중이에요.";
   }
   return null;
+}
+
+/**
+ * Splits the single machine error channel into the two surfaces it actually
+ * carries. Local rule feedback belongs beside the board and must not offer a
+ * retry; connection and server errors stay on the recovery surface, where
+ * re-reading authority is a real remedy.
+ */
+export function omokErrorSurface(
+  error: string | null,
+): "none" | "local-rule" | "recovery" {
+  if (!error) return "none";
+  return error === OMOK_OCCUPIED_INTERSECTION_ERROR ? "local-rule" : "recovery";
 }

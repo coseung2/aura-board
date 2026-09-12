@@ -4,6 +4,7 @@ import {
   aimAt,
   applyCommitted,
   applyRejection,
+  applyServerFrame,
   canPlaceStone,
   confirmAim,
   ingestSnapshot,
@@ -99,6 +100,27 @@ describe("omok per-session version reducer", () => {
         { type: "session_replaced", previousSessionId: "session-a", sessionId: "session-b" },
       ]),
     );
+  });
+
+  it("clears a stale connection warning on same-session ready without accepting a foreign ready", () => {
+    const warned = seeded({ error: "연결을 확인해 주세요." });
+    const recovered = applyServerFrame(warned, {
+      type: "ready",
+      protocolVersion: 1,
+      sessionId: "session-a",
+      snapshot: snapshot({ version: 4 }),
+    });
+    expect(recovered.state.snapshot?.version).toBe(4);
+    expect(recovered.state.error).toBeNull();
+
+    const foreign = applyServerFrame(warned, {
+      type: "ready",
+      protocolVersion: 1,
+      sessionId: "session-b",
+      snapshot: snapshot({ sessionId: "session-b", version: 1 }),
+    });
+    expect(foreign.state.snapshot?.sessionId).toBe("session-a");
+    expect(foreign.state.error).toBe("연결을 확인해 주세요.");
   });
 
   it("clears the superseded pending scope when the session is replaced", () => {
@@ -283,6 +305,20 @@ describe("omok input gating", () => {
     };
     expect(aimAt(finished, { row: 3, column: 3 }).state.aim).toBeNull();
     expect(startIntent(finished, { type: "resign" }, makeOmokCommand).effects).toHaveLength(0);
+  });
+
+  it("clears an earlier aim when the next tapped intersection is occupied", () => {
+    const aimed = aimAt(seeded(), { row: 6, column: 6 }).state;
+    const occupied = {
+      ...aimed,
+      snapshot: withStone(aimed.snapshot!, 112, "second"),
+    };
+
+    const rejected = aimAt(occupied, { row: 7, column: 7 });
+
+    expect(rejected.state.aim).toBeNull();
+    expect(rejected.state.error).toBe("이미 돌이 놓인 자리예요.");
+    expect(confirmAim(rejected.state, makeOmokCommand).effects).toHaveLength(0);
   });
 
   it("drops an aim that authority filled while it was held", () => {

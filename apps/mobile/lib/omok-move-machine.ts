@@ -39,6 +39,9 @@ export const initialOmokMachineState: OmokMachineState = {
   error: null,
 };
 
+/** Local board-rule feedback shared with presentation routing. */
+export const OMOK_OCCUPIED_INTERSECTION_ERROR = "이미 돌이 놓인 자리예요.";
+
 const BOARD_SIZE = 15;
 
 function indexOf(position: OmokAim): number {
@@ -169,7 +172,10 @@ export function ingestSnapshot(
 export function aimAt(state: OmokMachineState, position: OmokAim): OmokTransition {
   if (state.pending || !canPlaceStone(state.snapshot)) return { state, effects: [] };
   if (!isEmptyIntersection(state.snapshot, position)) {
-    return { state: { ...state, error: "이미 돌이 놓인 자리예요." }, effects: [] };
+    return {
+      state: { ...state, aim: null, error: OMOK_OCCUPIED_INTERSECTION_ERROR },
+      effects: [],
+    };
   }
   return { state: { ...state, aim: position, error: null }, effects: [] };
 }
@@ -193,7 +199,10 @@ export function confirmAim(
     return { state, effects: [] };
   }
   if (!isEmptyIntersection(snapshot, aim)) {
-    return { state: { ...state, aim: null, error: "이미 돌이 놓인 자리예요." }, effects: [] };
+    return {
+      state: { ...state, aim: null, error: OMOK_OCCUPIED_INTERSECTION_ERROR },
+      effects: [],
+    };
   }
   const slot = snapshot.viewer.slot;
   if (!slot) return { state, effects: [] };
@@ -347,8 +356,19 @@ export function applyServerFrame(
   frame: OmokServerFrame,
 ): OmokTransition {
   switch (frame.type) {
-    case "ready":
-      return ingestSnapshot(state, frame.snapshot);
+    case "ready": {
+      const transition = ingestSnapshot(state, frame.snapshot);
+      // An authenticated ready frame proves that a previous ticket/socket
+      // warning is stale even when its snapshot version is already rendered.
+      // Keep foreign-session frames inert just like the snapshot reducer.
+      if (state.snapshot?.sessionId === frame.snapshot.sessionId) {
+        return {
+          ...transition,
+          state: { ...transition.state, error: null },
+        };
+      }
+      return transition;
+    }
     case "snapshot":
       return ingestSnapshot(state, frame.snapshot);
     case "command_committed":

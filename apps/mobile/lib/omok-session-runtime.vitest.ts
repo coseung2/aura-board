@@ -1,5 +1,17 @@
-import { describe, expect, it, vi } from "vitest";
+// @vitest-environment jsdom
 
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const runtimeMocks = vi.hoisted(() => ({
+  fetchCurrentOmokSession: vi.fn(),
+  onSocketStatus: null as null | ((status: import("./omok-socket").OmokSocketStatus) => void),
+}));
+
+// The hook renderer lives at the workspace root, so the source-under-test must
+// share that exact React instance instead of the mobile package's second copy.
+// @ts-expect-error The runtime package path intentionally has no local declaration entry.
+vi.mock("react", async () => import("../../../node_modules/react"));
 vi.mock("react-native", () => ({
   AppState: { addEventListener: () => ({ remove: () => undefined }) },
 }));
@@ -12,7 +24,7 @@ vi.mock("./api", () => ({
 }));
 vi.mock("./play-platform", () => ({
   clearPendingOmokCommand: async () => undefined,
-  fetchCurrentOmokSession: async () => null,
+  fetchCurrentOmokSession: runtimeMocks.fetchCurrentOmokSession,
   fetchOmokRealtimeTicket: async () => { throw new Error("network disabled"); },
   loadPendingOmokCommand: async () => null,
   makeOmokCommand: () => { throw new Error("not used by policy tests"); },
@@ -22,13 +34,36 @@ vi.mock("./play-platform", () => ({
   savePendingOmokCommand: async () => undefined,
   submitOmokCommand: async () => { throw new Error("network disabled"); },
 }));
+vi.mock("./omok-socket", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./omok-socket")>();
+  return {
+    ...actual,
+    createNativeOmokConnect: () => vi.fn(),
+    createOmokSocket: vi.fn((options: {
+      onStatus: (status: import("./omok-socket").OmokSocketStatus) => void;
+    }) => {
+      runtimeMocks.onSocketStatus = options.onStatus;
+      options.onStatus("connecting");
+      return {
+        dispose: vi.fn(),
+        getHandshakeAttempts: () => 0,
+        getStatus: () => "connecting",
+        reset: vi.fn(),
+        sendCommand: vi.fn(() => false),
+        setActive: vi.fn(),
+      };
+    }),
+  };
+});
 
 import {
   acquireOmokReplayLock,
   confirmsOmokAuthoritativeCatchUp,
+  createOmokPendingPersistenceQueue,
   findDurableOmokPending,
   nextOmokCatchUpLock,
   sendOmokPendingViaAvailableTransport,
+  useOmokSessionRuntime,
 } from "./omok-session-runtime";
 import {
   adoptPending,
@@ -80,7 +115,44 @@ const pending: OmokPending = {
   phase: "confirming",
 };
 
+afterEach(() => {
+  vi.useRealTimers();
+  runtimeMocks.fetchCurrentOmokSession.mockReset();
+  runtimeMocks.onSocketStatus = null;
+});
+
 describe("Omok runtime recovery policy", () => {
+  it("serializes a fast acknowledgement clear after the pending save", async () => {
+    const events: string[] = [];
+    let finishSave: () => void = () => {
+      throw new Error("save did not start");
+    };
+    const save = vi.fn(async () => {
+      events.push("save:start");
+      await new Promise<void>((resolve) => {
+        finishSave = resolve;
+      });
+      events.push("save:end");
+    });
+    const clear = vi.fn(async () => {
+      events.push("clear");
+    });
+    const queue = createOmokPendingPersistenceQueue(save, clear);
+
+    const saving = queue.persist(pending);
+    await Promise.resolve();
+    const clearing = queue.clear("session-a", "place_stone");
+    await Promise.resolve();
+
+    expect(events).toEqual(["save:start"]);
+    expect(clear).not.toHaveBeenCalled();
+    finishSave();
+    await Promise.all([saving, clearing]);
+
+    expect(events).toEqual(["save:start", "save:end", "clear"]);
+    expect(clear).toHaveBeenCalledWith("session-a", "place_stone");
+  });
+
   it("recreates from durable pending, replays the same id, and settles once", async () => {
     const load = vi.fn(async (_sessionId: string, commandType: "place_stone" | "resign" | "ready") =>
       commandType === "place_stone" ? pending : null,
@@ -163,6 +235,8 @@ describe("Omok runtime recovery policy", () => {
 
   it("polls through interruption, catches up monotonically, unlocks, and stops on ready", () => {
     expect(shouldPollActiveOmokGame("connecting", "active")).toBe(true);
+    expect(shouldPollActiveOmokGame("unavailable", null)).toBe(false);
+    expect(shouldPollActiveOmokGame("unavailable", "finished")).toBe(false);
     let locked = nextOmokCatchUpLock({
       current: false,
       previousSocketStatus: "ready",
@@ -198,5 +272,53 @@ describe("Omok runtime recovery policy", () => {
       socketStatus: "connecting",
       roomStatus: "active",
     })).toBe(false);
+  });
+
+  it("does not let reconnect status churn postpone active-game HTTP recovery", async () => {
+    vi.useFakeTimers();
+    const refreshTimes: number[] = [];
+    runtimeMocks.fetchCurrentOmokSession.mockImplementation(async () => {
+      refreshTimes.push(Date.now());
+      return snapshot(1);
+    });
+    const onPlacementFeedback = vi.fn();
+    const onUnauthorized = vi.fn();
+
+    const hook = renderHook(() => useOmokSessionRuntime({
+      boardId: "board-1",
+      onPlacementFeedback,
+      onUnauthorized,
+    }));
+    await act(async () => undefined);
+    expect(runtimeMocks.fetchCurrentOmokSession).toHaveBeenCalled();
+    expect(runtimeMocks.onSocketStatus).not.toBeNull();
+    const mountedAt = Date.now();
+
+    for (const [delay, status] of [
+      [1_000, "unavailable"],
+      [1_000, "connecting"],
+      [100, "unavailable"],
+      [2_000, "connecting"],
+      [100, "unavailable"],
+    ] as const) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(delay);
+        runtimeMocks.onSocketStatus?.(status);
+      });
+    }
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(800);
+    });
+
+    expect(refreshTimes.some((calledAt) => calledAt - mountedAt >= 3_000)).toBe(true);
+    const callsAfterRecovery = refreshTimes.length;
+    await act(async () => {
+      runtimeMocks.onSocketStatus?.("ready");
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(3_000);
+    });
+    expect(refreshTimes).toHaveLength(callsAfterRecovery);
+    hook.unmount();
   });
 });

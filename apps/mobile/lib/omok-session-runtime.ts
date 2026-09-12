@@ -35,7 +35,13 @@ import {
 } from "./omok-socket";
 import { createOmokSubmitLock } from "./omok-submit-lock";
 import type { OmokSubmitLock } from "./omok-submit-lock";
-import { omokLatency } from "./omok-latency";
+import {
+  bindOmokQualificationRequest,
+  discardOmokQualificationProbe,
+  markOmokQualificationPeerSnapshot,
+  markOmokQualificationRequesterAck,
+  omokLatency,
+} from "./omok-latency";
 import {
   clearPendingOmokCommand,
   fetchCurrentOmokSession,
@@ -131,6 +137,50 @@ export async function sendOmokPendingViaAvailableTransport(input: {
   return "http";
 }
 
+export type OmokPendingPersistenceQueue = {
+  persist: (pending: OmokPending) => Promise<void>;
+  clear: (sessionId: string, commandType: OmokIntent["type"]) => Promise<void>;
+};
+
+/** Preserve per-command SecureStore ordering without delaying optimistic paint
+ * or transport. A fast acknowledgement may enqueue clear while save is still
+ * in flight; serializing the same storage key prevents that completed command
+ * from being written back after deletion. */
+export function createOmokPendingPersistenceQueue(
+  save: (pending: OmokPending) => Promise<void> = savePendingOmokCommand,
+  clear: (
+    sessionId: string,
+    commandType: OmokIntent["type"],
+  ) => Promise<void> = clearPendingOmokCommand,
+): OmokPendingPersistenceQueue {
+  const tails = new Map<string, Promise<void>>();
+  const keyFor = (sessionId: string, commandType: OmokIntent["type"]) =>
+    `${sessionId}\u0000${commandType}`;
+
+  const enqueue = (key: string, operation: () => Promise<void>): Promise<void> => {
+    const previous = tails.get(key) ?? Promise.resolve();
+    const current = previous
+      .catch(() => undefined)
+      .then(operation)
+      .catch(() => undefined)
+      .finally(() => {
+        if (tails.get(key) === current) tails.delete(key);
+      });
+    tails.set(key, current);
+    return current;
+  };
+
+  return {
+    persist: (pending) =>
+      enqueue(
+        keyFor(pending.sessionId, pending.request.command.type),
+        () => save(pending),
+      ),
+    clear: (sessionId, commandType) =>
+      enqueue(keyFor(sessionId, commandType), () => clear(sessionId, commandType)),
+  };
+}
+
 /** Built once: the connector is stateless and holds no per-session data. */
 const nativeConnect = createNativeOmokConnect();
 
@@ -174,11 +224,17 @@ export function useOmokSessionRuntime({
   const lockRef = useRef(createOmokSubmitLock());
   const socketRef = useRef<ReturnType<typeof createOmokSocket> | null>(null);
   const previousSocketStatusRef = useRef<OmokSocketStatus>("idle");
+  const socketStatusRef = useRef<OmokSocketStatus>(socketStatus);
+  socketStatusRef.current = socketStatus;
   const ackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const migratedRef = useRef(false);
   const adoptedRef = useRef<string | null>(null);
   const transportRef = useRef<"unknown" | "websocket" | "http" | "blocked">("unknown");
   const catchUpLockedRef = useRef(false);
+  const pendingPersistenceRef = useRef<OmokPendingPersistenceQueue | null>(null);
+  const pendingPersistence =
+    pendingPersistenceRef.current ?? createOmokPendingPersistenceQueue();
+  pendingPersistenceRef.current = pendingPersistence;
 
   const updateCatchUpLock = useCallback((next: boolean) => {
     catchUpLockedRef.current = next;
@@ -274,6 +330,11 @@ export function useOmokSessionRuntime({
           }),
         );
         omokLatency.markCommitted(response.requestId);
+        markOmokQualificationRequesterAck(
+          pending.sessionId,
+          response.requestId,
+          response.version,
+        );
         updateCatchUpLock(false);
         setOffline(false);
         await runEffects(effects);
@@ -296,11 +357,21 @@ export function useOmokSessionRuntime({
             }),
           );
           omokLatency.discard(pending.request.requestId);
+          discardOmokQualificationProbe(
+            pending.sessionId,
+            pending.request.requestId,
+            "command_rejected",
+          );
           await runEffects(effects);
           return;
         }
         // Timeout or server error: keep the durable pending and stay 확인 중.
         if (status === 0 || status === 408) setOffline(true);
+        discardOmokQualificationProbe(
+          pending.sessionId,
+          pending.request.requestId,
+          "http_unconfirmed",
+        );
         const transition = markPendingUnconfirmed(stateRef.current);
         apply(transition);
         clearAckTimer();
@@ -347,20 +418,21 @@ export function useOmokSessionRuntime({
           break;
         case "persist_pending":
           // The UI has already painted; persistence is never awaited before it.
-          void savePendingOmokCommand(effect.pending).catch(() => undefined);
+          void pendingPersistence.persist(effect.pending);
           break;
         case "clear_pending":
           clearAckTimer();
           lockRef.current.release();
           setBusy(false);
-          void clearPendingOmokCommand(effect.sessionId, effect.commandType).catch(
-            () => undefined,
-          );
+          void pendingPersistence.clear(effect.sessionId, effect.commandType);
           break;
         case "send":
           await send(effect.pending);
           break;
         case "session_replaced":
+          if (effect.previousSessionId) {
+            discardOmokQualificationProbe(effect.previousSessionId, undefined, "session_replaced");
+          }
           adoptedRef.current = null;
           transportRef.current = "unknown";
           socketRef.current?.dispose();
@@ -416,16 +488,25 @@ export function useOmokSessionRuntime({
         const effects = apply(transition);
         if (frame.type === "command_committed") {
           omokLatency.markCommitted(frame.requestId);
+          markOmokQualificationRequesterAck(frame.sessionId, frame.requestId, frame.version);
         } else if (frame.type === "command_rejected") {
           omokLatency.discard(frame.requestId);
+          discardOmokQualificationProbe(
+            frame.sessionId,
+            frame.requestId,
+            "command_rejected",
+          );
+        } else if (frame.type === "connection_error") {
+          discardOmokQualificationProbe(sessionId, undefined, "connection_error");
         } else if (
           frame.type === "snapshot" &&
           frame.snapshot.version > previousVersion &&
           transition.state.snapshot?.version === frame.snapshot.version
         ) {
           // Dispatch publishes the accepted snapshot to React state. Native
-          // paint completion still requires physical-device instrumentation.
+          // paint completion still requires Android frame-present correlation.
           omokLatency.markPeerSnapshotDispatched(receivedAt);
+          markOmokQualificationPeerSnapshot(frame.sessionId, frame.snapshot.version);
         }
         if (
           frame.type !== "connection_error" &&
@@ -467,10 +548,15 @@ export function useOmokSessionRuntime({
   /** Bounded HTTP recovery. The 3s active-game poll runs only while the game
    * socket is not healthy. */
   useEffect(() => {
-    if (!shouldPollActiveOmokGame(socketStatus, state.snapshot?.roomStatus ?? null)) return;
-    const timer = setInterval(() => void refresh(), OMOK_ACTIVE_POLL_INTERVAL_MS);
+    const roomStatus = state.snapshot?.roomStatus ?? null;
+    if (!roomStatus || roomStatus === "finished") return;
+    const timer = setInterval(() => {
+      if (shouldPollActiveOmokGame(socketStatusRef.current, roomStatus)) {
+        void refresh();
+      }
+    }, OMOK_ACTIVE_POLL_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [refresh, socketStatus, state.snapshot?.roomStatus]);
+  }, [refresh, state.snapshot?.roomStatus]);
 
   useEffect(() => {
     void (async () => {
@@ -524,17 +610,30 @@ export function useOmokSessionRuntime({
   /** The lock is taken synchronously, before any state or async work, so two
    * confirms in one JS frame cannot both submit. */
   const confirm = useCallback(() => {
-    if (catchUpLockedRef.current) return;
-    if (!lockRef.current.acquire()) return;
+    const activeSessionId = stateRef.current.snapshot?.sessionId;
+    if (catchUpLockedRef.current) {
+      if (activeSessionId) discardOmokQualificationProbe(activeSessionId, undefined, "input_gated");
+      return;
+    }
+    if (!lockRef.current.acquire()) {
+      if (activeSessionId) discardOmokQualificationProbe(activeSessionId, undefined, "submit_locked");
+      return;
+    }
     const startedAt = omokLatency.beginConfirm();
     const transition = confirmAim(stateRef.current, makeOmokCommand);
     const effects = apply(transition);
     if (!effects.length) {
       lockRef.current.release();
+      if (activeSessionId) discardOmokQualificationProbe(activeSessionId, undefined, "no_effects");
       return;
     }
     const pending = transition.state.pending;
     if (pending) {
+      bindOmokQualificationRequest(
+        pending.sessionId,
+        pending.request.requestId,
+        pending.request.expectedVersion,
+      );
       omokLatency.markPending(
         pending.request.requestId,
         startedAt,

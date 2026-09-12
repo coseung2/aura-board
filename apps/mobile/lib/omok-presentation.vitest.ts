@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import type { OmokSnapshot } from "./omok-contract";
 import { omokBoardFrame } from "./omok-geometry";
 import {
+  aimAt,
   initialOmokMachineState,
+  OMOK_OCCUPIED_INTERSECTION_ERROR,
+  omokRejectionMessage,
   type OmokMachineState,
 } from "./omok-move-machine";
 import {
   omokConnectionNotice,
+  omokErrorSurface,
   omokHintText,
   omokOutcomeTitle,
   omokRematchMessage,
@@ -167,5 +171,32 @@ describe("Omok commercial presentation", () => {
       viewer: { role: "host", slot: null, capabilities: { canRematch: true } },
     });
     expect(omokRematchMessage(host, true)).toContain("두 사람 모두");
+  });
+
+  it("routes a board-rule refusal away from network recovery", () => {
+    const occupied = Array(225).fill(null);
+    occupied[7 * 15 + 7] = "second";
+    const refused = aimAt(
+      state({ snapshot: snapshot({ game: { ...snapshot().game, board: occupied } }) }),
+      { row: 7, column: 7 },
+    );
+
+    // The machine decided this locally, so re-reading authority cannot help.
+    expect(refused.state.error).toBe(OMOK_OCCUPIED_INTERSECTION_ERROR);
+    expect(refused.state.aim).toBeNull();
+    expect(omokErrorSurface(refused.state.error)).toBe("local-rule");
+  });
+
+  it("keeps connection and server errors on the retryable recovery surface", () => {
+    expect(omokErrorSurface(null)).toBe("none");
+    for (const error of [
+      omokConnectionNotice("unavailable", { httpRecovering: true, offline: true }),
+      omokConnectionNotice("degraded", { httpRecovering: false, offline: false }),
+      omokRejectionMessage("version_conflict"),
+      omokRejectionMessage("domain_rejected"),
+      "연결을 확인해 주세요. 미확인 요청은 안전하게 다시 보낼 수 있어요.",
+    ]) {
+      expect(omokErrorSurface(error)).toBe("recovery");
+    }
   });
 });

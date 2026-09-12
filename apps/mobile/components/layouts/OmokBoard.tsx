@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { type Href, useRouter } from "expo-router";
 import {
   ActivityIndicator,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type GestureResponderEvent,
 } from "react-native";
 import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions";
 import type { BoardDetailResponse } from "../../lib/types";
@@ -20,7 +21,13 @@ import {
 import { omokBoardFrame } from "../../lib/omok-geometry";
 import { canPlaceStone, projectPendingBoard } from "../../lib/omok-move-machine";
 import {
+  beginOmokQualificationTouch,
+  markOmokQualificationAuthoritativeLayout,
+  markOmokQualificationPendingLayout,
+} from "../../lib/omok-latency";
+import {
   omokConnectionNotice,
+  omokErrorSurface,
   omokHintText,
   omokTurnBanner,
 } from "../../lib/omok-presentation";
@@ -73,6 +80,26 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   });
   const { state, socketStatus, offline } = runtime;
   const snapshot = state.snapshot;
+
+  useLayoutEffect(() => {
+    if (!snapshot) return;
+    if (state.pending?.stone) {
+      markOmokQualificationPendingLayout(snapshot.sessionId);
+    }
+    markOmokQualificationAuthoritativeLayout(snapshot.sessionId, snapshot.version);
+  }, [snapshot, state.pending?.stone]);
+
+  const markConfirmTouch = useCallback(
+    (event: GestureResponderEvent) => {
+      if (!snapshot) return;
+      beginOmokQualificationTouch({
+        sessionId: snapshot.sessionId,
+        version: snapshot.version,
+        nativeEventTimestampMs: event.nativeEvent.timestamp,
+      });
+    },
+    [snapshot],
+  );
 
   const acceptMatchmaking = useCallback(
     (next: OmokMatchmakingStatus) => {
@@ -265,7 +292,12 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
     httpRecovering: offline,
     offline,
   });
-  const recoveryMessage = state.error ?? notice;
+  // The machine carries one error channel; board-rule feedback and network
+  // recovery are different surfaces with different remedies.
+  const errorSurface = omokErrorSurface(state.error);
+  const ruleFeedback = errorSurface === "local-rule" ? state.error : null;
+  const recoveryError = errorSurface === "recovery" ? state.error : null;
+  const recoveryMessage = recoveryError ?? notice;
   const reservedHeight = terminal
     ? omokTokens.terminalReservedHeight
     : omokTokens.reservedHeight;
@@ -298,7 +330,13 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
         onAim={runtime.aim}
       />
 
-      {hint ? (
+      {/* Rule feedback replaces the hint in the same single status line, so
+          local feedback never grows the layout the board is sized against. */}
+      {ruleFeedback ? (
+        <Text style={styles.ruleFeedback} accessibilityLiveRegion="assertive">
+          {ruleFeedback}
+        </Text>
+      ) : hint ? (
         <Text style={styles.hint} accessibilityLiveRegion="polite">
           {hint}
         </Text>
@@ -312,48 +350,59 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
           onLeave={leaveGame}
           onRematch={runtime.rematch}
         />
-      ) : (
+      ) : state.aim ? (
         <View style={styles.actionRow}>
-          {state.aim ? (
-            <>
-              <AppButton style={styles.actionButton} onPress={runtime.confirm}>
-                여기에 두기
-              </AppButton>
-              <AppButton
-                variant="secondary"
-                style={styles.actionButton}
-                onPress={runtime.cancelAim}
-              >
-                취소
-              </AppButton>
-            </>
-          ) : snapshot.roomStatus === "waiting" && !me?.ready ? (
-            <AppButton
-              style={styles.actionButton}
-              disabled={!!state.pending}
-              onPress={() => runtime.sendIntent({ type: "ready" })}
-            >
-              준비 완료
-            </AppButton>
-          ) : snapshot.roomStatus === "active" ? (
-            <AppButton
-              variant="danger"
-              style={styles.actionButton}
-              disabled={!!state.pending}
-              onPress={confirmResign}
-            >
-              기권
-            </AppButton>
-          ) : null}
+          <AppButton
+            style={styles.actionButton}
+            onPressIn={markConfirmTouch}
+            onPress={runtime.confirm}
+          >
+            여기에 두기
+          </AppButton>
+          <AppButton
+            variant="secondary"
+            style={styles.actionButton}
+            onPress={runtime.cancelAim}
+          >
+            취소
+          </AppButton>
         </View>
+      ) : snapshot.roomStatus === "waiting" && !me?.ready ? (
+        <View style={styles.actionRow}>
+          <AppButton
+            style={styles.actionButton}
+            disabled={!!state.pending}
+            onPress={() => runtime.sendIntent({ type: "ready" })}
+          >
+            준비 완료
+          </AppButton>
+        </View>
+      ) : snapshot.roomStatus === "active" ? (
+        // Resign is a rare, destructive exit: it keeps its own accessible
+        // target but never reads as the turn's primary action.
+        <View style={styles.resignRow}>
+          <AppButton
+            variant="secondary"
+            style={styles.resignButton}
+            textStyle={styles.resignLabel}
+            disabled={!!state.pending}
+            onPress={confirmResign}
+          >
+            기권
+          </AppButton>
+        </View>
+      ) : (
+        <View style={styles.actionRow} />
       )}
 
       {recoveryMessage ? (
         <View
-          style={[styles.recovery, state.error ? styles.recoveryError : null]}
-          accessibilityLiveRegion={state.error ? "assertive" : "polite"}
+          style={[styles.recovery, recoveryError ? styles.recoveryError : null]}
+          accessibilityLiveRegion={recoveryError ? "assertive" : "polite"}
         >
-          <Text style={[styles.recoveryText, state.error ? styles.recoveryErrorText : null]}>
+          <Text
+            style={[styles.recoveryText, recoveryError ? styles.recoveryErrorText : null]}
+          >
             {recoveryMessage}
           </Text>
           <AppButton
@@ -381,6 +430,13 @@ const styles = StyleSheet.create({
     ...typography.body,
     color: omokTokens.statusHint,
     textAlign: "center",
+  },
+  /** Board-rule feedback shares the hint slot with an error tone. */
+  ruleFeedback: {
+    ...typography.body,
+    color: omokTokens.errorText,
+    textAlign: "center",
+    fontWeight: "700",
   },
   recovery: {
     minHeight: omokTokens.recoveryMinHeight,
@@ -417,6 +473,16 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: omokTokens.confirmMinHeight,
   },
+  /** The secondary exit stays out of the primary action's position. */
+  resignRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  resignButton: {
+    minHeight: omokTokens.confirmMinHeight,
+    minWidth: omokTokens.recoveryButtonMinWidth,
+  },
+  resignLabel: { color: omokTokens.errorText },
   center: {
     flex: 1,
     minHeight: omokTokens.loadingMinHeight,
