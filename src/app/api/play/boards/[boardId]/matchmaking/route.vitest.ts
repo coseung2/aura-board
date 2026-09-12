@@ -277,4 +277,38 @@ describe("Omok matchmaking", () => {
     }));
     expect(mocks.announceMatchmaking).toHaveBeenCalledWith("lobby-1");
   });
+
+  it("clears a matched ticket when its exact session does not include the current student", async () => {
+    mocks.ticketFindUnique.mockResolvedValue({
+      id: "ticket-2",
+      status: "matched",
+      matchBoardId: "match-board-1",
+      sessionId: "session-1",
+    });
+    mocks.sessionFindFirst.mockResolvedValue(null);
+
+    const response = await GET(request, context);
+
+    expect(mocks.sessionFindFirst).toHaveBeenCalledWith({
+      where: {
+        id: "session-1",
+        boardId: "match-board-1",
+        current: true,
+        participants: {
+          some: {
+            OR: [
+              { studentId: "student-2" },
+              { actorSubject: "student:student-2" },
+            ],
+          },
+        },
+      },
+      select: { completedAtMs: true, state: true },
+    });
+    expect(await response.json()).toEqual({ status: "idle", playerCount: 0 });
+    expect(mocks.ticketUpdate).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: "ticket-2" },
+      data: expect.objectContaining({ status: "idle", matchBoardId: null, sessionId: null }),
+    }));
+  });
 });

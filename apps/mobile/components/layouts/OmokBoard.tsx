@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { type Href, useRouter } from "expo-router";
 import {
   ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,28 +13,22 @@ import type { BoardDetailResponse } from "../../lib/types";
 import { ApiError } from "../../lib/api";
 import {
   cancelOmokMatch,
-  clearPendingOmokCommand,
-  fetchCurrentOmokSession,
   fetchOmokMatchmaking,
-  isOmokSnapshot,
-  loadPendingOmokCommand,
-  makeOmokCommand,
-  mergeOmokCommandSnapshot,
-  playApiError,
   requestOmokMatch,
-  savePendingOmokCommand,
-  submitOmokCommand,
-  type OmokIntent,
   type OmokMatchmakingStatus,
-  type OmokSlot,
-  type OmokSnapshot,
-  type PendingOmokCommand,
 } from "../../lib/play-platform";
+import { omokBoardFrame } from "../../lib/omok-geometry";
+import { canPlaceStone, projectPendingBoard } from "../../lib/omok-move-machine";
 import {
-  BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
-  shouldUseBoardFallbackPolling,
-  useBoardRealtime,
-} from "../../lib/use-board-realtime";
+  omokConnectionNotice,
+  omokHintText,
+  omokTurnBanner,
+} from "../../lib/omok-presentation";
+import {
+  omokHttpErrorMessage,
+  useOmokSessionRuntime,
+} from "../../lib/omok-session-runtime";
+import { useBoardRealtime } from "../../lib/use-board-realtime";
 import {
   colors,
   omokTokens,
@@ -41,9 +36,11 @@ import {
   spacing,
   typography,
 } from "../../theme/tokens";
-import { AppButton, BarePressable, EmptyState } from "../ui";
+import { AppButton, EmptyState } from "../ui";
+import { OmokGrid } from "./omok/OmokGrid";
+import { OmokHud, OmokTurnBar } from "./omok/OmokHud";
+import { OmokTerminalPanel } from "./omok/OmokTerminalPanel";
 
-const STAR_POINTS = new Set(["3:3", "3:11", "7:7", "11:3", "11:11"]);
 const MATCHMAKING_HEARTBEAT_MS = 15_000;
 
 export function OmokBoard({ data }: { data: BoardDetailResponse }) {
@@ -51,43 +48,31 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   const boardId = data.board.id;
   const matchmakingEnabled =
     data.board.systemGameKind === "omok" || data.board.slug.startsWith("game-hub-omok-");
-  const [snapshot, setSnapshot] = useState<OmokSnapshot | null>(null);
   const [matchmaking, setMatchmaking] = useState<OmokMatchmakingStatus>({
     status: "idle",
     playerCount: 0,
   });
-  const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [hasPending, setHasPending] = useState(false);
+  const [matchmakingLoading, setMatchmakingLoading] = useState(matchmakingEnabled);
+  const [matchmakingBusy, setMatchmakingBusy] = useState(false);
+  const [matchmakingError, setMatchmakingError] = useState<string | null>(null);
   const sequenceRef = useRef(0);
   const matchmakingRefreshRef = useRef<Promise<void> | null>(null);
-  const retriedRef = useRef<string | null>(null);
-  const { width } = useSafeWindowDimensions();
-  const cellSize = Math.max(20, Math.min(29, Math.floor((width - 40) / 15)));
+  const { width, height } = useSafeWindowDimensions();
 
-  const refresh = useCallback(async () => {
-    const sequence = ++sequenceRef.current;
-    setSyncing(true);
-    try {
-      const next = await fetchCurrentOmokSession(boardId);
-      if (sequence !== sequenceRef.current) return;
-      setSnapshot(next);
-      setError(null);
-      const pending = await loadPendingOmokCommand(boardId);
-      if (sequence !== sequenceRef.current) return;
-      setHasPending(!!pending && pending.sessionId === next?.sessionId);
-    } catch (cause) {
-      if (sequence !== sequenceRef.current) return;
-      setError(messageForError(cause));
-    } finally {
-      if (sequence === sequenceRef.current) {
-        setLoading(false);
-        setSyncing(false);
-      }
-    }
-  }, [boardId]);
+  // A non-canonical board that the actor cannot read returns to the play list
+  // rather than showing an error surface.
+  const handleUnauthorized = useCallback(() => {
+    if (matchmakingEnabled) return;
+    router.replace("/(student)/boards?filter=play" as Href);
+  }, [matchmakingEnabled, router]);
+
+  const runtime = useOmokSessionRuntime({
+    boardId,
+    onPlacementFeedback: () => undefined,
+    onUnauthorized: handleUnauthorized,
+  });
+  const { state, socketStatus, offline } = runtime;
+  const snapshot = state.snapshot;
 
   const acceptMatchmaking = useCallback(
     (next: OmokMatchmakingStatus) => {
@@ -107,20 +92,16 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
 
     const task = (async () => {
       const sequence = ++sequenceRef.current;
-      setSyncing(true);
       try {
         const next = await fetchOmokMatchmaking(boardId);
         if (sequence !== sequenceRef.current) return;
         acceptMatchmaking(next);
-        setError(null);
+        setMatchmakingError(null);
       } catch (cause) {
         if (sequence !== sequenceRef.current) return;
-        setError(messageForError(cause));
+        setMatchmakingError(omokHttpErrorMessage(cause));
       } finally {
-        if (sequence === sequenceRef.current) {
-          setLoading(false);
-          setSyncing(false);
-        }
+        if (sequence === sequenceRef.current) setMatchmakingLoading(false);
       }
     })();
     matchmakingRefreshRef.current = task;
@@ -133,28 +114,15 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   }, [acceptMatchmaking, boardId]);
 
   useEffect(() => {
-    void (matchmakingEnabled ? refreshMatchmaking() : refresh());
-  }, [matchmakingEnabled, refresh, refreshMatchmaking]);
+    if (matchmakingEnabled) void refreshMatchmaking();
+  }, [matchmakingEnabled, refreshMatchmaking]);
 
-  const realtime = useBoardRealtime({
+  // Supabase board realtime stays an invalidation source for lobby/matchmaking
+  // state. Rust game-socket health is tracked separately by the runtime.
+  useBoardRealtime({
     slug: boardId,
-    onReload: matchmakingEnabled ? refreshMatchmaking : refresh,
+    onReload: matchmakingEnabled ? refreshMatchmaking : runtime.refresh,
   });
-  useEffect(() => {
-    // Matchmaking already has a lease heartbeat below, which also returns the
-    // authoritative matchmaking snapshot. Avoid a second identical 15s poll
-    // when Realtime is degraded while waiting in the lobby.
-    if (
-      matchmakingEnabled ||
-      !shouldUseBoardFallbackPolling(realtime.status)
-    ) {
-      return;
-    }
-    const timer = setInterval(() => {
-      void refresh();
-    }, BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS);
-    return () => clearInterval(timer);
-  }, [matchmakingEnabled, realtime.status, refresh]);
 
   useEffect(() => {
     if (!matchmakingEnabled || matchmaking.status !== "waiting") return;
@@ -164,109 +132,56 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
     return () => clearInterval(timer);
   }, [matchmaking.status, matchmakingEnabled, refreshMatchmaking]);
 
-  const executePending = useCallback(
-    async (pending: PendingOmokCommand, persist = true) => {
-      if (persist) {
-        await savePendingOmokCommand(boardId, pending).catch(() => undefined);
-      }
-      setHasPending(true);
-      setBusy(true);
-      setError(null);
-      try {
-        const response = await submitOmokCommand(pending.sessionId, pending.request);
-        setSnapshot((current) =>
-          mergeOmokCommandSnapshot(current, pending.sessionId, response.snapshot),
-        );
-        await clearPendingOmokCommand(boardId).catch(() => undefined);
-        setHasPending(false);
-      } catch (cause) {
-        const apiBody = playApiError(cause);
-        if (cause instanceof ApiError && cause.status === 409 && isOmokSnapshot(apiBody?.snapshot)) {
-          setSnapshot((current) =>
-            mergeOmokCommandSnapshot(current, pending.sessionId, apiBody.snapshot!),
-          );
-          await clearPendingOmokCommand(boardId).catch(() => undefined);
-          setHasPending(false);
-          setError("다른 화면에서 상태가 먼저 바뀌어 최신 판으로 맞췄어요.");
-        } else {
-          if (cause instanceof ApiError && cause.status < 500 && cause.status !== 408) {
-            await clearPendingOmokCommand(boardId).catch(() => undefined);
-            setHasPending(false);
-          }
-          setError(messageForError(cause));
-        }
-      } finally {
-        setBusy(false);
-      }
-    },
-    [boardId],
-  );
-
-  useEffect(() => {
-    if (!snapshot || busy) return;
-    let cancelled = false;
-    void loadPendingOmokCommand(boardId).then((pending) => {
-      if (
-        cancelled ||
-        !pending ||
-        pending.sessionId !== snapshot.sessionId ||
-        retriedRef.current === pending.request.requestId
-      ) {
-        return;
-      }
-      retriedRef.current = pending.request.requestId;
-      void executePending(pending, false);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [boardId, busy, executePending, snapshot]);
-
-  const sendIntent = useCallback(
-    (command: OmokIntent) => {
-      if (!snapshot || busy || syncing) return;
-      void executePending({
-        sessionId: snapshot.sessionId,
-        request: makeOmokCommand(snapshot, command),
-      });
-    },
-    [busy, executePending, snapshot, syncing],
-  );
-
   const startMatchmaking = useCallback(
     async (opponent: "human" | "computer") => {
-      if (!matchmakingEnabled || busy) return;
-      setBusy(true);
-      setError(null);
+      if (!matchmakingEnabled || matchmakingBusy) return;
+      setMatchmakingBusy(true);
+      setMatchmakingError(null);
       try {
         acceptMatchmaking(await requestOmokMatch(boardId, opponent));
       } catch (cause) {
-        setError(messageForError(cause));
+        setMatchmakingError(omokHttpErrorMessage(cause));
       } finally {
-        setBusy(false);
+        setMatchmakingBusy(false);
       }
     },
-    [acceptMatchmaking, boardId, busy, matchmakingEnabled],
+    [acceptMatchmaking, boardId, matchmakingBusy, matchmakingEnabled],
   );
 
   const stopMatchmaking = useCallback(async () => {
-    if (!matchmakingEnabled || busy) return;
-    setBusy(true);
-    setError(null);
+    if (!matchmakingEnabled || matchmakingBusy) return;
+    setMatchmakingBusy(true);
+    setMatchmakingError(null);
     try {
       acceptMatchmaking(await cancelOmokMatch(boardId));
     } catch (cause) {
-      setError(messageForError(cause));
+      setMatchmakingError(omokHttpErrorMessage(cause));
     } finally {
-      setBusy(false);
+      setMatchmakingBusy(false);
     }
-  }, [acceptMatchmaking, boardId, busy, matchmakingEnabled]);
+  }, [acceptMatchmaking, boardId, matchmakingBusy, matchmakingEnabled]);
 
-  if (loading) {
+  const confirmResign = useCallback(() => {
+    Alert.alert("기권할까요?", "지금 기권하면 상대의 승리로 끝나요.", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "기권하기",
+        style: "destructive",
+        onPress: () => runtime.sendIntent({ type: "resign" }),
+      },
+    ]);
+  }, [runtime]);
+
+  const leaveGame = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace("/(student)/boards?filter=play" as Href);
+  }, [router]);
+
+  if (runtime.loading || (matchmakingEnabled && matchmakingLoading && !snapshot)) {
     return (
       <View style={styles.center} accessibilityLiveRegion="polite">
         <ActivityIndicator />
-        <Text style={styles.muted}>권위 게임 상태를 불러오는 중이에요…</Text>
+        <Text style={styles.muted}>대국을 불러오는 중이에요…</Text>
       </View>
     );
   }
@@ -286,21 +201,18 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
                 ? `현재 ${matchmaking.playerCount}명이 매칭에 참여 중이에요.`
                 : "같은 학급 친구를 찾거나 컴퓨터와 바로 대국할 수 있어요."}
             </Text>
-            <Text style={styles.connectionText}>
-              {realtime.status === "subscribed" ? "실시간 매칭 연결됨" : "매칭 연결 복구 중"}
-            </Text>
             <View style={styles.matchActions}>
               {waiting ? (
                 <>
                   <AppButton
                     variant="secondary"
-                    disabled={busy}
+                    disabled={matchmakingBusy}
                     onPress={() => void stopMatchmaking()}
                   >
-                    {busy ? "처리 중…" : "매칭 취소"}
+                    {matchmakingBusy ? "처리 중…" : "매칭 취소"}
                   </AppButton>
                   <AppButton
-                    disabled={busy}
+                    disabled={matchmakingBusy}
                     onPress={() => void startMatchmaking("computer")}
                   >
                     컴퓨터와 바로 대국
@@ -309,14 +221,14 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
               ) : (
                 <>
                   <AppButton
-                    disabled={busy}
+                    disabled={matchmakingBusy}
                     onPress={() => void startMatchmaking("human")}
                   >
-                    {busy ? "처리 중…" : "친구 매칭"}
+                    {matchmakingBusy ? "처리 중…" : "친구 매칭"}
                   </AppButton>
                   <AppButton
                     variant="secondary"
-                    disabled={busy}
+                    disabled={matchmakingBusy}
                     onPress={() => void startMatchmaking("computer")}
                   >
                     컴퓨터와 대국
@@ -324,7 +236,7 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
                 </>
               )}
             </View>
-            {error ? <Text style={styles.error}>{error}</Text> : null}
+            {matchmakingError ? <Text style={styles.error}>{matchmakingError}</Text> : null}
           </View>
         </ScrollView>
       );
@@ -336,8 +248,8 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
           title="대국 준비 중"
           description="교사가 상대를 정하면 이 화면에 자동으로 오목판이 나타나요."
         />
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-        <AppButton variant="secondary" onPress={() => void refresh()}>
+        {state.error ? <Text style={styles.error}>{state.error}</Text> : null}
+        <AppButton variant="secondary" onPress={() => void runtime.refresh()}>
           최신 상태 확인
         </AppButton>
       </ScrollView>
@@ -347,213 +259,136 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   const me = snapshot.viewer.slot
     ? snapshot.participants.find((participant) => participant.slot === snapshot.viewer.slot)
     : null;
-  const nextPlayer = snapshot.participants.find(
-    (participant) => participant.slot === snapshot.game.nextTurn,
-  );
-  const canPlace =
-    snapshot.viewer.role === "participant" &&
-    snapshot.roomStatus === "active" &&
-    snapshot.viewer.slot === snapshot.game.nextTurn &&
-    !busy &&
-    !syncing;
+  const terminal = snapshot.roomStatus === "finished";
+  const board = projectPendingBoard(state) ?? snapshot.game.board;
+  const frame = omokBoardFrame({
+    width,
+    height,
+    reservedHeight: omokTokens.reservedHeight,
+    horizontalPadding: spacing.md,
+    maxEdge: omokTokens.boardMaxEdge,
+    minEdge: omokTokens.boardMinEdge,
+  });
+  const banner = omokTurnBanner(state);
+  const hint = omokHintText(state);
+  const notice = omokConnectionNotice(socketStatus, {
+    httpRecovering: offline,
+    offline,
+  });
+  const boardEnabled = !terminal && !state.pending && canPlaceStone(snapshot);
 
+  // No scroll view: the board and its chrome are sized to the viewport.
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <View style={styles.hero}>
-        <View style={styles.heroText}>
-          <Text style={styles.eyebrow}>AUTHORITATIVE OMOK</Text>
-          <Text style={styles.title}>{data.board.title || "권위 오목"}</Text>
-        </View>
-        <View style={styles.versionPill}>
-          <Text style={styles.versionText}>v{snapshot.version}</Text>
-          <Text style={styles.versionSub}>{syncing ? "동기화 중" : "동기화됨"}</Text>
-        </View>
-      </View>
+    <View style={styles.gameRoot}>
+      <OmokHud snapshot={snapshot} />
+      <OmokTurnBar banner={banner} />
 
-      <View style={styles.statusCard} accessibilityLiveRegion="polite">
-        <Text style={styles.statusLabel}>진행 상태</Text>
-        <Text style={styles.statusValue}>{describeStatus(snapshot, nextPlayer?.displayName ?? null)}</Text>
-        <Text style={styles.statusHint}>{actionHint(snapshot)}</Text>
-      </View>
+      <OmokGrid
+        board={board}
+        frame={frame}
+        aim={state.aim}
+        pendingStone={state.pending?.stone ?? null}
+        lastMove={snapshot.game.lastMove?.position ?? null}
+        enabled={boardEnabled}
+        onAim={runtime.aim}
+      />
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.boardScroll}>
-        <View
-          style={[
-            styles.board,
-            { width: cellSize * 15 + 8, height: cellSize * 15 + 8 },
-          ]}
-        >
-          {snapshot.game.board.map((cell, index) => {
-            const row = Math.floor(index / 15);
-            const column = index % 15;
-            const last =
-              snapshot.game.lastMove?.position.row === row &&
-              snapshot.game.lastMove.position.column === column;
-            const enabled = canPlace && cell === null;
-            return (
-              <BarePressable
-                key={`${row}:${column}`}
-                accessibilityRole="button"
-                accessibilityLabel={`${row + 1}행 ${column + 1}열${cell ? `, ${slotLabel(cell)} 돌` : ", 빈 칸"}`}
-                accessibilityState={{ disabled: !enabled }}
-                disabled={!enabled}
-                onPress={() =>
-                  sendIntent({ type: "place_stone", position: { row, column } })
-                }
-                style={[
-                  styles.cell,
-                  { width: cellSize, height: cellSize },
-                ]}
-              >
-                {STAR_POINTS.has(`${row}:${column}`) && !cell ? <View style={styles.star} /> : null}
-                {cell ? (
-                  <View
-                    style={[
-                      styles.stone,
-                      cell === "first" ? styles.blackStone : styles.whiteStone,
-                      last ? styles.lastStone : null,
-                      { width: cellSize * 0.78, height: cellSize * 0.78 },
-                    ]}
-                  />
-                ) : null}
-              </BarePressable>
-            );
-          })}
-        </View>
-      </ScrollView>
-
-      <View style={styles.playersCard}>
-        <Text style={styles.sectionTitle}>대국 참가자</Text>
-        {snapshot.participants.map((participant) => (
-          <View style={styles.playerRow} key={participant.slot}>
-            <View style={styles.playerIdentity}>
-              <View
-                style={[
-                  styles.playerStone,
-                  participant.slot === "first" ? styles.blackStone : styles.whiteStone,
-                ]}
-              />
-              <Text style={styles.playerName} numberOfLines={1}>
-                {participant.displayName}
-                {participant.slot === snapshot.viewer.slot ? " (나)" : ""}
-              </Text>
-            </View>
-            <Text style={styles.readyBadge}>{participant.ready ? "준비됨" : "대기"}</Text>
-          </View>
-        ))}
-      </View>
-
-      <View style={styles.actions}>
-        {snapshot.roomStatus === "waiting" && !me?.ready ? (
-          <AppButton
-            disabled={busy || syncing}
-            onPress={() => sendIntent({ type: "ready" })}
-          >
-            준비 완료
-          </AppButton>
-        ) : null}
-        {snapshot.roomStatus === "active" ? (
-          <AppButton
-            variant="danger"
-            disabled={busy || syncing}
-            onPress={() => sendIntent({ type: "resign" })}
-          >
-            기권하기
-          </AppButton>
-        ) : null}
-        {hasPending ? (
-          <AppButton
-            variant="secondary"
-            disabled={busy}
-            onPress={() => {
-              void loadPendingOmokCommand(boardId).then((pending) => {
-                if (pending) void executePending(pending, false);
-              });
-            }}
-          >
-            미확인 요청 다시 보내기
-          </AppButton>
-        ) : null}
-        <AppButton
-          variant="secondary"
-          disabled={busy || syncing}
-          onPress={() => void refresh()}
-        >
-          최신 상태 확인
-        </AppButton>
-      </View>
-
-      {error ? (
-        <Text style={styles.error} accessibilityRole="alert">
-          {error}
+      {hint ? (
+        <Text style={styles.hint} accessibilityLiveRegion="polite">
+          {hint}
         </Text>
       ) : null}
-    </ScrollView>
+
+      {terminal ? (
+        <OmokTerminalPanel
+          snapshot={snapshot}
+          busy={runtime.busy}
+          canRematch={snapshot.viewer.capabilities.canRematch}
+          onLeave={leaveGame}
+          onRematch={runtime.rematch}
+        />
+      ) : (
+        <View style={styles.actionRow}>
+          {state.aim ? (
+            <>
+              <AppButton style={styles.actionButton} onPress={runtime.confirm}>
+                여기에 두기
+              </AppButton>
+              <AppButton
+                variant="secondary"
+                style={styles.actionButton}
+                onPress={runtime.cancelAim}
+              >
+                취소
+              </AppButton>
+            </>
+          ) : snapshot.roomStatus === "waiting" && !me?.ready ? (
+            <AppButton
+              style={styles.actionButton}
+              disabled={!!state.pending}
+              onPress={() => runtime.sendIntent({ type: "ready" })}
+            >
+              준비 완료
+            </AppButton>
+          ) : snapshot.roomStatus === "active" ? (
+            <AppButton
+              variant="danger"
+              style={styles.actionButton}
+              disabled={!!state.pending}
+              onPress={confirmResign}
+            >
+              기권
+            </AppButton>
+          ) : null}
+        </View>
+      )}
+
+      {notice ? (
+        <Text style={styles.notice} accessibilityLiveRegion="polite">
+          {notice}
+        </Text>
+      ) : null}
+      {state.error ? (
+        <Text style={styles.error} accessibilityRole="alert">
+          {state.error}
+        </Text>
+      ) : null}
+    </View>
   );
-}
-
-function slotLabel(slot: OmokSlot | null): string {
-  if (slot === "first") return "흑";
-  if (slot === "second") return "백";
-  return "관전자";
-}
-
-function describeStatus(snapshot: OmokSnapshot, turnName: string | null): string {
-  switch (snapshot.roomStatus) {
-    case "waiting":
-      return `준비 대기 · ${snapshot.participants.filter((participant) => participant.ready).length}/2`;
-    case "ready":
-      return "두 참가자 준비 완료";
-    case "active":
-      return `${turnName ?? slotLabel(snapshot.game.nextTurn)} 차례`;
-    case "finished": {
-      if (!snapshot.outcome?.winner) return "무승부";
-      const winner = snapshot.participants.find(
-        (participant) => participant.slot === snapshot.outcome?.winner,
-      );
-      return `${winner?.displayName ?? slotLabel(snapshot.outcome.winner)} 승리`;
-    }
-  }
-}
-
-function actionHint(snapshot: OmokSnapshot): string {
-  if (snapshot.roomStatus === "waiting") return "준비 완료를 누르면 교사가 대국을 시작할 수 있어요.";
-  if (snapshot.roomStatus === "ready") return "교사가 곧 대국을 시작합니다.";
-  if (snapshot.roomStatus === "active") {
-    return snapshot.viewer.slot === snapshot.game.nextTurn
-      ? "내 차례예요. 빈 교차점을 선택해 주세요."
-      : "상대 차례예요. 판은 자동으로 최신 상태를 불러옵니다.";
-  }
-  if (snapshot.outcome?.reason === "resignation") return "기권으로 대국이 종료됐습니다.";
-  if (snapshot.outcome?.reason === "draw") return "무승부로 대국이 종료됐습니다.";
-  return "다섯 돌이 이어져 대국이 종료됐습니다.";
-}
-
-function messageForError(error: unknown): string {
-  const body = playApiError(error);
-  switch (body?.error) {
-    case "invalid_phase":
-      return "지금 단계에서는 그 동작을 할 수 없어요. 최신 상태를 확인해 주세요.";
-    case "domain_rejected":
-      return "그 자리는 둘 수 없거나 내 차례가 아니에요.";
-    case "forbidden":
-      return "이 대국에 참여할 권한이 없어요.";
-    case "play_engine_unavailable":
-      return "게임 서버 연결이 불안정해요. 같은 요청으로 다시 시도할 수 있어요.";
-    case "match_creation_failed":
-    case "match_reservation_failed":
-      return "대국을 만들지 못했어요. 잠시 후 다시 시도해 주세요.";
-    default:
-      return "연결을 확인해 주세요. 미확인 요청은 안전하게 다시 보낼 수 있어요.";
-  }
 }
 
 const styles = StyleSheet.create({
-  container: {
+  /** The active game fills the shell and never scrolls. */
+  gameRoot: {
+    flex: 1,
     padding: spacing.md,
-    paddingBottom: spacing.xxxl,
-    gap: spacing.md,
+    gap: spacing.sm,
     backgroundColor: omokTokens.pageBg,
+  },
+  hint: {
+    ...typography.body,
+    color: omokTokens.statusHint,
+    textAlign: "center",
+  },
+  notice: {
+    ...typography.label,
+    color: omokTokens.noticeText,
+    backgroundColor: omokTokens.noticeSurface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: omokTokens.noticeBorder,
+    borderRadius: radii.control,
+    padding: spacing.sm,
+    textAlign: "center",
+    overflow: "hidden",
+  },
+  actionRow: {
+    flexDirection: "row",
+    gap: omokTokens.confirmGap,
+  },
+  /** Confirm and cancel are separate, non-overlapping >=44dp targets. */
+  actionButton: {
+    flex: 1,
+    minHeight: omokTokens.confirmMinHeight,
   },
   center: {
     flex: 1,
@@ -605,144 +440,12 @@ const styles = StyleSheet.create({
   matchActions: { gap: spacing.sm },
   muted: { ...typography.body, color: colors.textMuted },
   emptyIcon: { fontSize: omokTokens.emptyIconSize },
-  hero: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: spacing.md,
-  },
-  heroText: { flex: 1 },
   eyebrow: {
     ...typography.micro,
     color: omokTokens.eyebrow,
     fontWeight: "800",
     letterSpacing: omokTokens.eyebrowLetterSpacing,
   },
-  title: { ...typography.title, color: omokTokens.text },
-  versionPill: {
-    borderRadius: radii.pill,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: omokTokens.versionSurface,
-    alignItems: "center",
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: omokTokens.versionBorder,
-  },
-  versionText: {
-    ...typography.micro,
-    color: omokTokens.versionText,
-    fontWeight: "800",
-  },
-  versionSub: {
-    fontSize: omokTokens.versionSubtextSize,
-    color: omokTokens.versionSubtext,
-  },
-  statusCard: {
-    borderRadius: radii.card,
-    backgroundColor: omokTokens.panelSurface,
-    padding: spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: omokTokens.panelBorder,
-    gap: spacing.xs,
-  },
-  statusLabel: {
-    ...typography.micro,
-    color: omokTokens.statusLabel,
-    fontWeight: "800",
-  },
-  statusValue: {
-    ...typography.subtitle,
-    color: omokTokens.text,
-    fontWeight: "900",
-  },
-  statusHint: { ...typography.body, color: omokTokens.statusHint },
-  boardScroll: {
-    paddingHorizontal: spacing.xxs,
-    paddingVertical: spacing.sm,
-  },
-  board: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    borderWidth: omokTokens.boardBorderWidth,
-    borderColor: omokTokens.boardBorder,
-    borderRadius: radii.control,
-    overflow: "hidden",
-    backgroundColor: omokTokens.boardWood,
-  },
-  cell: {
-    alignItems: "center",
-    justifyContent: "center",
-    borderRightWidth: StyleSheet.hairlineWidth,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderColor: omokTokens.boardGrid,
-  },
-  star: {
-    width: omokTokens.starSize,
-    height: omokTokens.starSize,
-    borderRadius: radii.pill,
-    backgroundColor: omokTokens.star,
-  },
-  stone: { borderRadius: radii.pill },
-  blackStone: {
-    backgroundColor: omokTokens.blackStone,
-    borderColor: omokTokens.blackStoneBorder,
-  },
-  whiteStone: {
-    backgroundColor: omokTokens.whiteStone,
-    borderWidth: omokTokens.whiteStoneBorderWidth,
-    borderColor: omokTokens.whiteStoneBorder,
-  },
-  lastStone: {
-    borderWidth: omokTokens.lastMoveBorderWidth,
-    borderColor: omokTokens.lastMove,
-  },
-  playersCard: {
-    borderRadius: radii.card,
-    backgroundColor: omokTokens.panelSurface,
-    padding: spacing.md,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: omokTokens.panelBorder,
-  },
-  sectionTitle: {
-    ...typography.subtitle,
-    color: omokTokens.text,
-    marginBottom: spacing.sm,
-  },
-  playerRow: {
-    minHeight: omokTokens.playerRowMinHeight,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: omokTokens.playerDivider,
-  },
-  playerIdentity: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  playerStone: {
-    width: omokTokens.playerStoneSize,
-    height: omokTokens.playerStoneSize,
-    borderRadius: radii.pill,
-  },
-  playerName: {
-    ...typography.body,
-    flex: 1,
-    color: omokTokens.text,
-    fontWeight: "800",
-  },
-  readyBadge: {
-    ...typography.badge,
-    color: omokTokens.readyText,
-    backgroundColor: omokTokens.readyBg,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: radii.pill,
-    overflow: "hidden",
-  },
-  actions: { gap: spacing.sm },
   error: {
     ...typography.body,
     color: omokTokens.errorText,

@@ -1,6 +1,7 @@
 export const PLAY_COMMAND_SCHEMA_VERSION = 1 as const;
 export const PLAY_SESSION_STATE_SCHEMA_VERSION = 1 as const;
 export const OMOK_RULES_VERSION = 1 as const;
+export const OMOK_REALTIME_PROTOCOL_VERSION = 1 as const;
 export const PLAY_SESSION_CHANGED_EVENT = "play_session_changed" as const;
 
 export type PlayActorRole = "host" | "participant";
@@ -45,7 +46,11 @@ export type OmokSnapshot = {
   previousSessionId: string | null;
   roomStatus: OmokRoomStatus;
   participants: OmokParticipant[];
-  viewer: { role: PlayActorRole; slot: OmokSlot | null };
+  viewer: {
+    role: PlayActorRole;
+    slot: OmokSlot | null;
+    capabilities: { canRematch: boolean };
+  };
   game: OmokState;
   outcome: OmokOutcome | null;
 };
@@ -78,6 +83,83 @@ export type PlayApiError = {
   currentVersion?: number;
   snapshot?: OmokSnapshot;
 };
+
+export type OmokRealtimeTransport =
+  | {
+      transport: "websocket";
+      protocolVersion: typeof OMOK_REALTIME_PROTOCOL_VERSION;
+      websocketUrl: string;
+      ticket: string;
+      expiresAtMs: number;
+    }
+  | {
+      transport: "http";
+      reason: "bot_session";
+      pollIntervalMs: 3000;
+    };
+
+export type OmokRealtimeClientFrame =
+  | {
+      type: "authenticate";
+      protocolVersion: typeof OMOK_REALTIME_PROTOCOL_VERSION;
+      ticket: string;
+      lastSeenVersion?: number;
+    }
+  | ({
+      type: "command";
+      protocolVersion: typeof OMOK_REALTIME_PROTOCOL_VERSION;
+    } & PlayCommandRequest);
+
+export type OmokRealtimeServerFrame =
+  | {
+      type: "ready";
+      protocolVersion: typeof OMOK_REALTIME_PROTOCOL_VERSION;
+      sessionId: string;
+      snapshot: OmokSnapshot;
+    }
+  | {
+      type: "command_committed";
+      protocolVersion: typeof OMOK_REALTIME_PROTOCOL_VERSION;
+      sessionId: string;
+      requestId: string;
+      commandType: OmokIntent["type"];
+      previousVersion: number;
+      version: number;
+      replayed: boolean;
+      snapshot: OmokSnapshot;
+    }
+  | {
+      type: "snapshot";
+      protocolVersion: typeof OMOK_REALTIME_PROTOCOL_VERSION;
+      sessionId: string;
+      reason: "session_changed";
+      snapshot: OmokSnapshot;
+    }
+  | {
+      type: "command_rejected";
+      protocolVersion: typeof OMOK_REALTIME_PROTOCOL_VERSION;
+      sessionId: string;
+      requestId: string;
+      commandType: OmokIntent["type"];
+      error: string;
+      retryable: boolean;
+      currentVersion?: number;
+      snapshot?: OmokSnapshot;
+    }
+  | {
+      type: "connection_error";
+      protocolVersion: typeof OMOK_REALTIME_PROTOCOL_VERSION;
+      error: string;
+      retryable: boolean;
+    }
+  | {
+      type: "session_replaced";
+      protocolVersion: typeof OMOK_REALTIME_PROTOCOL_VERSION;
+      reason: "rematch";
+      previousSessionId: string;
+      sessionId: string;
+      snapshot: OmokSnapshot;
+    };
 export type OmokRosterStudent = {
   id: string;
   name: string;
@@ -158,7 +240,9 @@ export function isOmokSnapshot(value: unknown): value is OmokSnapshot {
     (viewer.role !== "host" && viewer.role !== "participant") ||
     !(viewer.slot === null || isOmokSlot(viewer.slot)) ||
     (viewer.role === "host" && viewer.slot !== null) ||
-    (viewer.role === "participant" && !isOmokSlot(viewer.slot))
+    (viewer.role === "participant" && !isOmokSlot(viewer.slot)) ||
+    !isRecord(viewer.capabilities) ||
+    typeof viewer.capabilities.canRematch !== "boolean"
   ) return false;
 
   const board = game.board;

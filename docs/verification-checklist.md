@@ -478,6 +478,75 @@ Object payload replication or a documented media degraded-mode is a separate gat
 
 ### Lifecycle and recovery matrix
 
+- For the Omok realtime implementation and rollout order, use
+  `docs/omok-realtime-commercialization-plan.md`. Record local feedback,
+  server commit/ack, and peer render as separate timings; a fast pending stone
+  does not prove persistence or peer propagation.
+- Obtain a short-lived realtime ticket only after normal Next authentication.
+  Verify anonymous, non-member, wrong-session, expired, tampered and replayed-to-
+  another-session tickets fail, and verify the client URL/logs never contain the
+  ticket, actor subject, student ID or shared secret.
+- Verify the React Native client sends the fixed Origin
+  `https://mobile.aura-board.invalid`, Rust accepts it only when it is explicitly
+  present in `PLAY_ENGINE_REALTIME_ALLOWED_ORIGINS`, and an empty allowlist keeps
+  `/v1/realtime` fail-closed without disabling the HTTP play routes. Force six
+  consecutive pre-ready failures and confirm the client enters HTTP-only
+  degraded mode with no reconnect timer; foregrounding or resetting the session
+  must open a fresh bounded retry cycle.
+- Connect S23 `R3CW50BW8KB` and A20 `R59M904MEMY` to one Omok session. Play
+  black → white → black → white in both directions and record p50/p95 for touch
+  to pending, engine commit/ack and peer render. Target p95 is at most 100ms,
+  500ms and 1s respectively; normal server approval must not exceed 1s.
+- Verify the pending stone is visually distinct from the last committed move,
+  appears within 100ms of the separate move-confirm action, blocks same-frame
+  duplicate confirmation, confirms only from a correlated committed frame, and
+  rolls back with useful feedback on domain rejection or version conflict.
+- On a 360dp-wide phone, verify the board acts as one coordinate-selection
+  surface: nearest legal aim, coordinate announcement, cancel, and a separate
+  non-overlapping 44dp confirm control. Do not count overlapping 44dp targets on
+  each of the 15 intersections as valid accessibility coverage.
+- While a WebSocket is healthy, verify the 3-second active-game poll is absent.
+  Interrupt the socket and confirm bounded HTTP/outbox recovery starts; restore
+  it and confirm polling stops after a monotonic catch-up snapshot.
+- Disconnect and reconnect each device, background/foreground it, restart the
+  app after an unacknowledged move, and restart the Rust service. Input must stay
+  disabled until catch-up; a durable request ID may mutate the game at most once.
+- Make one subscriber slow and force a version gap. It may skip intermediate
+  versions but must receive the latest actor-projected snapshot without an
+  unbounded queue or another participant's viewer/slot projection.
+- Resign from each side and finish by five in a row. Both devices must show the
+  same winner/reason, reject every post-terminal move, and preserve the result
+  after app reload. Verify only the terminal current-session host has
+  `canRematch`, rematch creates a new linked session, and both devices obtain new
+  tickets and enter the same reset board.
+
+2026-09-12 local device evidence for the realtime slice:
+
+- S23 `R3CW50BW8KB` (1080x2340, student `test`, black) and A20
+  `R59M904MEMY` (720x1560, student `공서희`, white) joined board
+  `cmtx9ttb50011vs30ai2j2pso`, session
+  `fabf8167-1399-4f2f-99e4-4d2bf56c9d66` in Expo Go portrait mode.
+- Two sustained connections to the isolated Rust realtime listener remained
+  established. Black → white → black → white propagated in both directions;
+  after the final white move both boards showed the same new stone, S23 showed
+  `내 차례`, and A20 showed `상대 차례`.
+- With both sockets healthy, the isolated Next log contained no active-session
+  poll or command POST. Its byte length remained unchanged across the final
+  move, so that move did not use the HTTP command fallback.
+- Backgrounding S23 disconnected its socket; foreground/deep-link recovery
+  obtained a new ticket and restored the second sustained socket and current
+  board. This verifies the exercised foreground reconnect path, not every
+  failure-injection row below.
+- Aim, separate confirm, and the immediate pending state were visually checked
+  on A20. Android static-frame recording and variable ADB input return time did
+  not provide trustworthy touch/commit/peer p50 or p95 numbers, so the latency
+  thresholds above remain a measured rollout gate rather than a claimed pass.
+- Evidence is preserved at
+  `C:\Users\coseung2\AppData\Local\Temp\aura-board-omok-device-current`.
+  `s23-after-final-white.png` and `a20-after-final-white.png` are the final
+  convergence pair. The authoritative version number was not independently
+  queried in this pass.
+
 - Create a session and confirm the server assigns unique `first` and `second` slots. Reload web and Expo before either student is ready; both must recover the same `waiting` snapshot.
 - Ready one participant, reload, and confirm only that participant is ready. Ready the second participant and confirm the session becomes `ready` but does not start automatically.
 - Start as the host. Confirm participants cannot start and the host cannot place a stone.

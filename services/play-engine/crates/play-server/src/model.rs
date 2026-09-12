@@ -134,6 +134,13 @@ pub struct PublicParticipant {
 pub struct ViewerProjection {
     pub role: ActorRole,
     pub slot: Option<OmokSlot>,
+    pub capabilities: ViewerCapabilities,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ViewerCapabilities {
+    pub can_rematch: bool,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
@@ -410,6 +417,7 @@ impl SessionRecord {
             viewer: ViewerProjection {
                 role: actor.role,
                 slot,
+                capabilities: ViewerCapabilities { can_rematch: false },
             },
             game: self.state.game.clone(),
             outcome: self.state.outcome.clone(),

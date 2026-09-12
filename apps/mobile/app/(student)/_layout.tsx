@@ -14,6 +14,7 @@ import { WalkingPermissionOnboarding } from "../../components/WalkingPermissionO
 import { InputFeedbackProvider } from "../../components/input-feedback-provider";
 import { AppButton } from "../../components/ui";
 import { ApiError, apiFetch } from "../../lib/api";
+import { isActiveOmokRoute } from "../../lib/omok-route";
 import {
   BOARD_LIST_CACHE_KEY,
   STUDENT_HOME_CACHE_KEY,
@@ -46,7 +47,11 @@ export default function StudentLayout() {
     pathname.endsWith("/compose") ||
     pathname.endsWith("/edit") ||
     pathname.endsWith("/comments") ||
-    pathname.endsWith("/submit");
+    pathname.endsWith("/submit") ||
+    // An active Omok game owns the full screen: the board is sized to the
+    // viewport and a global tab bar would both steal room and allow a
+    // mis-tap out of a live turn.
+    isActiveOmokRoute(pathname);
   const [cacheReady, setCacheReady] = useState(false);
   const [accessError, setAccessError] = useState(false);
   const [me, setMe] = useState<MeResponse | null>(

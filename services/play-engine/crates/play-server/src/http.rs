@@ -10,10 +10,12 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::auth::AssertionVerifier;
+use crate::command::CommandService;
 use crate::model::{
     ActorContext, CommandRequest, CreateSessionRequest, CreateSongGuessSessionRequest, ModelError,
     RematchRequest, SessionSnapshot, SongGuessCommandRequest, SongGuessSnapshot,
 };
+use crate::realtime::{RealtimeConfig, SessionHub, realtime_disabled, websocket_route};
 use crate::repository::{Execution, PlayRepository, RepositoryError};
 use crate::shadow::{
     CreateShadowAllianceSessionRequest, ShadowAllianceCommandRequest, ShadowAllianceSnapshot,
@@ -25,8 +27,10 @@ const INTERNAL_HEADER: &str = "x-aura-play-internal-secret";
 #[derive(Clone)]
 pub struct AppState {
     repository: Arc<dyn PlayRepository>,
+    command_service: CommandService,
     assertion_verifier: AssertionVerifier,
     internal_secret: Arc<str>,
+    realtime_config: Option<RealtimeConfig>,
     clock: Arc<dyn Fn() -> i64 + Send + Sync>,
 }
 
@@ -36,12 +40,20 @@ impl AppState {
         assertion_verifier: AssertionVerifier,
         internal_secret: impl Into<Arc<str>>,
     ) -> Self {
+        let command_service = CommandService::new(repository.clone(), SessionHub::default());
         Self {
             repository,
+            command_service,
             assertion_verifier,
             internal_secret: internal_secret.into(),
+            realtime_config: None,
             clock: Arc::new(system_time_ms),
         }
+    }
+
+    pub fn with_realtime(mut self, realtime_config: RealtimeConfig) -> Self {
+        self.realtime_config = Some(realtime_config);
+        self
     }
 
     #[cfg(test)]
@@ -50,14 +62,28 @@ impl AppState {
         self
     }
 
-    fn now_ms(&self) -> i64 {
+    pub(crate) fn now_ms(&self) -> i64 {
         (self.clock)()
+    }
+
+    pub(crate) fn command_service(&self) -> &CommandService {
+        &self.command_service
+    }
+
+    pub(crate) fn realtime_config(&self) -> Option<&RealtimeConfig> {
+        self.realtime_config.as_ref()
     }
 }
 
 pub fn router(state: AppState) -> Router {
+    let realtime_route = if state.realtime_config().is_some() {
+        get(websocket_route)
+    } else {
+        get(realtime_disabled)
+    };
     Router::new()
         .route("/health", get(health))
+        .route("/v1/realtime", realtime_route)
         .route("/v1/boards/{board_id}/sessions", post(create_session))
         .route(
             "/v1/boards/{board_id}/sessions/current",
@@ -139,9 +165,11 @@ async fn current_session(
         .map_err(|error| ApiError::from_repository(error, &actor, state.now_ms()))?
         .ok_or_else(ApiError::not_found)?;
     Ok(Json(
-        record
-            .snapshot(&actor, state.now_ms())
-            .map_err(ApiError::from_model)?,
+        state
+            .command_service
+            .project_record(&actor, &record, state.now_ms())
+            .await
+            .map_err(|error| ApiError::from_repository(error, &actor, state.now_ms()))?,
     ))
 }
 
@@ -226,9 +254,11 @@ async fn session_snapshot(
         .await
         .map_err(|error| ApiError::from_repository(error, &actor, state.now_ms()))?;
     Ok(Json(
-        record
-            .snapshot(&actor, state.now_ms())
-            .map_err(ApiError::from_model)?,
+        state
+            .command_service
+            .project_record(&actor, &record, state.now_ms())
+            .await
+            .map_err(|error| ApiError::from_repository(error, &actor, state.now_ms()))?,
     ))
 }
 
@@ -257,11 +287,26 @@ async fn execute_command(
     Json(request): Json<CommandRequest>,
 ) -> Result<Response, ApiError> {
     let actor = actor(&state, &headers)?;
-    let result = state
-        .repository
-        .execute_command(&actor, &session_id, &request, state.now_ms())
+    let now_ms = state.now_ms();
+    let result = match state
+        .command_service
+        .execute(&actor, &session_id, &request, now_ms)
         .await
-        .map_err(|error| ApiError::from_repository(error, &actor, state.now_ms()))?;
+    {
+        Ok(result) => result,
+        Err(RepositoryError::VersionConflict { current }) => {
+            let current_version = current.version;
+            let snapshot = state
+                .command_service
+                .project_record(&actor, &current, now_ms)
+                .await
+                .ok()
+                .and_then(|snapshot| serde_json::to_value(snapshot).ok())
+                .map(Box::new);
+            return Err(ApiError::version_conflict(current_version, snapshot));
+        }
+        Err(error) => return Err(ApiError::from_repository(error, &actor, now_ms)),
+    };
     Ok(execution_response(StatusCode::OK, result))
 }
 
@@ -370,7 +415,7 @@ async fn create_rematch(
 ) -> Result<Response, ApiError> {
     let actor = actor(&state, &headers)?;
     let result = state
-        .repository
+        .command_service
         .rematch(&actor, &session_id, &request, state.now_ms())
         .await
         .map_err(|error| ApiError::from_repository(error, &actor, state.now_ms()))?;
@@ -527,6 +572,18 @@ impl ApiError {
         result
     }
 
+    fn version_conflict(current_version: u64, snapshot: Option<Box<serde_json::Value>>) -> Self {
+        Self {
+            status: StatusCode::CONFLICT,
+            body: ErrorBody {
+                error: "version_conflict".to_owned(),
+                detail: None,
+                current_version: Some(current_version),
+                snapshot,
+            },
+        }
+    }
+
     fn from_model(error: ModelError) -> Self {
         match error {
             ModelError::Unauthorized => Self::unauthorized(),
@@ -560,20 +617,7 @@ impl ApiError {
             }
             RepositoryError::UnsupportedSchema => Self::bad_request("unsupported_command_schema"),
             RepositoryError::VersionConflict { current } => {
-                let snapshot = current
-                    .snapshot(actor, now_ms)
-                    .ok()
-                    .and_then(|snapshot| serde_json::to_value(snapshot).ok())
-                    .map(Box::new);
-                Self {
-                    status: StatusCode::CONFLICT,
-                    body: ErrorBody {
-                        error: "version_conflict".to_owned(),
-                        detail: None,
-                        current_version: Some(current.version),
-                        snapshot,
-                    },
-                }
+                Self::version_conflict(current.version, None)
             }
             RepositoryError::SongGuessVersionConflict { current } => {
                 let snapshot = current
@@ -768,5 +812,28 @@ mod tests {
             app.oneshot(request).await.unwrap().status(),
             StatusCode::UNAUTHORIZED
         );
+    }
+
+    #[tokio::test]
+    async fn realtime_route_is_503_while_http_engine_remains_available() {
+        let (app, _) = test_app();
+        let realtime = Request::builder()
+            .uri("/v1/realtime")
+            .body(Body::empty())
+            .unwrap();
+        let response = app.clone().oneshot(realtime).await.unwrap();
+        assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+        assert_eq!(
+            json_body(response).await,
+            json!({"error": "realtime_disabled"})
+        );
+
+        let health = Request::builder()
+            .uri("/health")
+            .body(Body::empty())
+            .unwrap();
+        let response = app.oneshot(health).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(json_body(response).await["ok"], true);
     }
 }

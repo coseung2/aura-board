@@ -116,6 +116,26 @@ function isFinishedSession(session: { completedAtMs: bigint | null; state: unkno
   return state.roomStatus === "finished";
 }
 
+function findTicketSession(ticket: {
+  matchBoardId: string | null;
+  sessionId: string | null;
+}, studentId: string) {
+  if (!ticket.matchBoardId || !ticket.sessionId) return Promise.resolve(null);
+  return db.playSession.findFirst({
+    where: {
+      id: ticket.sessionId,
+      boardId: ticket.matchBoardId,
+      current: true,
+      participants: {
+        some: {
+          OR: [{ studentId }, { actorSubject: `student:${studentId}` }],
+        },
+      },
+    },
+    select: { completedAtMs: true, state: true },
+  });
+}
+
 async function responseFor(
   boardId: string,
   studentId: string,
@@ -133,10 +153,7 @@ async function responseFor(
         where: { id: ticket.matchBoardId },
         select: { slug: true },
       }),
-      db.playSession.findFirst({
-        where: { boardId: ticket.matchBoardId, current: true },
-        select: { completedAtMs: true, state: true },
-      }),
+      findTicketSession(ticket, studentId),
     ]);
     if (!board || isFinishedSession(session)) {
       await db.omokMatchTicket.update({
@@ -368,10 +385,7 @@ export async function POST(request: Request, { params }: Params) {
     where: { lobbyBoardId_studentId: { lobbyBoardId: boardId, studentId: student.id } },
   });
   if (existing?.status === "matched" && existing.matchBoardId) {
-    const session = await db.playSession.findFirst({
-      where: { boardId: existing.matchBoardId, current: true },
-      select: { completedAtMs: true, state: true },
-    });
+    const session = await findTicketSession(existing, student.id);
     if (!isFinishedSession(session)) return responseFor(boardId, student.id);
   }
 

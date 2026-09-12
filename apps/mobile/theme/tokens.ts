@@ -218,16 +218,16 @@ export const typography = {
 /** Tap target — handoff ingest T1-1. 학생 태블릿 기준. */
 export const tapMin = 44;
 
-/** Authoritative Omok board tokens. Kept here so the game surface follows the
- * shared mobile design-system rule against component-local visual constants. */
+/** Authoritative Omok board and active-game tokens. Kept here so the game
+ * surface follows the shared rule against component-local visual constants.
+ * A 15x15 grid cannot give each intersection a 44dp target at 360dp width, so
+ * the board is a continuous aim surface and the confirm/cancel controls carry
+ * the accessible targets; aim and pending markers stay distinct through ring,
+ * dash and transparency rather than hue alone. */
 export const omokTokens = {
   pageBg: "#eef8f5",
   text: "#17352d",
   eyebrow: "#44786b",
-  versionSurface: "rgba(255, 255, 255, 0.86)",
-  versionBorder: "#b7d4cc",
-  versionText: "#285f51",
-  versionSubtext: "#5d7e76",
   panelSurface: "#ffffff",
   panelBorder: "#c9ded8",
   statusLabel: "#63847c",
@@ -235,30 +235,50 @@ export const omokTokens = {
   boardBorder: "#9a6737",
   boardWood: "#d6a45e",
   boardGrid: "rgba(70, 42, 18, 0.58)",
-  cellPressed: "rgba(255, 247, 205, 0.64)",
   star: "#4a2e16",
   blackStone: "#172722",
   blackStoneBorder: "#08100e",
   whiteStone: "#f5fbf8",
   whiteStoneBorder: "#a9c0b9",
   lastMove: "#ffc847",
-  playerDivider: "#e2eeea",
-  readyText: "#286e5c",
-  readyBg: "#e3f3ee",
   errorText: "#9b392c",
   errorBg: "#fff0ed",
   loadingMinHeight: 300,
   emptyMinHeight: 360,
   matchMaxWidth: 520,
-  playerRowMinHeight: 48,
   emptyIconSize: 42,
-  versionSubtextSize: 10,
   eyebrowLetterSpacing: 1.2,
   boardBorderWidth: 4,
   whiteStoneBorderWidth: 1,
   lastMoveBorderWidth: 3,
   starSize: 4,
-  playerStoneSize: 24,
+  hudSurface: "#ffffff",
+  hudBorder: "#c9ded8",
+  myTurnSurface: "#1f6f5c",
+  myTurnText: "#f2fffb",
+  peerTurnSurface: "#e3f3ee",
+  peerTurnText: "#27594c",
+  turnBarMinHeight: 52,
+  hudMinHeight: 44,
+  hudStoneSize: 18,
+  hudStoneBorderWidth: 1,
+  aimRing: "#0f5c8a",
+  aimRingWidth: 3,
+  aimFill: "rgba(15, 92, 138, 0.22)",
+  pendingOpacity: 0.62,
+  pendingRing: "#0f5c8a",
+  pendingRingWidth: 2,
+  lastMoveDotSize: 6,
+  boardMaxEdge: 520,
+  boardMinEdge: 240,
+  /** Room for HUD, turn bar, hint line and action row. */
+  reservedHeight: 268,
+  confirmMinHeight: 48,
+  confirmGap: 12,
+  terminalMaxWidth: 420,
+  noticeSurface: "#fffaf0",
+  noticeBorder: "#ecd9ae",
+  noticeText: "#6b5424",
 } as const;
 
 /** Authoritative Song Guess student surface. */

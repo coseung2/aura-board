@@ -32,7 +32,11 @@ function snapshot(version = 7): OmokSnapshot {
       { displayName: "첫째", slot: "first", ready: true },
       { displayName: "둘째", slot: "second", ready: true },
     ],
-    viewer: { role: "participant", slot: "first" },
+    viewer: {
+      role: "participant",
+      slot: "first",
+      capabilities: { canRematch: false },
+    },
     game: {
       board: Array.from({ length: 225 }, () => null),
       nextTurn: "first",
@@ -142,6 +146,12 @@ describe("authoritative play wire contract", () => {
       }),
     ).toBe(false);
     expect(isOmokSnapshot({ ...snapshot(), participants: [] })).toBe(false);
+    expect(
+      isOmokSnapshot({
+        ...snapshot(),
+        viewer: { role: "participant", slot: "first" },
+      }),
+    ).toBe(false);
     const invalidCell = snapshot();
     invalidCell.game.board[0] = "third" as never;
     expect(isOmokSnapshot(invalidCell)).toBe(false);

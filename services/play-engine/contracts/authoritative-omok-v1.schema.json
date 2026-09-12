@@ -163,7 +163,7 @@
         "viewer": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["role", "slot"],
+          "required": ["role", "slot", "capabilities"],
           "properties": {
             "role": { "type": "string", "enum": ["host", "participant"] },
             "slot": {
@@ -171,6 +171,14 @@
                 { "$ref": "#/$defs/slot" },
                 { "type": "null" }
               ]
+            },
+            "capabilities": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["canRematch"],
+              "properties": {
+                "canRematch": { "type": "boolean" }
+              }
             }
           }
         },

@@ -14,23 +14,35 @@ function Get-EnvMap([string]$path) {
   }
   return $map
 }
-$root = "C:\Users\심보승\Desktop\Projects\aura-board"
+$root = Split-Path -Parent $PSScriptRoot
 $envMap = Get-EnvMap (Join-Path $root ".env")
 $localMap = Get-EnvMap (Join-Path $root ".env.local")
 foreach ($k in $localMap.Keys) { $envMap[$k] = $localMap[$k] }
-foreach ($k in @("PLAY_ENGINE_ASSERTION_SECRET","PLAY_ENGINE_INTERNAL_SECRET")) {
-  if (-not $envMap.ContainsKey($k) -or [string]::IsNullOrWhiteSpace([string]$envMap[$k])) { throw "missing $k" }
+$assertionSecret = [Environment]::GetEnvironmentVariable("PLAY_ENGINE_ASSERTION_SECRET")
+if ([string]::IsNullOrWhiteSpace($assertionSecret) -and $envMap.ContainsKey("PLAY_ENGINE_ASSERTION_SECRET")) {
+  $assertionSecret = [string]$envMap["PLAY_ENGINE_ASSERTION_SECRET"]
 }
-$db = $null
-if ($envMap.ContainsKey("DIRECT_URL") -and -not [string]::IsNullOrWhiteSpace([string]$envMap["DIRECT_URL"])) {
+$internalSecret = [Environment]::GetEnvironmentVariable("PLAY_ENGINE_INTERNAL_SECRET")
+if ([string]::IsNullOrWhiteSpace($internalSecret) -and $envMap.ContainsKey("PLAY_ENGINE_INTERNAL_SECRET")) {
+  $internalSecret = [string]$envMap["PLAY_ENGINE_INTERNAL_SECRET"]
+}
+if ([string]::IsNullOrWhiteSpace($assertionSecret)) { throw "missing PLAY_ENGINE_ASSERTION_SECRET" }
+if ([string]::IsNullOrWhiteSpace($internalSecret)) { throw "missing PLAY_ENGINE_INTERNAL_SECRET" }
+
+$db = [Environment]::GetEnvironmentVariable("DIRECT_URL")
+if ([string]::IsNullOrWhiteSpace($db)) {
+  $db = [Environment]::GetEnvironmentVariable("DATABASE_URL")
+}
+if ([string]::IsNullOrWhiteSpace($db) -and $envMap.ContainsKey("DIRECT_URL")) {
   $db = [string]$envMap["DIRECT_URL"]
-} elseif ($envMap.ContainsKey("DATABASE_URL")) {
+}
+if ([string]::IsNullOrWhiteSpace($db) -and $envMap.ContainsKey("DATABASE_URL")) {
   $db = [string]$envMap["DATABASE_URL"]
 }
 if ([string]::IsNullOrWhiteSpace($db)) { throw "missing DATABASE_URL/DIRECT_URL" }
 $env:DATABASE_URL = $db
-$env:PLAY_ENGINE_ASSERTION_SECRET = [string]$envMap["PLAY_ENGINE_ASSERTION_SECRET"]
-$env:PLAY_ENGINE_INTERNAL_SECRET = [string]$envMap["PLAY_ENGINE_INTERNAL_SECRET"]
+$env:PLAY_ENGINE_ASSERTION_SECRET = $assertionSecret
+$env:PLAY_ENGINE_INTERNAL_SECRET = $internalSecret
 $env:PLAY_ENGINE_BIND = "127.0.0.1:8787"
 if (-not $env:DATABASE_URL.StartsWith("postgres")) { throw "DATABASE_URL still not raw" }
 $uri = [Uri]$env:DATABASE_URL

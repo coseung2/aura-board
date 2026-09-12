@@ -16,9 +16,13 @@ production secrets, or mutate production data.
 web / Expo
   -> existing Next.js teacher or student authentication
   -> board/classroom authorization and actor resolution
-  -> short-lived HMAC actor assertion
-  -> private Axum play service
+  -> short-lived session-bound realtime ticket
+  -> Axum WebSocket for active play commands and snapshots
   -> Postgres transaction (session + receipt + outbox)
+  -> post-commit WebSocket snapshot fanout
+
+recovery path
+  -> existing Next HTTP proxy and snapshot
   -> Next cron outbox consumer
   -> Supabase Broadcast compact invalidation
   -> clients reload authoritative snapshot
@@ -81,8 +85,11 @@ The Postgres repository owns command ordering:
 The request hash includes scope, actor subject, actor role, expected version,
 and payload. A reused key with changed content returns
 `idempotency_key_reuse`. A genuine stale command returns `409 version_conflict`
-with the currently authorized snapshot. Clients do not optimistically place a
-stone; input remains disabled until the response or a recovery snapshot arrives.
+with the currently authorized snapshot. Omok may render a clearly distinct
+local pending stone immediately, but it is never treated as authoritative: the
+client confirms it only from a committed snapshot and rolls it back on rejection,
+or conflict. Generic catch-up snapshots converge the board monotonically but do
+not prove that a particular pending request committed.
 
 Board-scoped Postgres advisory transaction locks serialize initial creation and
 rematch pointer changes even when no current row exists yet. The partial unique
@@ -90,11 +97,33 @@ index is the final database invariant.
 
 ## Realtime and reconnect recovery
 
-`PlayOutbox` is written in the same transaction as accepted state. The cron
-consumer claims rows with `FOR UPDATE SKIP LOCKED`, a lock token, attempt count,
-and a two-minute stale lease. Completion must present the same lock token, so an
-expired worker cannot acknowledge a row reclaimed by another consumer. It
-publishes only:
+For active Omok play, the Rust WebSocket path described in
+`docs/omok-realtime-commercialization-plan.md` is primary. A command uses the
+same request ID, expected version, repository, receipt, and transaction as HTTP.
+The session hub is notified only after the repository returns from a successful
+database commit. Each subscriber receives an actor-projected authoritative
+snapshot; a slow subscriber may skip intermediate versions but must converge to
+the latest one without an unbounded queue.
+
+Human-versus-human Omok uses WebSocket v1. A bot session receives an
+authenticated `transport: "http"` selection instead of a ticket so the existing
+Next command route continues to run the bot follow-up move. A successful command
+acknowledges only the requesting connection; peers receive request-ID-free
+snapshots. Durable pending is settled only by a correlated committed/rejected
+frame, never by a generic snapshot.
+
+The actor-projected viewer includes `capabilities.canRematch`. Under rules
+version 1 it is true only for the host of the terminal current session. Rematch
+continues through the existing HTTP endpoint, creates a linked session, and
+announces `session_replaced` to old-session subscribers after commit. Clients
+then obtain a new session-bound ticket; current-session HTTP discovery recovers
+a missed announcement.
+
+`PlayOutbox` remains the durable recovery signal and is written in the same
+transaction as accepted state. The cron consumer claims rows with `FOR UPDATE
+SKIP LOCKED`, a lock token, attempt count, and a two-minute stale lease.
+Completion must present the same lock token, so an expired worker cannot
+acknowledge a row reclaimed by another consumer. It publishes only:
 
 ```json
 {
@@ -112,8 +141,10 @@ safe because clients reload snapshots.
 
 Web uses the existing board invalidation hook: Supabase Broadcast first,
 focus/visibility/online reconciliation, and 10-second polling only while
-Realtime is unavailable. Expo uses the existing board channel registry,
-foreground catch-up, and 15-second fallback polling while unsubscribed.
+Realtime is unavailable. Expo Omok stops active polling while its game socket
+is healthy; it uses foreground catch-up and bounded HTTP polling only while the
+socket is unavailable or recovering. Other play surfaces retain their documented
+transport until separately migrated.
 
 Web stores an unacknowledged command in browser storage. Expo stores it in
 SecureStore. After reconnect or remount, the same request ID is retried once.
