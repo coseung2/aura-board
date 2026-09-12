@@ -36,6 +36,7 @@ struct TestServer {
     record: SessionRecord,
     assertion_verifier: AssertionVerifier,
     ticket_verifier: RealtimeTicketVerifier,
+    realtime_config: RealtimeConfig,
     hub: SessionHub,
     task: JoinHandle<()>,
 }
@@ -77,18 +78,19 @@ async fn test_server(auto_start: bool) -> TestServer {
         .unwrap();
     let assertion_verifier = AssertionVerifier::new(ASSERTION_SECRET).unwrap();
     let ticket_verifier = RealtimeTicketVerifier::new(TICKET_SECRET).unwrap();
-    let state = AppState::new(
-        repository,
-        assertion_verifier.clone(),
-        Arc::<str>::from("internal-test-secret-32-bytes-long"),
-    )
-    .with_realtime(RealtimeConfig::new(
+    let realtime_config = RealtimeConfig::new(
         ticket_verifier.clone(),
         [
             "https://aura-board.com".to_owned(),
             MOBILE_ORIGIN.to_owned(),
         ],
-    ))
+    );
+    let state = AppState::new(
+        repository,
+        assertion_verifier.clone(),
+        Arc::<str>::from("internal-test-secret-32-bytes-long"),
+    )
+    .with_realtime(realtime_config.clone())
     .with_clock(|| 1_000);
     let hub = state.command_service().hub().clone();
     let app = router(state);
@@ -104,6 +106,7 @@ async fn test_server(auto_start: bool) -> TestServer {
         record,
         assertion_verifier,
         ticket_verifier,
+        realtime_config,
         hub,
         task,
     }
@@ -308,6 +311,9 @@ async fn websocket_and_http_commands_share_post_commit_projection_and_recovery()
     assert_eq!(committed["commandType"], "place_stone");
     assert_eq!(committed["version"], 1);
     assert_eq!(committed["replayed"], false);
+    let duration = server.realtime_config.command_duration_snapshot();
+    assert_eq!(duration.sample_count, 1);
+    assert!(duration.total_micros >= duration.max_micros);
 
     let peer = read_json(&mut second_socket).await;
     assert_eq!(peer["type"], "snapshot");
@@ -344,6 +350,13 @@ async fn websocket_and_http_commands_share_post_commit_projection_and_recovery()
     assert_eq!(replay["type"], "command_committed");
     assert_eq!(replay["replayed"], true);
     assert_eq!(replay["version"], 1);
+    assert_eq!(
+        server
+            .realtime_config
+            .command_duration_snapshot()
+            .sample_count,
+        3
+    );
     let replay_evidence = server.hub.subscribe(&server.record.session_id);
     assert!(!replay_evidence.has_changed().unwrap());
 

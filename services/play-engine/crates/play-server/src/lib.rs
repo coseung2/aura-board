@@ -11,5 +11,5 @@ pub mod shadow;
 pub use auth::AssertionVerifier;
 pub use http::{AppState, router};
 pub use postgres::PostgresRepository;
-pub use realtime::{RealtimeConfig, RealtimeTicketVerifier};
+pub use realtime::{CommandDurationSnapshot, RealtimeConfig, RealtimeTicketVerifier};
 pub use repository::{MemoryRepository, PlayRepository};

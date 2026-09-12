@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::future::Future;
 use std::hash::Hash;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
@@ -306,6 +307,38 @@ pub struct RealtimeConfig {
     pub ticket_verifier: RealtimeTicketVerifier,
     allowed_origins: Arc<HashSet<String>>,
     connections: ActiveConnectionRegistry,
+    command_metrics: CommandDurationMetrics,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct CommandDurationSnapshot {
+    pub sample_count: u64,
+    pub total_micros: u64,
+    pub max_micros: u64,
+}
+
+#[derive(Clone, Default)]
+struct CommandDurationMetrics {
+    sample_count: Arc<AtomicU64>,
+    total_micros: Arc<AtomicU64>,
+    max_micros: Arc<AtomicU64>,
+}
+
+impl CommandDurationMetrics {
+    fn observe(&self, duration: Duration) {
+        let micros = u64::try_from(duration.as_micros()).unwrap_or(u64::MAX);
+        self.sample_count.fetch_add(1, Ordering::Relaxed);
+        self.total_micros.fetch_add(micros, Ordering::Relaxed);
+        self.max_micros.fetch_max(micros, Ordering::Relaxed);
+    }
+
+    fn snapshot(&self) -> CommandDurationSnapshot {
+        CommandDurationSnapshot {
+            sample_count: self.sample_count.load(Ordering::Relaxed),
+            total_micros: self.total_micros.load(Ordering::Relaxed),
+            max_micros: self.max_micros.load(Ordering::Relaxed),
+        }
+    }
 }
 
 impl RealtimeConfig {
@@ -323,11 +356,18 @@ impl RealtimeConfig {
                     .collect(),
             ),
             connections: ActiveConnectionRegistry::default(),
+            command_metrics: CommandDurationMetrics::default(),
         }
     }
 
     pub fn origin_allowed(&self, origin: Option<&str>) -> bool {
         origin.is_none_or(|origin| self.allowed_origins.contains(origin))
+    }
+
+    /// Aggregate command receive-to-repository-return timing. It deliberately
+    /// carries no session, actor, request, command body, or ticket labels.
+    pub fn command_duration_snapshot(&self) -> CommandDurationSnapshot {
+        self.command_metrics.snapshot()
     }
 }
 
@@ -725,7 +765,15 @@ async fn run_socket(
                             command_schema_version,
                             command,
                         };
-                        match service.execute(&actor, &session_id, &request, state.now_ms()).await {
+                        let command_started_at = Instant::now();
+                        let execution = service.execute(
+                            &actor,
+                            &session_id,
+                            &request,
+                            state.now_ms(),
+                        ).await;
+                        config.command_metrics.observe(command_started_at.elapsed());
+                        match execution {
                             Ok(execution) => {
                                 last_sent_version = last_sent_version.max(execution.value.version);
                                 if send_frame(&mut socket, &ServerFrame::CommandCommitted {
@@ -860,7 +908,14 @@ async fn send_frame(socket: &mut WebSocket, frame: &ServerFrame) -> Result<(), (
 }
 
 async fn send_message(socket: &mut WebSocket, message: Message) -> Result<(), ()> {
-    timeout(SEND_TIMEOUT, socket.send(message))
+    complete_send_before(SEND_TIMEOUT, socket.send(message)).await
+}
+
+async fn complete_send_before<F, E>(deadline: Duration, send: F) -> Result<(), ()>
+where
+    F: Future<Output = Result<(), E>>,
+{
+    timeout(deadline, send)
         .await
         .map_err(|_| ())?
         .map_err(|_| ())
@@ -1222,6 +1277,19 @@ mod tests {
             HubEvent::SessionChanged { version: 1_000 }
         );
         assert!(!subscriber.has_changed().unwrap());
+    }
+
+    #[tokio::test]
+    async fn send_timeout_seam_drops_a_stalled_subscriber_deterministically() {
+        let stalled = std::future::pending::<Result<(), ()>>();
+        assert_eq!(
+            complete_send_before(Duration::from_millis(1), stalled).await,
+            Err(())
+        );
+        assert_eq!(
+            complete_send_before(Duration::from_secs(1), async { Ok::<_, ()>(()) }).await,
+            Ok(())
+        );
     }
 }
 

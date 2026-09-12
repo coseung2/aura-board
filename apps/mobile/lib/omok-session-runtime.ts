@@ -34,6 +34,8 @@ import {
   type OmokSocketStatus,
 } from "./omok-socket";
 import { createOmokSubmitLock } from "./omok-submit-lock";
+import type { OmokSubmitLock } from "./omok-submit-lock";
+import { omokLatency } from "./omok-latency";
 import {
   clearPendingOmokCommand,
   fetchCurrentOmokSession,
@@ -55,6 +57,78 @@ type Action =
 
 function machineReducer(state: OmokMachineState, action: Action): OmokMachineState {
   return action.kind === "replace" ? action.state : action.transition.state;
+}
+
+export function nextOmokCatchUpLock(input: {
+  current: boolean;
+  previousSocketStatus: OmokSocketStatus;
+  socketStatus: OmokSocketStatus;
+  roomStatus: OmokSnapshot["roomStatus"] | null;
+  authoritativeSnapshotApplied?: boolean;
+}): boolean {
+  if (input.socketStatus === "ready" || input.authoritativeSnapshotApplied) return false;
+  if (input.previousSocketStatus === "ready" && input.roomStatus === "active") return true;
+  return input.current;
+}
+
+export function confirmsOmokAuthoritativeCatchUp(
+  current: OmokSnapshot | null,
+  candidate: OmokSnapshot,
+  replacesSession: boolean,
+): boolean {
+  if (replacesSession || !current) return true;
+  return (
+    candidate.sessionId === current.sessionId &&
+    candidate.version >= current.version
+  );
+}
+
+export async function findDurableOmokPending(
+  sessionId: string,
+  load: typeof loadPendingOmokCommand = loadPendingOmokCommand,
+): Promise<OmokPending | null> {
+  for (const commandType of ["place_stone", "resign", "ready"] as const) {
+    const pending = await load(sessionId, commandType);
+    if (pending) return { ...pending, stone: null, phase: "confirming" };
+  }
+  return null;
+}
+
+export async function acquireOmokReplayLock(
+  lock: OmokSubmitLock,
+  cancelled: () => boolean,
+  waitForRetry: () => Promise<void> = () =>
+    new Promise((resolve) => setTimeout(resolve, 25)),
+): Promise<boolean> {
+  while (!cancelled()) {
+    if (lock.acquire()) return true;
+    await waitForRetry();
+  }
+  return false;
+}
+
+export async function sendOmokPendingViaAvailableTransport(input: {
+  pending: OmokPending;
+  transport: "unknown" | "websocket" | "http" | "blocked";
+  socket: Pick<ReturnType<typeof createOmokSocket>, "sendCommand"> | null;
+  submitOverHttp: (pending: OmokPending) => Promise<void>;
+}): Promise<"websocket" | "http"> {
+  if (
+    input.transport !== "blocked" &&
+    input.transport !== "http" &&
+    input.socket?.sendCommand({
+      type: "command",
+      protocolVersion: OMOK_PROTOCOL_VERSION,
+      requestId: input.pending.request.requestId,
+      expectedVersion: input.pending.request.expectedVersion,
+      commandSchemaVersion: input.pending.request.commandSchemaVersion,
+      command: input.pending.request.command,
+    })
+  ) {
+    return "websocket";
+  }
+  await input.submitOverHttp(input.pending);
+  return "http";
 }
 
 /** Built once: the connector is stateless and holds no per-session data. */
@@ -93,15 +167,23 @@ export function useOmokSessionRuntime({
   const [busy, setBusy] = useState(false);
   const [socketStatus, setSocketStatus] = useState<OmokSocketStatus>("idle");
   const [offline, setOffline] = useState(false);
+  const [catchUpLocked, setCatchUpLocked] = useState(false);
 
   const stateRef = useRef(state);
   stateRef.current = state;
   const lockRef = useRef(createOmokSubmitLock());
   const socketRef = useRef<ReturnType<typeof createOmokSocket> | null>(null);
+  const previousSocketStatusRef = useRef<OmokSocketStatus>("idle");
   const ackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const migratedRef = useRef(false);
   const adoptedRef = useRef<string | null>(null);
   const transportRef = useRef<"unknown" | "websocket" | "http" | "blocked">("unknown");
+  const catchUpLockedRef = useRef(false);
+
+  const updateCatchUpLock = useCallback((next: boolean) => {
+    catchUpLockedRef.current = next;
+    setCatchUpLocked(next);
+  }, []);
 
   const apply = useCallback((transition: OmokTransition) => {
     stateRef.current = transition.state;
@@ -118,8 +200,14 @@ export function useOmokSessionRuntime({
    * explicit replacement or current-session discovery. */
   const ingest = useCallback(
     (snapshot: OmokSnapshot, replacesSession: boolean) => {
+      const caughtUp = confirmsOmokAuthoritativeCatchUp(
+        stateRef.current.snapshot,
+        snapshot,
+        replacesSession,
+      );
       const effects = apply(ingestSnapshot(stateRef.current, snapshot, { replacesSession }));
       void runEffects(effects);
+      return caughtUp;
     },
     // runEffects is stable via refs below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -141,7 +229,11 @@ export function useOmokSessionRuntime({
       }
       // A session id we have never seen is authoritative discovery: it also
       // recovers a rematch replacement whose notification was missed.
-      ingest(next, next.sessionId !== stateRef.current.snapshot?.sessionId);
+      const caughtUp = ingest(
+        next,
+        next.sessionId !== stateRef.current.snapshot?.sessionId,
+      );
+      if (caughtUp) updateCatchUpLock(false);
       setOffline(false);
     } catch (cause) {
       if (
@@ -158,7 +250,7 @@ export function useOmokSessionRuntime({
     } finally {
       setLoading(false);
     }
-  }, [apply, boardId, ingest, onUnauthorized]);
+  }, [apply, boardId, ingest, onUnauthorized, updateCatchUpLock]);
 
   /** HTTP command path: also the fallback whenever the socket is not ready. */
   const submitOverHttp = useCallback(
@@ -181,6 +273,8 @@ export function useOmokSessionRuntime({
             snapshot: response.snapshot,
           }),
         );
+        omokLatency.markCommitted(response.requestId);
+        updateCatchUpLock(false);
         setOffline(false);
         await runEffects(effects);
       } catch (cause) {
@@ -201,6 +295,7 @@ export function useOmokSessionRuntime({
               snapshot: body?.snapshot ?? null,
             }),
           );
+          omokLatency.discard(pending.request.requestId);
           await runEffects(effects);
           return;
         }
@@ -218,19 +313,13 @@ export function useOmokSessionRuntime({
         setBusy(false);
       }
     },
-    [apply, clearAckTimer, runEffects],
+    [apply, clearAckTimer, runEffects, updateCatchUpLock],
   );
 
   const send = useCallback(
     async (pending: OmokPending) => {
       setBusy(true);
       const socket = socketRef.current;
-
-      if (transportRef.current === "blocked") {
-        setBusy(false);
-        lockRef.current.release();
-        return;
-      }
 
       clearAckTimer();
       ackTimerRef.current = setTimeout(() => {
@@ -240,19 +329,12 @@ export function useOmokSessionRuntime({
         void runEffects(effects);
       }, OMOK_ACK_TIMEOUT_MS);
 
-      const overSocket =
-        transportRef.current !== "http" &&
-        !!socket &&
-        socket.sendCommand({
-          type: "command",
-          protocolVersion: OMOK_PROTOCOL_VERSION,
-          requestId: pending.request.requestId,
-          expectedVersion: pending.request.expectedVersion,
-          commandSchemaVersion: pending.request.commandSchemaVersion,
-          command: pending.request.command,
-        });
-      if (overSocket) return;
-      await submitOverHttp(pending);
+      await sendOmokPendingViaAvailableTransport({
+        pending,
+        transport: transportRef.current,
+        socket,
+        submitOverHttp,
+      });
     },
     [apply, clearAckTimer, submitOverHttp],
   );
@@ -325,10 +407,33 @@ export function useOmokSessionRuntime({
       lastSeenVersion: () => stateRef.current.snapshot?.version ?? null,
       onStatus: setSocketStatus,
       onFrame: (frame: OmokServerFrame) => {
+        const receivedAt = Date.now();
         if (frame.type === "command_committed" || frame.type === "command_rejected") {
           clearAckTimer();
         }
-        const effects = apply(applyServerFrame(stateRef.current, frame));
+        const previousVersion = stateRef.current.snapshot?.version ?? -1;
+        const transition = applyServerFrame(stateRef.current, frame);
+        const effects = apply(transition);
+        if (frame.type === "command_committed") {
+          omokLatency.markCommitted(frame.requestId);
+        } else if (frame.type === "command_rejected") {
+          omokLatency.discard(frame.requestId);
+        } else if (
+          frame.type === "snapshot" &&
+          frame.snapshot.version > previousVersion &&
+          transition.state.snapshot?.version === frame.snapshot.version
+        ) {
+          // Dispatch publishes the accepted snapshot to React state. Native
+          // paint completion still requires physical-device instrumentation.
+          omokLatency.markPeerSnapshotDispatched(receivedAt);
+        }
+        if (
+          frame.type !== "connection_error" &&
+          frame.type !== "command_rejected" &&
+          transition.state.snapshot === frame.snapshot
+        ) {
+          updateCatchUpLock(false);
+        }
         if (frame.type === "command_rejected" && !effects.length) {
           apply(setError(stateRef.current, omokRejectionMessage(frame.error)));
         }
@@ -342,9 +447,22 @@ export function useOmokSessionRuntime({
     return () => {
       listener.remove();
       client.dispose();
-      if (socketRef.current === client) socketRef.current = null;
+      if (socketRef.current === client) {
+        socketRef.current = null;
+      }
     };
-  }, [apply, clearAckTimer, onUnauthorized, runEffects, sessionId]);
+  }, [apply, clearAckTimer, onUnauthorized, runEffects, sessionId, updateCatchUpLock]);
+
+  useEffect(() => {
+    const previousSocketStatus = previousSocketStatusRef.current;
+    previousSocketStatusRef.current = socketStatus;
+    updateCatchUpLock(nextOmokCatchUpLock({
+      current: catchUpLockedRef.current,
+      previousSocketStatus,
+      socketStatus,
+      roomStatus: state.snapshot?.roomStatus ?? null,
+    }));
+  }, [socketStatus, state.snapshot?.roomStatus, updateCatchUpLock]);
 
   /** Bounded HTTP recovery. The 3s active-game poll runs only while the game
    * socket is not healthy. */
@@ -369,18 +487,23 @@ export function useOmokSessionRuntime({
     if (!sessionId || state.pending || busy) return;
     let cancelled = false;
     void (async () => {
-      for (const commandType of ["place_stone", "resign", "ready"] as const) {
-        const pending = await loadPendingOmokCommand(sessionId, commandType);
-        if (cancelled || !pending) continue;
-        const key = `${sessionId}:${pending.request.requestId}`;
-        if (adoptedRef.current === key) continue;
-        adoptedRef.current = key;
-        if (!lockRef.current.acquire()) return;
-        const effects = apply(adoptPending(stateRef.current, { ...pending, stone: null, phase: "confirming" }));
-        if (!effects.length) lockRef.current.release();
-        await runEffects(effects);
+      const pending = await findDurableOmokPending(sessionId);
+      if (cancelled || !pending) return;
+      const key = `${sessionId}:${pending.request.requestId}`;
+      if (adoptedRef.current === key) return;
+      if (!(await acquireOmokReplayLock(lockRef.current, () => cancelled))) return;
+      if (cancelled) {
+        lockRef.current.release();
         return;
       }
+      if (adoptedRef.current === key) {
+        lockRef.current.release();
+        return;
+      }
+      adoptedRef.current = key;
+      const effects = apply(adoptPending(stateRef.current, pending));
+      if (!effects.length) lockRef.current.release();
+      await runEffects(effects);
     })();
     return () => {
       cancelled = true;
@@ -390,7 +513,10 @@ export function useOmokSessionRuntime({
   useEffect(() => clearAckTimer, [clearAckTimer]);
 
   const aim = useCallback(
-    (position: OmokAim) => apply(aimAt(stateRef.current, position)),
+    (position: OmokAim) => {
+      if (catchUpLockedRef.current) return;
+      apply(aimAt(stateRef.current, position));
+    },
     [apply],
   );
   const cancelAim = useCallback(() => apply(clearAim(stateRef.current)), [apply]);
@@ -398,17 +524,28 @@ export function useOmokSessionRuntime({
   /** The lock is taken synchronously, before any state or async work, so two
    * confirms in one JS frame cannot both submit. */
   const confirm = useCallback(() => {
+    if (catchUpLockedRef.current) return;
     if (!lockRef.current.acquire()) return;
-    const effects = apply(confirmAim(stateRef.current, makeOmokCommand));
+    const startedAt = omokLatency.beginConfirm();
+    const transition = confirmAim(stateRef.current, makeOmokCommand);
+    const effects = apply(transition);
     if (!effects.length) {
       lockRef.current.release();
       return;
+    }
+    const pending = transition.state.pending;
+    if (pending) {
+      omokLatency.markPending(
+        pending.request.requestId,
+        startedAt,
+      );
     }
     void runEffects(effects);
   }, [apply, runEffects]);
 
   const sendIntent = useCallback(
     (command: Exclude<OmokIntent, { type: "place_stone" }>) => {
+      if (catchUpLockedRef.current) return;
       if (!lockRef.current.acquire()) return;
       const effects = apply(startIntent(stateRef.current, command, makeOmokCommand));
       if (!effects.length) {
@@ -444,7 +581,7 @@ export function useOmokSessionRuntime({
     () => ({
       state,
       loading,
-      busy,
+      busy: busy || catchUpLocked,
       socketStatus,
       offline,
       refresh,
@@ -457,6 +594,7 @@ export function useOmokSessionRuntime({
     [
       aim,
       busy,
+      catchUpLocked,
       cancelAim,
       confirm,
       loading,

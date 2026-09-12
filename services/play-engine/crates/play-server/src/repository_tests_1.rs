@@ -252,6 +252,100 @@ async fn full_first_game_flow_reaches_a_win() {
     let record = repository.get_session(&session_id).await.unwrap();
     assert_eq!(record.version, version);
     assert_eq!(record.state.room_status, crate::model::RoomStatus::Finished);
+    let outcome = record.state.outcome.clone();
+    let outbox_len = repository.outbox().await.len();
+
+    for (request_id, actor, command) in [
+        (
+            "move-after-win",
+            participant("second"),
+            OmokIntent::PlaceStone {
+                position: OmokPosition { row: 1, column: 1 },
+            },
+        ),
+        ("resign-after-win", participant("first"), OmokIntent::Resign),
+    ] {
+        let rejected = repository
+            .execute_command(
+                &actor,
+                &session_id,
+                &CommandRequest {
+                    request_id: request_id.to_owned(),
+                    expected_version: version,
+                    command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
+                    command,
+                },
+                500,
+            )
+            .await;
+        assert_eq!(
+            rejected,
+            Err(RepositoryError::Model(
+                crate::model::ModelError::InvalidPhase
+            ))
+        );
+    }
+
+    let unchanged = repository.get_session(&session_id).await.unwrap();
+    assert_eq!(unchanged.version, version);
+    assert_eq!(unchanged.state.outcome, outcome);
+    assert_eq!(repository.outbox().await.len(), outbox_len);
+}
+
+#[tokio::test]
+async fn resignation_is_terminal_without_post_finish_mutation_or_outbox() {
+    let repository = MemoryRepository::new();
+    let mut request = create_request("resignation-terminal");
+    request.auto_start = true;
+    let created = repository
+        .create_session(&host(), "resignation-board", &request, 100)
+        .await
+        .unwrap();
+    let session_id = created.value.snapshot.session_id;
+    let resigned = repository
+        .execute_command(
+            &participant("first"),
+            &session_id,
+            &CommandRequest {
+                request_id: "resign-once".to_owned(),
+                expected_version: 0,
+                command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
+                command: OmokIntent::Resign,
+            },
+            200,
+        )
+        .await
+        .unwrap();
+    let version = resigned.value.version;
+    let record = repository.get_session(&session_id).await.unwrap();
+    let outcome = record.state.outcome.clone();
+    let outbox_len = repository.outbox().await.len();
+
+    let rejected = repository
+        .execute_command(
+            &participant("second"),
+            &session_id,
+            &CommandRequest {
+                request_id: "move-after-resign".to_owned(),
+                expected_version: version,
+                command_schema_version: crate::model::COMMAND_SCHEMA_VERSION,
+                command: OmokIntent::PlaceStone {
+                    position: OmokPosition { row: 7, column: 7 },
+                },
+            },
+            300,
+        )
+        .await;
+    assert_eq!(
+        rejected,
+        Err(RepositoryError::Model(
+            crate::model::ModelError::InvalidPhase
+        ))
+    );
+    let unchanged = repository.get_session(&session_id).await.unwrap();
+    assert_eq!(unchanged.version, version);
+    assert_eq!(unchanged.state.outcome, outcome);
+    assert_eq!(repository.outbox().await.len(), outbox_len);
 }
 
 #[tokio::test]
