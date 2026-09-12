@@ -122,6 +122,34 @@ afterEach(() => {
 });
 
 describe("Omok runtime recovery policy", () => {
+  it("blocks a queued confirm synchronously when the ready socket disconnects", async () => {
+    runtimeMocks.fetchCurrentOmokSession.mockResolvedValue(snapshot(4));
+    const onPlacementFeedback = vi.fn();
+    const onUnauthorized = vi.fn();
+    const hook = renderHook(() => useOmokSessionRuntime({
+      boardId: "board-1", onPlacementFeedback, onUnauthorized,
+    }));
+    await act(async () => undefined);
+    act(() => runtimeMocks.onSocketStatus?.("ready"));
+    act(() => hook.result.current.aim({ row: 7, column: 7 }));
+    expect(hook.result.current.state.aim).toEqual({ row: 7, column: 7 });
+    act(() => {
+      runtimeMocks.onSocketStatus?.("connecting");
+      hook.result.current.confirm();
+      hook.result.current.aim({ row: 8, column: 8 });
+      hook.result.current.sendIntent({ type: "resign" });
+    });
+    expect(hook.result.current.busy).toBe(true);
+    expect(hook.result.current.state.pending).toBeNull();
+    expect(hook.result.current.state.aim).toEqual({ row: 7, column: 7 });
+    expect(onPlacementFeedback).not.toHaveBeenCalled();
+    await act(async () => { await hook.result.current.refresh(); });
+    expect(hook.result.current.busy).toBe(false);
+    act(() => hook.result.current.aim({ row: 8, column: 8 }));
+    expect(hook.result.current.state.aim).toEqual({ row: 8, column: 8 });
+    hook.unmount();
+  });
+
   it("serializes a fast acknowledgement clear after the pending save", async () => {
     const events: string[] = [];
     let finishSave: () => void = () => {

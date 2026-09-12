@@ -223,9 +223,7 @@ export function useOmokSessionRuntime({
   stateRef.current = state;
   const lockRef = useRef(createOmokSubmitLock());
   const socketRef = useRef<ReturnType<typeof createOmokSocket> | null>(null);
-  const previousSocketStatusRef = useRef<OmokSocketStatus>("idle");
   const socketStatusRef = useRef<OmokSocketStatus>(socketStatus);
-  socketStatusRef.current = socketStatus;
   const ackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const migratedRef = useRef(false);
   const adoptedRef = useRef<string | null>(null);
@@ -477,7 +475,19 @@ export function useOmokSessionRuntime({
       // from the URL, which the engine cannot allowlist safely.
       connect: nativeConnect,
       lastSeenVersion: () => stateRef.current.snapshot?.version ?? null,
-      onStatus: setSocketStatus,
+      onStatus: (nextStatus) => {
+        // Close the input gate in the socket callback itself. Waiting for a
+        // React effect leaves an already queued confirm able to submit.
+        const previousSocketStatus = socketStatusRef.current;
+        socketStatusRef.current = nextStatus;
+        updateCatchUpLock(nextOmokCatchUpLock({
+          current: catchUpLockedRef.current,
+          previousSocketStatus,
+          socketStatus: nextStatus,
+          roomStatus: stateRef.current.snapshot?.roomStatus ?? null,
+        }));
+        setSocketStatus(nextStatus);
+      },
       onFrame: (frame: OmokServerFrame) => {
         const receivedAt = Date.now();
         if (frame.type === "command_committed" || frame.type === "command_rejected") {
@@ -533,17 +543,6 @@ export function useOmokSessionRuntime({
       }
     };
   }, [apply, clearAckTimer, onUnauthorized, runEffects, sessionId, updateCatchUpLock]);
-
-  useEffect(() => {
-    const previousSocketStatus = previousSocketStatusRef.current;
-    previousSocketStatusRef.current = socketStatus;
-    updateCatchUpLock(nextOmokCatchUpLock({
-      current: catchUpLockedRef.current,
-      previousSocketStatus,
-      socketStatus,
-      roomStatus: state.snapshot?.roomStatus ?? null,
-    }));
-  }, [socketStatus, state.snapshot?.roomStatus, updateCatchUpLock]);
 
   /** Bounded HTTP recovery. The 3s active-game poll runs only while the game
    * socket is not healthy. */
