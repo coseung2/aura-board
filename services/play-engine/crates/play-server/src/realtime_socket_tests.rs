@@ -414,6 +414,18 @@ async fn handshake_origin_auth_and_frame_policies_are_enforced() {
         matches!(denied, tungstenite::Error::Http(response) if response.status() == StatusCode::FORBIDDEN)
     );
 
+    let missing = connect_async(url.clone()).await.unwrap_err();
+    assert!(
+        matches!(missing, tungstenite::Error::Http(response) if response.status() == StatusCode::FORBIDDEN)
+    );
+
+    let participant = actor("student:1", ActorRole::Participant);
+    let mut mobile = open_socket(&server).await;
+    authenticate(&mut mobile, ticket(&server, &participant)).await;
+    let mobile_ready = read_json(&mut mobile).await;
+    assert_eq!(mobile_ready["type"], "ready");
+    assert_eq!(mobile_ready["snapshot"]["viewer"]["slot"], "first");
+
     let mut allowed_request = url.clone().into_client_request().unwrap();
     allowed_request
         .headers_mut()
@@ -438,7 +450,11 @@ async fn handshake_origin_auth_and_frame_policies_are_enforced() {
     assert_eq!(error["type"], "connection_error");
     assert_eq!(error["error"], "authentication_required");
 
-    let (mut unauthenticated, _) = connect_async(url.clone()).await.unwrap();
+    let mut unauthenticated_request = url.clone().into_client_request().unwrap();
+    unauthenticated_request
+        .headers_mut()
+        .insert("origin", HeaderValue::from_static(MOBILE_ORIGIN));
+    let (mut unauthenticated, _) = connect_async(unauthenticated_request).await.unwrap();
     let timeout_frame = timeout(Duration::from_secs(7), unauthenticated.next())
         .await
         .expect("first-frame authentication timeout was not enforced")
@@ -451,7 +467,11 @@ async fn handshake_origin_auth_and_frame_policies_are_enforced() {
     assert_eq!(timeout_error["type"], "connection_error");
     assert_eq!(timeout_error["error"], "authentication_timeout");
 
-    let (mut oversized, _) = connect_async(url).await.unwrap();
+    let mut oversized_request = url.into_client_request().unwrap();
+    oversized_request
+        .headers_mut()
+        .insert("origin", HeaderValue::from_static(MOBILE_ORIGIN));
+    let (mut oversized, _) = connect_async(oversized_request).await.unwrap();
     oversized
         .send(ClientMessage::Text("x".repeat(16 * 1024 + 1).into()))
         .await

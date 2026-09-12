@@ -361,7 +361,7 @@ impl RealtimeConfig {
     }
 
     pub fn origin_allowed(&self, origin: Option<&str>) -> bool {
-        origin.is_none_or(|origin| self.allowed_origins.contains(origin))
+        origin.is_some_and(|origin| self.allowed_origins.contains(origin))
     }
 
     /// Aggregate command receive-to-repository-return timing. It deliberately
@@ -1131,12 +1131,12 @@ mod tests {
     }
 
     #[test]
-    fn missing_origin_is_native_compatible_but_present_origin_is_allowlisted() {
+    fn origin_must_be_present_and_exactly_allowlisted() {
         let config = RealtimeConfig::new(
             RealtimeTicketVerifier::new([1_u8; 32]).unwrap(),
             ["https://aura-board.com".to_owned()],
         );
-        assert!(config.origin_allowed(None));
+        assert!(!config.origin_allowed(None));
         assert!(config.origin_allowed(Some("https://aura-board.com")));
         assert!(!config.origin_allowed(Some("https://aura-board.com/")));
         assert!(!config.origin_allowed(Some("https://evil.example")));
@@ -1145,7 +1145,7 @@ mod tests {
             RealtimeTicketVerifier::new([2_u8; 32]).unwrap(),
             std::iter::empty(),
         );
-        assert!(fail_closed.origin_allowed(None));
+        assert!(!fail_closed.origin_allowed(None));
         assert!(!fail_closed.origin_allowed(Some("https://aura-board.com")));
     }
 
