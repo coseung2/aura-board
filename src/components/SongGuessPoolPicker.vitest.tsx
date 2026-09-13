@@ -133,4 +133,28 @@ describe("SongGuessPoolPicker", () => {
     fireEvent.click(screen.getByRole("button", { name: "다시 확인" }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(3));
   });
+
+  it("explains an active-game setup lock and returns to the room list", async () => {
+    const onSetupLocked = vi.fn();
+    fetchMock
+      .mockResolvedValueOnce(response(catalog))
+      .mockResolvedValueOnce(response({ error: "song_guess_setup_locked" }, 409));
+    render(
+      <SongGuessPoolPicker
+        boardId="board-1"
+        busy={false}
+        onPrepared={vi.fn()}
+        onSetupLocked={onSetupLocked}
+      />,
+    );
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "1문제 준비하기" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "진행 중인 노래 맞히기 게임이 있어 새 문제를 준비할 수 없어요.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "방 목록으로 돌아가기" }));
+    expect(onSetupLocked).toHaveBeenCalledOnce();
+  });
 });

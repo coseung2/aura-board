@@ -14,11 +14,13 @@ export function SongGuessPoolPicker({
   busy,
   onPrepared,
   onPreparingChange,
+  onSetupLocked,
 }: {
   boardId: string;
   busy: boolean;
   onPrepared: (setup: SongGuessTeacherSetup) => void | Promise<void>;
   onPreparingChange?: (preparing: boolean) => void;
+  onSetupLocked?: () => void;
 }) {
   const [catalog, setCatalog] = useState<SongGuessCatalogSummary | null>(null);
   const [categories, setCategories] = useState<SongGuessCatalogCategory[]>([]);
@@ -27,6 +29,7 @@ export function SongGuessPoolPicker({
   const [loading, setLoading] = useState(true);
   const [preparing, setPreparing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [setupLocked, setSetupLocked] = useState(false);
   const [retry, setRetry] = useState(0);
   const endpoint = `/api/song-guess/boards/${encodeURIComponent(boardId)}/catalog`;
 
@@ -81,6 +84,7 @@ export function SongGuessPoolPicker({
     setPreparing(true);
     onPreparingChange?.(true);
     setError(null);
+    setSetupLocked(false);
     try {
       const response = await fetch(endpoint, {
         method: "POST",
@@ -90,8 +94,13 @@ export function SongGuessPoolPicker({
       const body = await response.json();
       if (!response.ok) throw new Error(body.error ?? "prepare_failed");
       await onPrepared(body.setup as SongGuessTeacherSetup);
-    } catch {
-      setError("노래를 준비하지 못했어요.");
+    } catch (cause) {
+      if (cause instanceof Error && cause.message === "song_guess_setup_locked") {
+        setSetupLocked(true);
+        setError("진행 중인 노래 맞히기 게임이 있어 새 문제를 준비할 수 없어요. 방 목록에서 기존 게임을 끝낸 뒤 다시 준비해 주세요.");
+      } else {
+        setError("노래를 준비하지 못했어요.");
+      }
     } finally {
       setPreparing(false);
       onPreparingChange?.(false);
@@ -213,9 +222,15 @@ export function SongGuessPoolPicker({
             className={styles.retryButton}
             type="button"
             disabled={disabled}
-            onClick={() => setRetry((current) => current + 1)}
+            onClick={() => {
+              if (setupLocked && onSetupLocked) {
+                onSetupLocked();
+                return;
+              }
+              setRetry((current) => current + 1);
+            }}
           >
-            다시 확인
+            {setupLocked && onSetupLocked ? "방 목록으로 돌아가기" : "다시 확인"}
           </button>
         </>
       )}

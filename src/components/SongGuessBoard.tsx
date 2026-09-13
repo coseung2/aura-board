@@ -548,6 +548,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
               busy={busy}
               onPreparingChange={setBusy}
               onPrepared={prepareAutoGame}
+              onSetupLocked={() => setTeacherSetup(false)}
             />
             {setup && (
               <>
