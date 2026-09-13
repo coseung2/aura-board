@@ -22,6 +22,7 @@ import {
   pageChrome,
 } from "../../theme/tokens";
 import { AppButton, EmptyState, Pill, SurfaceCard, TextField } from "../ui";
+import { KordleLiveFeed } from "../kordle/KordleLiveFeed";
 
 type LetterState = "correct" | "present" | "absent";
 type Feedback = Array<{ char: string; state: LetterState }>;
@@ -52,6 +53,7 @@ type PuzzleInfo = {
   wordLength: number;
   maxGuesses: number;
   locale: string;
+  latestTerminalAttemptId?: string | null;
   puzzle: { id: string; status: "DRAFT" | "LIVE" | "SCHEDULED" } | null;
 };
 
@@ -110,6 +112,28 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
         if (!mountedRef.current || controller.signal.aborted) return;
 
         if (!info.puzzle || info.puzzle.status !== "LIVE") {
+          const terminalAttemptId = previousAttemptId ?? info.latestTerminalAttemptId;
+          if (terminalAttemptId) {
+            try {
+              const previous = await apiFetch<{ state: PublicState }>(
+                `/api/kordle/attempts/${encodeURIComponent(terminalAttemptId)}`,
+                { signal: controller.signal },
+              );
+              if (previous.state.status !== "IN_PROGRESS") {
+                setPuzzle(info);
+                setAttemptId(terminalAttemptId);
+                setState(previous.state);
+                setDraft("");
+                pendingCommandRef.current = null;
+                attemptRef.current = terminalAttemptId;
+                puzzleRef.current = previous.state.puzzleId;
+                setError(null);
+                return;
+              }
+            } catch {
+              // Fall through to the current no-live-puzzle state.
+            }
+          }
           setPuzzle(info);
           setAttemptId(null);
           setState(null);
@@ -282,6 +306,7 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
   }
 
   return (
+    <View style={styles.screen}>
     <ScrollView
       contentInsetAdjustmentBehavior="automatic"
       contentContainerStyle={styles.content}
@@ -305,7 +330,38 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
         </SurfaceCard>
       ) : null}
 
-      {!puzzle?.puzzle ? (
+      {state && state.status !== "IN_PROGRESS" ? (
+        <>
+          <SurfaceCard style={styles.gridCard} accessibilityLabel="꼬들 추리판">
+            {rows.map((row, rowIndex) => (
+              <View key={rowIndex} style={[styles.row, { gap: cellGap }]}>
+                {row.map((cell, cellIndex) => (
+                  <View
+                    key={cellIndex}
+                    accessible={Boolean(cell)}
+                    accessibilityLabel={cell ? `${cell.char}, ${feedbackLabel(cell.state)}` : undefined}
+                    style={[
+                      styles.cell,
+                      { width: cellSize, height: cellSize },
+                      cell?.state === "correct" && styles.cellCorrect,
+                      cell?.state === "present" && styles.cellPresent,
+                      cell?.state === "absent" && styles.cellAbsent,
+                    ]}
+                  >
+                    <Text style={[styles.cellText, cell && styles.cellTextFilled]}>
+                      {cell?.char ?? ""}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ))}
+          </SurfaceCard>
+          <EmptyState
+            title={state.status === "WON" ? "정답을 맞혔어요!" : "이번 문제가 끝났어요"}
+            description={state.solvedAtGuess ? `${state.solvedAtGuess}번째 시도에서 완료했어요.` : "다음 문제를 기다려 주세요."}
+          />
+        </>
+      ) : !puzzle?.puzzle ? (
         <EmptyState title="준비된 문제가 없어요" description="선생님이 문제를 만들면 여기에서 시작할 수 있어요." />
       ) : puzzle.puzzle.status !== "LIVE" ? (
         <EmptyState title="게임 시작을 기다리고 있어요" description="문제가 시작되면 자동으로 입장합니다." />
@@ -380,6 +436,8 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
         </>
       ) : null}
     </ScrollView>
+    <KordleLiveFeed boardId={data.board.id} />
+    </View>
   );
 }
 
@@ -403,6 +461,7 @@ function feedbackLabel(state: LetterState) {
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1 },
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
   content: { paddingHorizontal: spacing.xl, paddingTop: pageChrome.directContentStartGap, gap: spacing.lg, paddingBottom: spacing.xxxl },
   heading: { flexDirection: "row", alignItems: "center", gap: spacing.md },

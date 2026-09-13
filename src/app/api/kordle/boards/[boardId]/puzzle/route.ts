@@ -194,11 +194,21 @@ async function GETHandler(_req: Request, { params }: Params) {
     return jsonPrivateNoStore({ error: "forbidden" }, { status: 403 });
   }
   const puzzle = game.puzzles[0] ?? null;
+  const latestAttempt = await db.kordleAttempt.findFirst({
+    where: {
+      studentId: student.id,
+      puzzle: { gameId: game.id },
+      status: { in: ["WON", "LOST", "ABANDONED"] },
+    },
+    orderBy: { startedAt: "desc" },
+    select: { id: true },
+  });
   return jsonPrivateNoStore({
     gameId: game.id,
     wordLength: game.wordLength,
     maxGuesses: game.maxGuesses,
     locale: game.locale,
+    latestTerminalAttemptId: latestAttempt?.id ?? null,
     puzzle: puzzle
       ? {
           ...serializePuzzle(puzzle),

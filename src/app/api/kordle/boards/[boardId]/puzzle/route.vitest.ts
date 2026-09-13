@@ -15,13 +15,22 @@ const mocks = vi.hoisted(() => ({
   announce: vi.fn(),
   queryRaw: vi.fn(),
   withReceipt: vi.fn(),
+  getCurrentStudent: vi.fn(),
+  findGame: vi.fn(),
+  findLatestAttempt: vi.fn(),
 }));
 
 vi.mock("@/lib/auth", () => ({
   getCurrentUser: vi.fn(async () => ({ id: "teacher-1" })),
 }));
-vi.mock("@/lib/student-auth", () => ({ getCurrentStudent: vi.fn() }));
-vi.mock("@/lib/http-cache", () => ({ jsonPrivateNoStore: vi.fn() }));
+vi.mock("@/lib/student-auth", () => ({
+  getCurrentStudent: mocks.getCurrentStudent,
+}));
+vi.mock("@/lib/http-cache", () => ({
+  jsonPrivateNoStore: vi.fn((body: unknown, init?: ResponseInit) =>
+    Response.json(body, init),
+  ),
+}));
 vi.mock("@/lib/realtime-broadcast", () => ({
   announceKordlePuzzleChange: mocks.announce,
 }));
@@ -56,6 +65,8 @@ vi.mock("@/lib/db", () => {
       board: {
         findFirst: vi.fn(async () => ({ id: "board-1", title: "꼬들" })),
       },
+      kordleGame: { findUnique: mocks.findGame },
+      kordleAttempt: { findFirst: mocks.findLatestAttempt },
       $transaction: vi.fn(
         async (operation: (client: typeof tx) => Promise<unknown>) => operation(tx),
       ),
@@ -63,7 +74,7 @@ vi.mock("@/lib/db", () => {
   };
 });
 
-import { PATCH } from "./route";
+import { GET, PATCH } from "./route";
 
 const context = { params: Promise.resolve({ boardId: "board-1" }) };
 
@@ -205,5 +216,46 @@ describe("Kordle versioned puzzle advancement", () => {
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ error: "bad_request" });
     expect(mocks.withReceipt).not.toHaveBeenCalled();
+  });
+});
+
+describe("Kordle student puzzle recovery", () => {
+  beforeEach(() => {
+    mocks.getCurrentStudent.mockReset().mockResolvedValue({
+      id: "student-1",
+      classroomId: "classroom-1",
+    });
+    mocks.findGame.mockReset().mockResolvedValue({
+      id: "game-1",
+      wordLength: 6,
+      maxGuesses: 6,
+      locale: "ko-KR",
+      board: { classroomId: "classroom-1" },
+      puzzles: [],
+    });
+    mocks.findLatestAttempt.mockReset().mockResolvedValue({ id: "attempt-won" });
+  });
+
+  it("returns the latest terminal attempt when there is no live puzzle", async () => {
+    const response = await GET(
+      new Request("http://localhost/api/kordle/boards/board-1/puzzle"),
+      context,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      gameId: "game-1",
+      latestTerminalAttemptId: "attempt-won",
+      puzzle: null,
+    });
+    expect(mocks.findLatestAttempt).toHaveBeenCalledWith({
+      where: {
+        studentId: "student-1",
+        puzzle: { gameId: "game-1" },
+        status: { in: ["WON", "LOST", "ABANDONED"] },
+      },
+      orderBy: { startedAt: "desc" },
+      select: { id: true },
+    });
   });
 });
