@@ -253,17 +253,24 @@ impl PlayRepository for PostgresRepository {
             return Err(ModelError::Forbidden.into());
         }
         let payload_hash = request_hash(SONG_GUESS_CREATE_SCOPE, board_id, actor, request)?;
-        let receipt_scope = if request.room_mode == crate::model::SongGuessRoomMode::StudentFree {
-            format!("{SONG_GUESS_CREATE_SCOPE}:{}", actor.subject)
-        } else {
-            SONG_GUESS_CREATE_SCOPE.to_owned()
-        };
+        // Keep scopeType aligned with the database allow-list. Student-free
+        // rooms still need per-student idempotency isolation, so put the actor
+        // in scopeId rather than inventing a suffixed scopeType.
+        let (receipt_scope, receipt_scope_id) =
+            if request.room_mode == crate::model::SongGuessRoomMode::StudentFree {
+                (
+                    SONG_GUESS_CREATE_SCOPE.to_owned(),
+                    format!("{board_id}:{}", actor.subject),
+                )
+            } else {
+                (SONG_GUESS_CREATE_SCOPE.to_owned(), board_id.to_owned())
+            };
         let mut tx = self.pool.begin().await.map_err(storage)?;
         lock_scope(&mut tx, board_id).await?;
         if let Some(replay) = lookup_receipt::<SongGuessSessionResponse>(
             &mut tx,
             &receipt_scope,
-            board_id,
+            &receipt_scope_id,
             &request.request_id,
             &payload_hash,
         )
@@ -302,7 +309,7 @@ impl PlayRepository for PostgresRepository {
         insert_receipt(
             &mut tx,
             &receipt_scope,
-            board_id,
+            &receipt_scope_id,
             &request.request_id,
             &payload_hash,
             &response,

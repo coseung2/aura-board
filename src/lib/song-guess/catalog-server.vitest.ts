@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
 
 const mocks = vi.hoisted(() => ({
   loadTeacherBoard: vi.fn(),
@@ -9,7 +8,17 @@ const mocks = vi.hoisted(() => ({
   deleteClip: vi.fn(),
   loadDbCatalog: vi.fn(),
   downloadPrivateObject: vi.fn(),
+  readFile: vi.fn(),
 }));
+
+vi.mock("node:fs/promises", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:fs/promises")>();
+  return {
+    ...actual,
+    default: { ...actual, readFile: mocks.readFile },
+    readFile: mocks.readFile,
+  };
+});
 
 vi.mock("@/lib/play-platform/actor", () => ({ loadSongGuessTeacherBoard: mocks.loadTeacherBoard }));
 vi.mock("@/lib/song-guess/server", () => ({
@@ -32,6 +41,7 @@ beforeEach(() => {
   mocks.loadTeacherBoard.mockResolvedValue({ actor: { role: "host", userId: "teacher-1" } });
   mocks.storeClip.mockResolvedValue({ id: "asset-1" });
   mocks.saveSetup.mockResolvedValue({ rounds: [] });
+  mocks.readFile.mockResolvedValue(wavWithListChunk());
   mocks.loadDbCatalog.mockResolvedValue([{
     id: "chopin-waltz-no19",
     title: "Waltz No. 19",
@@ -74,7 +84,7 @@ describe("song-guess catalog WAV normalization", () => {
     expect(canonical.toString("ascii", 36, 40)).toBe("data");
   });
 
-  it("prepares a real checked-in classical WAV as a private audio upload", async () => {
+  it("prepares a file-backed classical WAV as a private audio upload", async () => {
     const result = await createSongGuessSetupFromCatalog("board-1", {
       categories: ["classical"],
       segment: "highlight",
@@ -92,7 +102,7 @@ describe("song-guess catalog WAV normalization", () => {
   });
 
   it("materializes a DB private clip into a board-owned setup asset", async () => {
-    const bytes = canonicalizeCatalogWav(readFileSync("data/song-guess/clips/chopin-waltz-no19/highlight.wav"));
+    const bytes = canonicalizeCatalogWav(wavWithListChunk());
     const sha256 = createHash("sha256").update(bytes).digest("hex");
     const objectKey = `song-guess/catalog/db-song/highlight/${sha256}.wav`;
     mocks.loadDbCatalog.mockResolvedValue([{
