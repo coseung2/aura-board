@@ -24,18 +24,23 @@ $repo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 Write-Host "repo: $repo"
 Write-Host "infisical env: $Env"
 
-$adb = Get-Command adb -ErrorAction SilentlyContinue
+$sdkAdb = Join-Path $env:LOCALAPPDATA "Android\Sdk\platform-tools\adb.exe"
+$adbPath = if (Test-Path -LiteralPath $sdkAdb) {
+  $sdkAdb
+} else {
+  (Get-Command adb -ErrorAction SilentlyContinue).Source
+}
 $explicitApiBase = -not [string]::IsNullOrWhiteSpace($ApiBase)
 $usbDevice = $null
-if ($adb) {
-  $usbDevice = (& $adb.Source devices 2>$null |
+if ($adbPath) {
+  $usbDevice = (& $adbPath devices 2>$null |
     Select-String "^(?<serial>[^\s]+)\s+device$").Matches |
     Select-Object -First 1 -ExpandProperty Groups |
     Where-Object Name -eq "serial" |
     Select-Object -First 1 -ExpandProperty Value
   if ($usbDevice) {
-    & $adb.Source -s $usbDevice reverse tcp:3000 tcp:3000 | Out-Null
-    & $adb.Source -s $usbDevice reverse tcp:8081 tcp:8081 | Out-Null
+    & $adbPath -s $usbDevice reverse tcp:3000 tcp:3000 | Out-Null
+    & $adbPath -s $usbDevice reverse tcp:8081 tcp:8081 | Out-Null
     if (-not $explicitApiBase) { $ApiBase = "http://127.0.0.1:3000" }
     Write-Host "USB device: $usbDevice (ADB reverse 3000/8081 enabled)"
   }
@@ -64,7 +69,7 @@ Start-Process -FilePath "pwsh" -ArgumentList @(
 
 Start-Process -FilePath "pwsh" -ArgumentList @(
   "-NoProfile", "-NoExit", "-Command",
-  "Set-Location '$repo\apps\mobile'; `$env:EXPO_PUBLIC_API_BASE='$ApiBase'; infisical run --env=$Env -- npx expo start --clear"
+  "infisical run --env=$Env -- pwsh -NoProfile -Command `"Set-Location '$repo\apps\mobile'; `$env:EXPO_PUBLIC_API_BASE='$ApiBase'; npx expo start --clear`""
 ) -WorkingDirectory "$repo\apps\mobile"
 
 Write-Host "Next.js and Expo starting in separate windows."
