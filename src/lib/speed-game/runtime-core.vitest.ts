@@ -22,7 +22,34 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import { authenticateGameViewer } from "./runtime-core";
+import {
+  authenticateGameViewer,
+  DEFAULT_SPEED_GAME_TIME_LIMIT_MS,
+  deriveSpeedGameGuesserSlot,
+  parseConfig,
+  validSpeedGameTimeLimitMs,
+} from "./runtime-core";
+
+describe("speed-game canonical defaults", () => {
+  it("uses a runtime-valid deterministic time limit", () => {
+    expect(validSpeedGameTimeLimitMs(0)).toBe(DEFAULT_SPEED_GAME_TIME_LIMIT_MS);
+    expect(
+      parseConfig({
+        answerMode: "normalize-space",
+        baseScore: 1000,
+        minScore: 0,
+        bonusRanks: [300, 200, 100],
+      }).timeLimitMs,
+    ).toBe(DEFAULT_SPEED_GAME_TIME_LIMIT_MS);
+  });
+
+  it("keeps every round guesser valid for a two-student one-group game", () => {
+    expect([0, 1].map((order) => deriveSpeedGameGuesserSlot(order, 2))).toEqual([
+      1,
+      2,
+    ]);
+  });
+});
 
 describe("authenticateGameViewer", () => {
   beforeEach(() => {

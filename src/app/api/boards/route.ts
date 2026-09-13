@@ -19,12 +19,15 @@ import {
   snapshotClassroomGroupsToBoard,
 } from "@/lib/default-groups";
 import {
-  deriveGuesserSlot,
   normalizeKeyword,
   parseKeywords,
 } from "@/lib/speed-game/score";
 import { deriveBoardCategory } from "@/lib/game-platform/catalog";
-import { createSpeedGameRun } from "@/lib/speed-game/runtime";
+import {
+  createSpeedGameRun,
+  DEFAULT_SPEED_GAME_TIME_LIMIT_MS,
+  deriveSpeedGameGuesserSlot,
+} from "@/lib/speed-game/runtime";
 
 // Grid cell dims ??matches Card default width/height; render uses CSS grid so
 // these are stored-only placeholders for future freeform fallback.
@@ -85,7 +88,7 @@ const CreateBoardSchema = z.object({
   // keywords: 라운드별 키워드. 1..100개, 각 1..80자.
   // answerMode: 'exact' | 'normalize-space' | 'teacher-approval'.
   // bonusRanks: '300,200,100' 형식 CSV.
-  // timeLimitMs: 라운드당 시간 한도 (0 = 무제한).
+  // timeLimitMs: 라운드당 시간 한도.
   speedGameConfig: z
     .object({
       title: z.string().max(100).optional(),
@@ -104,7 +107,12 @@ const CreateBoardSchema = z.object({
         .string()
         .regex(/^(\d+)(,\d+){0,2}$/)
         .optional(),
-      timeLimitMs: z.number().int().min(0).max(600000).default(0),
+      timeLimitMs: z
+        .number()
+        .int()
+        .min(1_000)
+        .max(600_000)
+        .default(DEFAULT_SPEED_GAME_TIME_LIMIT_MS),
     })
     .optional(),
 });
@@ -445,19 +453,6 @@ export async function POST(req: Request) {
             timeLimitMs: cfg.timeLimitMs,
           },
         });
-        // 라운드 1..N (order 0-indexed, guesserSlot 자동 회전).
-        for (let i = 0; i < keywords.length; i++) {
-          const kw = keywords[i];
-          await tx.speedGameRound.create({
-            data: {
-              gameId: game.id,
-              order: i,
-              keyword: kw,
-              keywordNormalized: normalizeKeyword(kw),
-              guesserSlot: deriveGuesserSlot(i),
-            },
-          });
-        }
         const roster = await tx.student.findMany({
           where: { classroomId: ownedClassroom.id },
           orderBy: [{ number: "asc" }, { createdAt: "asc" }],
@@ -475,6 +470,22 @@ export async function POST(req: Request) {
           speedGameGroups[index % groupCount].studentIds.push(student.id);
         });
         await saveBoardDefaultGroups(tx, createdBoard.id, speedGameGroups);
+        const smallestGroupSize = Math.min(
+          ...speedGameGroups.map((group) => Math.max(group.studentIds.length, 1)),
+        );
+        // Every round must point at a member that exists in every configured group.
+        for (let i = 0; i < keywords.length; i++) {
+          const kw = keywords[i];
+          await tx.speedGameRound.create({
+            data: {
+              gameId: game.id,
+              order: i,
+              keyword: kw,
+              keywordNormalized: normalizeKeyword(kw),
+              guesserSlot: deriveSpeedGameGuesserSlot(i, smallestGroupSize),
+            },
+          });
+        }
         await createSpeedGameRun(tx, { gameId: game.id });
         return createdBoard;
       });

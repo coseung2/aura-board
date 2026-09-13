@@ -218,6 +218,7 @@ export function CreateSpeedGameBoardModal({
             rankBonusSecond,
             rankBonusThird,
             groupCount,
+            timeLimitMs: 30_000,
           },
         }),
       });

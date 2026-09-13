@@ -21,6 +21,21 @@ import {
 
 const SPEED_RULES_VERSION = 1;
 const SPEED_STATE_SCHEMA_VERSION = 1;
+export const DEFAULT_SPEED_GAME_TIME_LIMIT_MS = 30_000;
+
+export function validSpeedGameTimeLimitMs(value: number): number {
+  return Number.isInteger(value) && value >= 1_000 && value <= 3_600_000
+    ? value
+    : DEFAULT_SPEED_GAME_TIME_LIMIT_MS;
+}
+
+export function deriveSpeedGameGuesserSlot(
+  roundOrder: number,
+  smallestGroupSize: number,
+): number {
+  const availableSlots = Math.max(1, Math.floor(smallestGroupSize));
+  return (Math.max(0, Math.floor(roundOrder)) % availableSlots) + 1;
+}
 
 type SpeedClient = Prisma.TransactionClient | typeof db;
 
@@ -30,7 +45,12 @@ const ConfigSchema = z
     baseScore: z.number().int().min(1).max(1_000_000),
     minScore: z.number().int().min(0).max(1_000_000),
     bonusRanks: z.array(z.number().int().min(0).max(1_000_000)).max(100),
-    timeLimitMs: z.number().int().min(1_000).max(3_600_000),
+    timeLimitMs: z
+      .number()
+      .int()
+      .min(1_000)
+      .max(3_600_000)
+      .default(DEFAULT_SPEED_GAME_TIME_LIMIT_MS),
   })
   .strict();
 
@@ -281,7 +301,7 @@ export async function createSpeedGameRun(
         baseScore: game.baseScore,
         minScore: game.minScore,
         bonusRanks: parseBonusRanks(game.bonusRanks),
-        timeLimitMs: game.timeLimitMs,
+        timeLimitMs: validSpeedGameTimeLimitMs(game.timeLimitMs),
       },
     },
     select: { id: true },
