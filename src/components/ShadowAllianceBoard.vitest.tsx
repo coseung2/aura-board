@@ -111,6 +111,64 @@ describe("ShadowAllianceBoard legacy presentation adapter", () => {
     });
   });
 
+  it.each([
+    { round: 4, button: "다음 라운드 (5/5)", action: "next" },
+    { round: 5, button: "최종 결과 보기", action: "finish" },
+  ])("sends $action from the round $round postround action", async ({ round, button, action }) => {
+    const postroundSnapshot = {
+      ...snapshot,
+      version: round,
+      phase: "postround" as const,
+      round,
+      command: 50,
+      lastResult: {
+        round,
+        command: 50,
+        winner: "black" as const,
+        blackAverage: 45,
+        whiteAverage: 60,
+        blackDifference: 5,
+        whiteDifference: 10,
+        players: [
+          {
+            studentId: "student-1",
+            name: "그림자 1",
+            team: "black" as const,
+            number: 45,
+            gain: 100,
+          },
+          {
+            studentId: "student-2",
+            name: "그림자 2",
+            team: "white" as const,
+            number: 60,
+            gain: 0,
+          },
+        ],
+      },
+    };
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ snapshot: postroundSnapshot }), {
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(
+      <ShadowAllianceBoard
+        boardId="board-1"
+        boardTitle="그림자연합"
+        viewer="teacher"
+      />,
+    );
+
+    fireEvent.click(await screen.findByRole("button", { name: button }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    const request = fetchMock.mock.calls[1]?.[1] as RequestInit;
+    expect(JSON.parse(String(request.body))).toMatchObject({ action });
+  });
+
   it("renders the restored student UI and auto-joins", async () => {
     const studentSnapshot = {
       ...snapshot,

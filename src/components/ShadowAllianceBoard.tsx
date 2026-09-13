@@ -610,6 +610,7 @@ export function ShadowAllianceBoard({ boardId, boardTitle, viewer }: Props) {
         }}
         onResetGame={() => void command("rematch")}
         onNextRound={() => void command("next")}
+        onFinishGame={() => void command("finish")}
         onRevealRound={() => void command("reveal")}
         onShowPostround={() => void command("postround")}
         onSetTimerRunning={(running) =>

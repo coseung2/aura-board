@@ -35,6 +35,7 @@ type Props = {
   onContinueGame?: () => boolean | Promise<boolean>;
   onExitGame?: () => boolean | Promise<boolean>;
   onNextRound: () => void;
+  onFinishGame: () => void;
   onRevealRound: () => void;
   onShowPostround: () => void;
   onSetTimerRunning: (running: boolean) => void;
@@ -230,12 +231,14 @@ function ShadowAlliancePostroundPage({
   result,
   rankings,
   onNextRound,
+  onFinishGame,
 }: {
   round: number;
   totalRounds: number;
   result: ShadowAllianceResult;
   rankings: ShadowAlliancePlayer[];
   onNextRound: () => void;
+  onFinishGame: () => void;
 }) {
   const winningPlayers = result.winner === "black" ? result.black : result.white;
   const lastRound = round >= totalRounds;
@@ -286,7 +289,11 @@ function ShadowAlliancePostroundPage({
         </ol>
       </section>
 
-      <button type="button" className="shadow-alliance-button primary" onClick={onNextRound}>
+      <button
+        type="button"
+        className="shadow-alliance-button primary"
+        onClick={lastRound ? onFinishGame : onNextRound}
+      >
         {lastRound ? "최종 결과 보기" : `다음 라운드 (${round + 1}/${totalRounds})`}
       </button>
     </section>
@@ -356,6 +363,7 @@ export function ShadowAllianceTeacherGame({
   onContinueGame,
   onExitGame,
   onNextRound,
+  onFinishGame,
   onRevealRound,
   onShowPostround,
   onSetTimerRunning,
@@ -435,6 +443,7 @@ export function ShadowAllianceTeacherGame({
           result={result}
           rankings={rankings}
           onNextRound={onNextRound}
+          onFinishGame={onFinishGame}
         />
       </main>
     );
