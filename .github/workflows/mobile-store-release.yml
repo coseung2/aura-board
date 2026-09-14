@@ -13,6 +13,7 @@ on:
           - validate
           - android-build
           - android
+          - android-submit
           - android-promote
           - ios-build
           - ios
@@ -39,6 +40,11 @@ on:
         description: Existing Google Play versionCode to promote when platform is android-promote
         required: false
         default: "0"
+        type: string
+      android_build_id:
+        description: Existing EAS Android build ID when platform is android-submit
+        required: false
+        default: ""
         type: string
 
 permissions:
@@ -115,7 +121,7 @@ jobs:
           NODE
 
       - name: Run mobile release checks
-        if: ${{ inputs.platform != 'ios-submit' }}
+        if: ${{ inputs.platform != 'ios-submit' && inputs.platform != 'android-submit' }}
         run: |
           npm run typecheck
           npm run design:check
@@ -155,6 +161,12 @@ jobs:
         env:
           IOS_RELEASE_NOTES: ${{ inputs.release_notes }}
         run: test -n "$IOS_RELEASE_NOTES"
+
+      - name: Validate existing Android build ID
+        if: ${{ inputs.platform == 'android-submit' }}
+        env:
+          ANDROID_BUILD_ID: ${{ inputs.android_build_id }}
+        run: test -n "$ANDROID_BUILD_ID"
 
       - name: Materialize Firebase Android config for preflight
         if: ${{ inputs.platform == 'all' || inputs.platform == 'validate' || inputs.platform == 'android-build' || inputs.platform == 'android' }}
@@ -366,6 +378,73 @@ jobs:
             echo "- Version code: ${{ inputs.android_version_code }}"
             echo "- Play track: production"
           } >> "$GITHUB_STEP_SUMMARY"
+
+  android-submit-existing:
+    name: Submit existing Android build to closed testing
+    environment: Production
+    if: ${{ inputs.platform == 'android-submit' }}
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - name: Checkout release commit
+        uses: actions/checkout@v5
+
+      - name: Load release secrets from Infisical
+        uses: Infisical/secrets-action@v1.0.9
+        with:
+          method: oidc
+          identity-id: c45f8370-4f1b-4f7b-8851-0050eaf1df63
+          oidc-audience: https://github.com/coseung2
+          project-slug: aura-board-zp9-h
+          env-slug: prod
+          secret-path: /mobile
+
+      - name: Setup Expo and EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ env.EXPO_TOKEN }}
+
+      - name: Materialize Google Play service account
+        run: |
+          node - <<'NODE'
+          const fs = require("node:fs");
+          const path = require("node:path");
+          const serviceAccount = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON;
+          if (!serviceAccount) throw new Error("GOOGLE_PLAY_SERVICE_ACCOUNT_JSON was not loaded");
+          JSON.parse(serviceAccount);
+          const output = path.join(process.env.RUNNER_TEMP, "google-play-service-account.json");
+          fs.writeFileSync(output, serviceAccount + "\n", { encoding: "utf8", mode: 0o600 });
+          const easPath = path.join(process.cwd(), "eas.json");
+          const eas = JSON.parse(fs.readFileSync(easPath, "utf8"));
+          eas.submit.closed.android.serviceAccountKeyPath = output;
+          fs.writeFileSync(easPath, JSON.stringify(eas, null, 2) + "\n", { encoding: "utf8", mode: 0o600 });
+          NODE
+
+      - name: Submit existing AAB to Google Play closed testing
+        run: >-
+          eas submit --platform android --profile closed
+          --id "${{ inputs.android_build_id }}"
+          --wait --non-interactive
+
+      - name: Write Android submission summary
+        if: always()
+        run: |
+          {
+            echo "## Android closed testing submission"
+            echo "- Commit: $GITHUB_SHA"
+            echo "- Version: ${{ inputs.expected_version }}"
+            echo "- EAS build: ${{ inputs.android_build_id }}"
+            echo "- Play track: alpha"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Remove Google Play service account
+        if: always()
+        run: rm -f "$RUNNER_TEMP/google-play-service-account.json"
 
   ios:
     name: iOS IPA build and optional App Store Connect submission
