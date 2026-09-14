@@ -409,6 +409,9 @@ jobs:
           eas-version: latest
           token: ${{ env.EXPO_TOKEN }}
 
+      - name: Install mobile dependencies
+        run: npm ci --legacy-peer-deps
+
       - name: Materialize Google Play service account
         run: |
           node - <<'NODE'
