@@ -201,13 +201,13 @@
 
 .playerIdentity {
   display: grid;
-  grid-template-columns: 54px 22px minmax(0, 1fr);
+  grid-template-columns: 56px 22px minmax(0, 1fr);
   align-items: center;
   gap: 9px;
   min-width: 0;
 }
 
-.petThumb { display: grid; place-items: center; width: 54px; height: 54px; overflow: hidden; }
+.petThumb { display: grid; place-items: center; width: 56px; height: 56px; }
 .playerRecord { grid-column: 3; color: #62847c; font-size: .72rem; font-weight: 700; }
 
 .matchInfo { display: grid; gap: 10px; border: 1px solid rgba(43, 91, 78, 0.12); border-radius: 18px; background: #f9fffc; padding: 16px; }

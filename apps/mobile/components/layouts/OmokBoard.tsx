@@ -36,6 +36,7 @@ import {
   useOmokSessionRuntime,
 } from "../../lib/omok-session-runtime";
 import { useBoardRealtime } from "../../lib/use-board-realtime";
+import { useOmokPlayerPets } from "../../lib/use-omok-player-pets";
 import {
   colors,
   omokTokens,
@@ -80,6 +81,7 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   });
   const { state, socketStatus, offline } = runtime;
   const snapshot = state.snapshot;
+  const playerPets = useOmokPlayerPets(snapshot?.sessionId);
 
   useLayoutEffect(() => {
     if (!snapshot) return;
@@ -317,7 +319,7 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   // No scroll view: the board and its chrome are sized to the viewport.
   return (
     <View style={styles.gameRoot}>
-      <OmokHud snapshot={snapshot} />
+      <OmokHud snapshot={snapshot} players={playerPets} />
       <OmokTurnBar banner={banner} />
 
       <OmokGrid

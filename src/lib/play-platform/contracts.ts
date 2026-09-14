@@ -182,6 +182,8 @@ export type OmokPlayerProfile = {
     color: string;
     growthStage: number;
     equippedFloor: string;
+    equippedItemKeys?: string[];
+    hiddenItemKeys?: string[];
   } | null;
   record: { wins: number; losses: number; draws: number };
 };

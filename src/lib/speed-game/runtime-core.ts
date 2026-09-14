@@ -158,6 +158,7 @@ async function loadRunRecord(client: SpeedClient, runId: string) {
 
 function serializeRunRecord(
   run: NonNullable<Awaited<ReturnType<typeof loadRunRecord>>>,
+  pets: Map<string, NonNullable<SpeedGameWire["participants"][number]["representativePet"]>>,
 ): SpeedGameWire {
   const config = parseConfig(run.configSnapshot);
   const rankByAnswerId = new Map<string, number>();
@@ -238,6 +239,7 @@ function serializeRunRecord(
       studentId: participant.studentId,
       groupId: participant.groupId,
       name: participant.student.name,
+      representativePet: pets.get(participant.studentId) ?? null,
       invitedAt: participant.invitedAt.toISOString(),
       joinedAt: participant.joinedAt?.toISOString() ?? null,
       readyAt: participant.readyAt?.toISOString() ?? null,
@@ -373,7 +375,29 @@ export async function loadSpeedGameRunSnapshot(
   client: SpeedClient = db,
 ): Promise<SpeedGameWire | null> {
   const run = await loadRunRecord(client, runId);
-  return run ? serializeRunRecord(run) : null;
+  if (!run) return null;
+  const classroomId = run.game.board.classroomId;
+  const studentIds = [...new Set(run.participants.map((participant) => participant.studentId))];
+  const slimes = classroomId && studentIds.length
+    ? await client.studentSlime.findMany({
+        where: {
+          classroomId,
+          studentId: { in: studentIds },
+          student: { classroomId },
+          isRepresentative: true,
+        },
+        select: {
+          studentId: true, color: true, growthStage: true,
+          equippedItemKeys: true, hiddenItemKeys: true,
+        },
+      })
+    : [];
+  return serializeRunRecord(run, new Map(slimes.map((slime) => [slime.studentId, {
+    color: slime.color,
+    growthStage: slime.growthStage === 2 || slime.growthStage === 3 ? slime.growthStage : 1,
+    equippedItemKeys: slime.equippedItemKeys,
+    hiddenItemKeys: slime.hiddenItemKeys,
+  }])));
 }
 
 export async function loadGameSnapshot(

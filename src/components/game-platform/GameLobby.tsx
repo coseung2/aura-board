@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
+import { GameParticipantPet, type GameParticipantPetData } from "@/features/games/components/GameParticipantPet";
 import styles from "./game-platform.module.css";
 
 export type GameLobbyParticipant = {
   id: string;
   name: string;
+  representativePet?: GameParticipantPetData | null;
   state?: "invited" | "joined" | "ready" | "forfeited";
 };
 
@@ -55,7 +57,12 @@ export function GameLobby({
         <div className={styles.lobbyGrid}>
           {participants.map((participant) => (
             <div className={styles.participantRow} key={participant.id}>
-              <strong>{participant.name}</strong>
+              <span className={styles.participantIdentity}>
+                {participant.representativePet !== undefined ? (
+                  <GameParticipantPet name={participant.name} pet={participant.representativePet} size={56} />
+                ) : null}
+                <strong>{participant.name}</strong>
+              </span>
               <span className={styles.participantState}>{stateLabel(participant.state)}</span>
             </div>
           ))}

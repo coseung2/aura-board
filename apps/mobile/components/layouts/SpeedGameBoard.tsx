@@ -14,6 +14,8 @@ import {
 import { AppButton, TextField } from "../ui";
 import { GameExitDialog } from "../game-platform/GameExitDialog";
 import { GameLobby } from "../game-platform/GameLobby";
+import { GameParticipantPet } from "../game-platform/GameParticipantPet";
+import { GAME_PET_SIZES } from "../../lib/game-participant-pet";
 import { GameResultPanel } from "../game-platform/GameResultPanel";
 import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 
@@ -303,6 +305,9 @@ export function SpeedGameBoard({ data }: Props) {
     return (
       <GameLobby
         title="스피드게임 대기실"
+        renderParticipantLeading={({ id, name }) => (
+          <GameParticipantPet name={name} pet={game.participants.find((candidate) => candidate.studentId === id)?.representativePet} size={GAME_PET_SIZES.compact} />
+        )}
         description="내 모둠을 확인하고 준비가 끝나면 준비하기를 눌러 주세요."
         participants={game.participants.map((candidate) => ({
           id: candidate.studentId,
@@ -395,6 +400,7 @@ export function SpeedGameBoard({ data }: Props) {
       ) : null}
 
       <View style={styles.promptCard}>
+        {participant ? <GameParticipantPet name={participant.name} pet={participant.representativePet} size={GAME_PET_SIZES.player} /> : null}
         <Text selectable style={styles.promptLabel}>현재 순서</Text>
         <Text selectable style={styles.promptValue}>
           {round ? `${round.guesserSlot}번` : "—"}

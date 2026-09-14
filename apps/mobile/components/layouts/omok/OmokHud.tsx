@@ -2,13 +2,17 @@ import { StyleSheet, Text, View } from "react-native";
 import { omokSlotLabel, type OmokTurnBanner } from "../../../lib/omok-presentation";
 import type { OmokSnapshot } from "../../../lib/omok-contract";
 import { omokTokens, radii, spacing, typography } from "../../../theme/tokens";
+import { GameParticipantPet } from "../../game-platform/GameParticipantPet";
+import { GAME_PET_SIZES } from "../../../lib/game-participant-pet";
+import type { OmokPlayerPet } from "../../../lib/use-omok-player-pets";
 
 /** Compact identity row: stone colour, name, whose turn it is. No version or
  * internal sync copy. */
-export function OmokHud({ snapshot }: { snapshot: OmokSnapshot }) {
+export function OmokHud({ snapshot, players = [] }: { snapshot: OmokSnapshot; players?: readonly OmokPlayerPet[] }) {
   return (
     <View style={styles.hud} accessibilityRole="summary">
       {snapshot.participants.map((participant) => {
+        const profile = players.find((player) => player.slot === participant.slot);
         const isViewer = participant.slot === snapshot.viewer.slot;
         const isTurn =
           snapshot.roomStatus === "active" && participant.slot === snapshot.game.nextTurn;
@@ -20,6 +24,7 @@ export function OmokHud({ snapshot }: { snapshot: OmokSnapshot }) {
               isViewer ? ", 나" : ""
             }${isTurn ? ", 현재 차례" : ""}`}
           >
+            {profile?.pet ? <GameParticipantPet key={profile.studentId} name={profile.name} pet={profile.pet} size={GAME_PET_SIZES.player} /> : null}
             <View
               style={[
                 styles.stone,
@@ -68,13 +73,13 @@ export function OmokTurnBar({ banner }: { banner: OmokTurnBanner }) {
 
 const styles = StyleSheet.create({
   hud: {
-    flexDirection: "row",
+    flexDirection: "column",
     alignItems: "center",
     gap: spacing.sm,
     minHeight: omokTokens.hudMinHeight,
   },
   player: {
-    flex: 1,
+    alignSelf: "stretch",
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.xs,

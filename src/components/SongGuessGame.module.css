@@ -654,13 +654,8 @@
   margin: 0;
 }
 
-.myEntry > div[role="img"] {
-  width: 128px;
-  height: 128px;
-}
-
-.myEntry > div[role="img"] > div {
-  transform: scale(2);
+.myEntry > [role="img"] {
+  --game-pet-size: 96px;
 }
 
 .entrants {
@@ -687,13 +682,8 @@
   font-size: 14px;
 }
 
-.entrant > div[role="img"] {
-  width: 96px;
-  height: 96px;
-}
-
-.entrant > div[role="img"] > div {
-  transform: scale(1.5);
+.entrant > [role="img"] {
+  --game-pet-size: 64px;
 }
 
 .emptyEntrants {
@@ -820,11 +810,8 @@
 }
 
 .layout[data-viewer="student"] .myEntry { min-height: 210px; gap: 12px; padding: 24px; border: 1px solid #40345f; border-radius: 16px; background: var(--song-student-surface); }
-.layout[data-viewer="student"] .myEntry > div[role="img"] { width: 96px; height: 96px; }
 .layout[data-viewer="student"] .entrants { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px 8px; margin-top: 28px; }
 .layout[data-viewer="student"] .entrant { gap: 6px; }
-.layout[data-viewer="student"] .entrant > div[role="img"] { width: 64px; height: 64px; }
-.layout[data-viewer="student"] .entrant > div[role="img"] > div { transform: scale(1); }
 .layout[data-viewer="student"] .entrant strong { font-size: 11px; }
 
 @keyframes enterRoom {

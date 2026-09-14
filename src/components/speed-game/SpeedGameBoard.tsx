@@ -1,6 +1,8 @@
 
 "use client";
 
+import { SpeedGamePlayers } from "./SpeedGamePlayers";
+
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameExitDialog } from "@/components/game-platform/GameExitDialog";
 import {
@@ -715,6 +717,8 @@ export function SpeedGameBoard({
           ))}
         </ol>
       </section>
+
+      <SpeedGamePlayers participants={game.participants} currentStudentId={currentStudentId} />
 
       {viewerKind === "teacher" && game.answerMode === "teacher-approval" ? (
         <section className="speed-game-review-panel" aria-label="답변 판정">

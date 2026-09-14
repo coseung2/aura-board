@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpeedGameWire } from "./types";
 
@@ -29,6 +29,12 @@ vi.mock("@/lib/supabase/client", () => ({
 
 vi.mock("@/components/PlayBoardContinueButton", () => ({
   PlayBoardContinueButton: () => null,
+}));
+
+vi.mock("@/features/games/components/GameParticipantPet", () => ({
+  GameParticipantPet: ({ name, pet, size }: { name: string; pet?: { color: string } | null; size: number }) => (
+    <span role="img" aria-label={`${name} 대표펫`} data-color={pet?.color ?? "none"} data-size={size} />
+  ),
 }));
 
 import { SpeedGameBoard } from "./SpeedGameBoard";
@@ -85,6 +91,34 @@ describe("SpeedGameBoard realtime transport", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
+  });
+
+  const participants: SpeedGameWire["participants"] = ["a", "b"].map((studentId, index) => ({
+    studentId, name: "동명이인", groupId: "group", invitedAt: new Date(0).toISOString(),
+    joinedAt: new Date(0).toISOString(), readyAt: null, forfeitedAt: null,
+    representativePet: { color: index === 0 ? "pink" : "blue", growthStage: 3, equippedItemKeys: ["vehicle"], hiddenItemKeys: [] },
+  }));
+
+  it("passes each student's representative to the waiting lobby at 56px", () => {
+    renderBoard({ ...game, participants });
+    expect(screen.getAllByRole("img").map((image) => [image.dataset.color, image.dataset.size]))
+      .toEqual([["pink", "56"], ["blue", "56"]]);
+  });
+
+  it("renders active students by ID through reordering and leaves team standings pet-free", async () => {
+    const active: SpeedGameWire = {
+      ...game, status: "active", participants,
+      leaderboard: [{ groupId: "group", groupName: "모둠", score: 100 }],
+    };
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ game: { ...active, participants: [...participants].reverse() } }) });
+    renderBoard(active);
+    expect(within(screen.getByRole("region", { name: "모둠 점수" })).queryByRole("img")).toBeNull();
+    expect(within(screen.getByRole("region", { name: "참가자" })).getAllByRole("img").map((image) => image.dataset.color))
+      .toEqual(["pink", "blue"]);
+    await waitFor(() => expect(realtime.status).toBeTypeOf("function"));
+    await act(async () => realtime.broadcast?.());
+    expect(within(screen.getByRole("region", { name: "참가자" })).getAllByRole("img").map((image) => image.dataset.color))
+      .toEqual(["blue", "pink"]);
   });
 
   it("refetches the authoritative GET snapshot on Broadcast invalidation", async () => {

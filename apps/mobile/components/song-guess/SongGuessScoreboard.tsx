@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from "react-native";
-import { SLIME_ASSET_COLORS, type SlimeColor } from "../../lib/slime-assets";
+import { GAME_PET_SIZES } from "../../lib/game-participant-pet";
 import type { SongGuessSnapshot } from "../../lib/song-guess-contract";
 import {
   borders,
@@ -9,7 +9,7 @@ import {
   typography,
 } from "../../theme/tokens";
 import { songGuessStudentTheme as song } from "../../theme/song-guess";
-import { SlimeSprite } from "../slime/SlimeSprite";
+import { GameParticipantPet } from "../game-platform/GameParticipantPet";
 
 type RankedSongGuessParticipant = SongGuessSnapshot["participants"][number] & {
   rank: number;
@@ -17,15 +17,13 @@ type RankedSongGuessParticipant = SongGuessSnapshot["participants"][number] & {
 
 export function SongGuessScoreboard({
   snapshot,
+  studentId,
 }: {
   snapshot: SongGuessSnapshot;
+  studentId?: string;
 }) {
   const ranked = rankParticipants(snapshot.participants);
-  const own = snapshot.viewer.participantIndex == null
-    ? null
-    : ranked.find((participant) =>
-        participant.participantId === snapshot.participants[snapshot.viewer.participantIndex!]?.participantId,
-      ) ?? null;
+  const own = studentId ? ranked.find((participant) => participant.participantId === studentId) ?? null : null;
 
   if (snapshot.phase === "draft" || snapshot.phase === "lobby" || snapshot.phase === "guessing") {
     return null;
@@ -57,7 +55,7 @@ export function SongGuessScoreboard({
                 <Text style={styles.finalScore}>{own.score.toLocaleString("ko-KR")}점</Text>
               </View>
               <View style={styles.finalPet}>
-                {own.representativePet ? <SlimeSprite slimeColor={toSlimeColor(own.representativePet.color)} growthStage={own.representativePet.growthStage} action="idle" displayScale={0.65} accessibilityLabel={`${own.displayName} 슬라임`} /> : null}
+                <GameParticipantPet name={own.displayName} pet={own.representativePet} size={GAME_PET_SIZES.emphasis} />
               </View>
             </View>
           ) : null}
@@ -65,7 +63,7 @@ export function SongGuessScoreboard({
           <View style={styles.revealRows}>
             {podiumParticipants(ranked).map((participant) => (
               <ScoreParticipantRow
-                key={`${participant.participantId ?? participant.displayName}-${participant.rank}`}
+                key={participant.participantId}
                 participant={participant}
                 podium
               />
@@ -141,13 +139,7 @@ function ScoreParticipantRow({
       </Text>
       <View style={styles.scoreAvatar}>
         {pet ? (
-          <SlimeSprite
-            slimeColor={toSlimeColor(pet.color)}
-            growthStage={pet.growthStage}
-            action="idle"
-            displayScale={0.45}
-            accessibilityLabel={`${participant.displayName} 슬라임`}
-          />
+          <GameParticipantPet name={participant.displayName} pet={pet} size={GAME_PET_SIZES.player} />
         ) : (
           <Text style={styles.scoreAvatarFallback} selectable>
             {participant.displayName.slice(0, 1)}
@@ -181,12 +173,6 @@ function ScoreParticipantRow({
   );
 }
 
-function toSlimeColor(value: string): SlimeColor {
-  return (SLIME_ASSET_COLORS as readonly string[]).includes(value)
-    ? (value as SlimeColor)
-    : (SLIME_ASSET_COLORS[0] as SlimeColor);
-}
-
 const styles = StyleSheet.create({
   ownResultCard: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.md, padding: spacing.lg, borderRadius: song.answerRadius, backgroundColor: song.track },
   resultMeta: { ...typography.micro, color: song.muted },
@@ -196,7 +182,7 @@ const styles = StyleSheet.create({
   finalSummary: { minHeight: song.finalSummaryMinHeight, flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.lg, borderRadius: song.answerRadius, backgroundColor: song.track },
   finalRank: { ...typography.display, color: song.text },
   finalScore: { ...typography.label, color: song.muted },
-  finalPet: { width: song.finalPetSize, height: song.finalPetSize, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  finalPet: { width: GAME_PET_SIZES.emphasis, height: GAME_PET_SIZES.emphasis, alignItems: "center", justifyContent: "center" },
   revealCard: {
     gap: spacing.md,
     padding: spacing.lg,
@@ -228,11 +214,10 @@ const styles = StyleSheet.create({
   },
   podiumRank: { color: song.accent },
   scoreAvatar: {
-    width: spacing.xxl,
-    height: spacing.xxl,
+    width: GAME_PET_SIZES.player,
+    height: GAME_PET_SIZES.player,
     alignItems: "center",
     justifyContent: "center",
-    overflow: "hidden",
   },
   scoreAvatarFallback: { ...typography.label, color: song.accent },
   scoreIdentity: { flex: 1, minWidth: 0, gap: spacing.xxs },

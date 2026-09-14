@@ -24,6 +24,7 @@ export type MobileGameLobbyProps = {
   error?: string | null;
   participantMessage?: string | null;
   actions?: ReactNode;
+  renderParticipantLeading?: (participant: MobileGameLobbyParticipant) => ReactNode;
 };
 
 function stateLabel(state: MobileGameLobbyParticipant["state"]): string {
@@ -42,6 +43,7 @@ export function GameLobby({
   error,
   participantMessage,
   actions,
+  renderParticipantLeading,
 }: MobileGameLobbyProps) {
   return (
     <View style={styles.root} accessibilityState={{ busy: loading }}>
@@ -58,6 +60,7 @@ export function GameLobby({
         <View style={styles.list}>
           {participants.map((participant) => (
             <View style={styles.row} key={participant.id}>
+              {renderParticipantLeading?.(participant)}
               <Text selectable style={styles.name}>{participant.name}</Text>
               <Text selectable style={styles.state}>{stateLabel(participant.state)}</Text>
             </View>

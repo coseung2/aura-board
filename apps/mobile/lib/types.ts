@@ -117,6 +117,8 @@ export type StudentDuty = {
   href: string;
 };
 
+import type { GameParticipantPetData } from "./game-participant-pet";
+
 export type SpeedGameWire = {
   id: string;
   runId: string;
@@ -161,6 +163,7 @@ export type SpeedGameWire = {
     joinedAt: string | null;
     readyAt: string | null;
     forfeitedAt: string | null;
+    representativePet?: GameParticipantPetData | null;
   }>;
   leaderboard: Array<{ groupId: string; groupName: string; score: number }>;
 };

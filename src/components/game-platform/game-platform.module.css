@@ -137,6 +137,14 @@
   font-size: 0.86rem;
 }
 
+.participantIdentity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .resultOutcome {
   margin: 0;
   font-size: clamp(1.4rem, 4vw, 2.2rem);

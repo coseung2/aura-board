@@ -539,10 +539,10 @@
   font-weight: 750;
 }
 
-.game-participant-list div,
-.kordle-participant-list div,
-.game-waiting-participants div,
-.kordle-waiting-participants div {
+.game-participant-list > div,
+.kordle-participant-list > div,
+.game-waiting-participants > div,
+.kordle-waiting-participants > div {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;

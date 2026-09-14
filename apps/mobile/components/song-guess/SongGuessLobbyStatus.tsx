@@ -3,10 +3,11 @@ import { AppButton } from "../ui";
 import { borders, radii, spacing, typography } from "../../theme/tokens";
 import { songGuessStudentTheme as song } from "../../theme/song-guess";
 import type { SongGuessSnapshot } from "../../lib/song-guess-contract";
-import { SLIME_ASSET_COLORS, type SlimeColor } from "../../lib/slime-assets";
-import { SlimeSprite } from "../slime/SlimeSprite";
+import { GAME_PET_SIZES } from "../../lib/game-participant-pet";
+import { GameParticipantPet } from "../game-platform/GameParticipantPet";
 
 type Props = {
+  studentId?: string;
   snapshot: SongGuessSnapshot;
   joined: boolean;
   pending: boolean;
@@ -14,24 +15,16 @@ type Props = {
   onRetry: () => void;
 };
 
-export function SongGuessLobbyStatus({ snapshot, joined, pending, failed, onRetry }: Props) {
+export function SongGuessLobbyStatus({ snapshot, studentId, joined, pending, failed, onRetry }: Props) {
   const participants = snapshot.participants.filter((participant) => participant.joined !== false);
-  const own = snapshot.viewer.participantIndex == null
-    ? null
-    : snapshot.participants[snapshot.viewer.participantIndex] ?? null;
+  const own = studentId ? snapshot.participants.find((participant) => participant.participantId === studentId) ?? null : null;
   const friends = participants.filter((participant) => participant !== own);
   return (
     <View style={styles.wrap} accessibilityLiveRegion="polite">
       <View style={styles.card}>
         {own?.representativePet ? (
           <View style={styles.heroPet}>
-            <SlimeSprite
-              slimeColor={toSlimeColor(own.representativePet.color)}
-              growthStage={own.representativePet.growthStage}
-              action="idle"
-              displayScale={1.15}
-              accessibilityLabel={`${own.displayName} 슬라임`}
-            />
+            <GameParticipantPet name={own.displayName} pet={own.representativePet} size={GAME_PET_SIZES.emphasis} />
           </View>
         ) : null}
       <Text style={styles.title} selectable>
@@ -67,17 +60,11 @@ export function SongGuessLobbyStatus({ snapshot, joined, pending, failed, onRetr
           </View>
           <View style={styles.participantPanel}>
             <View style={styles.participantGrid}>
-              {friends.map((participant, index) => (
-                <View key={participant.participantId ?? `${participant.displayName}-${index}`} style={styles.participant}>
+              {friends.map((participant) => (
+                <View key={participant.participantId} style={styles.participant}>
                   <View style={styles.participantPet}>
                     {participant.representativePet ? (
-                      <SlimeSprite
-                        slimeColor={toSlimeColor(participant.representativePet.color)}
-                        growthStage={participant.representativePet.growthStage}
-                        action="idle"
-                        displayScale={0.48}
-                        accessibilityLabel={`${participant.displayName} 슬라임`}
-                      />
+                      <GameParticipantPet name={participant.displayName} pet={participant.representativePet} size={GAME_PET_SIZES.compact} />
                     ) : null}
                   </View>
                   <Text style={styles.participantName} numberOfLines={1}>{participant.displayName}</Text>
@@ -98,12 +85,6 @@ export function SongGuessLobbyStatus({ snapshot, joined, pending, failed, onRetr
   );
 }
 
-function toSlimeColor(value: string): SlimeColor {
-  return (SLIME_ASSET_COLORS as readonly string[]).includes(value)
-    ? (value as SlimeColor)
-    : (SLIME_ASSET_COLORS[0] as SlimeColor);
-}
-
 const styles = StyleSheet.create({
   wrap: { gap: spacing.md },
   card: {
@@ -117,7 +98,7 @@ const styles = StyleSheet.create({
     borderColor: song.border,
     alignItems: "center",
   },
-  heroPet: { width: song.lobbyHeroPetSize, height: song.lobbyHeroPetSize, alignItems: "center", justifyContent: "center" },
+  heroPet: { width: GAME_PET_SIZES.emphasis, height: GAME_PET_SIZES.emphasis, alignItems: "center", justifyContent: "center" },
   title: { ...typography.title, color: song.text, textAlign: "center" },
   muted: { ...typography.body, color: song.muted, textAlign: "center" },
   status: { ...typography.label, color: song.accent, textAlign: "center" },
@@ -129,7 +110,7 @@ const styles = StyleSheet.create({
   participantPanel: { minHeight: song.lobbyParticipantPanelMinHeight, padding: spacing.md, borderRadius: song.answerRadius, backgroundColor: song.panel },
   participantGrid: { flexDirection: "row", flexWrap: "wrap", rowGap: spacing.md },
   participant: { width: "25%", alignItems: "center", gap: spacing.xs },
-  participantPet: { width: song.lobbyParticipantPetSize, height: song.lobbyParticipantPetSize, alignItems: "center", justifyContent: "center", overflow: "hidden" },
+  participantPet: { width: GAME_PET_SIZES.compact, height: GAME_PET_SIZES.compact, alignItems: "center", justifyContent: "center" },
   participantName: { ...typography.micro, maxWidth: song.lobbyParticipantNameMaxWidth, color: song.text, textAlign: "center" },
   emptyFriends: { ...typography.body, width: "100%", paddingVertical: spacing.xl, color: song.muted, textAlign: "center" },
   waitCard: { gap: spacing.xxs, padding: spacing.lg, borderRadius: song.answerRadius, backgroundColor: song.track, alignItems: "center" },

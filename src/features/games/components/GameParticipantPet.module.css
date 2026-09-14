@@ -1,0 +1,27 @@
+.holder {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: var(--game-pet-size, var(--game-pet-default-size, 44px));
+  max-width: 100%;
+  aspect-ratio: 1;
+  vertical-align: middle;
+  color: var(--color-text-muted, #64748b);
+  isolation: isolate;
+}
+
+.canvas {
+  position: absolute;
+  display: block;
+  width: max-content;
+  height: max-content;
+  max-width: none;
+  left: 50%;
+  top: 50%;
+  transform-origin: center;
+  image-rendering: pixelated;
+  pointer-events: none;
+}
+
+.fallback { width: 50%; height: 50%; }

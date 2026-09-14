@@ -23,31 +23,13 @@ import {
 } from "../../theme/tokens";
 import { AppButton, EmptyState, Pill, SurfaceCard, TextField } from "../ui";
 import { KordleLiveFeed } from "../kordle/KordleLiveFeed";
-import { SlimeSprite } from "../slime/SlimeSprite";
-import { SLIME_ASSET_COLORS, type SlimeColor } from "../../lib/slime-assets";
-
-/** Falls back to the first catalog colour when a stored value is unknown. */
-function toSlimeColor(value: string): SlimeColor {
-  return (SLIME_ASSET_COLORS as readonly string[]).includes(value)
-    ? (value as SlimeColor)
-    : (SLIME_ASSET_COLORS[0] as SlimeColor);
-}
-
-/**
- * Roster pet size.
- *
- * The sprite scene is `64 * imageScale(4) * displayScale` wide, so the avatar
- * box has to match that or the circle crops the character down to its hat.
- * 0.25 is the renderer's smallest quantized step and yields a 64px scene.
- */
-const ROSTER_PET_DISPLAY_SCALE = 0.25;
-const ROSTER_PET_SIZE = 64 * 4 * ROSTER_PET_DISPLAY_SCALE;
+import { GameParticipantPet } from "../game-platform/GameParticipantPet";
+import { GAME_PET_SIZES, type GameParticipantPetData } from "../../lib/game-participant-pet";
 
 /**
  * Waiting-room roster with each student's representative pet.
  *
- * Only the character is drawn. Scene furniture (backgrounds, floors, vehicles)
- * is excluded server-side and by omission here, so a compact row stays aligned.
+ * Visible equipment stays attached to the student's own pet.
  */
 function KordleWaitingRoster({
   participants,
@@ -63,21 +45,7 @@ function KordleWaitingRoster({
       <View style={styles.rosterList}>
         {participants.map((participant) => (
           <View key={participant.id} style={styles.rosterChip}>
-            <View style={styles.rosterAvatar}>
-              {participant.representativePet ? (
-                <SlimeSprite
-                  slimeColor={toSlimeColor(participant.representativePet.color)}
-                  growthStage={participant.representativePet.growthStage}
-                  action="idle"
-                  displayScale={ROSTER_PET_DISPLAY_SCALE}
-                  accessibilityLabel={`${participant.name} 대표펫`}
-                />
-              ) : (
-                <Text style={styles.rosterAvatarFallback} selectable>
-                  {participant.name.slice(0, 1)}
-                </Text>
-              )}
-            </View>
+            <GameParticipantPet name={participant.name} pet={participant.representativePet} size={GAME_PET_SIZES.compact} />
             <Text style={styles.rosterName} numberOfLines={1} selectable>
               {participant.name}
             </Text>
@@ -127,10 +95,7 @@ type PuzzleInfo = {
 type KordleWaitingParticipant = {
   id: string;
   name: string;
-  representativePet?: {
-    color: string;
-    growthStage: 1 | 2 | 3;
-  } | null;
+  representativePet?: GameParticipantPetData | null;
 };
 
 const KORDLE_GUESS_SUBMITTED_EVENT = "guess-submitted";
@@ -589,15 +554,5 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: colors.surface,
   },
-  rosterAvatar: {
-    width: ROSTER_PET_SIZE,
-    height: ROSTER_PET_SIZE,
-    borderRadius: 999,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-    backgroundColor: colors.surfaceAlt,
-  },
-  rosterAvatarFallback: { ...typography.label, color: colors.textMuted },
   rosterName: { ...typography.body, color: colors.text, maxWidth: 120 },
 });

@@ -1,3 +1,5 @@
+import type { GameParticipantPetData } from "@/features/games/components/GameParticipantPet";
+
 export type SpeedGameStatus = "waiting" | "active" | "finished";
 
 export type SpeedGameRound = {
@@ -56,6 +58,7 @@ export type SpeedGameWire = {
     studentId: string;
     groupId: string;
     name: string;
+    representativePet?: GameParticipantPetData | null;
     invitedAt: string;
     joinedAt: string | null;
     readyAt: string | null;

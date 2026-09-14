@@ -5,8 +5,7 @@
 .row:last-child { border-bottom: 0; }
 .rank { flex-shrink: 0; min-width: 20px; color: var(--color-text-muted); font-weight: 700; font-variant-numeric: tabular-nums; }
 .row[data-leading="true"] .rank { color: var(--color-accent-tinted-text); }
-.pet { display: flex; width: 64px; height: 64px; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; color: var(--color-text-faint); }
-.pet > div { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
+.pet { color: var(--color-text-faint); }
 .name { min-width: 0; flex: 1; overflow-wrap: anywhere; line-height: 1.4; font-size: 14px; font-weight: 600; }
 .score { white-space: nowrap; font-size: 14px; font-variant-numeric: tabular-nums; }
 .podium { display: flex; justify-content: center; align-items: flex-end; gap: 12px; list-style: none; margin: 48px auto 32px; padding: 0; max-width: 640px; }
@@ -14,8 +13,7 @@
 .podiumPlace[data-place="1"] { order: 2; animation-delay: 700ms; }
 .podiumPlace[data-place="2"] { order: 1; animation-delay: 350ms; }
 .podiumPlace[data-place="3"] { order: 3; }
-.podiumPlace .pet { width: 96px; height: 96px; max-width: 100%; }
-.podiumPlace .pet > div { transform: scale(1.5); }
+.podiumPlace .pet { --game-pet-size: 96px; }
 .podiumName { max-width: 100%; font-size: 16px; text-align: center; overflow-wrap: anywhere; }
 .podiumScore { font-size: 13px; color: var(--color-text-muted); font-variant-numeric: tabular-nums; }
 .pedestal { box-sizing: border-box; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; gap: 12px; width: 100%; min-height: 90px; margin-top: 8px; padding: 20px 8px; border-radius: var(--radius-card) var(--radius-card) 0 0; background: var(--color-surface-alt); color: var(--color-text); }
@@ -44,8 +42,7 @@
   .board[data-round-results="true"] .row { gap: 4px; }
   .board[data-round-results="true"] .rank { width: 20px; font-size: 16px; }
   .board[data-round-results="true"] .name { font-size: 14px; }
-  .board[data-round-results="true"] .pet { width: 48px; }
-  .board[data-round-results="true"] .pet > div { transform: scale(0.75); }
+  .board[data-round-results="true"] .row .pet { --game-pet-size: 56px; }
   .roundGain { min-width: 40px; font-size: 12px; }
   .movement { width: 28px; }
 }

@@ -1,12 +1,9 @@
 "use client";
 
 import { memo, useMemo } from "react";
-import { ArrowDown, ArrowUp, Trophy, UserRound } from "lucide-react";
+import { ArrowDown, ArrowUp, Trophy } from "lucide-react";
 import type { SongGuessSnapshot } from "@/lib/song-guess/contracts";
-import { getSlimeDefinition, getSlimeShopItem } from "@/lib/pets/catalog";
-import { visibleEquippedSlimeItemKeys } from "@/lib/pets/item-visibility";
-import type { SlimeShopItem } from "@/lib/pets/types";
-import { SlimeCharacterSprite } from "./creatures/SlimeCharacterSprite";
+import { GameParticipantPet } from "@/features/games/components/GameParticipantPet";
 import styles from "./SongGuessScoreboard.module.css";
 import teacherStyles from "./SongGuessTeacher.module.css";
 
@@ -24,23 +21,8 @@ export function rankSongGuessParticipants(participants: Participant[]) {
 }
 
 export const SongGuessParticipantPet = memo(function SongGuessParticipantPet({ participant }: { participant: Participant }) {
-  const pet = participant.representativePet;
-  const slime = pet ? getSlimeDefinition(pet.color) : null;
-  const items = pet
-    ? visibleEquippedSlimeItemKeys(pet.equippedItemKeys, pet.hiddenItemKeys)
-        .map((key) => getSlimeShopItem(key))
-        .filter((item): item is SlimeShopItem => Boolean(item))
-    : [];
   return (
-    <div className={styles.pet} role="img" aria-label={`${participant.displayName} ${slime ? "대표펫" : "대표펫 미지정"}`}>
-      <div aria-hidden="true">
-        {slime ? (
-          <SlimeCharacterSprite slime={slime} items={items} growthStage={pet?.growthStage} scale={1} hostBackground={false} />
-        ) : (
-          <UserRound size={28} />
-        )}
-      </div>
-    </div>
+    <GameParticipantPet className={styles.pet} name={participant.displayName} pet={participant.representativePet} size={64} />
   );
 });
 

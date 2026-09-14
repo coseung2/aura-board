@@ -23,6 +23,8 @@ export async function GET(_request: Request, { params }: Params) {
     const session = await db.playSession.findUnique({
       where: { id: sessionId },
       select: {
+        gameKind: true,
+        board: { select: { classroomId: true } },
         startedAtMs: true,
         participants: {
           orderBy: { slot: "asc" },
@@ -31,6 +33,8 @@ export async function GET(_request: Request, { params }: Params) {
       },
     });
     if (!session) return jsonPrivateNoStore({ error: "not_found" }, { status: 404 });
+    if (session.gameKind !== "omok") return jsonPrivateNoStore({ error: "not_found" }, { status: 404 });
+    const classroomId = session.board.classroomId;
     const studentIdFor = (participant: { actorSubject: string; studentId: string | null }) => {
       if (participant.studentId) return participant.studentId;
       return participant.actorSubject.startsWith("student:")
@@ -45,12 +49,17 @@ export async function GET(_request: Request, { params }: Params) {
     ];
     const [students, slimes, results] = await Promise.all([
       db.student.findMany({
-        where: { id: { in: studentIds } },
+        where: { id: { in: classroomId ? studentIds : [] }, classroomId: classroomId ?? "" },
         select: { id: true, name: true, number: true },
       }),
       db.studentSlime.findMany({
-        where: { studentId: { in: studentIds }, isRepresentative: true },
-        select: { studentId: true, color: true, growthStage: true, equippedItemKeys: true },
+        where: {
+          studentId: { in: classroomId ? studentIds : [] },
+          classroomId: classroomId ?? "",
+          student: { classroomId: classroomId ?? "" },
+          isRepresentative: true,
+        },
+        select: { studentId: true, color: true, growthStage: true, equippedItemKeys: true, hiddenItemKeys: true },
       }),
       db.gameResult.findMany({
         where: { studentId: { in: studentIds }, gameKind: "omok" },
@@ -65,7 +74,7 @@ export async function GET(_request: Request, { params }: Params) {
       players: session.participants.map((participant) => {
         const studentId = studentIdFor(participant);
         const student = studentId ? studentById.get(studentId) : null;
-        const slime = studentId ? slimeById.get(studentId) : null;
+        const slime = student && studentId ? slimeById.get(studentId) : null;
         const records = studentId
           ? results.filter((result) => result.studentId === studentId)
           : [];
@@ -79,6 +88,8 @@ export async function GET(_request: Request, { params }: Params) {
                 color: slime.color,
                 growthStage: slime.growthStage,
                 equippedFloor: getEquippedSlimeFloor(slime.equippedItemKeys),
+                equippedItemKeys: slime.equippedItemKeys,
+                hiddenItemKeys: slime.hiddenItemKeys,
               }
             : null,
           record: {

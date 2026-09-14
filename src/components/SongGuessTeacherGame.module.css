@@ -415,7 +415,7 @@
 
 .scoreboardColumns {
   display: grid;
-  grid-template-columns: 32px 40px minmax(0, 1fr) auto;
+  grid-template-columns: 32px 56px minmax(0, 1fr) auto;
   gap: 10px;
   padding: 0 14px 10px;
   color: var(--song-teacher-muted);
@@ -443,7 +443,7 @@
 .teacherScoreRow {
   min-height: 56px;
   display: grid;
-  grid-template-columns: 32px 40px minmax(0, 1fr) auto;
+  grid-template-columns: 32px 56px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 0 14px;
@@ -470,23 +470,14 @@
 }
 
 .teacherPet {
-  width: 36px;
-  height: 36px;
-  overflow: hidden;
+  --game-pet-size: 56px;
+  width: 56px;
+  height: 56px;
   display: grid;
   place-items: center;
   border-radius: 13px;
   background: var(--song-teacher-accent);
   color: var(--song-teacher-bg);
-}
-
-.teacherPet > div {
-  width: 64px;
-  height: 64px;
-  display: grid;
-  place-items: center;
-  transform: scale(0.56);
-  transform-origin: center;
 }
 
 .teacherName {

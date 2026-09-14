@@ -8,7 +8,7 @@ import { slimeUi } from "../../theme/tokens";
 import { styles } from "./slime-sprite.styles";
 import type { SlimeSpriteViewModel } from "./use-slime-sprite-model";
 
-export function SlimeSpriteLayers({ model }: { model: SlimeSpriteViewModel }) {
+export function SlimeSpriteLayers({ model, containScene = false }: { model: SlimeSpriteViewModel; containScene?: boolean }) {
   const {
     styles,
     viewport,
@@ -274,6 +274,7 @@ export function SlimeSpriteLayers({ model }: { model: SlimeSpriteViewModel }) {
       style={[
         styles.viewport,
         hostBackground ? { width: "100%", height: "100%", alignSelf: "stretch" } : viewport,
+        containScene && { overflow: "visible" },
       ]}
       accessible
       accessibilityRole="image"
@@ -398,14 +399,14 @@ export function SlimeSpriteLayers({ model }: { model: SlimeSpriteViewModel }) {
               width: baseViewport.width,
               height: baseViewport.height,
               left: sceneInsetX,
-              top: sceneInsetY,
+              top: sceneInsetY + (containScene ? riderOffsetY : 0),
             },
           ]}
           pointerEvents="none"
         >
           <Image
             source={imageSource(resolution.sheet)}
-            style={[styles.layer, packedSheetSize, baseOffset]}
+            style={[styles.layer, packedSheetSize, baseOffset, containScene && { top: baseOffset.top - riderOffsetY }]}
             contentFit="fill"
             allowDownscaling={false}
             recyclingKey={playbackKey}

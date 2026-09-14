@@ -31,6 +31,7 @@ import {
 } from "@/lib/pets/slime-sprite-geometry";
 
 import styles from "./OfficialSlimeSprite.module.css";
+import { participantSceneBounds } from "@/lib/pets/participant-scene-bounds";
 import {
   useGroundedVehiclePlayback,
   useSlimeSpritePlayback,
@@ -47,6 +48,8 @@ const SCENE_BACKGROUND_FEATHER_MASK =
   "/creatures/slimes/official/shared/scene-background-feather-mask.png";
 
 export type OfficialSlimeSpriteProps = {
+  /** Fit complete vehicle/gear frames for compact identity holders. */
+  containEquipment?: boolean;
   slimeColor: SlimeColor;
   /**
    * Persisted evolution. Prefer `growthStage`; this remains for callers that
@@ -160,6 +163,7 @@ export type OfficialSlimeSpriteProps = {
  * one-shot actions can return to the parent's idle state exactly at the end.
  */
 export function OfficialSlimeSprite({
+  containEquipment = false,
   slimeColor,
   evolution = "base",
   growthStage,
@@ -338,7 +342,7 @@ export function OfficialSlimeSprite({
     resolution.metadata.meta.size.w,
     resolution.metadata.meta.size.h,
     scale,
-    riderOffsetY,
+    containEquipment ? 0 : riderOffsetY,
   );
   const ballPackedSheetSize = ballAsset
     ? {
@@ -349,9 +353,10 @@ export function OfficialSlimeSprite({
   const ballOffset = ballAsset
     ? slimePropFrameOffset(frameIndex, ballAsset, scale)
     : null;
+  const bounds = containEquipment ? participantSceneBounds(geometry, viewportHeight, Boolean(resolvedVehicleSpritePath), vehicleBobY ?? [], resolvedWearables) : null;
   const viewportStyle: CSSProperties = {
-    width: sceneWidth,
-    height: viewportHeight,
+    width: bounds?.width ?? sceneWidth,
+    height: bounds?.height ?? viewportHeight,
   };
   /**
    * Vehicle sheets share the character's frame clock, so a rider and its ride
@@ -495,6 +500,7 @@ export function OfficialSlimeSprite({
       data-vehicle-left={vehicleLeft}
       data-rider-offset-y={riderOffsetY}
     >
+      <div style={{ display: bounds ? "block" : "contents", position: bounds ? "absolute" : undefined, left: bounds ? -bounds.x : undefined, top: bounds ? -bounds.y : undefined, width: bounds ? sceneWidth : undefined, height: bounds ? viewportHeight : undefined }}>
       {resolvedBackgroundSpritePath ? (
         <div
           className={featherBackground ? styles.backgroundFeather : styles.backgroundFull}
@@ -638,7 +644,7 @@ export function OfficialSlimeSprite({
             width: baseWidth,
             height: baseHeight,
             left: sceneInsetX,
-            top: sceneInsetY,
+            top: sceneInsetY + (containEquipment ? riderOffsetY : 0),
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -750,6 +756,7 @@ export function OfficialSlimeSprite({
         </div>
       ) : null}
       {!itemSpritePath ? renderWearableLayers(propWearables, true) : null}
+      </div>
     </div>
   );
 }

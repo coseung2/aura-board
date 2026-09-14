@@ -30,6 +30,7 @@ type Props = {
    */
   hostBackground?: boolean;
   className?: string;
+  containEquipment?: boolean;
 };
 
 export function SlimeCharacterSprite({
@@ -43,6 +44,7 @@ export function SlimeCharacterSprite({
   scale,
   hostBackground,
   className = "",
+  containEquipment = false,
 }: Props) {
   const {
     wearables,
@@ -84,6 +86,7 @@ export function SlimeCharacterSprite({
         </div>
       ) : null}
       <OfficialSlimeSprite
+        containEquipment={containEquipment}
         slimeColor={slime.color as SlimeColor}
         growthStage={growthStage}
         action={resolvedAction}

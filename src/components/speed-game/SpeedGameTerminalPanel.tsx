@@ -45,6 +45,7 @@ export function SpeedGameTerminalPanel({
           participants={game.participants.map((participant) => ({
             id: participant.studentId,
             name: participant.name,
+            representativePet: participant.representativePet ?? null,
             state: participantState(participant),
           }))}
           actions={

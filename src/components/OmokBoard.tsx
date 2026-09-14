@@ -3,8 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
-import { OfficialSlimeSprite } from "@/components/creatures/OfficialSlimeSprite";
-import type { SlimeColor } from "@/lib/pets/slime-assets";
+import { GameParticipantPet } from "@/features/games/components/GameParticipantPet";
 import {
   boardChannelKey,
   OMOK_MATCHMAKING_CHANGED_EVENT,
@@ -64,6 +63,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
   const [hasPending, setHasPending] = useState(false);
   const [matchmaking, setMatchmaking] = useState<OmokMatchmakingStatus>({ status: "idle", playerCount: 0 });
   const [profiles, setProfiles] = useState<OmokPlayerProfile[]>([]);
+  const [profileSessionId, setProfileSessionId] = useState<string | null>(null);
   const [startedAtMs, setStartedAtMs] = useState<number | null>(null);
   const [clockNow, setClockNow] = useState(Date.now());
   const requestSequence = useRef(0);
@@ -173,12 +173,17 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
 
   useEffect(() => {
     if (!snapshot) return;
-    void fetchOmokPlayerProfiles(snapshot.sessionId)
+    let cancelled = false;
+    const sessionId = snapshot.sessionId;
+    void fetchOmokPlayerProfiles(sessionId)
       .then((next) => {
+        if (cancelled) return;
         setProfiles(next.players);
+        setProfileSessionId(sessionId);
         setStartedAtMs(next.startedAtMs);
       })
       .catch(() => undefined);
+    return () => { cancelled = true; };
   }, [snapshot?.sessionId]);
 
   useEffect(() => {
@@ -519,7 +524,9 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
 
           <aside className={styles.sidebar}>
             {snapshot.participants.map((participant, index) => {
-              const profile = profileFor(profiles, participant.slot);
+              const profile = profileSessionId === snapshot.sessionId
+                ? profileFor(profiles, participant.slot)
+                : null;
               return (
                 <Fragment key={participant.slot}>
                   <div className={styles.card}>
@@ -529,16 +536,16 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
                 <div className={styles.playerRow} key={participant.slot}>
                   <div className={styles.playerIdentity}>
                     <div className={styles.petThumb}>
-                      {profile?.pet ? (
-                        <OfficialSlimeSprite
-                          slimeColor={profile.pet.color as SlimeColor}
-                          growthStage={profile.pet.growthStage}
-                          scale={1}
-                          alt={`${profile.name} 대표 펫`}
-                        />
-                      ) : (
-                        <span aria-hidden>?</span>
-                      )}
+                      <GameParticipantPet
+                        name={profile?.name ?? participant.displayName}
+                        pet={profile?.pet ? {
+                          color: profile.pet.color,
+                          growthStage: profile.pet.growthStage === 2 || profile.pet.growthStage === 3 ? profile.pet.growthStage : 1,
+                          equippedItemKeys: profile.pet.equippedItemKeys ?? [],
+                          hiddenItemKeys: profile.pet.hiddenItemKeys ?? [],
+                        } : null}
+                        size={56}
+                      />
                     </div>
                     <span
                       className={`${styles.dot} ${participant.slot === "first" ? styles.first : styles.second}`}

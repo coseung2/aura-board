@@ -633,6 +633,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       {snapshot.phase === "lobby" ? (
         <SongGuessLobbyStatus
           snapshot={snapshot}
+          studentId={data.currentStudent?.id}
           joined={snapshot.viewer.joined !== false}
           pending={hasPending || busy || syncing}
           failed={entryFailed}
@@ -819,7 +820,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         </View>
       ) : null}
 
-      <SongGuessScoreboard snapshot={snapshot} />
+      <SongGuessScoreboard snapshot={snapshot} studentId={data.currentStudent?.id} />
 
       <View style={styles.sessionFooter}>
         <Text style={styles.sessionMeta}>
