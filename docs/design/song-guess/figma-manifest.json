@@ -1,6 +1,6 @@
 {
   "fileKey": "I74zYjs7O4bOtFAwahqfza",
-  "updated": "2026-09-08",
+  "updated": "2026-09-15",
   "collections": [
     "VariableCollectionId:39:2",
     "VariableCollectionId:39:3"
@@ -64,7 +64,11 @@
     "teacherComponents": "39:88",
     "studentComponents": "39:89",
     "teacher": "39:90",
-    "student": "39:91"
+    "student": "39:91",
+    "kordle": "146:2",
+    "kordleComponents": "146:3",
+    "archiveExploration": "0:1",
+    "archiveRandomPicker": "59:25"
   },
   "components": {
     "buttons": [
@@ -339,7 +343,7 @@
       "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-10"
     }
   ],
-  "status": "Design complete; web/mobile implementation applied; visual acceptance pending",
+  "status": "v1 design applied to web/mobile; v2 teacher flow partially applied; Kordle pages WIP",
   "tokenValues": {
     "teacher/bg": {
       "type": "COLOR",
@@ -725,5 +729,10 @@
         "WEB": "var(--song-radius-24)"
       }
     }
+  },
+  "flowV2Frames": {
+    "note": "v2 플로우 화면. 상위 페이지 ID는 MCP 페이지 목록에 노출되지 않아 미기록.",
+    "teacherAutoSetup": "100:2",
+    "teacherLobby": "101:2"
   }
 }
