@@ -76,7 +76,7 @@ export type SlimeShopItem = {
   /** Vehicle parts that stay planted while the body moves, such as wheels. */
   vehicleGroundedSpritePath?: string;
   /** Transparent effect sheets synchronized to the vehicle's main frame clock. */
-  vehicleEffectSpritePaths?: string[];
+  vehicleEffectSpritePaths?: readonly string[];
   /** Frames in the vehicle sheet. Omitted means a single static image. */
   vehicleFrameCount?: number;
   /** Frames in the grounded-part sheet, such as a wheel rotation. */
@@ -88,7 +88,7 @@ export type SlimeShopItem = {
   /** Where the character sits inside a taller vehicle canvas. */
   vehicleCharacterOffsetY?: number;
   /** Per-frame vertical bob authored into the vehicle. The rider follows it. */
-  vehicleBobY?: number[];
+  vehicleBobY?: readonly number[];
   /** Animated vehicle sheet; `spritePath` stays the still shop image. */
   vehicleSheetPath?: string;
   effectKey?: string;

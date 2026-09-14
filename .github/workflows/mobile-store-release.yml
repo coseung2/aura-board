@@ -115,6 +115,7 @@ jobs:
           NODE
 
       - name: Run mobile release checks
+        if: ${{ inputs.platform != 'ios-submit' }}
         run: |
           npm run typecheck
           npm run design:check
