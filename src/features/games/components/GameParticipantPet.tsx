@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, type CSSProperties } from "react";
 import { UserRound } from "lucide-react";
 import { getSlimeDefinition, getSlimeShopItem } from "@/lib/pets/catalog";
 import { characterOnlySlimeItemKeys } from "@/lib/pets/character-only-items";
@@ -25,9 +25,12 @@ export type GameParticipantPetData = {
 export const GameParticipantPet = memo(function GameParticipantPet({
   name,
   pet,
+  size = 44,
 }: {
   name: string;
   pet: GameParticipantPetData | null | undefined;
+  /** The visible holder size. The sprite keeps a logical 64px viewport. */
+  size?: 40 | 44 | 48 | 56 | 64 | 96;
 }) {
   const slime = pet?.color ? getSlimeDefinition(pet.color) : undefined;
   const items = pet
@@ -41,6 +44,7 @@ export const GameParticipantPet = memo(function GameParticipantPet({
   return (
     <span
       className="game-participant-pet"
+      style={{ "--game-participant-pet-size": `${size}px` } as CSSProperties}
       role="img"
       aria-label={`${name} ${slime ? "대표펫" : "대표펫 미지정"}`}
     >

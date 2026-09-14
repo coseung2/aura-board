@@ -343,8 +343,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: var(--game-participant-pet-size, 44px);
+  height: var(--game-participant-pet-size, 44px);
   flex: 0 0 auto;
   border-radius: 999px;
   background: #e2e8f0;
@@ -358,6 +358,11 @@
   justify-content: center;
   width: 100%;
   height: 100%;
+  /* SlimeCharacterSprite is authored on a 64px logical viewport. Scale that
+     viewport to the holder instead of allowing its overflow mask to crop it. */
+  transform: scale(calc(var(--game-participant-pet-size, 44px) / 64));
+  transform-origin: center;
+  flex: 0 0 64px;
 }
 
 @keyframes kordle-ready-dot {
