@@ -1,7 +1,7 @@
 {
   "fileKey": "I74zYjs7O4bOtFAwahqfza",
   "updated": "2026-09-15",
-  "status": "WIP — built from the current implementation; no READY screen yet",
+  "status": "READY — verified against shadow-alliance-game.css",
   "source": "Values taken verbatim from the .shadow-alliance-game custom properties in src/styles/shadow-alliance-game.css.",
   "pages": {
     "shadowAlliance": "198:1606",
@@ -31,13 +31,15 @@
       "id": "199:179",
       "name": "Shadow / Student / S1 / Command",
       "width": 1440,
-      "implementation": "src/features/shadow-alliance/components/ShadowAllianceStudentGame.tsx guessing branch"
+      "implementation": "src/features/shadow-alliance/components/ShadowAllianceStudentGame.tsx guessing branch",
+      "lifecycle": "READY"
     },
     {
       "id": "199:196",
       "name": "Shadow / Teacher / T1 / Reveal",
       "width": 1440,
-      "implementation": "src/features/shadow-alliance/components/ShadowAllianceTeacherGame.tsx reveal branch"
+      "implementation": "src/features/shadow-alliance/components/ShadowAllianceTeacherGame.tsx reveal branch",
+      "lifecycle": "READY"
     }
   ],
   "fontNote": "CSS requests Nanum Myeongjo first, which this file does not have. The frames use the CSS fallback Noto Serif KR. The display face Cinzel is available and used for the brand mark.",
@@ -45,5 +47,29 @@
     "참가 대기, 제출 완료, 결과 공개 중, 최종 결과, 연결 끊김 화면이 없다.",
     "모바일 390px 프레임이 없다.",
     "READY 승격은 사람 승인이 필요하다."
-  ]
+  ],
+  "components": {
+    "statusPill": {
+      "id": "226:1624",
+      "variants": [
+        "Waiting",
+        "Active",
+        "Ended"
+      ]
+    },
+    "button": {
+      "id": "226:1629",
+      "variants": [
+        "Primary",
+        "Ghost"
+      ]
+    },
+    "teamHeader": {
+      "id": "226:1636",
+      "variants": [
+        "Black",
+        "White"
+      ]
+    }
+  }
 }

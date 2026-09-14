@@ -1,7 +1,7 @@
 {
   "fileKey": "I74zYjs7O4bOtFAwahqfza",
   "updated": "2026-09-15",
-  "status": "WIP — built from the current implementation; no READY screen yet",
+  "status": "READY (current-implementation baseline). Redesign directions A/B/C remain unapproved in the EXPLORE section.",
   "source": "Values taken verbatim from src/components/OmokBoard.module.css. Screens follow src/components/OmokBoard.tsx state branches.",
   "pages": {
     "omok": "183:2",
@@ -12,7 +12,8 @@
     "wip": "186:8",
     "review": "186:9",
     "ready": "186:10",
-    "deprecated": "186:11"
+    "deprecated": "186:11",
+    "explore": "197:209"
   },
   "collections": {
     "primitives": {
@@ -58,34 +59,84 @@
       "name": "Omok / Web / G1 / Playing",
       "width": 1440,
       "height": 900,
-      "implementation": "src/components/OmokBoard.tsx in-game branch"
+      "implementation": "src/components/OmokBoard.tsx in-game branch",
+      "lifecycle": "READY"
     },
     {
       "id": "191:1483",
       "name": "Omok / Web / M1 / Matching",
       "width": 1440,
       "height": 900,
-      "implementation": "src/components/OmokBoard.tsx matchmaking branch"
+      "implementation": "src/components/OmokBoard.tsx matchmaking branch",
+      "lifecycle": "READY"
     },
     {
       "id": "191:1496",
       "name": "Omok / Web / R1 / Result Win",
       "width": 1440,
       "height": 900,
-      "implementation": "src/components/OmokBoard.tsx outcome branch"
+      "implementation": "src/components/OmokBoard.tsx outcome branch",
+      "lifecycle": "READY"
     },
     {
       "id": "191:1509",
       "name": "Omok / Mobile / G1 / Playing",
       "width": 390,
       "height": 844,
-      "implementation": "apps/mobile/components/layouts/OmokBoard.tsx"
+      "implementation": "apps/mobile/components/layouts/OmokBoard.tsx",
+      "lifecycle": "READY"
     }
   ],
   "gaps": [
     "무승부, 기권 확정, 관전자, 연결 끊김 화면은 아직 없다.",
     "matchSignal 펄스와 승리 강조 애니메이션은 CSS에만 있고 프레임은 정지 상태다.",
     "태블릿 브레이크포인트 프레임이 없다.",
-    "READY 승격은 사람 승인이 필요하다."
+    "READY 승격은 사람 승인이 필요하다.",
+    "EXPLORE 3안은 대국 진행 상태만 담고 있어 매칭·준비·종료·복구 상태가 없다."
+  ],
+  "explore": {
+    "section": "197:209",
+    "added": "2026-09-15",
+    "status": "EXPLORE — 승인 전 대안, 구현 기준이 아니다",
+    "record": "docs/design/omok-explore-2026-09-15.md",
+    "notes": "218:381",
+    "concepts": [
+      {
+        "key": "A",
+        "name": "교실 대국",
+        "web": "198:104",
+        "mobile": "201:1571"
+      },
+      {
+        "key": "B",
+        "name": "슬레이트 미니멀",
+        "web": "205:196",
+        "mobile": "206:242"
+      },
+      {
+        "key": "C",
+        "name": "나이트 펫대국",
+        "web": "208:288",
+        "mobile": "215:334"
+      }
+    ]
+  },
+  "readyNote": "This READY set documents what ships today, verified against OmokBoard.module.css. It is not a decision on the A/B/C redesign, which needs a human direction choice. When a direction is approved, promote it and move this baseline to DEPRECATED.",
+  "exploreDirections": [
+    {
+      "id": "198:104",
+      "name": "A · 교실 대국 (web)",
+      "mobile": "201:1571"
+    },
+    {
+      "id": "205:196",
+      "name": "B · 슬레이트 미니멀 (web)",
+      "mobile": "206:242"
+    },
+    {
+      "id": "208:288",
+      "name": "C · 나이트 펫대국 (web)",
+      "mobile": "215:334"
+    }
   ]
 }

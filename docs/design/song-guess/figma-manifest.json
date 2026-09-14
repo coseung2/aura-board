@@ -63,8 +63,8 @@
     "tokens": "39:87",
     "teacherComponents": "39:88",
     "studentComponents": "39:89",
-    "teacher": "39:90",
-    "student": "39:91",
+    "teacher": "39:90 (archived · superseded by 91)",
+    "student": "39:91 (archived · superseded by 91)",
     "kordle": "146:2",
     "kordleComponents": "146:3",
     "archiveExploration": "0:1",
@@ -345,7 +345,7 @@
       "url": "https://www.figma.com/design/I74zYjs7O4bOtFAwahqfza?node-id=48-10"
     }
   ],
-  "status": "v1 design applied to web/mobile; v2 teacher flow partially applied; Kordle pages WIP",
+  "status": "READY — v2 flow page (99:3) is canonical. v1 teacher/student pages archived as superseded.",
   "tokenValues": {
     "teacher/bg": {
       "type": "COLOR",
@@ -736,5 +736,85 @@
     "note": "v2 플로우 화면. 상위 페이지는 pages.flowV2(99:3).",
     "teacherAutoSetup": "100:2",
     "teacherLobby": "101:2"
-  }
+  },
+  "canonical": {
+    "page": "99:3",
+    "readySection": "225:167",
+    "designNotes": "225:169",
+    "componentsPage": "112:2"
+  },
+  "v2ReadyScreens": [
+    {
+      "id": "100:2",
+      "name": "T0 · 교사 · 자동 출제"
+    },
+    {
+      "id": "100:74",
+      "name": "T1 · 교사 · 직접 음원 구성"
+    },
+    {
+      "id": "100:151",
+      "name": "T2 · 교사 · 게임 생성됨"
+    },
+    {
+      "id": "101:2",
+      "name": "T3 · 교사 · 로비"
+    },
+    {
+      "id": "101:58",
+      "name": "T4 · 교사 · 문제 진행"
+    },
+    {
+      "id": "101:140",
+      "name": "T5 · 교사 · 정답 공개"
+    },
+    {
+      "id": "101:192",
+      "name": "T6 · 교사 · 최종 결과"
+    },
+    {
+      "id": "102:3",
+      "name": "S0 · 학생 · 로비"
+    },
+    {
+      "id": "102:45",
+      "name": "S1 · 학생 · 객관식 문제"
+    },
+    {
+      "id": "102:82",
+      "name": "S2 · 학생 · 답변 제출"
+    },
+    {
+      "id": "102:120",
+      "name": "S3 · 학생 · 정답 공개"
+    },
+    {
+      "id": "102:160",
+      "name": "S4 · 학생 · 최종 결과"
+    },
+    {
+      "id": "102:193",
+      "name": "S5 · 학생 · 직접 입력 문제"
+    },
+    {
+      "id": "102:223",
+      "name": "공통 상태 · 로딩/오류/늦은 입장"
+    },
+    {
+      "id": "128:165",
+      "name": "모바일 · 보드 진입 및 방 생성"
+    },
+    {
+      "id": "132:165",
+      "name": "웹 · 보드 진입 및 방 관리"
+    },
+    {
+      "id": "133:165",
+      "name": "모바일 · 공통 상태"
+    },
+    {
+      "id": "134:165",
+      "name": "웹 · 공통 상태"
+    }
+  ]
 }

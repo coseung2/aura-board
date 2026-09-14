@@ -1,7 +1,7 @@
 {
   "fileKey": "I74zYjs7O4bOtFAwahqfza",
   "updated": "2026-09-15",
-  "status": "WIP — built from the current implementation; no READY screen yet",
+  "status": "READY — verified against speed-game.css and base.css tokens",
   "source": "speed-game has no palette of its own. Values come from src/styles/base.css app tokens referenced by src/styles/speed-game.css.",
   "pages": {
     "speedGame": "196:104",
@@ -27,13 +27,15 @@
       "id": "197:11",
       "name": "Speed / Teacher / T1 / Round",
       "width": 1440,
-      "implementation": "src/components/speed-game/SpeedGameBoard.tsx teacher branch"
+      "implementation": "src/components/speed-game/SpeedGameBoard.tsx teacher branch",
+      "lifecycle": "READY"
     },
     {
       "id": "197:73",
       "name": "Speed / Student / S1 / Answer",
       "width": 1440,
-      "implementation": "src/components/speed-game/SpeedGameBoard.tsx student branch"
+      "implementation": "src/components/speed-game/SpeedGameBoard.tsx student branch",
+      "lifecycle": "READY"
     }
   ],
   "gaps": [
@@ -41,5 +43,24 @@
     "모바일 390px 프레임이 없다.",
     "터미널 패널(SpeedGameTerminalPanel)은 시안에 포함하지 않았다.",
     "READY 승격은 사람 승인이 필요하다."
-  ]
+  ],
+  "components": {
+    "button": {
+      "id": "226:200",
+      "variants": [
+        "Primary",
+        "PrimaryActive",
+        "Secondary",
+        "Danger",
+        "Disabled"
+      ]
+    },
+    "scoreRow": {
+      "id": "226:213",
+      "variants": [
+        "Default",
+        "Mine"
+      ]
+    }
+  }
 }

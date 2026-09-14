@@ -25,15 +25,15 @@
     },
     {
       "id": "39:90",
-      "name": "10 · 교사 화면"
+      "name": "99 · Archive · 교사 화면 v1 (superseded by 91)"
     },
     {
       "id": "39:91",
-      "name": "20 · 학생 화면"
+      "name": "99 · Archive · 학생 화면 v1 (superseded by 91)"
     },
     {
       "id": "59:25",
-      "name": "99 · Archive · 랜덤뽑기 탐색"
+      "name": "99 · Archive · 랜덤뽑기 + 노래 맞히기 교사 탐색"
     },
     {
       "id": "59:26",
@@ -120,8 +120,21 @@
   "playBoardCoverage": {
     "song-guess": "10/20 pages plus v2 flow (99:3, 112:2)",
     "kordle": "146:2, 146:3",
-    "omok": "183:2, 183:3",
+    "omok": "183:2, 183:3 (EXPLORE 시안 3안: section 197:209)",
     "speed-game": "196:104, 196:105",
     "shadow-alliance": "198:1606, 198:1607"
+  },
+  "lifecycle": {
+    "note": "All five play boards have a READY section as of 2026-09-15.",
+    "ready": {
+      "song-guess": "99:3 → 225:167 (canonical v2; v1 pages archived)",
+      "kordle": "146:2 → 149:10 (11 screens)",
+      "omok": "183:2 → 186:10 (4 screens, current-implementation baseline)",
+      "speed-game": "196:104 → 197:9 (2 screens)",
+      "shadow-alliance": "198:1606 → 199:177 (2 screens)"
+    },
+    "pendingDecision": {
+      "omokRedesign": "197:209 holds unapproved directions A/B/C. A human direction choice is still needed."
+    }
   }
 }
