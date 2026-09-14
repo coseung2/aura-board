@@ -68,7 +68,9 @@
     "kordle": "146:2",
     "kordleComponents": "146:3",
     "archiveExploration": "0:1",
-    "archiveRandomPicker": "59:25"
+    "archiveRandomPicker": "59:25",
+    "flowV2": "99:3",
+    "flowV2Components": "112:2"
   },
   "components": {
     "buttons": [
@@ -731,7 +733,7 @@
     }
   },
   "flowV2Frames": {
-    "note": "v2 플로우 화면. 상위 페이지 ID는 MCP 페이지 목록에 노출되지 않아 미기록.",
+    "note": "v2 플로우 화면. 상위 페이지는 pages.flowV2(99:3).",
     "teacherAutoSetup": "100:2",
     "teacherLobby": "101:2"
   }

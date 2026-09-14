@@ -1,0 +1,127 @@
+{
+  "fileKey": "I74zYjs7O4bOtFAwahqfza",
+  "updated": "2026-09-15",
+  "note": "get_metadata without a nodeId returns only one page. Use these ids to open pages directly.",
+  "pages": [
+    {
+      "id": "0:1",
+      "name": "90 · 탐색 시안 보관"
+    },
+    {
+      "id": "39:86",
+      "name": "00 · 사용 안내"
+    },
+    {
+      "id": "39:87",
+      "name": "01 · 디자인 토큰"
+    },
+    {
+      "id": "39:88",
+      "name": "02 · 교사 컨트롤"
+    },
+    {
+      "id": "39:89",
+      "name": "03 · 학생 게임 컴포넌트"
+    },
+    {
+      "id": "39:90",
+      "name": "10 · 교사 화면"
+    },
+    {
+      "id": "39:91",
+      "name": "20 · 학생 화면"
+    },
+    {
+      "id": "59:25",
+      "name": "99 · Archive · 랜덤뽑기 탐색"
+    },
+    {
+      "id": "59:26",
+      "name": "31 · 게임 리디자인 · 컴포넌트"
+    },
+    {
+      "id": "99:3",
+      "name": "91 · 노래 맞히기 전체 플로우 v2"
+    },
+    {
+      "id": "112:2",
+      "name": "92 · 플로우 v2 컴포넌트"
+    },
+    {
+      "id": "146:2",
+      "name": "14 · Game · 꼬들"
+    },
+    {
+      "id": "146:3",
+      "name": "15 · Game · 꼬들 · 컴포넌트"
+    },
+    {
+      "id": "183:2",
+      "name": "11 · Game · 오목"
+    },
+    {
+      "id": "183:3",
+      "name": "12 · Game · 오목 · 컴포넌트"
+    },
+    {
+      "id": "196:104",
+      "name": "13 · Game · 스피드게임"
+    },
+    {
+      "id": "196:105",
+      "name": "13.1 · Game · 스피드게임 · 컴포넌트"
+    },
+    {
+      "id": "198:1606",
+      "name": "16 · Game · 그림자연합"
+    },
+    {
+      "id": "198:1607",
+      "name": "16.1 · Game · 그림자연합 · 컴포넌트"
+    }
+  ],
+  "variableCollections": [
+    {
+      "id": "VariableCollectionId:146:4",
+      "name": "Kordle · Primitives",
+      "count": 29
+    },
+    {
+      "id": "VariableCollectionId:146:5",
+      "name": "Kordle · Semantic",
+      "count": 25
+    },
+    {
+      "id": "VariableCollectionId:183:4",
+      "name": "Omok · Primitives",
+      "count": 23
+    },
+    {
+      "id": "VariableCollectionId:183:5",
+      "name": "Omok · Semantic",
+      "count": 11
+    },
+    {
+      "id": "VariableCollectionId:196:106",
+      "name": "App · Foundations",
+      "count": 20
+    },
+    {
+      "id": "VariableCollectionId:198:1608",
+      "name": "ShadowAlliance · Primitives",
+      "count": 18
+    },
+    {
+      "id": "VariableCollectionId:198:1609",
+      "name": "ShadowAlliance · Semantic",
+      "count": 11
+    }
+  ],
+  "playBoardCoverage": {
+    "song-guess": "10/20 pages plus v2 flow (99:3, 112:2)",
+    "kordle": "146:2, 146:3",
+    "omok": "183:2, 183:3",
+    "speed-game": "196:104, 196:105",
+    "shadow-alliance": "198:1606, 198:1607"
+  }
+}

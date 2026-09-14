@@ -1,0 +1,45 @@
+{
+  "fileKey": "I74zYjs7O4bOtFAwahqfza",
+  "updated": "2026-09-15",
+  "status": "WIP — built from the current implementation; no READY screen yet",
+  "source": "speed-game has no palette of its own. Values come from src/styles/base.css app tokens referenced by src/styles/speed-game.css.",
+  "pages": {
+    "speedGame": "196:104",
+    "speedGameComponents": "196:105"
+  },
+  "designNotes": "197:2",
+  "sections": {
+    "wip": "197:7",
+    "review": "197:8",
+    "ready": "197:9",
+    "deprecated": "197:10"
+  },
+  "collections": {
+    "appFoundations": {
+      "id": "VariableCollectionId:196:106",
+      "name": "App · Foundations",
+      "count": 20,
+      "note": "Shared app tokens, not game-specific. Reusable by other layouts that follow base.css."
+    }
+  },
+  "screens": [
+    {
+      "id": "197:11",
+      "name": "Speed / Teacher / T1 / Round",
+      "width": 1440,
+      "implementation": "src/components/speed-game/SpeedGameBoard.tsx teacher branch"
+    },
+    {
+      "id": "197:73",
+      "name": "Speed / Student / S1 / Answer",
+      "width": 1440,
+      "implementation": "src/components/speed-game/SpeedGameBoard.tsx student branch"
+    }
+  ],
+  "gaps": [
+    "라운드 준비 중, 게임 완료, 조기 종료 확정, 기권 화면이 없다.",
+    "모바일 390px 프레임이 없다.",
+    "터미널 패널(SpeedGameTerminalPanel)은 시안에 포함하지 않았다.",
+    "READY 승격은 사람 승인이 필요하다."
+  ]
+}
