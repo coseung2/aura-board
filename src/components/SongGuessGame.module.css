@@ -13,12 +13,12 @@
 }
 
 .layout[data-viewer="student"] {
-  --song-student-bg: #201342;
-  --song-student-surface: #30204e;
+  --song-student-bg: #130e28;
+  --song-student-surface: #21183c;
   --song-student-text: #fff;
   --song-student-muted: #c8bee0;
   --song-student-accent: #c8b2ff;
-  --song-student-track: #493762;
+  --song-student-track: #2a2048;
   --song-student-disc: #160d2b;
   --song-answer-1: #b93247;
   --song-answer-2: #235bc3;
@@ -42,9 +42,10 @@
   --color-status-returned-bg: rgb(185 50 71 / 24%);
   --color-danger: #ff9aaa;
   grid-template-columns: minmax(0, 1fr);
-  max-width: 760px;
-  min-height: min(760px, calc(100vh - 96px));
-  padding: 24px;
+  max-width: 390px;
+  min-height: min(844px, calc(100vh - 32px));
+  padding: 20px 24px 24px;
+  border: 1px solid #40345f;
   border-radius: 24px;
   background: var(--song-student-bg);
   color: var(--song-student-text);
@@ -56,7 +57,7 @@
 
 .layout[data-viewer="student"] .stage {
   width: 100%;
-  max-width: 680px;
+  max-width: 342px;
   margin: 0 auto;
 }
 
@@ -72,9 +73,24 @@
 }
 
 .layout[data-viewer="student"] .roundHeading {
-  min-height: 48px;
-  padding-bottom: 16px;
-  border-color: rgb(255 255 255 / 14%);
+  min-height: 60px;
+  padding-bottom: 12px;
+  border: 0;
+}
+
+.headingCopy { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.gameTitle { color: var(--song-student-text); font-size: 20px; font-weight: 900; letter-spacing: -0.6px; }
+
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .roundLabel {
@@ -82,7 +98,9 @@
 }
 
 .layout[data-viewer="student"] .roundLabel {
-  font-size: 18px;
+  align-self: flex-end;
+  color: var(--song-student-muted);
+  font-size: 12px;
   letter-spacing: -0.2px;
 }
 
@@ -117,7 +135,7 @@
 .clock {
   display: grid;
   gap: 12px;
-  margin-top: 20px;
+  margin-top: 8px;
   color: var(--color-accent-tinted-text);
 }
 
@@ -136,7 +154,7 @@
 .clock progress {
   appearance: none;
   width: 100%;
-  height: 6px;
+  height: 5px;
   overflow: hidden;
   border: 0;
   border-radius: var(--radius-pill);
@@ -173,8 +191,8 @@
 }
 
 .layout[data-viewer="student"] .question {
-  gap: 24px;
-  padding-top: 28px;
+  gap: 18px;
+  padding: 20px 0 16px;
 }
 
 .clue {
@@ -187,8 +205,8 @@
 .studentQuestion {
   margin: 0;
   color: var(--song-student-text);
-  text-align: center;
-  font-size: clamp(24px, 5vw, 34px);
+  text-align: left;
+  font-size: 18px;
   font-weight: 800;
   line-height: 1.25;
   letter-spacing: -0.7px;
@@ -227,19 +245,17 @@
 }
 
 .layout[data-viewer="student"] .playButton {
-  width: 176px;
-  height: 176px;
-  border: 12px solid var(--song-student-track);
-  background: var(--song-student-disc);
-  color: var(--song-student-accent);
-  box-shadow:
-    0 0 0 2px rgb(255 255 255 / 9%),
-    inset 0 0 0 24px var(--song-student-disc),
-    inset 0 0 0 26px var(--song-student-track);
+  width: 88px;
+  height: 88px;
+  flex: 0 0 88px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .layout[data-viewer="student"] .playButton:hover:not(:disabled) {
-  background: #1b1035;
+  background: transparent;
   transform: scale(1.02);
 }
 
@@ -254,6 +270,9 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 12px;
 }
+
+.layout[data-viewer="student"] .answerForm { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+.layout[data-viewer="student"] .answerForm button { min-height: 54px; border-radius: 16px; }
 
 .answerForm input {
   box-sizing: border-box;
@@ -289,6 +308,8 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
 }
+
+.layout[data-viewer="student"] .choices { grid-template-columns: minmax(0, 1fr); gap: 12px; }
 
 .choice {
   display: flex;
@@ -345,14 +366,14 @@
 }
 
 .layout[data-viewer="student"] .choice {
-  min-height: 112px;
-  padding: 18px;
-  border: 3px solid transparent;
+  min-height: 62px;
+  padding: 12px;
+  border: 1px solid transparent;
   border-radius: 16px;
   color: #fff;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1.35;
-  box-shadow: 0 8px 24px rgb(7 2 20 / 18%);
+  box-shadow: none;
 }
 
 .layout[data-viewer="student"] .choice[data-option="0"] {
@@ -373,8 +394,8 @@
 }
 
 .layout[data-viewer="student"] .choiceNumber {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   border: 0;
   background: rgb(255 255 255 / 14%);
   font-size: 14px;
@@ -386,8 +407,11 @@
 
 .layout[data-viewer="student"] .choice[aria-pressed="true"] {
   border-color: #fff;
-  box-shadow: 0 0 0 2px var(--song-student-bg), 0 0 0 5px #fff;
+  box-shadow: none;
 }
+
+.layout[data-viewer="student"] .choices:has([aria-pressed="true"]) .choice[aria-pressed="false"] { opacity: 0.36; }
+.choiceBadge { display: inline-flex; align-items: center; gap: 4px; flex: 0 0 auto; font-size: 11px; font-weight: 800; white-space: nowrap; }
 
 .layout[data-viewer="student"] .choices[data-reveal="true"] .choice[data-result="muted"] {
   opacity: 0.38;
@@ -400,7 +424,7 @@
 
 .layout[data-viewer="student"] .choices[data-reveal="true"] .choice[data-result="correct"] {
   border-color: #fff;
-  box-shadow: 0 0 0 2px var(--song-student-bg), 0 0 0 5px #fff;
+  box-shadow: none;
 }
 
 .scored {
@@ -511,12 +535,86 @@
 }
 
 .layout[data-viewer="student"] .roundAnswer {
-  margin: 28px 0 20px;
-  padding: 24px;
+  margin: 24px 0 4px;
+  padding: 22px 20px;
   border: 1px solid var(--color-border);
   border-radius: 16px;
   background: var(--song-student-surface);
 }
+
+.layout[data-viewer="student"] .roundAnswer > span { color: #45d398; font-size: 18px; font-weight: 900; }
+.layout[data-viewer="student"] .roundAnswer > span { display: grid; justify-items: center; }
+.layout[data-viewer="student"] .roundAnswer > span small { color: var(--song-student-muted); font-size: 11px; font-weight: 600; }
+.submittedCard { display: grid; gap: 5px; padding: 18px 20px; border: 1px solid #40345f; border-radius: 16px; background: var(--song-student-surface); text-align: center; }
+.submittedCard strong { color: var(--song-student-text); font-size: 15px; }
+.submittedCard span { color: var(--song-student-muted); font-size: 12px; }
+.studentRankCard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; margin-top: 4px; border: 1px solid #40345f; border-radius: 16px; background: var(--song-student-surface); }
+.studentRankCard > div { display: grid; gap: 6px; padding: 18px 20px; }
+.studentRankCard > div + div { border-left: 1px solid #40345f; }
+.studentRankCard span, .studentRankCard p { color: var(--song-student-muted); font-size: 11px; }
+.studentRankCard strong { color: var(--song-student-text); font-size: 22px; }
+.studentRankCard p { grid-column: 1 / -1; margin: 0; padding: 13px 20px; border-top: 1px solid #40345f; text-align: center; }
+
+.studentMusicCard {
+  position: relative;
+  min-height: 150px;
+  padding: 30px 20px;
+  border: 1px solid #40345f;
+  border-radius: 16px;
+  background: var(--song-student-surface);
+}
+
+.studentMusicCard .player {
+  min-height: 88px;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+  gap: 20px;
+}
+
+.studentMusicCard .studentQuestion {
+  position: absolute;
+  top: 48px;
+  left: 128px;
+  margin: 0;
+}
+
+.studentRecord {
+  position: relative;
+  width: 88px;
+  height: 88px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: repeating-radial-gradient(circle, #160d2b 0 8px, #2a2048 9px 10px);
+}
+
+.studentRecordHub {
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--song-student-accent);
+  color: var(--song-student-bg);
+}
+
+.studentPlayerInfo {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 6px;
+  padding-top: 52px;
+  color: var(--song-student-muted);
+}
+
+.studentPlayerInfo strong { color: var(--song-student-accent); font-size: 11px; }
+.studentPlayerInfo > span:not(.studentWaveTrack) { display: none; }
+.studentPlayerInfo small { font-size: 12px; }
+.studentWaveTrack { height: 5px; overflow: hidden; border-radius: 5px; background: #40345f; }
+.studentWaveTrack > span { display: block; height: 100%; border-radius: inherit; background: var(--song-student-accent); }
+.choicePrompt { grid-column: 1 / -1; margin: 0 0 2px; color: var(--song-student-muted); font-size: 12px; font-weight: 600; }
 
 .layout[data-viewer="student"] .roundAnswer h2 {
   font-size: clamp(24px, 5vw, 32px);
@@ -604,13 +702,130 @@
   color: var(--color-text-muted);
 }
 
+/* Teacher lobby (`T3`) shows a live entry count and a start hint so the host
+   can judge readiness without counting pets. */
+.entryStat {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 14px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.entryStat > span:first-child {
+  grid-column: 1;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-text-muted);
+}
+
+.entryStat strong {
+  grid-column: 1;
+  font-size: 26px;
+  color: var(--color-accent);
+}
+
+.entryStatLive {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-status-reviewed-text);
+  background: var(--color-surface-alt);
+}
+
+.entryHint {
+  margin: 24px 0 0;
+  text-align: center;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+/* Created-game step (`T2`). The host previously landed straight on the game
+   surface with no confirmation of what was built. */
+.createdSummary {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  margin-bottom: 32px;
+  text-align: center;
+}
+
+.createdEyebrow {
+  padding: 6px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  border-radius: 10px;
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+
+.createdTitle {
+  margin: 0;
+  font-size: 32px;
+}
+
+.createdNote {
+  margin: 0;
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.createdCard {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 20px;
+  width: min(500px, 100%);
+  margin-top: 8px;
+  padding: 20px 24px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.createdCard strong {
+  font-size: 20px;
+  color: var(--color-accent);
+}
+
+.createdCard > span:not(.createdClosed) {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.createdClosed {
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  color: var(--color-text-muted);
+  background: var(--color-surface-alt);
+}
+
 .layout[data-viewer="student"] .entrance {
-  padding-top: 40px;
+  padding-top: 28px;
 }
 
 .layout[data-viewer="student"] .myEntry h2 {
-  font-size: 24px;
+  font-size: 20px;
 }
+
+.layout[data-viewer="student"] .myEntry { min-height: 210px; gap: 12px; padding: 24px; border: 1px solid #40345f; border-radius: 16px; background: var(--song-student-surface); }
+.layout[data-viewer="student"] .myEntry > div[role="img"] { width: 96px; height: 96px; }
+.layout[data-viewer="student"] .entrants { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px 8px; margin-top: 28px; }
+.layout[data-viewer="student"] .entrant { gap: 6px; }
+.layout[data-viewer="student"] .entrant > div[role="img"] { width: 64px; height: 64px; }
+.layout[data-viewer="student"] .entrant > div[role="img"] > div { transform: scale(1); }
+.layout[data-viewer="student"] .entrant strong { font-size: 11px; }
 
 @keyframes enterRoom {
   from { opacity: 0; transform: translateY(8px); }
@@ -632,8 +847,8 @@
 
 @media (max-width: 560px) {
   .layout[data-viewer="student"] {
-    min-height: calc(100vh - 32px);
-    padding: 18px 16px 28px;
+    min-height: 100vh;
+    padding: 20px 24px 24px;
     border-radius: 0;
   }
 
@@ -650,11 +865,6 @@
     height: 120px;
   }
 
-  .layout[data-viewer="student"] .playButton {
-    width: 152px;
-    height: 152px;
-  }
-
   .answerForm {
     gap: 8px;
   }
@@ -669,8 +879,8 @@
   }
 
   .layout[data-viewer="student"] .choice {
-    min-height: 100px;
-    padding: 16px 14px;
+    min-height: 62px;
+    padding: 12px;
     font-size: 16px;
   }
 
@@ -696,4 +906,62 @@
   .entrant {
     animation: none;
   }
+}
+/* Clue card (`N4` / `V3`). When audio fails the clue is the only way to answer,
+   so it needs a labelled surface instead of one muted centered line. */
+.clueCard {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  padding: 16px 20px;
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.clueLabel {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-accent);
+}
+/* Round outcome card (`N6` / `N7` / `V3`). The previous single tinted line could
+   not carry the score and the next-step hint together. */
+.feedbackCard {
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+  padding: 16px 20px;
+  text-align: center;
+  border: 2px solid var(--color-border);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+
+.feedbackCard strong {
+  font-size: 18px;
+}
+
+.feedbackCard span {
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.feedbackCard[data-outcome="correct"] {
+  border-color: var(--color-status-reviewed-text);
+}
+
+.feedbackCard[data-outcome="correct"] strong {
+  color: var(--color-status-reviewed-text);
+}
+
+.feedbackCard[data-outcome="miss"] {
+  border-color: var(--color-danger);
+}
+
+.feedbackCard[data-outcome="miss"] strong {
+  color: var(--color-danger);
+}
+
+.feedbackCard[data-outcome="timeout"] {
+  border-color: var(--color-text-muted);
 }

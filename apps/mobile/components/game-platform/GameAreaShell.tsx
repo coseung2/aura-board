@@ -20,6 +20,9 @@ export type MobileGameAreaShellProps = Omit<MobileGameHudProps, "connection"> & 
   participantActions?: ReactNode;
   scrollEnabled?: boolean;
   bottomSafeArea?: boolean;
+  /** Games with their own dark surface (song guess) would otherwise show the
+   * light app background around the HUD and below the content. */
+  surfaceColor?: string;
 };
 
 export function GameAreaShell({
@@ -31,13 +34,15 @@ export function GameAreaShell({
   participantActions,
   scrollEnabled = true,
   bottomSafeArea = true,
+  surfaceColor,
   ...hudProps
 }: MobileGameAreaShellProps) {
   const locked = inputLocked || connection !== "online";
+  const surface = surfaceColor ? { backgroundColor: surfaceColor } : null;
   return (
-    <SafeAreaView style={styles.root} edges={bottomSafeArea ? ["top", "right", "bottom", "left"] : ["top", "right", "left"]} accessibilityState={{ busy: locked }}>
+    <SafeAreaView style={[styles.root, surface]} edges={bottomSafeArea ? ["top", "right", "bottom", "left"] : ["top", "right", "left"]} accessibilityState={{ busy: locked }}>
       <GameHud {...hudProps} connection={connection} />
-      <KeyboardAvoidingView style={styles.playfield} enabled={scrollEnabled} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <KeyboardAvoidingView style={[styles.playfield, surface]} enabled={scrollEnabled} behavior={Platform.OS === "ios" ? "padding" : "height"}>
         {hostControls ? <View style={styles.zone}>{hostControls}</View> : null}
         {participantActions ? <View style={styles.zone}>{participantActions}</View> : null}
         {scrollEnabled ? (
@@ -51,7 +56,7 @@ export function GameAreaShell({
           </ScrollView>
         ) : <View style={styles.content}>{children}</View>}
         {locked ? (
-          <View style={styles.lockOverlay} accessibilityLiveRegion="polite">
+          <View style={[styles.lockOverlay, surface]} accessibilityLiveRegion="polite">
             <Text selectable style={styles.lockText}>
               {statusMessage ??
                 (connection === "offline"

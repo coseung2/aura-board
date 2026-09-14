@@ -65,6 +65,8 @@ output/
 # Local mobile signing credentials and one-off build outputs
 .codex/tmp/
 .codex/builds/
+# Local-only development secrets (play-engine dev run). Never published.
+.codex/local/
 /.codex/*.png
 /.codex/*.xml
 supabase/.temp/

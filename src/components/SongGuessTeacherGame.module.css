@@ -1,9 +1,9 @@
 .teacherShell {
-  --song-teacher-bg: #201342;
-  --song-teacher-surface: #30204e;
-  --song-teacher-surface-strong: #271646;
-  --song-teacher-track: #493762;
-  --song-teacher-line: #584574;
+  --song-teacher-bg: #130e28;
+  --song-teacher-surface: #21183c;
+  --song-teacher-surface-strong: #19122f;
+  --song-teacher-track: #2a2048;
+  --song-teacher-line: #40345f;
   --song-teacher-text: #ffffff;
   --song-teacher-muted: #c8bee0;
   --song-teacher-accent: #c8b2ff;
@@ -54,8 +54,8 @@
 }
 
 .teacherGame[data-viewer="teacher"] {
-  grid-template-columns: minmax(0, 1fr) 384px;
-  gap: 32px;
+  grid-template-columns: minmax(0, 960px) minmax(320px, 376px);
+  gap: 24px;
   max-width: 1360px;
   color: var(--song-teacher-text);
 }
@@ -107,11 +107,11 @@
 
 .teacherPlayer {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 150px;
+  grid-template-columns: 166px minmax(0, 1fr) 184px;
   align-items: center;
   gap: 30px;
-  min-height: 276px;
-  padding: 30px;
+  min-height: 214px;
+  padding: 24px;
   border: 1px solid var(--song-teacher-line);
   border-radius: 24px;
   background: var(--song-teacher-surface);
@@ -119,8 +119,8 @@
 
 .recordButton {
   position: relative;
-  width: 204px;
-  height: 204px;
+  width: 150px;
+  height: 150px;
   border: 0;
   border-radius: 50%;
   background:
@@ -244,7 +244,7 @@
 }
 
 .timerBox {
-  min-height: 202px;
+  min-height: 162px;
   display: grid;
   place-items: center;
   align-content: center;
@@ -263,7 +263,7 @@
 
 .timerNumber {
   color: var(--song-teacher-accent);
-  font-size: 70px;
+  font-size: 58px;
   font-weight: 900;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -296,12 +296,12 @@
 }
 
 .teacherGame[data-viewer="teacher"] [data-song-choice] {
-  min-height: 104px;
+  min-height: 72px;
   padding: 18px 20px;
   border: 0;
   border-radius: 16px;
   color: #fff;
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 900;
   box-shadow: 0 10px 28px rgb(7 2 20 / 14%);
 }
@@ -347,7 +347,7 @@
 }
 
 .teacherScoreboard {
-  padding: 24px;
+  padding: 22px;
   border: 1px solid var(--song-teacher-line);
   border-radius: 24px;
   background: var(--song-teacher-surface);
@@ -383,7 +383,7 @@
 .scoreboardStats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 22px 0 28px;
+  margin: 18px 0 20px;
   border-radius: 16px;
   background: var(--song-teacher-surface-strong);
 }
@@ -441,7 +441,7 @@
 }
 
 .teacherScoreRow {
-  min-height: 62px;
+  min-height: 56px;
   display: grid;
   grid-template-columns: 32px 40px minmax(0, 1fr) auto;
   align-items: center;
@@ -585,4 +585,49 @@
   .timerFill {
     transition: none;
   }
+}
+
+/* Reveal accuracy card (`T5`). The teacher previously saw only a plain
+   "n / m명 정답" line, with no share of the class to read at a glance. */
+.revealRate {
+  display: grid;
+  gap: 4px;
+  justify-items: center;
+  min-width: 200px;
+  padding: 16px 24px;
+  text-align: center;
+  border: 1px solid var(--song-teacher-line);
+  border-radius: 16px;
+  background: var(--song-teacher-surface);
+}
+
+.revealRate > span {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.revealRate > strong {
+  font-size: 32px;
+  line-height: 1.25;
+  color: var(--color-accent);
+}
+
+.revealRate > em {
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 700;
+  color: var(--color-status-reviewed-text);
+}
+/* Reveal answer row (`T5`). The teacher answer sat on a bare row, so the
+   headline answer and the accuracy card had no shared surface. */
+.teacherGame[data-viewer="teacher"] [data-song-reveal-answer] {
+  padding: 28px 32px;
+  border: 1px solid var(--song-teacher-line);
+  border-radius: 24px;
+  background: var(--song-teacher-surface);
+}
+
+.teacherGame[data-viewer="teacher"] [data-song-reveal-answer] h2 {
+  font-size: clamp(34px, 4vw, 54px);
+  line-height: 1.1;
 }

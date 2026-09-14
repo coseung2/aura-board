@@ -325,6 +325,43 @@ Next.js:
 All values are server-only. No play secret belongs in a public browser or Expo
 environment variable.
 
+### Local development
+
+The room list, room creation, and every gameplay command are served by the Rust
+engine. Without it those routes answer `503` and the board shows "방 목록을
+불러오지 못했어요" while the rest of the page works, so the engine must be running
+before verifying song-guess flows locally.
+
+`PLAY_ENGINE_URL`, `PLAY_ENGINE_ASSERTION_SECRET`, and `PLAY_ENGINE_INTERNAL_SECRET`
+are registered in Infisical `dev /` and point at `http://127.0.0.1:8090`. Both
+processes read the same assertion secret from there, so no manual export is
+needed.
+
+```powershell
+# 1. Postgres tunnel (loopback 15434 on the VM, not 5432)
+.codex\scripts\open-db-tunnel.ps1 -SessionId <bastion-managed-ssh-session> -RemotePort 15434
+
+# 2. Rust engine on 127.0.0.1:8090
+.codex\scripts\start-play-engine.ps1 -Port 8090
+
+# 3. Next dev server using the Infisical values
+.codex\scripts\start-next-with-engine.ps1 -UseInfisicalOnly
+```
+
+`start-play-engine.ps1` defaults to port 8090 because Metro already owns the
+engine's built-in default of 8081. It also caches local-only fallback secrets in
+the git-ignored `.codex/local/`; those are a convenience for machines without
+Infisical access and are never published.
+
+Verify with `GET /api/health` returning `{"ok":true,"database":"reachable"}` and
+with the room route answering `401` rather than `503` when called without a
+session cookie.
+
+The free-game screen offers a category only when its segment has playable clips.
+If every genre shows `0곡`, load the catalog with
+`node --conditions=react-server --import tsx scripts/song-guess-catalog-sync.ts --apply`
+as described in [song-guess-catalog.md](song-guess-catalog.md).
+
 ## Operability
 
 Minimum signals for staging and production:

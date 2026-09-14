@@ -42,6 +42,7 @@ import {
   type SongGuessRoundSaveDraft,
 } from "@/lib/song-guess/teacher-workflow";
 import styles from "./SongGuessBoard.module.css";
+import states from "./SongGuessStates.module.css";
 import teacherStyles from "./SongGuessTeacher.module.css";
 import type { RoundDraft } from "./song-guess-board-model";
 import { useSongGuessClock } from "./use-song-guess-clock";
@@ -522,8 +523,18 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   if (loading) {
     return (
       <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
-        <div className={styles.panel} role="status">
-          음악 퀴즈를 불러오는 중이에요…
+        <div className={states.state} role="status">
+          <span className={states.eyebrow}>LOADING</span>
+          <span className={states.icon} aria-hidden="true">
+            ♪
+          </span>
+          <h2 className={states.title}>음악 퀴즈를 불러오고 있어요</h2>
+          <p className={states.body}>
+            {"방 정보와 첫 문제를 준비하는 중이에요.\n잠시만 기다려 주세요."}
+          </p>
+          <span className={states.track}>
+            <span className={states.fill} />
+          </span>
         </div>
       </section>
     );
@@ -681,17 +692,40 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   if (!snapshot) {
     return (
       <section className={styles.shell} data-viewer={viewer} aria-label={boardTitle}>
-        <div className={styles.panel}>
-          <h2>{error ? "게임을 불러오지 못했어요" : "게임 준비 중"}</h2>
-          <button type="button" className={styles.secondaryButton} onClick={exitRoom}>방 목록</button>
-          <button
-            className={styles.secondaryButton}
-            type="button"
-            onClick={() => void refreshSession()}
-            disabled={syncing}
+        <div
+          className={`${states.state} ${error ? states.stateDanger : ""}`}
+          role={error ? "alert" : "status"}
+        >
+          <span className={`${states.eyebrow} ${error ? states.eyebrowDanger : ""}`}>
+            {error ? "OFFLINE" : "READY"}
+          </span>
+          <span
+            className={`${states.icon} ${error ? states.iconDanger : ""}`}
+            aria-hidden="true"
           >
-            최신 상태 확인
-          </button>
+            {error ? "!" : "♪"}
+          </span>
+          <h2 className={states.title}>
+            {error ? "게임을 불러오지 못했어요" : "게임 준비 중"}
+          </h2>
+          <p className={states.body}>
+            {error
+              ? "네트워크를 확인한 뒤 다시 시도해 주세요.\n점수와 진행 상황은 서버에 저장되어 있어요."
+              : "로비가 열리면 자동으로 시작돼요."}
+          </p>
+          <div className={states.actions}>
+            <button
+              className={styles.secondaryButton}
+              type="button"
+              onClick={() => void refreshSession()}
+              disabled={syncing}
+            >
+              최신 상태 확인
+            </button>
+            <button type="button" className={styles.secondaryButton} onClick={exitRoom}>
+              방 목록
+            </button>
+          </div>
           <StatusMessages error={error ?? setupError} notice={notice} />
         </div>
       </section>

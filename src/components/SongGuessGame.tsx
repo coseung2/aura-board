@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import { Check, Clock3, Users, Volume2, VolumeX, X } from "lucide-react";
+import { Check, Users, Volume2, VolumeX, X } from "lucide-react";
 import type {
   SongGuessGuessResult,
   SongGuessIntent,
@@ -87,6 +87,16 @@ export function SongGuessGame({
       snapshot.viewer.selectedChoiceId != null);
   const answerDisabled =
     !canInteract || expired || snapshot.viewer.scoredCurrentRound || answered;
+  const ownParticipant =
+    snapshot.viewer.participantIndex == null
+      ? studentView ? participants[0] ?? null : null
+      : snapshot.participants[snapshot.viewer.participantIndex] ?? null;
+  const ownRank = ownParticipant
+    ? participants.filter((participant) => participant.score > ownParticipant.score).length + 1
+    : null;
+  const ownRankMovement = ownParticipant?.previousRank != null && ownRank != null
+    ? ownParticipant.previousRank - ownRank
+    : 0;
 
   return (
     <div
@@ -98,13 +108,16 @@ export function SongGuessGame({
     >
       <main className={styles.stage} data-song-stage>
         <div className={styles.roundHeading} data-song-round-heading>
-          <span className={styles.roundLabel} data-song-round-label>
-            {finished
-              ? "최종 결과"
-              : waiting
-                ? "시작 대기"
-                : `${currentRound.order + 1}라운드${totalRounds ? ` / ${totalRounds}` : ""}`}
-          </span>
+          <div className={styles.headingCopy}>
+            {studentView && <strong className={styles.gameTitle}>노래 맞히기</strong>}
+            <span className={styles.roundLabel} data-song-round-label>
+              {finished
+                ? "최종 결과"
+                : waiting
+                  ? "시작 대기"
+                  : `${String(currentRound.order + 1).padStart(2, "0")}${totalRounds ? ` / ${String(totalRounds).padStart(2, "0")}` : ""}`}
+            </span>
+          </div>
           <div className={styles.headingActions}>
             {studentView && phase === "guessing" && remainingSeconds !== null ? (
               <span className={styles.studentTime} data-expired={expired}>
@@ -134,10 +147,6 @@ export function SongGuessGame({
 
         {studentView && phase === "guessing" && remainingSeconds !== null && (
           <div className={styles.clock} data-expired={expired}>
-            <div role="timer" aria-label="남은 시간">
-              <Clock3 size={18} aria-hidden="true" />
-              <strong>{expired ? "시간 종료" : `${remainingSeconds}초 남음`}</strong>
-            </div>
             <progress
               max={roundDuration}
               value={remainingSeconds}
@@ -157,21 +166,20 @@ export function SongGuessGame({
 
         {phase === "guessing" && (
           <div className={styles.question} data-song-question>
-            <p
-              className={studentView ? styles.studentQuestion : teacherStyles.teacherQuestion}
-            >
-              {questionText}
-            </p>
+            {!studentView && <p className={teacherStyles.teacherQuestion}>{questionText}</p>}
             {currentRound.currentClip && (
-              <SongGuessPlayer
-                key={`${snapshot.sessionId}:${currentRound.currentClip.assetId}`}
-                sessionId={snapshot.sessionId}
-                clip={currentRound.currentClip}
-                onPlayingChange={sound.onMusicPlaying}
-                teacher={isHost}
-                remainingSeconds={remainingSeconds}
-                roundDurationSeconds={roundDuration}
-              />
+              <div className={studentView ? styles.studentMusicCard : undefined}>
+                <SongGuessPlayer
+                  key={`${snapshot.sessionId}:${currentRound.currentClip.assetId}`}
+                  sessionId={snapshot.sessionId}
+                  clip={currentRound.currentClip}
+                  onPlayingChange={sound.onMusicPlaying}
+                  teacher={isHost}
+                  remainingSeconds={remainingSeconds}
+                  roundDurationSeconds={roundDuration}
+                />
+                {studentView && <p className={styles.studentQuestion}>{questionText}</p>}
+              </div>
             )}
             {isHost &&
               (!currentRound.currentClip ||
@@ -182,7 +190,10 @@ export function SongGuessGame({
                 />
               )}
             {currentRound.accessibilityClue && (
-              <p className={styles.clue}>{currentRound.accessibilityClue}</p>
+              <div className={styles.clueCard}>
+                <span className={styles.clueLabel}>글자 힌트</span>
+                <p className={styles.clue}>{currentRound.accessibilityClue}</p>
+              </div>
             )}
             {!isHost && snapshot.viewer.joined === false && (
               <p className={styles.scored}>
@@ -196,6 +207,7 @@ export function SongGuessGame({
                 role="group"
                 aria-label={`${answerPrompt} 보기`}
               >
+                {studentView && <p className={styles.choicePrompt}>정답이라고 생각하는 곡을 골라요</p>}
                 {currentRound.choices?.map((choice, index) => (
                   <button
                     key={choice.id}
@@ -218,7 +230,9 @@ export function SongGuessGame({
                     </span>
                     <span>{choice.label}</span>
                     {snapshot.viewer.selectedChoiceId === choice.id && (
-                      <Check size={20} aria-label="선택한 답" />
+                      <span className={styles.choiceBadge}>
+                        <Check size={14} aria-label="선택한 답" /> 내 답
+                      </span>
                     )}
                   </button>
                 ))}
@@ -272,20 +286,32 @@ export function SongGuessGame({
               </form>
             )}
             {feedback && (
-              <p
-                className={`${feedback.correct ? controls.correctResult : controls.wrongResult} ${styles.answerFeedback}`}
+              <div
+                className={`${styles.answerFeedback} ${styles.feedbackCard}`}
+                data-outcome={
+                  feedback.timedOut ? "timeout" : feedback.correct ? "correct" : "miss"
+                }
                 role="status"
               >
-                {feedback.timedOut
-                  ? "시간이 끝났어요."
-                  : feedback.alreadyScored
-                    ? "이 라운드는 이미 점수를 받았어요."
+                <strong>
+                  {feedback.timedOut
+                    ? "시간이 끝났어요"
+                    : feedback.alreadyScored
+                      ? "이미 점수를 받았어요"
+                      : feedback.correct
+                        ? `정답! +${feedback.score}점`
+                        : "아쉬워요"}
+                </strong>
+                <span>
+                  {feedback.timedOut
+                    ? "이번 문제는 답을 고르지 못했어요. 다음 문제에서 다시 도전할 수 있어요."
                     : feedback.correct
-                      ? `정답! +${feedback.score}점`
+                      ? "정답 공개에서 순위 변화를 확인해요."
                       : multipleChoice
-                        ? "아쉬워요! 정답 공개를 기다려 주세요."
+                        ? "정답 공개를 기다려 주세요. 다음 문제에서 만회할 수 있어요."
                         : "다시 도전해 보세요."}
-              </p>
+                </span>
+              </div>
             )}
             {!feedback && snapshot.viewer.scoredCurrentRound && (
               <p className={styles.scored} role="status">
@@ -293,9 +319,10 @@ export function SongGuessGame({
               </p>
             )}
             {!feedback && answered && !snapshot.viewer.scoredCurrentRound && (
-              <p className={styles.scored} role="status">
-                답변 제출 완료 · 정답 공개를 기다려 주세요.
-              </p>
+              <div className={styles.submittedCard} role="status">
+                <strong>답변 제출 완료</strong>
+                <span>정답 공개를 기다리는 중…</span>
+              </div>
             )}
             {isHost && (
               <p className={styles.scored} data-song-correct-count>
@@ -307,14 +334,27 @@ export function SongGuessGame({
 
         {roundResults && (
           <>
-            <div className={styles.roundAnswer}>
+            <div className={styles.roundAnswer} data-song-reveal-answer>
               <div>
-                <p>정답</p>
+                <p>{studentView && snapshot.viewer.scoredCurrentRound ? "정답이에요!" : "정답"}</p>
                 <h2>{currentRound.revealedAnswer ?? "정답을 불러오는 중…"}</h2>
               </div>
-              <span>
-                {scoredCount} / {participants.length}명 정답
-              </span>
+              {studentView ? (
+                <span>
+                  <strong>{`+${ownParticipant?.roundScore ?? 0}`}</strong>
+                  <small>점</small>
+                </span>
+              ) : (
+                <div className={teacherStyles.revealRate}>
+                  <span>이번 문제 정답</span>
+                  <strong>{`${scoredCount} / ${participants.length}`}</strong>
+                  <em>
+                    {participants.length > 0
+                      ? `${Math.round((scoredCount / participants.length) * 100)}%`
+                      : "0%"}
+                  </em>
+                </div>
+              )}
             </div>
             {studentView && multipleChoice && currentRound.choices && (
               <div
@@ -323,6 +363,7 @@ export function SongGuessGame({
                 role="group"
                 aria-label={`${answerPrompt} 제출 결과`}
               >
+                <p className={styles.choicePrompt}>내 답과 정답</p>
                 {currentRound.choices.map((choice, index) => {
                   const selected = snapshot.viewer.selectedChoiceId === choice.id;
                   const correct =
@@ -345,7 +386,10 @@ export function SongGuessGame({
                       </span>
                       <span>{choice.label}</span>
                       {correct ? (
-                        <Check size={20} aria-label="정답" />
+                        <span className={styles.choiceBadge}>
+                          <Check size={14} aria-label="정답" />
+                          {selected ? "정답 · 내 답" : "정답"}
+                        </span>
                       ) : selected ? (
                         <X size={20} aria-label="제출한 오답" />
                       ) : null}
@@ -354,7 +398,23 @@ export function SongGuessGame({
                 })}
               </div>
             )}
-            <SongGuessScoreboard participants={participants} roundResults />
+            {studentView && ownParticipant && (
+              <div className={styles.studentRankCard}>
+                <h2 className={styles.visuallyHidden}>라운드 순위</h2>
+                <div>
+                  <span>현재 순위</span>
+                  <strong>{ownRank ?? "—"}위</strong>
+                  {ownRankMovement !== 0 && (
+                    <span className={styles.visuallyHidden} aria-label={`${Math.abs(ownRankMovement)}위 ${ownRankMovement > 0 ? "상승" : "하락"}`}>
+                      {ownRankMovement > 0 ? "상승" : "하락"}
+                    </span>
+                  )}
+                </div>
+                <div><span>누적</span><strong>{ownParticipant.score.toLocaleString("ko-KR")}점</strong></div>
+                <p>다음 문제는 교사가 시작해요</p>
+              </div>
+            )}
+            {isHost && <SongGuessScoreboard participants={participants} roundResults />}
           </>
         )}
 

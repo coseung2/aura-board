@@ -21,6 +21,14 @@ for bounded specialist tasks. The project source of truth is the current code,
   and test fixture notes.
 
 ## Local Commands
+## Figma design governance
+
+Before any Figma task, read `docs/ai/global-figma-design-ops.md` and
+`docs/design/figma-constitution.md`, then the relevant feature handoff/manifest.
+Follow READ → CODE COMPARE → MIGRATION PLAN → FIGMA WRITE → SCREENSHOT VERIFY.
+Use `docs/verification-checklist.md#figma-design-operations` for verification.
+
+## Local Commands
 
 - Development secrets and environment variables are managed in Infisical.
   Do not expect a local `.env` file or start authenticated/database-backed
@@ -40,6 +48,17 @@ for bounded specialist tasks. The project source of truth is the current code,
 - When local auth or database APIs return configuration-related 500 errors,
   first verify that the server was launched through Infisical before changing
   application code or diagnosing the database.
+- Song-guess room list, room creation, and gameplay commands go through the Rust
+  play-engine. When those routes answer 503 while the rest of the page works,
+  start the engine before changing application code. Order and scripts are in
+  `docs/authoritative-play-platform.md#local-development`:
+  `.codex\scripts\open-db-tunnel.ps1 -SessionId <session> -RemotePort 15434`,
+  then `.codex\scripts\start-play-engine.ps1 -Port 8090`, then
+  `.codex\scripts\start-next-with-engine.ps1 -UseInfisicalOnly`.
+  The DB tunnel targets loopback 15434 on the VM, not 5432, and the engine uses
+  8090 because Metro owns its default 8081. `PLAY_ENGINE_URL`,
+  `PLAY_ENGINE_ASSERTION_SECRET`, and `PLAY_ENGINE_INTERNAL_SECRET` are
+  registered in Infisical `dev /`.
 - Type check: `npm run typecheck`
 - Tests: `npm run test`
 - Production build: `npm run build`

@@ -64,6 +64,7 @@ import { OmokBoard } from "../../../components/layouts/OmokBoard";
 import { SongGuessBoard } from "../../../components/layouts/SongGuessBoard";
 import { AppButton } from "../../../components/ui";
 import { GameAreaShell } from "../../../components/game-platform/GameAreaShell";
+import { songGuessStudentTheme } from "../../../theme/song-guess";
 import {
   isMobileOfficialGameKind,
   MOBILE_GAME_CATALOG,
@@ -304,6 +305,9 @@ export default function BoardDetail() {
         exitLabel="게임 목록"
         scrollEnabled={board.layout === "speed-game"}
         bottomSafeArea={false}
+        surfaceColor={
+          board.layout === "song-guess" ? songGuessStudentTheme.bg : undefined
+        }
       >
         {renderOfficialGameLayout(data)}
       </GameAreaShell>

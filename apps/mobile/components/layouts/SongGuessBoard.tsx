@@ -44,6 +44,7 @@ import { SongGuessScoreboard } from "../song-guess/SongGuessScoreboard";
 import { SongGuessLobbyStatus } from "../song-guess/SongGuessLobbyStatus";
 import { SongGuessAnswer } from "../song-guess/SongGuessAnswer";
 import { songGuessBoardStyles as styles } from "../song-guess/songGuessBoardStyles";
+import { songGuessRoomsStyles as stateStyles } from "../song-guess/songGuessRoomsStyles";
 import { AppButton } from "../ui";
 import { SongGuessRooms } from "../song-guess/song-guess-rooms";
 import { useNavigation } from "expo-router";
@@ -480,37 +481,78 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
 
   if (loading) {
     return (
-      <View style={styles.center} accessibilityLiveRegion="polite">
-        <ActivityIndicator />
+      <View style={stateStyles.stateScreen} accessibilityLiveRegion="polite">
+        <View style={stateStyles.stateCard}>
+          <Text style={stateStyles.stateEyebrow}>LOADING</Text>
+          <ActivityIndicator />
+          <Text style={stateStyles.stateTitle}>음악 퀴즈를 불러오고 있어요</Text>
+          <Text style={stateStyles.stateBody}>
+            {"방 정보와 첫 문제를 준비하는 중이에요.\n잠시만 기다려 주세요."}
+          </Text>
+        </View>
       </View>
     );
   }
 
   if (!snapshot && error) {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.questionText}>연결할 수 없어요.</Text>
-        <AppButton variant="secondary" onPress={exitRoom}>방 목록</AppButton>
-        <Text style={styles.muted}>네트워크를 확인한 뒤 다시 시도해 주세요.</Text>
-        <Text style={styles.errorText} accessibilityRole="alert">
-          {error}
-        </Text>
-        <AppButton variant="secondary" style={styles.actionButton} textStyle={styles.actionButtonText} onPress={() => void refresh()}>
-          다시 시도
-        </AppButton>
+      <View style={stateStyles.stateScreen}>
+        <View style={[stateStyles.stateCard, stateStyles.stateCardDanger]} accessibilityRole="alert">
+          <Text style={[stateStyles.stateEyebrow, stateStyles.stateEyebrowDanger]}>OFFLINE</Text>
+          <View style={[stateStyles.stateIcon, stateStyles.stateIconDanger]}>
+            <Text style={[stateStyles.stateIconText, stateStyles.stateIconTextDanger]}>!</Text>
+          </View>
+          <Text style={stateStyles.stateTitle}>연결이 끊겼어요</Text>
+          <Text style={stateStyles.stateBody}>
+            {"네트워크를 확인한 뒤 다시 시도해 주세요.\n점수는 서버에 저장되어 있어요."}
+          </Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <View style={stateStyles.stateActions}>
+            <AppButton
+              style={stateStyles.primaryAction}
+              textStyle={stateStyles.primaryActionText}
+              onPress={() => void refresh()}
+            >
+              다시 시도
+            </AppButton>
+            <AppButton
+              variant="secondary"
+              style={stateStyles.secondaryAction}
+              textStyle={stateStyles.secondaryActionText}
+              onPress={exitRoom}
+            >
+              방 목록
+            </AppButton>
+          </View>
+        </View>
       </View>
     );
   }
 
   if (!snapshot || snapshot.phase === "draft") {
     return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.questionText}>준비 중</Text>
-        <Text style={styles.muted}>로비가 열리면 시작돼요.</Text>
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        <AppButton variant="secondary" style={styles.actionButton} textStyle={styles.actionButtonText} onPress={() => void refresh()}>
-          다시 시도
-        </AppButton>
+      <View style={stateStyles.stateScreen}>
+        <View style={stateStyles.stateCard} accessibilityLiveRegion="polite">
+          <Text style={stateStyles.stateEyebrow}>READY</Text>
+          <View style={stateStyles.stateIcon}>
+            <Text style={stateStyles.stateIconText}>♪</Text>
+          </View>
+          <Text style={stateStyles.stateTitle}>곧 시작해요</Text>
+          <Text style={stateStyles.stateBody}>
+            {"로비가 열리면 자동으로 입장돼요.\n화면을 켠 채로 기다려 주세요."}
+          </Text>
+          {error ? <Text style={styles.errorText}>{error}</Text> : null}
+          <View style={stateStyles.stateActions}>
+            <AppButton
+              variant="secondary"
+              style={stateStyles.secondaryAction}
+              textStyle={stateStyles.secondaryActionText}
+              onPress={() => void refresh()}
+            >
+              다시 시도
+            </AppButton>
+          </View>
+        </View>
       </View>
     );
   }
@@ -553,6 +595,9 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const roundTimerProgress = remainingSeconds === null
     ? 0
     : Math.max(0, Math.min(1, remainingSeconds / roundDurationSeconds));
+  const ownParticipant = snapshot.viewer.participantIndex == null
+    ? null
+    : snapshot.participants[snapshot.viewer.participantIndex] ?? null;
 
   return (
     <ScrollView
@@ -567,7 +612,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       {snapshot.viewer.canFinish && snapshot.phase !== "finished" ? <AppButton variant="secondary" disabled={busy || hasPending} onPress={() => Alert.alert("게임을 끝낼까요?", "모든 참여자의 게임이 종료돼요.", [{ text: "취소", style: "cancel" }, { text: "게임 끝내기", style: "destructive", onPress: () => void executePending({ sessionId: snapshot.sessionId, request: makeSongGuessCommand(snapshot, { type: "finish" }) }) }])}>게임 끝내기</AppButton> : null}
       <View style={styles.phaseRow} accessibilityLiveRegion="polite">
         <Text style={styles.phaseLabel}>
-          {snapshot.phase === "guessing" ? `${snapshot.currentRound.order + 1}라운드` : phaseLabel(snapshot.phase)}
+          {snapshot.phase === "guessing" ? "노래 맞히기" : phaseLabel(snapshot.phase)}
         </Text>
         <Text style={styles.roundText}>
           {snapshot.phase === "guessing" && remainingSeconds !== null
@@ -576,8 +621,18 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         </Text>
       </View>
 
+      {hasPending || syncing ? (
+        <View style={styles.syncBanner} accessibilityLiveRegion="polite">
+          <ActivityIndicator />
+          <Text style={styles.syncBannerText}>
+            {hasPending ? "답을 서버로 보내는 중이에요" : "최신 상태를 확인하는 중이에요"}
+          </Text>
+        </View>
+      ) : null}
+
       {snapshot.phase === "lobby" ? (
         <SongGuessLobbyStatus
+          snapshot={snapshot}
           joined={snapshot.viewer.joined !== false}
           pending={hasPending || busy || syncing}
           failed={entryFailed}
@@ -602,12 +657,9 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         </View>
       ) : null}
 
-      {snapshot.phase === "guessing" ? (
-        <Text style={styles.questionText}>{`이 노래의 ${answerPrompt}은?`}</Text>
-      ) : null}
-
       {snapshot.phase === "guessing" && clip?.mimeType === "video/youtube" ? (
         <View style={styles.playerCard} accessibilityLiveRegion="polite">
+          <Text style={styles.questionText}>{`이 노래의 ${answerPrompt}은?`}</Text>
           <Text style={styles.playerError} accessibilityRole="alert">
             음원 파일이 없는 문제예요.
           </Text>
@@ -616,30 +668,31 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
 
       {snapshot.phase === "guessing" && clip && clip.mimeType !== "video/youtube" ? (
         <View style={styles.playerCard}>
-          <View style={styles.playerTopRow}>
-            <Text style={styles.playerDuration}>
-              {formatClipLabel(clip.tierMs)}
-            </Text>
-            <Text style={styles.playerTime}>
-              {formatSeconds(playerStatus.currentTime)} /{" "}
-              {formatSeconds(clip.durationMs / 1000)}
-            </Text>
-          </View>
-          <View style={styles.progressTrack}>
-            <View
-              style={[styles.progressFill, { width: `${progress * 100}%` }]}
-            />
+          <View style={styles.playerMainRow}>
+            <View style={styles.recordDisc}>
+              <AppButton
+                style={styles.recordButton}
+                textStyle={styles.recordButtonText}
+                loading={audioPreparing}
+                disabled={!playerStatus.isLoaded || !!audioError}
+                onPress={() => void playClip()}
+                accessibilityLabel={playerStatus.playing ? "노래 다시 듣기" : "노래 듣기"}
+              >
+                {playerStatus.playing ? "↻" : "▶"}
+              </AppButton>
+            </View>
+            <View style={styles.playerInfo}>
+              <Text style={styles.playerDuration}>{formatClipLabel(clip.tierMs)}</Text>
+              <Text style={styles.questionText}>{`이 노래의 ${answerPrompt}은?`}</Text>
+              <Text style={styles.playerTime}>
+                {formatSeconds(playerStatus.currentTime)} / {formatSeconds(clip.durationMs / 1000)}
+              </Text>
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
+              </View>
+            </View>
           </View>
           <View style={styles.playerActions}>
-            <AppButton
-              style={styles.playerButton}
-              textStyle={styles.playerButtonText}
-              loading={audioPreparing}
-              disabled={!playerStatus.isLoaded || !!audioError}
-              onPress={() => void playClip()}
-            >
-              {playerStatus.playing ? "다시 듣기" : "듣기"}
-            </AppButton>
             {playerStatus.playing ? (
               <AppButton
                 style={styles.secondaryPlayerButton}
@@ -659,16 +712,36 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
               {muted ? "소리 켜기" : "음소거"}
             </AppButton>
           </View>
-          {audioError ? (
-            <Text style={styles.playerError}>{audioError}</Text>
-          ) : null}
+        </View>
+      ) : null}
+
+      {snapshot.phase === "guessing" && audioError ? (
+        <View style={styles.audioErrorCard} accessibilityRole="alert">
+          <Text style={styles.audioErrorTitle}>노래를 재생할 수 없어요</Text>
+          <Text style={styles.audioErrorBody}>
+            {snapshot.currentRound.accessibilityClue
+              ? "볼륨과 무음 모드를 확인해 주세요. 소리 없이도 힌트로 답을 고를 수 있어요."
+              : "볼륨과 무음 모드를 확인한 뒤 다시 재생해 주세요."}
+          </Text>
+          <Text style={styles.playerError}>{audioError}</Text>
+          <AppButton
+            variant="secondary"
+            style={styles.actionButton}
+            textStyle={styles.actionButtonText}
+            onPress={() => void playClip()}
+          >
+            다시 재생
+          </AppButton>
         </View>
       ) : null}
 
       {snapshot.currentRound.accessibilityClue ? (
-        <Text style={styles.clueText}>
-          {snapshot.currentRound.accessibilityClue}
-        </Text>
+        <View style={styles.clueCard}>
+          <Text style={styles.clueLabel}>글자 힌트</Text>
+          <Text style={styles.clueValue}>
+            {snapshot.currentRound.accessibilityClue}
+          </Text>
+        </View>
       ) : null}
 
       <SongGuessAnswer
@@ -684,39 +757,78 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       {snapshot.phase === "guessing" && snapshot.viewer.joined === false ? (
         <View style={styles.waitingCard} accessibilityLiveRegion="polite">
           <Text style={styles.joinTitle} selectable>
-            관전 중
+            지금은 관전 중이에요
           </Text>
           <Text style={styles.muted} selectable>
-            다음 라운드부터 참여하려면 선생님에게 입장을 요청하세요.
+            이미 시작한 게임이라 이번 문제는 참여할 수 없어요. 친구들의 정답과 순위는 함께 볼 수 있어요.
+          </Text>
+          <Text style={styles.clueLabel} selectable>
+            다음 게임부터 바로 참여할 수 있어요
           </Text>
         </View>
       ) : null}
 
       {lastResult ? (
-        <Text
+        <View
           style={[
-            styles.resultText,
-            lastResult.correct ? styles.successText : styles.missText,
+            styles.resultCard,
+            lastResult.timedOut
+              ? styles.resultCardTimeout
+              : lastResult.correct
+                ? styles.resultCardCorrect
+                : styles.resultCardMiss,
           ]}
+          accessibilityLiveRegion="polite"
         >
-          {lastResult.timedOut
-            ? "시간이 지나 점수를 받지 못했어요"
-            : lastResult.correct
-              ? lastResult.alreadyScored
-                ? "이미 점수를 받았어요"
-                : `정답 +${lastResult.score}`
-              : "오답"}
-        </Text>
+          <Text
+            style={[
+              styles.resultTitle,
+              lastResult.timedOut
+                ? null
+                : lastResult.correct
+                  ? styles.resultTitleCorrect
+                  : styles.resultTitleMiss,
+            ]}
+          >
+            {lastResult.timedOut
+              ? "시간이 끝났어요"
+              : lastResult.correct
+                ? lastResult.alreadyScored
+                  ? "이미 점수를 받았어요"
+                  : "정답이에요!"
+                : "아쉬워요"}
+          </Text>
+          {!lastResult.timedOut && lastResult.correct && !lastResult.alreadyScored ? (
+            <Text style={styles.resultScore}>{`+${lastResult.score}점`}</Text>
+          ) : null}
+          <Text style={styles.resultBody}>
+            {lastResult.timedOut
+              ? "이번 문제는 답을 고르지 못했어요. 다음 문제에서 다시 도전할 수 있어요."
+              : lastResult.correct
+                ? "정답 공개에서 순위 변화를 확인해요."
+                : "정답 공개를 기다려 주세요. 다음 문제에서 만회할 수 있어요."}
+          </Text>
+        </View>
       ) : null}
 
       {(snapshot.phase === "reveal" || snapshot.phase === "finished") &&
       snapshot.currentRound.revealedAnswer ? (
-        <Text style={styles.answerText}>
-          {snapshot.currentRound.revealedAnswer}
-        </Text>
+        <View style={styles.answerCard}>
+          <Text style={styles.answerLabel}>{snapshot.viewer.scoredCurrentRound ? "정답이에요!" : "정답"}</Text>
+          <Text style={styles.answerText}>{snapshot.currentRound.revealedAnswer}</Text>
+        </View>
       ) : null}
 
       <SongGuessScoreboard snapshot={snapshot} />
+
+      <View style={styles.sessionFooter}>
+        <Text style={styles.sessionMeta}>
+          {syncing ? "동기화 중" : error ? "연결 확인 필요" : snapshot.phase === "finished" ? "최종 결과" : "연결됨"}
+        </Text>
+        <Text style={styles.sessionScore}>
+          {ownParticipant ? `${ownParticipant.score.toLocaleString("ko-KR")}점` : `${snapshot.participants.length}명`}
+        </Text>
+      </View>
 
       <View style={styles.actions}>
         {hasPending ? (
