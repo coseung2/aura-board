@@ -62,7 +62,7 @@ describe("SongGuessPoolPicker", () => {
     await screen.findByRole("button", { name: /여자 아이돌/ });
 
     fireEvent.click(screen.getByRole("button", { name: /여자 아이돌/ }));
-    fireEvent.change(screen.getByLabelText("듣기 구간"), { target: { value: "intro" } });
+    fireEvent.click(screen.getByRole("button", { name: "도입" }));
     const prepareButton = screen.getByRole("button", { name: "1문제 준비하기" });
     expect(prepareButton).toBeEnabled();
     fireEvent.click(prepareButton);
@@ -72,6 +72,22 @@ describe("SongGuessPoolPicker", () => {
       body: JSON.stringify({ categories: ["girl-idol"], segment: "intro", count: 1 }),
     });
     await waitFor(() => expect(onPrepared).toHaveBeenCalledWith({ rounds: [{ id: "round-1" }] }));
+  });
+
+  it("exposes segment and count as pressed buttons with a pool estimate", async () => {
+    render(<SongGuessPoolPicker boardId="board-1" busy={false} onPrepared={vi.fn()} />);
+    const highlight = await screen.findByRole("button", { name: "하이라이트" });
+    expect(highlight).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "도입" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
+    expect(screen.getByRole("button", { name: "1문제" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("img", { name: /조건에 맞는 1곡/ })).toBeInTheDocument();
+    expect(screen.getByText(/예상 진행/)).toBeInTheDocument();
   });
 
   it("keeps preparation busy until the prepared callback finishes", async () => {

@@ -5,6 +5,7 @@ export const SONG_GUESS_LEGACY_CLIP_TIERS_MS = [500, 1000, 1500] as const;
 export const SONG_GUESS_HIGHLIGHT_MS = 15000 as const;
 export const SONG_GUESS_CLIP_TIERS_MS = [500, 1000, 1500, 15000] as const;
 export const SONG_GUESS_CLIP_SCORES = [1000, 700, 400] as const;
+export const SONG_GUESS_ANSWER_WINDOW_MS = 30000 as const;
 export const SONG_GUESS_MAX_ROUNDS = 50;
 export const SONG_GUESS_MAX_CLIP_SIZE_BYTES = 8 * 1024 * 1024;
 export const SONG_GUESS_ALLOWED_MIME_TYPES = [
@@ -453,7 +454,7 @@ export function isSongGuessSnapshot(value: unknown): value is SongGuessSnapshot 
       if (startedAtMs !== null || deadlineAtMs !== null) return false;
     } else if (
       !Number.isSafeInteger(startedAtMs) || Number(startedAtMs) < 0 ||
-      !Number.isSafeInteger(deadlineAtMs) || Number(deadlineAtMs) - Number(startedAtMs) !== 30000
+      !Number.isSafeInteger(deadlineAtMs) || Number(deadlineAtMs) - Number(startedAtMs) !== SONG_GUESS_ANSWER_WINDOW_MS
     ) return false;
   }
   if (value.phase !== "guessing" && currentRound.currentClip !== null) return false;

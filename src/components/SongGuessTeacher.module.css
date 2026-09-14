@@ -10,6 +10,17 @@
 .setupControls { composes: setupControls from "./SongGuessTeacherSetup.module.css"; }
 .selectField { composes: selectField from "./SongGuessTeacherSetup.module.css"; }
 .setupActions { composes: setupActions from "./SongGuessTeacherSetup.module.css"; }
+.choiceFieldset { composes: choiceFieldset from "./SongGuessTeacherSetup.module.css"; }
+.choiceRow { composes: choiceRow from "./SongGuessTeacherSetup.module.css"; }
+.choiceButton { composes: choiceButton from "./SongGuessTeacherSetup.module.css"; }
+.choiceHint { composes: choiceHint from "./SongGuessTeacherSetup.module.css"; }
+.poolSummary { composes: poolSummary from "./SongGuessTeacherSetup.module.css"; }
+.poolSummaryHead { composes: poolSummaryHead from "./SongGuessTeacherSetup.module.css"; }
+.poolTotal { composes: poolTotal from "./SongGuessTeacherSetup.module.css"; }
+.poolTrack { composes: poolTrack from "./SongGuessTeacherSetup.module.css"; }
+.poolFill { composes: poolFill from "./SongGuessTeacherSetup.module.css"; }
+.poolEstimate { composes: poolEstimate from "./SongGuessTeacherSetup.module.css"; }
+.setupLabel { composes: setupLabel from "./SongGuessTeacherSetup.module.css"; }
 .poolCount { composes: poolCount from "./SongGuessTeacherSetup.module.css"; }
 .prepareButton { composes: prepareButton from "./SongGuessTeacherSetup.module.css"; }
 .setupError { composes: setupError from "./SongGuessTeacherSetup.module.css"; }

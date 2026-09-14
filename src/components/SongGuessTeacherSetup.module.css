@@ -415,3 +415,113 @@
     transition: none;
   }
 }
+
+.choiceFieldset {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choiceFieldset legend {
+  padding: 0;
+}
+
+.choiceRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.choiceButton {
+  min-height: 44px;
+  min-width: 96px;
+  padding: 0 18px;
+  border: 1px solid var(--song-teacher-line);
+  border-radius: 12px;
+  background: var(--song-teacher-surface-strong);
+  color: var(--song-teacher-text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease;
+}
+
+.choiceButton:hover:not(:disabled) {
+  border-color: var(--song-teacher-accent);
+}
+
+.choiceButton[aria-pressed="true"] {
+  border-color: var(--song-teacher-accent);
+  background: #efe7ff;
+  color: var(--song-teacher-bg);
+  box-shadow: inset 0 0 0 1px var(--song-teacher-accent);
+}
+
+.choiceButton:focus-visible {
+  outline: 3px solid rgb(200 178 255 / 42%);
+  outline-offset: 2px;
+}
+
+.choiceFieldset:disabled .choiceButton {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.choiceHint {
+  margin: 0;
+  color: var(--song-teacher-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.poolSummary {
+  display: grid;
+  gap: 10px;
+  padding-top: 24px;
+}
+
+.poolSummaryHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.poolTotal {
+  color: var(--song-teacher-text);
+  font-size: 24px;
+  font-weight: 900;
+}
+
+.poolTrack {
+  position: relative;
+  block-size: 8px;
+  border-radius: 999px;
+  background: var(--song-teacher-surface-strong);
+  overflow: hidden;
+}
+
+.poolFill {
+  display: block;
+  block-size: 100%;
+  border-radius: 999px;
+  background: var(--song-teacher-accent);
+}
+
+.poolEstimate {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  color: var(--song-teacher-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.poolEstimate strong {
+  color: var(--song-teacher-text);
+  font-size: 18px;
+  font-weight: 900;
+}

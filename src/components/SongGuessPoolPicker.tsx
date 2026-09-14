@@ -7,7 +7,18 @@ import type {
   SongGuessCatalogSummary,
 } from "@/lib/song-guess/catalog";
 import type { SongGuessTeacherSetup } from "@/lib/song-guess/contracts";
+import { estimateSongGuessDuration } from "@/lib/song-guess/setup-estimate";
 import styles from "./SongGuessTeacher.module.css";
+
+const SEGMENT_OPTIONS: { value: SongGuessCatalogSegment; label: string }[] = [
+  { value: "highlight", label: "하이라이트" },
+  { value: "intro", label: "도입" },
+];
+
+const SEGMENT_HINTS: Record<SongGuessCatalogSegment, string> = {
+  highlight: "학생이 바로 알아볼 수 있는 대표 구간이에요.",
+  intro: "곡의 도입부만 들려줘요. 난도가 올라가요.",
+};
 
 export function SongGuessPoolPicker({
   boardId,
@@ -78,6 +89,12 @@ export function SongGuessPoolPicker({
     .filter((value) => value > 0 && value <= available.length)
     .sort((left, right) => left - right);
   const disabled = busy || preparing;
+  const totalPoolSize = catalog?.songs.length ?? 0;
+  const poolRatio =
+    totalPoolSize === 0
+      ? 0
+      : Math.max(2, Math.round((available.length / totalPoolSize) * 100));
+  const estimate = estimateSongGuessDuration(roundCount);
 
   async function prepare() {
     if (disabled || roundCount < 1) return;
@@ -127,7 +144,7 @@ export function SongGuessPoolPicker({
           <>
             <fieldset className={styles.categoryFieldset} disabled={disabled}>
               <legend className={styles.categoryLegendRow}>
-                <strong>노래 분류</strong>
+                <strong>1 · 노래 분류</strong>
                 <span>복수 선택 가능</span>
               </legend>
               <div className={styles.categoryGrid}>
@@ -167,36 +184,69 @@ export function SongGuessPoolPicker({
             </fieldset>
 
             <div className={styles.setupControls}>
-              <label className={styles.selectField}>
-                <span>듣기 구간</span>
-                <select
-                  value={segment}
-                  disabled={disabled}
-                  onChange={(event) =>
-                    setSegment(event.target.value as SongGuessCatalogSegment)
-                  }
-                >
-                  <option value="highlight">하이라이트</option>
-                  <option value="intro">도입</option>
-                </select>
-              </label>
-              <label className={styles.selectField}>
-                <span>문제 수</span>
-                <select
-                  value={roundCount}
-                  disabled={disabled || available.length === 0}
-                  onChange={(event) => setCount(Number(event.target.value))}
-                >
-                  {available.length === 0 && <option value={0}>0문제</option>}
-                  {countOptions.map((value) => (
-                    <option key={value} value={value}>
-                      {value}문제
-                    </option>
+              <fieldset className={styles.choiceFieldset} disabled={disabled}>
+                <legend className={styles.setupLabel}>2 · 듣기 구간</legend>
+                <div className={styles.choiceRow}>
+                  {SEGMENT_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      className={styles.choiceButton}
+                      aria-pressed={segment === option.value}
+                      onClick={() => setSegment(option.value)}
+                    >
+                      {option.label}
+                    </button>
                   ))}
-                </select>
-              </label>
+                </div>
+                <p className={styles.choiceHint}>{SEGMENT_HINTS[segment]}</p>
+              </fieldset>
+              <fieldset
+                className={styles.choiceFieldset}
+                disabled={disabled || available.length === 0}
+              >
+                <legend className={styles.setupLabel}>3 · 문제 수</legend>
+                <div className={styles.choiceRow}>
+                  {countOptions.length === 0 ? (
+                    <span className={styles.choiceHint}>선택한 조건에 맞는 곡이 없어요.</span>
+                  ) : (
+                    countOptions.map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        className={styles.choiceButton}
+                        aria-pressed={roundCount === value}
+                        onClick={() => setCount(value)}
+                      >
+                        {value}문제
+                      </button>
+                    ))
+                  )}
+                </div>
+              </fieldset>
             </div>
 
+            <div className={styles.poolSummary}>
+              <div className={styles.poolSummaryHead}>
+                <span className={styles.setupLabel}>선택 조건에서 출제 가능한 곡</span>
+                <strong className={styles.poolTotal}>
+                  {available.length === 0 ? "0곡" : `${available.length}곡`}
+                </strong>
+              </div>
+              <div
+                className={styles.poolTrack}
+                role="img"
+                aria-label={`전체 ${totalPoolSize}곡 중 조건에 맞는 ${available.length}곡`}
+              >
+                <span className={styles.poolFill} style={{ inlineSize: `${poolRatio}%` }} />
+              </div>
+              {estimate && (
+                <p className={styles.poolEstimate}>
+                  예상 진행 <strong>{estimate.label}</strong>
+                  <span>{`곡 풀 ${available.length}곡에서 ${roundCount}문제 무작위 구성`}</span>
+                </p>
+              )}
+            </div>
             <div className={styles.setupActions}>
               <span className={styles.poolCount}>
                 {available.length === 0 ? "등록된 곡 없음" : `곡 풀 ${available.length}곡`}
