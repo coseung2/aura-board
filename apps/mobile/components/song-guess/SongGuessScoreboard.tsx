@@ -21,45 +21,59 @@ export function SongGuessScoreboard({
   snapshot: SongGuessSnapshot;
 }) {
   const ranked = rankParticipants(snapshot.participants);
+  const own = snapshot.viewer.participantIndex == null
+    ? null
+    : ranked.find((participant) =>
+        participant.participantId === snapshot.participants[snapshot.viewer.participantIndex!]?.participantId,
+      ) ?? null;
+
+  if (snapshot.phase === "draft" || snapshot.phase === "lobby" || snapshot.phase === "guessing") {
+    return null;
+  }
+
   return (
     <>
-      {snapshot.phase === "reveal" || snapshot.phase === "finished" ? (
+      {snapshot.phase === "reveal" && own ? (
+        <View style={styles.ownResultCard} accessibilityLiveRegion="polite">
+          <View>
+            <Text style={styles.resultMeta}>현재 순위</Text>
+            <Text style={styles.ownRank}>{own.rank}위</Text>
+          </View>
+          <View>
+            <Text style={styles.resultMeta}>누적</Text>
+            <Text style={styles.ownScore}>{own.score.toLocaleString("ko-KR")}점</Text>
+          </View>
+          <Text style={styles.nextRound}>다음 문제는 선생님이 시작해요</Text>
+        </View>
+      ) : null}
+
+      {snapshot.phase === "finished" ? (
         <View style={styles.revealCard} accessibilityLiveRegion="polite">
-          <Text style={styles.revealTitle} selectable>
-            {snapshot.phase === "finished" ? "최종 포디엄" : "이번 라운드 결과"}
-          </Text>
+          {own ? (
+            <View style={styles.finalSummary}>
+              <View>
+                <Text style={styles.resultMeta}>내 최종 순위</Text>
+                <Text style={styles.finalRank}>{own.rank}위</Text>
+                <Text style={styles.finalScore}>{own.score.toLocaleString("ko-KR")}점</Text>
+              </View>
+              <View style={styles.finalPet}>
+                {own.representativePet ? <SlimeSprite slimeColor={toSlimeColor(own.representativePet.color)} growthStage={own.representativePet.growthStage} action="idle" displayScale={0.65} accessibilityLabel={`${own.displayName} 슬라임`} /> : null}
+              </View>
+            </View>
+          ) : null}
+          <Text style={styles.revealTitle} selectable>최종 TOP 3</Text>
           <View style={styles.revealRows}>
-            {(snapshot.phase === "finished"
-              ? podiumParticipants(ranked)
-              : ranked.slice(0, 5)
-            ).map((participant) => (
+            {podiumParticipants(ranked).map((participant) => (
               <ScoreParticipantRow
                 key={`${participant.participantId ?? participant.displayName}-${participant.rank}`}
                 participant={participant}
-                showRoundScore
-                podium={snapshot.phase === "finished"}
+                podium
               />
             ))}
           </View>
         </View>
       ) : null}
 
-      <View style={styles.scoreCard}>
-        <Text style={styles.scoreHeading} selectable>
-          전체 순위
-        </Text>
-        {ranked.length ? (
-          ranked.map((participant) => (
-            <ScoreParticipantRow
-              key={`${participant.participantId ?? participant.displayName}-overall`}
-              participant={participant}
-              showMovement={snapshot.phase !== "lobby"}
-            />
-          ))
-        ) : (
-          <Text style={styles.muted}>점수 없음</Text>
-        )}
-      </View>
     </>
   );
 }
@@ -174,6 +188,15 @@ function toSlimeColor(value: string): SlimeColor {
 }
 
 const styles = StyleSheet.create({
+  ownResultCard: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", gap: spacing.md, padding: spacing.lg, borderRadius: song.answerRadius, backgroundColor: song.track },
+  resultMeta: { ...typography.micro, color: song.muted },
+  ownRank: { ...typography.display, color: song.text },
+  ownScore: { ...typography.title, color: song.accent },
+  nextRound: { ...typography.body, width: "100%", color: song.muted },
+  finalSummary: { minHeight: song.finalSummaryMinHeight, flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.lg, borderRadius: song.answerRadius, backgroundColor: song.track },
+  finalRank: { ...typography.display, color: song.text },
+  finalScore: { ...typography.label, color: song.muted },
+  finalPet: { width: song.finalPetSize, height: song.finalPetSize, alignItems: "center", justifyContent: "center", overflow: "hidden" },
   revealCard: {
     gap: spacing.md,
     padding: spacing.lg,

@@ -51,14 +51,17 @@ export function SongGuessAnswer({
                   (answered || revealed) && !isSelected && styles.choiceMuted,
                   revealStyle,
                 ]}
-                textStyle={[styles.choiceText, index === 2 && styles.choiceTextDark]}
                 disabled={disabled || answered || revealed}
                 accessibilityLabel={`${index + 1}번, ${choice.label}${isCorrect ? ", 정답" : isSelected ? ", 제출한 오답" : ""}`}
                 accessibilityHint={revealed || answered ? undefined : "누르면 이 답을 제출합니다"}
                 accessibilityState={{ selected: isSelected }}
                 onPress={() => onSubmit(choice.id)}
               >
-                {`${index + 1}. ${choice.label}${isSelected ? "  ✓" : ""}`}
+                <View style={[styles.choiceNumber, index === 2 && styles.choiceNumberDark]}>
+                  <Text style={[styles.choiceNumberText, index === 2 && styles.choiceTextDark]}>{index + 1}</Text>
+                </View>
+                <Text style={[styles.choiceText, index === 2 && styles.choiceTextDark]} numberOfLines={2}>{choice.label}</Text>
+                {isSelected ? <Text style={[styles.choiceBadge, index === 2 && styles.choiceBadgeDark]}>{revealed && isCorrect ? "정답 · 내 답" : "내 답"}</Text> : null}
               </AppButton>
             );
           })}
@@ -108,21 +111,36 @@ export function SongGuessAnswer({
 
 const styles = StyleSheet.create({
   container: { gap: spacing.md },
-  title: { ...typography.subtitle, color: song.muted, textAlign: "center" },
+  title: { ...typography.badge, color: song.muted },
   choiceGrid: { gap: spacing.sm },
   choice: {
-    minHeight: tapMin * 1.75,
-    justifyContent: "flex-start",
-    borderWidth: borders.medium,
+    minHeight: song.answerHeight,
+    paddingHorizontal: spacing.md,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.md,
+    borderWidth: borders.hairline,
     borderColor: "transparent",
     borderRadius: song.answerRadius,
   },
-  choiceText: { ...typography.subtitle, color: song.text, textAlign: "left" },
+  choiceNumber: {
+    width: song.answerNumberSize,
+    height: song.answerNumberSize,
+    borderRadius: song.answerRadius,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: song.answerNumberBg,
+  },
+  choiceNumberDark: { backgroundColor: song.answerNumberDarkBg },
+  choiceNumberText: { ...typography.section, color: song.text },
+  choiceText: { ...typography.subtitle, flex: 1, color: song.text, textAlign: "left" },
   choiceTextDark: { color: song.answerDarkText },
   selected: { borderColor: song.text, borderWidth: song.selectedBorderWidth },
   choiceMuted: { opacity: song.mutedChoiceOpacity },
   choiceCorrect: { borderColor: song.text, borderWidth: song.selectedBorderWidth },
   choiceWrong: { borderColor: song.text, borderWidth: song.selectedBorderWidth },
+  choiceBadge: { ...typography.micro, color: song.text },
+  choiceBadgeDark: { color: song.answerDarkText },
   first: { backgroundColor: song.answer1 },
   second: { backgroundColor: song.answer2 },
   third: { backgroundColor: song.answer3 },

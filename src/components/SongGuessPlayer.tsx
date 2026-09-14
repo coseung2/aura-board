@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Music2, Pause, Play, RotateCcw } from "lucide-react";
+import { Pause, Play, RotateCcw } from "lucide-react";
 import type { SongGuessClipSnapshot } from "@/lib/song-guess/contracts";
 import { songGuessClipUrl } from "@/lib/song-guess/browser-client";
 import { SongGuessTeacherTimer } from "./SongGuessTeacherTimer";
@@ -199,18 +199,20 @@ export function SongGuessPlayer({
             aria-label={playing ? "음악 일시정지" : played ? "음악 다시 재생" : "음악 재생"}
             aria-pressed={playing}
           >
-            {playing ? (
-              <Pause size={40} aria-hidden="true" />
-            ) : played ? (
-              <RotateCcw size={36} aria-hidden="true" />
-            ) : (
-              <Play size={40} aria-hidden="true" />
-            )}
+            <span className={styles.studentRecord} aria-hidden="true">
+              <span className={styles.studentRecordHub}>
+                {playing ? <Pause size={16} /> : played ? <RotateCcw size={15} /> : <Play size={16} />}
+              </span>
+            </span>
           </button>
-          <span className={styles.clipLabel}>
-            <Music2 size={16} aria-hidden="true" />
-            {loading ? "불러오는 중…" : `${clip.tierMs / 1000}초 듣기`}
-          </span>
+          <div className={styles.studentPlayerInfo}>
+            <strong>{loading ? "불러오는 중" : playing ? "재생 중" : played ? "재생 완료" : "재생 준비"}</strong>
+            <span>{clip.tierMs / 1000}초 하이라이트</span>
+            <small>{formatTime(currentTime)} / {formatTime(clipDurationSeconds)}</small>
+            <span className={styles.studentWaveTrack} aria-hidden="true">
+              <span style={{ width: `${audioProgress * 100}%` }} />
+            </span>
+          </div>
           {media}
         </>
       ) : (
