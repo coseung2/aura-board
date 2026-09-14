@@ -51,11 +51,11 @@ export async function fetchOmokMatchmaking(
 
 export async function requestOmokMatch(
   boardId: string,
-  opponent: "human" | "computer" = "human",
+  request: { action?: "random" | "computer" | "create_room" | "join_room"; roomId?: string; roomName?: string; joinMode?: "player" | "spectator" } = {},
 ): Promise<OmokMatchmakingStatus> {
   return apiFetch<OmokMatchmakingStatus>(
     `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,
-    { method: "POST", json: { opponent }, timeoutMs: 8_000 },
+    { method: "POST", json: request, timeoutMs: 8_000 },
   );
 }
 

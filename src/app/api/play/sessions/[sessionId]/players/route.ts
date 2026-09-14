@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { getEquippedSlimeFloor } from "@/lib/pets/catalog";
-import { resolvePlayActor } from "@/lib/play-platform/actor";
+import { resolvePlayActorForSession } from "@/lib/play-platform/actor";
 import { playEngineFetch, proxyPlayEngineResponse } from "@/lib/play-platform/server-client";
 import { playRouteError } from "@/lib/play-platform/route-utils";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
@@ -13,7 +13,7 @@ type Params = { params: Promise<{ sessionId: string }> };
 export async function GET(_request: Request, { params }: Params) {
   try {
     const { sessionId } = await params;
-    const actor = await resolvePlayActor();
+    const actor = await resolvePlayActorForSession(sessionId);
     const authorized = await playEngineFetch(
       `/v1/sessions/${encodeURIComponent(sessionId)}/snapshot`,
       { actor },

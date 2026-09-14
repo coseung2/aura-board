@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { GameParticipantPet } from "@/features/games/components/GameParticipantPet";
@@ -300,7 +300,33 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
     setBusy(true);
     setError(null);
     try {
-      const next = await requestOmokMatch(boardId);
+      const next = await requestOmokMatch(boardId, { action: "random" });
+      setMatchmaking(next);
+      if (next.status === "matched" && next.href) router.replace(next.href);
+    } catch (cause) {
+      setError(messageForError(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function createLobbyRoom() {
+    setBusy(true);
+    setError(null);
+    try {
+      setMatchmaking(await requestOmokMatch(boardId, { action: "create_room" }));
+    } catch (cause) {
+      setError(messageForError(cause));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function joinLobbyRoom(roomId: string, joinMode: "player" | "spectator") {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await requestOmokMatch(boardId, { action: "join_room", roomId, joinMode });
       setMatchmaking(next);
       if (next.status === "matched" && next.href) router.replace(next.href);
     } catch (cause) {
@@ -352,7 +378,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
         <section className={styles.shell} aria-label={boardTitle}>
           <div className={styles.matchPanel}>
             <p className={styles.eyebrow}>온라인 오목</p>
-            <h1 className={styles.title}>{waiting ? "상대를 찾는 중" : "오목 매칭"}</h1>
+            <h1 className={styles.title}>{waiting ? "입장 대기 중" : "오목 로비"}</h1>
             <div className={styles.matchSignal} aria-hidden>
               <span />
               <span />
@@ -360,8 +386,8 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
             </div>
             <p className={styles.message} role="status" aria-live="polite">
               {waiting
-                ? `현재 ${matchmaking.playerCount}명이 입장해 있어요. 기다리는 동안 컴퓨터와 바로 시작할 수도 있어요.`
-                : "같은 학급 친구를 찾거나 컴퓨터와 바로 대국할 수 있어요."}
+                ? matchmaking.queueKind === "room" ? "내 방에 들어올 플레이어를 기다리고 있어요." : `현재 ${matchmaking.playerCount}명이 랜덤 매칭을 기다리고 있어요.`
+                : "랜덤 매칭을 시작하거나 공개 방에 참여하세요."}
             </p>
             <div className={styles.matchActions}>
               <button
@@ -370,7 +396,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
                 disabled={busy}
                 onClick={() => void (waiting ? stopMatchmaking() : startMatchmaking())}
               >
-                {busy ? "처리 중…" : waiting ? "매칭 취소" : "친구 매칭"}
+                {busy ? "처리 중…" : waiting ? "대기 취소" : "랜덤 매칭"}
               </button>
               <button
                 className={waiting ? styles.button : styles.secondaryButton}
@@ -380,7 +406,26 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
               >
                 컴퓨터와 대국
               </button>
+              {!waiting ? (
+                <button className={styles.secondaryButton} type="button" disabled={busy} onClick={() => void createLobbyRoom()}>
+                  방 만들기
+                </button>
+              ) : null}
             </div>
+            {!waiting ? (
+              <div className={styles.roomList} aria-label="공개 오목 방">
+                {(matchmaking.rooms ?? []).length === 0 ? <p className={styles.emptyRooms}>열린 방이 없어요.</p> : null}
+                {(matchmaking.rooms ?? []).map((room) => (
+                  <article className={styles.roomRow} key={room.id}>
+                    <div><strong>{room.name}</strong><span>{room.hostName} · 플레이 {room.playerCount}/2 · 관전 {room.spectatorCount}</span></div>
+                    <div className={styles.roomActions}>
+                      <button type="button" disabled={busy || room.status !== "waiting" || room.playerCount >= 2} onClick={() => void joinLobbyRoom(room.id, "player")}>플레이</button>
+                      <button type="button" disabled={busy || room.status !== "active"} onClick={() => void joinLobbyRoom(room.id, "spectator")}>관전</button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
             {error ? <p className={styles.error}>{error}</p> : null}
           </div>
         </section>
@@ -528,8 +573,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
                 ? profileFor(profiles, participant.slot)
                 : null;
               return (
-                <Fragment key={participant.slot}>
-                  <div className={styles.card}>
+                <div className={styles.card} key={participant.slot}>
                     <h2 className={styles.cardTitle}>
                       {participant.slot === "first" ? "흑돌 플레이어" : "백돌 플레이어"}
                     </h2>
@@ -560,21 +604,14 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
                     {participant.ready ? "준비됨" : "대기"}
                   </span>
                 </div>
-                  </div>
-                  {index === 0 ? (
-                    <div className={styles.matchInfo} role="status" aria-live="polite">
-                      <div><span>대국 시간</span><strong>{formatElapsed(startedAtMs, clockNow)}</strong></div>
-                      <div><span>현재 상태</span><strong>{statusText}</strong></div>
-                      <div><span>착수</span><strong>{snapshot.game.moveCount}수</strong></div>
-                    </div>
-                  ) : null}
-                </Fragment>
+                  {index === 0 ? <span className={styles.currentStatus}>{statusText}</span> : null}
+                </div>
               );
             })}
 
-            <div className={styles.card}>
-              <h2 className={styles.cardTitle}>진행 안내</h2>
-              <p className={styles.message}>{actionHint(snapshot)}</p>
+            <div className={styles.timerCard} role="timer" aria-label={`대국 시간 ${formatElapsed(startedAtMs, clockNow)}`}>
+              <strong>{formatElapsed(startedAtMs, clockNow)}</strong>
+              <div className={styles.timerTrack}><span style={{ width: `${((clockNow / 1000) % 60) / 60 * 100}%` }} /></div>
             </div>
 
             <div className={styles.actions}>

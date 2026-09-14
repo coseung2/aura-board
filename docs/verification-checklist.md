@@ -100,6 +100,17 @@ creating overlapping testing-notes documents.
 
 ## Baseline checks
 
+- 2026-09-15 KST Omok public rooms: students can use random matching or create
+  a public lobby room. The first two room entrants are players; after the match
+  starts, additional students explicitly enter as read-only spectators. The
+  play engine projects spectators with no slot and rejects gameplay commands.
+  Web and mobile show player/spectator counts, separate play/watch actions, and
+  elapsed time with a moving progress line. Focused web/API tests passed 30
+  cases and the Rust play-server suite passed 60 tests (1 Docker restart test
+  ignored). Prisma generation passed; schema validation requires the absent
+  local `DIRECT_URL`. Existing unrelated TypeScript and line-limit failures are
+  recorded in the release report.
+
 - 2026-09-11 KST game rooms: student entry only provisions Omok/song-guess hubs;
   Kordle, speed-game and shadow-alliance require an existing teacher-opened hub.
   Song-guess now lists separate teacher/student sessions. Student room creation

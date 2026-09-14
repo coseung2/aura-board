@@ -2049,6 +2049,9 @@ model OmokMatchTicket {
   studentId    String
 
   status            String  @default("waiting")
+  queueKind         String  @default("random")
+  joinMode          String  @default("player")
+  lobbyRoomId       String?
   opponentStudentId String?
   matchBoardId      String?
   sessionId         String?
@@ -2059,6 +2062,27 @@ model OmokMatchTicket {
 
   @@unique([lobbyBoardId, studentId])
   @@index([lobbyBoardId, status, requestedAt])
+  @@index([lobbyRoomId])
+  @@index([matchBoardId])
+  @@index([sessionId])
+}
+
+model OmokLobbyRoom {
+  id String @id @default(cuid())
+
+  lobbyBoardId String
+  classroomId  String
+  hostStudentId String
+  name          String
+  status        String @default("waiting")
+  matchBoardId  String?
+  sessionId     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([lobbyBoardId, classroomId, status, createdAt])
+  @@index([hostStudentId, status])
   @@index([matchBoardId])
   @@index([sessionId])
 }

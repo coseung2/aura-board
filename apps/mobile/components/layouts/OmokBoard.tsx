@@ -51,6 +51,11 @@ import { OmokTerminalPanel } from "./omok/OmokTerminalPanel";
 
 const MATCHMAKING_HEARTBEAT_MS = 15_000;
 
+function formatElapsed(startedAtMs: number | null, now: number): string {
+  const seconds = startedAtMs == null ? 0 : Math.max(0, Math.floor((now - startedAtMs) / 1000));
+  return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+}
+
 export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   const router = useRouter();
   const boardId = data.board.id;
@@ -63,6 +68,7 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   const [matchmakingLoading, setMatchmakingLoading] = useState(matchmakingEnabled);
   const [matchmakingBusy, setMatchmakingBusy] = useState(false);
   const [matchmakingError, setMatchmakingError] = useState<string | null>(null);
+  const [clockNow, setClockNow] = useState(Date.now());
   const sequenceRef = useRef(0);
   const matchmakingRefreshRef = useRef<Promise<void> | null>(null);
   const { width, height } = useSafeWindowDimensions();
@@ -81,7 +87,14 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   });
   const { state, socketStatus, offline } = runtime;
   const snapshot = state.snapshot;
-  const playerPets = useOmokPlayerPets(snapshot?.sessionId);
+  const playerProfiles = useOmokPlayerPets(snapshot?.sessionId);
+  const playerPets = playerProfiles.players;
+
+  useEffect(() => {
+    if (snapshot?.roomStatus !== "active") return;
+    const timer = setInterval(() => setClockNow(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [snapshot?.roomStatus]);
 
   useLayoutEffect(() => {
     if (!snapshot) return;
@@ -162,12 +175,12 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   }, [matchmaking.status, matchmakingEnabled, refreshMatchmaking]);
 
   const startMatchmaking = useCallback(
-    async (opponent: "human" | "computer") => {
+    async (request: Parameters<typeof requestOmokMatch>[1]) => {
       if (!matchmakingEnabled || matchmakingBusy) return;
       setMatchmakingBusy(true);
       setMatchmakingError(null);
       try {
-        acceptMatchmaking(await requestOmokMatch(boardId, opponent));
+        acceptMatchmaking(await requestOmokMatch(boardId, request));
       } catch (cause) {
         setMatchmakingError(omokHttpErrorMessage(cause));
       } finally {
@@ -223,12 +236,12 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
           <View style={styles.matchCard}>
             <Text style={styles.eyebrow}>온라인 오목</Text>
             <Text style={styles.matchTitle}>
-              {waiting ? "친구를 찾는 중" : "오목 매칭"}
+              {waiting ? "입장 대기 중" : "오목 로비"}
             </Text>
             <Text style={styles.matchMessage} accessibilityLiveRegion="polite">
               {waiting
-                ? `현재 ${matchmaking.playerCount}명이 매칭에 참여 중이에요.`
-                : "같은 학급 친구를 찾거나 컴퓨터와 바로 대국할 수 있어요."}
+                ? matchmaking.queueKind === "room" ? "내 방에 들어올 플레이어를 기다리고 있어요." : `현재 ${matchmaking.playerCount}명이 랜덤 매칭을 기다리고 있어요.`
+                : "랜덤 매칭을 시작하거나 공개 방에 참여하세요."}
             </Text>
             <View style={styles.matchActions}>
               {waiting ? (
@@ -242,7 +255,7 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
                   </AppButton>
                   <AppButton
                     disabled={matchmakingBusy}
-                    onPress={() => void startMatchmaking("computer")}
+                    onPress={() => void startMatchmaking({ action: "computer" })}
                   >
                     컴퓨터와 바로 대국
                   </AppButton>
@@ -251,20 +264,40 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
                 <>
                   <AppButton
                     disabled={matchmakingBusy}
-                    onPress={() => void startMatchmaking("human")}
+                    onPress={() => void startMatchmaking({ action: "random" })}
                   >
-                    {matchmakingBusy ? "처리 중…" : "친구 매칭"}
+                    {matchmakingBusy ? "처리 중…" : "랜덤 매칭"}
                   </AppButton>
                   <AppButton
                     variant="secondary"
                     disabled={matchmakingBusy}
-                    onPress={() => void startMatchmaking("computer")}
+                    onPress={() => void startMatchmaking({ action: "computer" })}
                   >
                     컴퓨터와 대국
+                  </AppButton>
+                  <AppButton variant="secondary" disabled={matchmakingBusy} onPress={() => void startMatchmaking({ action: "create_room" })}>
+                    방 만들기
                   </AppButton>
                 </>
               )}
             </View>
+            {!waiting ? (
+              <View style={styles.roomList} accessibilityLabel="공개 오목 방">
+                {(matchmaking.rooms ?? []).length === 0 ? <Text style={styles.roomEmpty}>열린 방이 없어요.</Text> : null}
+                {(matchmaking.rooms ?? []).map((room) => (
+                  <View style={styles.roomRow} key={room.id}>
+                    <View style={styles.roomCopy}>
+                      <Text style={styles.roomName} numberOfLines={1}>{room.name}</Text>
+                      <Text style={styles.roomMeta}>{`${room.hostName} · 플레이 ${room.playerCount}/2 · 관전 ${room.spectatorCount}`}</Text>
+                    </View>
+                    <View style={styles.roomActions}>
+                      <AppButton style={styles.roomButton} disabled={matchmakingBusy || room.status !== "waiting" || room.playerCount >= 2} onPress={() => void startMatchmaking({ action: "join_room", roomId: room.id, joinMode: "player" })}>플레이</AppButton>
+                      <AppButton variant="secondary" style={styles.roomButton} disabled={matchmakingBusy || room.status !== "active"} onPress={() => void startMatchmaking({ action: "join_room", roomId: room.id, joinMode: "spectator" })}>관전</AppButton>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
             {matchmakingError ? <Text style={styles.error}>{matchmakingError}</Text> : null}
           </View>
         </ScrollView>
@@ -321,6 +354,10 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
     <View style={styles.gameRoot}>
       <OmokHud snapshot={snapshot} players={playerPets} />
       <OmokTurnBar banner={banner} />
+      <View style={styles.timer} accessibilityRole="timer" accessibilityLabel={`대국 시간 ${formatElapsed(playerProfiles.startedAtMs, clockNow)}`}>
+        <Text style={styles.timerText}>{formatElapsed(playerProfiles.startedAtMs, clockNow)}</Text>
+        <View style={styles.timerTrack}><View style={[styles.timerFill, { width: `${(((clockNow / 1000) % 60) / 60) * 100}%` }]}><View style={styles.timerHead} /></View></View>
+      </View>
 
       <OmokGrid
         board={board}
@@ -533,6 +570,19 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   matchActions: { gap: spacing.sm },
+  roomList: { gap: spacing.sm },
+  roomEmpty: { ...typography.body, color: omokTokens.statusLabel, textAlign: "center" },
+  roomRow: { gap: spacing.sm, padding: spacing.md, borderRadius: radii.control, borderWidth: StyleSheet.hairlineWidth, borderColor: omokTokens.panelBorder, backgroundColor: omokTokens.roomSurface },
+  roomCopy: { gap: spacing.xs },
+  roomName: { ...typography.label, color: omokTokens.text, fontWeight: "800" },
+  roomMeta: { ...typography.micro, color: omokTokens.statusHint },
+  roomActions: { flexDirection: "row", gap: spacing.sm },
+  roomButton: { flex: 1, minHeight: omokTokens.confirmMinHeight },
+  timer: { gap: spacing.xs, paddingHorizontal: spacing.xs },
+  timerText: { ...typography.title, color: omokTokens.text, letterSpacing: omokTokens.timerLetterSpacing },
+  timerTrack: { height: omokTokens.timerTrackHeight, borderRadius: radii.pill, backgroundColor: omokTokens.timerTrack, overflow: "hidden" },
+  timerFill: { height: "100%", minWidth: 8, borderRadius: radii.pill, backgroundColor: omokTokens.timerFill, alignItems: "flex-end", justifyContent: "center" },
+  timerHead: { width: omokTokens.timerHeadSize, height: omokTokens.timerHeadSize, borderRadius: radii.pill, borderWidth: omokTokens.timerHeadBorderWidth, borderColor: omokTokens.eyebrow, backgroundColor: omokTokens.panelSurface },
   muted: { ...typography.body, color: colors.textMuted },
   emptyIcon: { fontSize: omokTokens.emptyIconSize },
   eyebrow: {

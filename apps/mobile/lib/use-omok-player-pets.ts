@@ -11,15 +11,15 @@ export type OmokPlayerPet = {
 };
 
 export function useOmokPlayerPets(sessionId: string | undefined) {
-  const [result, setResult] = useState<{ sessionId: string; players: OmokPlayerPet[] } | null>(null);
+  const [result, setResult] = useState<{ sessionId: string; startedAtMs: number | null; players: OmokPlayerPet[] } | null>(null);
   useEffect(() => {
     if (!sessionId) return;
     const controller = new AbortController();
     let retry: ReturnType<typeof setTimeout> | undefined;
     const load = async () => {
       try {
-        const response = await apiFetch<{ players: OmokPlayerPet[] }>(`/api/play/sessions/${encodeURIComponent(sessionId)}/players`, { signal: controller.signal });
-        if (!controller.signal.aborted) setResult({ sessionId, players: response.players });
+        const response = await apiFetch<{ startedAtMs: number | null; players: OmokPlayerPet[] }>(`/api/play/sessions/${encodeURIComponent(sessionId)}/players`, { signal: controller.signal });
+        if (!controller.signal.aborted) setResult({ sessionId, startedAtMs: response.startedAtMs, players: response.players });
       } catch {
         if (!controller.signal.aborted) retry = setTimeout(() => void load(), 5_000);
       }
@@ -27,5 +27,7 @@ export function useOmokPlayerPets(sessionId: string | undefined) {
     void load();
     return () => { controller.abort(); clearTimeout(retry); };
   }, [sessionId]);
-  return result?.sessionId === sessionId ? result.players : [];
+  return result && result.sessionId === sessionId
+    ? result
+    : { sessionId: null, startedAtMs: null, players: [] };
 }

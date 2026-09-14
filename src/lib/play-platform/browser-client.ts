@@ -130,21 +130,18 @@ export async function fetchOmokMatchmaking(boardId: string): Promise<OmokMatchma
   );
 }
 
-export async function requestOmokMatch(boardId: string): Promise<OmokMatchmakingStatus> {
+export async function requestOmokMatch(
+  boardId: string,
+  request: { action?: "random" | "computer" | "create_room" | "join_room"; roomId?: string; roomName?: string; joinMode?: "player" | "spectator" } = {},
+): Promise<OmokMatchmakingStatus> {
   return requestJson<OmokMatchmakingStatus>(
     `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,
-    { method: "POST" },
+    { method: "POST", body: JSON.stringify(request) },
   );
 }
 
 export async function requestOmokComputerMatch(boardId: string): Promise<OmokMatchmakingStatus> {
-  return requestJson<OmokMatchmakingStatus>(
-    `/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`,
-    {
-      method: "POST",
-      body: JSON.stringify({ opponent: "computer" }),
-    },
-  );
+  return requestOmokMatch(boardId, { action: "computer" });
 }
 
 export async function cancelOmokMatch(boardId: string): Promise<OmokMatchmakingStatus> {

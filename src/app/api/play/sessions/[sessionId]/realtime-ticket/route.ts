@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
-import { resolvePlayActor } from "@/lib/play-platform/actor";
+import { resolvePlayActorForSession } from "@/lib/play-platform/actor";
 import { isOmokSnapshot } from "@/lib/play-platform/contracts";
 import { OMOK_BOT_ACTOR_SUBJECT } from "@/lib/play-platform/omok-bot";
 import {
@@ -28,7 +28,7 @@ export async function POST(_request: Request, { params }: Params) {
       );
     }
     const { sessionId } = await params;
-    const actor = await resolvePlayActor();
+    const actor = await resolvePlayActorForSession(sessionId);
     const authorized = await playEngineFetch(
       `/v1/sessions/${encodeURIComponent(sessionId)}/snapshot`,
       { actor },
@@ -37,6 +37,13 @@ export async function POST(_request: Request, { params }: Params) {
     const snapshot = (await authorized.json().catch(() => null)) as unknown;
     if (!isOmokSnapshot(snapshot) || snapshot.sessionId !== sessionId) {
       throw new PlayEngineUnavailableError("invalid_play_engine_snapshot");
+    }
+    if (actor.role === "spectator") {
+      return jsonPrivateNoStore({
+        transport: "http" as const,
+        reason: "spectator" as const,
+        pollIntervalMs: 3000 as const,
+      });
     }
 
     const bot = await db.playParticipant.findFirst({

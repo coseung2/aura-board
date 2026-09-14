@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextResponse } from "next/server";
 
 const mocks = vi.hoisted(() => ({
-  resolvePlayActor: vi.fn(),
+  resolvePlayActorForSession: vi.fn(),
   playEngineFetch: vi.fn(),
   participantFindFirst: vi.fn(),
   issueTransport: vi.fn(),
@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock("@/lib/play-platform/actor", async (importOriginal) => {
   const original = await importOriginal<typeof import("@/lib/play-platform/actor")>();
-  return { ...original, resolvePlayActor: mocks.resolvePlayActor };
+  return { ...original, resolvePlayActorForSession: mocks.resolvePlayActorForSession };
 });
 vi.mock("@/lib/play-platform/server-client", async (importOriginal) => {
   const original = await importOriginal<
@@ -87,7 +87,7 @@ const context = { params: Promise.resolve({ sessionId: "session-1" }) };
 describe("Omok realtime ticket route", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.resolvePlayActor.mockResolvedValue(actor);
+    mocks.resolvePlayActorForSession.mockResolvedValue(actor);
     mocks.realtimeEnabled.mockReturnValue(true);
     mocks.playEngineFetch.mockResolvedValue(
       new Response(JSON.stringify(snapshot()), {
@@ -134,6 +134,17 @@ describe("Omok realtime ticket route", () => {
     expect(mocks.issueTransport).not.toHaveBeenCalled();
   });
 
+  it("returns read-only HTTP polling for a spectator", async () => {
+    mocks.resolvePlayActorForSession.mockResolvedValue({ ...actor, subject: "student:3", studentId: "3", role: "spectator" });
+    mocks.playEngineFetch.mockResolvedValue(new Response(JSON.stringify({ ...snapshot(), viewer: { role: "spectator", slot: null, capabilities: { canRematch: false } } }), { status: 200 }));
+
+    const response = await POST(request(), context);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ transport: "http", reason: "spectator", pollIntervalMs: 3000 });
+    expect(mocks.issueTransport).not.toHaveBeenCalled();
+  });
+
   it("forwards membership denial and does not query or issue transport", async () => {
     mocks.playEngineFetch.mockResolvedValue(
       new Response(JSON.stringify({ error: "forbidden" }), {
@@ -166,7 +177,7 @@ describe("Omok realtime ticket route", () => {
     const response = await POST(request(), context);
     expect(response.status).toBe(503);
     expect(await response.json()).toEqual({ error: "realtime_disabled" });
-    expect(mocks.resolvePlayActor).not.toHaveBeenCalled();
+    expect(mocks.resolvePlayActorForSession).not.toHaveBeenCalled();
     expect(mocks.playEngineFetch).not.toHaveBeenCalled();
     expect(mocks.participantFindFirst).not.toHaveBeenCalled();
     expect(mocks.issueTransport).not.toHaveBeenCalled();

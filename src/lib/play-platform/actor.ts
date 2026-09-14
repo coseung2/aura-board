@@ -58,6 +58,22 @@ export async function resolvePlayActor(): Promise<PlayActor> {
   throw new PlayAccessError(401, "unauthorized");
 }
 
+/** Resolve an Omok spectator ticket into a read-only play-engine actor. */
+export async function resolvePlayActorForSession(sessionId: string): Promise<PlayActor> {
+  const actor = await resolvePlayActor();
+  if (!actor.studentId) return actor;
+  const spectator = await db.omokMatchTicket.findFirst({
+    where: {
+      studentId: actor.studentId,
+      sessionId,
+      status: "matched",
+      joinMode: "spectator",
+    },
+    select: { id: true },
+  });
+  return spectator ? { ...actor, role: "spectator" } : actor;
+}
+
 type ClassroomBoardActorOptions = {
   notFoundCode: string;
   requiredLayout?: string;

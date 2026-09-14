@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { resolvePlayActor } from "@/lib/play-platform/actor";
+import { resolvePlayActorForSession } from "@/lib/play-platform/actor";
 import {
   playEngineFetch,
   proxyPlayEngineResponse,
@@ -30,7 +30,7 @@ export async function POST(request: Request, { params }: Params) {
         { status: 400 },
       );
     }
-    const actor = await resolvePlayActor();
+    const actor = await resolvePlayActorForSession(sessionId);
     const response = await playEngineFetch(
       `/v1/sessions/${encodeURIComponent(sessionId)}/rematch`,
       { actor, method: "POST", body: parsed.data },

@@ -7,7 +7,7 @@ vi.mock("@/lib/db", () => ({ db: {
   playSession: { findUnique: mocks.session }, student: { findMany: mocks.students },
   studentSlime: { findMany: mocks.slimes }, gameResult: { findMany: mocks.results },
 } }));
-vi.mock("@/lib/play-platform/actor", () => ({ resolvePlayActor: vi.fn().mockResolvedValue({ subject: "student:a" }) }));
+vi.mock("@/lib/play-platform/actor", () => ({ resolvePlayActorForSession: vi.fn().mockResolvedValue({ subject: "student:a" }) }));
 vi.mock("@/lib/play-platform/server-client", () => ({
   playEngineFetch: mocks.engine, proxyPlayEngineResponse: (response: Response) => response,
 }));

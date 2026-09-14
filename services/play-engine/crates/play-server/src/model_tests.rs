@@ -25,6 +25,37 @@ fn host() -> ActorContext {
     }
 }
 
+#[test]
+fn omok_spectator_can_read_but_cannot_play() {
+    let mut record = SessionRecord::new(
+        "session-spectator".to_owned(),
+        "board-1".to_owned(),
+        host().subject,
+        [seed("student:1"), seed("student:2")],
+        None,
+        1_000,
+    )
+    .unwrap();
+    record.start_immediately().unwrap();
+    let spectator = ActorContext {
+        subject: "student:3".to_owned(),
+        role: ActorRole::Spectator,
+    };
+
+    let snapshot = record.snapshot(&spectator, 1_001).unwrap();
+    assert_eq!(snapshot.viewer.role, ActorRole::Spectator);
+    assert_eq!(snapshot.viewer.slot, None);
+    assert_eq!(
+        record.apply(
+            &spectator,
+            &OmokIntent::PlaceStone {
+                position: play_domain::omok::OmokPosition { row: 7, column: 7 },
+            },
+        ),
+        Err(ModelError::NotParticipant),
+    );
+}
+
 fn session() -> SessionRecord {
     SessionRecord::new(
         "session-1".to_owned(),

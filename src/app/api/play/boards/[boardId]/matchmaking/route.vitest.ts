@@ -16,6 +16,11 @@ const mocks = vi.hoisted(() => ({
   ticketUpsert: vi.fn(),
   ticketUpdate: vi.fn(),
   ticketUpdateMany: vi.fn(),
+  roomFindMany: vi.fn(),
+  roomFindFirst: vi.fn(),
+  roomCreate: vi.fn(),
+  roomUpdate: vi.fn(),
+  roomUpdateMany: vi.fn(),
   sessionFindFirst: vi.fn(),
   classroomFindUnique: vi.fn(),
   queryRaw: vi.fn(),
@@ -50,6 +55,13 @@ vi.mock("@/lib/db", () => {
       upsert: mocks.ticketUpsert,
       update: mocks.ticketUpdate,
       updateMany: mocks.ticketUpdateMany,
+    },
+    omokLobbyRoom: {
+      findMany: mocks.roomFindMany,
+      findFirst: mocks.roomFindFirst,
+      create: mocks.roomCreate,
+      update: mocks.roomUpdate,
+      updateMany: mocks.roomUpdateMany,
     },
     playSession: { findFirst: mocks.sessionFindFirst },
     classroom: { findUnique: mocks.classroomFindUnique },
@@ -107,6 +119,10 @@ describe("Omok matchmaking", () => {
     mocks.ticketUpdate.mockResolvedValue({});
     mocks.ticketUpdateMany.mockResolvedValue({ count: 2 });
     mocks.ticketFindFirst.mockResolvedValue({ id: "ticket-1", studentId: "student-1" });
+    mocks.roomFindMany.mockResolvedValue([]);
+    mocks.roomCreate.mockResolvedValue({ id: "room-1" });
+    mocks.roomUpdate.mockResolvedValue({});
+    mocks.roomUpdateMany.mockResolvedValue({ count: 0 });
     mocks.sessionFindFirst.mockResolvedValue({ completedAtMs: null, state: { state: { roomStatus: "active" } } });
     mocks.classroomFindUnique.mockResolvedValue({ teacherId: "teacher-1" });
     mocks.queryRaw.mockResolvedValue([]);
@@ -120,6 +136,12 @@ describe("Omok matchmaking", () => {
             upsert: mocks.ticketUpsert,
             findFirst: mocks.ticketFindFirst,
             update: mocks.ticketUpdate,
+          },
+          omokLobbyRoom: {
+            findFirst: mocks.roomFindFirst,
+            create: mocks.roomCreate,
+            update: mocks.roomUpdate,
+            updateMany: mocks.roomUpdateMany,
           },
           classroom: { findUnique: mocks.classroomFindUnique },
           $queryRaw: mocks.queryRaw,
@@ -153,7 +175,12 @@ describe("Omok matchmaking", () => {
         requestedAt: { lt: expect.any(Date) },
       }),
     }));
-    expect(await response.json()).toEqual({ status: "waiting", playerCount: 2 });
+    expect(await response.json()).toEqual({
+      status: "waiting",
+      playerCount: 2,
+      queueKind: "random",
+      rooms: [],
+    });
   });
 
   it("does not write a heartbeat for every fast poll", async () => {
@@ -169,7 +196,12 @@ describe("Omok matchmaking", () => {
 
     expect(response.status).toBe(200);
     expect(mocks.ticketUpdateMany).not.toHaveBeenCalled();
-    expect(await response.json()).toEqual({ status: "waiting", playerCount: 2 });
+    expect(await response.json()).toEqual({
+      status: "waiting",
+      playerCount: 2,
+      queueKind: "random",
+      rooms: [],
+    });
   });
 
   it("pairs two students and starts the authoritative match without requiring teacher request auth", async () => {
@@ -206,6 +238,8 @@ describe("Omok matchmaking", () => {
     expect(await response.json()).toEqual({
       status: "matched",
       playerCount: 2,
+      queueKind: "random",
+      joinMode: "player",
       sessionId: "session-1",
       boardSlug: "omok-match-room",
       href: "/board/omok-match-room?view=student",
@@ -252,6 +286,8 @@ describe("Omok matchmaking", () => {
     expect(await response.json()).toEqual({
       status: "matched",
       playerCount: 1,
+      queueKind: "random",
+      joinMode: "player",
       sessionId: "session-bot",
       boardSlug: "omok-match-room",
       href: "/board/omok-match-room?view=student",
@@ -270,7 +306,7 @@ describe("Omok matchmaking", () => {
       state: { state: { roomStatus: "finished" } },
     });
     const response = await GET(request, context);
-    expect(await response.json()).toEqual({ status: "idle", playerCount: 0 });
+    expect(await response.json()).toEqual({ status: "idle", playerCount: 0, rooms: [] });
     expect(mocks.ticketUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "ticket-2" },
       data: expect.objectContaining({ status: "idle", matchBoardId: null, sessionId: null }),
@@ -305,7 +341,7 @@ describe("Omok matchmaking", () => {
       },
       select: { completedAtMs: true, state: true },
     });
-    expect(await response.json()).toEqual({ status: "idle", playerCount: 0 });
+    expect(await response.json()).toEqual({ status: "idle", playerCount: 0, rooms: [] });
     expect(mocks.ticketUpdate).toHaveBeenCalledWith(expect.objectContaining({
       where: { id: "ticket-2" },
       data: expect.objectContaining({ status: "idle", matchBoardId: null, sessionId: null }),

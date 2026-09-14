@@ -204,6 +204,7 @@ impl RealtimeTicketVerifier {
                 .iter()
                 .map(|participant| participant.actor_subject.as_str())
                 .collect(),
+            ActorRole::Spectator => Vec::new(),
         };
         let presented = URL_SAFE_NO_PAD
             .decode(&claims.actor_key)
@@ -299,6 +300,7 @@ fn role_name(role: ActorRole) -> &'static str {
     match role {
         ActorRole::Host => "host",
         ActorRole::Participant => "participant",
+        ActorRole::Spectator => "spectator",
     }
 }
 

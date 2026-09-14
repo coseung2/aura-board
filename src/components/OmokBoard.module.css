@@ -2,9 +2,9 @@
   min-height: 100%;
   padding: clamp(16px, 3vw, 36px);
   background:
-    radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.88), transparent 28%),
-    linear-gradient(145deg, #effbf7 0%, #e7f4ff 54%, #f7efff 100%);
-  color: #17352d;
+    radial-gradient(circle at 12% 8%, rgba(255, 255, 255, 0.9), transparent 28%),
+    #f1eefe;
+  color: #191c45;
 }
 
 .header {
@@ -18,7 +18,7 @@
 
 .eyebrow {
   margin: 0 0 4px;
-  color: #4a766b;
+  color: #7f66f0;
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -45,10 +45,10 @@
 .panel {
   max-width: 1380px;
   margin: 0 auto;
-  border: 1px solid rgba(38, 83, 72, 0.14);
+  border: 1px solid #e6e2fb;
   border-radius: 28px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 24px 70px rgba(44, 77, 99, 0.13);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 70px rgba(90, 70, 160, 0.13);
   backdrop-filter: blur(18px);
   overflow: hidden;
 }
@@ -88,6 +88,7 @@
 
 .matchSignal { display: flex; justify-content: center; gap: 7px; margin: 28px 0 18px; }
 .matchSignal span { width: 10px; height: 10px; border-radius: 50%; background: #1f7f68; animation: omok-match-pulse 1.2s infinite ease-in-out; }
+.matchSignal span { background: #7f66f0; }
 .matchSignal span:nth-child(2) { animation-delay: .16s; }
 .matchSignal span:nth-child(3) { animation-delay: .32s; }
 @keyframes omok-match-pulse { 0%, 70%, 100% { opacity: .28; transform: translateY(0); } 35% { opacity: 1; transform: translateY(-5px); } }
@@ -102,9 +103,9 @@
   width: min(100%, 820px);
   aspect-ratio: 1;
   margin: 0 auto;
-  border: 12px solid #ad7a42;
+  border: 12px solid #c49358;
   border-radius: 20px;
-  background: #d9a65e;
+  background: #e3bc86;
   box-shadow:
     inset 0 0 0 2px rgba(72, 42, 17, 0.28),
     0 18px 34px rgba(79, 55, 35, 0.2);
@@ -175,9 +176,9 @@
 }
 
 .card {
-  border: 1px solid rgba(43, 91, 78, 0.12);
+  border: 1px solid #e6e2fb;
   border-radius: 18px;
-  background: #f9fffc;
+  background: #f6f5fe;
   padding: 16px;
 }
 
@@ -209,6 +210,23 @@
 
 .petThumb { display: grid; place-items: center; width: 56px; height: 56px; }
 .playerRecord { grid-column: 3; color: #62847c; font-size: .72rem; font-weight: 700; }
+.playerRecord { color: #6f6b96; }
+.currentStatus { display: block; margin-top: 8px; color: #6f6b96; font-size: .78rem; font-weight: 800; }
+
+.timerCard { display: grid; gap: 10px; border: 1px solid #e6e2fb; border-radius: 18px; background: #fff; padding: 16px; }
+.timerCard strong { color: #191c45; font-size: 1.45rem; letter-spacing: .06em; }
+.timerTrack { height: 8px; overflow: hidden; border-radius: 999px; background: #ece9fa; }
+.timerTrack span { position: relative; display: block; height: 100%; min-width: 8px; border-radius: inherit; background: linear-gradient(90deg, #7f66f0, #fdc761); transition: width 1s linear; }
+.timerTrack span::after { content: ""; position: absolute; right: 0; top: 50%; width: 10px; height: 10px; border: 2px solid #7f66f0; border-radius: 50%; background: #fff; transform: translate(0, -50%); }
+
+.roomList { display: grid; gap: 10px; margin-top: 24px; text-align: left; }
+.emptyRooms { margin: 0; color: #8e8ab0; text-align: center; }
+.roomRow { display: flex; align-items: center; justify-content: space-between; gap: 14px; border: 1px solid #e6e2fb; border-radius: 16px; background: #f6f5fe; padding: 14px; }
+.roomRow > div:first-child { display: grid; gap: 4px; min-width: 0; }
+.roomRow span { color: #6f6b96; font-size: .78rem; }
+.roomActions { display: flex; gap: 6px; }
+.roomActions button { min-height: 40px; border: 1px solid #dcd6fa; border-radius: 10px; background: #fff; padding: 0 12px; color: #6c4eee; font-weight: 800; }
+.roomActions button:disabled { opacity: .4; }
 
 .matchInfo { display: grid; gap: 10px; border: 1px solid rgba(43, 91, 78, 0.12); border-radius: 18px; background: #f9fffc; padding: 16px; }
 .matchInfo > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -271,7 +289,7 @@
 
 .button {
   border: 0;
-  background: #1f7f68;
+  background: #7f66f0;
   color: white;
   box-shadow: 0 8px 18px rgba(31, 127, 104, 0.22);
 }

@@ -165,7 +165,7 @@
           "additionalProperties": false,
           "required": ["role", "slot", "capabilities"],
           "properties": {
-            "role": { "type": "string", "enum": ["host", "participant"] },
+            "role": { "type": "string", "enum": ["host", "participant", "spectator"] },
             "slot": {
               "oneOf": [
                 { "$ref": "#/$defs/slot" },

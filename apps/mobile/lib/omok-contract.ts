@@ -30,7 +30,7 @@ export type OmokSnapshot = {
     ready: boolean;
   }>;
   viewer: {
-    role: "host" | "participant";
+    role: "host" | "participant" | "spectator";
     slot: OmokSlot | null;
     /** Actor-projected capabilities. `canRematch` is true only for the host of
      * a terminal session, so the UI must never infer it from role or names. */
@@ -80,6 +80,18 @@ export type PendingOmokCommand = {
 export type OmokMatchmakingStatus = {
   status: "idle" | "waiting" | "matched";
   playerCount: number;
+  queueKind?: "random" | "room";
+  joinMode?: "player" | "spectator";
+  lobbyRoomId?: string | null;
+  rooms?: Array<{
+    id: string;
+    name: string;
+    hostName: string;
+    status: "waiting" | "active";
+    playerCount: number;
+    spectatorCount: number;
+    createdAt: string;
+  }>;
   sessionId?: string;
   boardSlug?: string;
   href?: string | null;
@@ -97,7 +109,7 @@ export type OmokRealtimeTransport =
     }
   | {
       transport: "http";
-      reason: "bot_session";
+      reason: "bot_session" | "spectator";
       pollIntervalMs: number;
     };
 
@@ -145,10 +157,11 @@ export function isOmokSnapshot(value: unknown): value is OmokSnapshot {
   }
   if (participantSlots.size !== 2) return false;
   if (
-    (viewer.role !== "host" && viewer.role !== "participant") ||
+    (viewer.role !== "host" && viewer.role !== "participant" && viewer.role !== "spectator") ||
     !(viewer.slot === null || isOmokSlot(viewer.slot)) ||
     (viewer.role === "host" && viewer.slot !== null) ||
     (viewer.role === "participant" && !isOmokSlot(viewer.slot)) ||
+    (viewer.role === "spectator" && viewer.slot !== null) ||
     !isPlainRecord(viewer.capabilities) ||
     typeof viewer.capabilities.canRematch !== "boolean"
   ) return false;
@@ -257,12 +270,12 @@ export function parseOmokRealtimeTransport(
   }
   if (value.transport === "http") {
     if (
-      value.reason !== "bot_session" ||
+      (value.reason !== "bot_session" && value.reason !== "spectator") ||
       value.pollIntervalMs !== OMOK_ACTIVE_POLL_INTERVAL_MS
     ) return null;
     return {
       transport: "http",
-      reason: "bot_session",
+      reason: value.reason,
       pollIntervalMs: OMOK_ACTIVE_POLL_INTERVAL_MS,
     };
   }

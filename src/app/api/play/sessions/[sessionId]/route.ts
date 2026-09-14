@@ -1,4 +1,4 @@
-import { resolvePlayActor } from "@/lib/play-platform/actor";
+import { resolvePlayActorForSession } from "@/lib/play-platform/actor";
 import {
   playEngineFetch,
   proxyPlayEngineResponse,
@@ -13,7 +13,7 @@ type Params = { params: Promise<{ sessionId: string }> };
 export async function GET(_request: Request, { params }: Params) {
   try {
     const { sessionId } = await params;
-    const actor = await resolvePlayActor();
+    const actor = await resolvePlayActorForSession(sessionId);
     const response = await playEngineFetch(
       `/v1/sessions/${encodeURIComponent(sessionId)}/snapshot`,
       { actor },

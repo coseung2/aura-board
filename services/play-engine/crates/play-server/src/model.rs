@@ -18,6 +18,7 @@ pub const MAX_SAFE_VERSION: u64 = 9_007_199_254_740_991;
 pub enum ActorRole {
     Host,
     Participant,
+    Spectator,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -377,6 +378,7 @@ impl SessionRecord {
     pub fn authorize(&self, actor: &ActorContext) -> Result<Option<OmokSlot>, ModelError> {
         match actor.role {
             ActorRole::Host if actor.subject == self.host_subject => Ok(None),
+            ActorRole::Spectator => Ok(None),
             ActorRole::Participant => self
                 .state
                 .participants

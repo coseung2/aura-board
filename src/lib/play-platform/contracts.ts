@@ -4,7 +4,7 @@ export const OMOK_RULES_VERSION = 1 as const;
 export const OMOK_REALTIME_PROTOCOL_VERSION = 1 as const;
 export const PLAY_SESSION_CHANGED_EVENT = "play_session_changed" as const;
 
-export type PlayActorRole = "host" | "participant";
+export type PlayActorRole = "host" | "participant" | "spectator";
 export type OmokSlot = "first" | "second";
 export type OmokRoomStatus = "waiting" | "ready" | "active" | "finished";
 export type OmokCell = OmokSlot | null;
@@ -94,7 +94,7 @@ export type OmokRealtimeTransport =
     }
   | {
       transport: "http";
-      reason: "bot_session";
+      reason: "bot_session" | "spectator";
       pollIntervalMs: 3000;
     };
 
@@ -169,6 +169,18 @@ export type OmokRosterStudent = {
 export type OmokMatchmakingStatus = {
   status: "idle" | "waiting" | "matched";
   playerCount: number;
+  queueKind?: "random" | "room";
+  joinMode?: "player" | "spectator";
+  lobbyRoomId?: string | null;
+  rooms?: Array<{
+    id: string;
+    name: string;
+    hostName: string;
+    status: "waiting" | "active";
+    playerCount: number;
+    spectatorCount: number;
+    createdAt: string;
+  }>;
   sessionId?: string;
   href?: string | null;
 };
@@ -239,10 +251,11 @@ export function isOmokSnapshot(value: unknown): value is OmokSnapshot {
   }
   if (participantSlots.size !== 2) return false;
   if (
-    (viewer.role !== "host" && viewer.role !== "participant") ||
+    (viewer.role !== "host" && viewer.role !== "participant" && viewer.role !== "spectator") ||
     !(viewer.slot === null || isOmokSlot(viewer.slot)) ||
     (viewer.role === "host" && viewer.slot !== null) ||
     (viewer.role === "participant" && !isOmokSlot(viewer.slot)) ||
+    (viewer.role === "spectator" && viewer.slot !== null) ||
     !isRecord(viewer.capabilities) ||
     typeof viewer.capabilities.canRematch !== "boolean"
   ) return false;

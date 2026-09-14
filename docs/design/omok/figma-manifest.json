@@ -118,7 +118,75 @@
         "name": "나이트 펫대국",
         "web": "208:288",
         "mobile": "215:334"
+      },
+      {
+        "key": "D",
+        "name": "라일락 카드",
+        "web": "238:396",
+        "mobile": "247:426",
+        "selected": true
       }
+    ],
+    "selected": "D · 라일락 카드 — 사용자 선택 (2026-09-15). 앱 셸 제거, 판·카드·타이머만 유지.",
+    "collections": {
+      "dLilac": {
+        "id": "VariableCollectionId:238:380",
+        "name": "Omok · D Lilac (EXPLORE)",
+        "count": 15
+      }
+    },
+    "assets": {
+      "petSprites": "public/creatures/slimes/official/base/{blue,green}/idle/sheet.png 첫 프레임",
+      "woodTexture": "work/omok-assets/felt-wood3.png (절차 생성, 커밋 대상 아님)"
+    },
+    "dScope": {
+      "kept": [
+        "board card",
+        "player cards",
+        "timer (progress line)",
+        "match info",
+        "actions"
+      ],
+      "removed": [
+        "icon rail",
+        "segmented tabs",
+        "bottom tab bar",
+        "hint card",
+        "move log"
+      ],
+      "timer": {
+        "web": "253:472",
+        "mobile": "255:472",
+        "style": "남은 시간 숫자 + 소진 진행선 + 헤드 마커"
+      },
+      "gridOverlay": {
+        "web": "262:472",
+        "mobile": "263:1892",
+        "reason": "인스턴스 자식 크기는 오버라이드 불가. 마스터 헤어라인을 숨기고 선명한 격자를 로컬로 그렸다."
+      }
+    },
+    "dStates": [
+      {
+        "id": "265:472",
+        "name": "D / Web / M1 · 매칭 대기"
+      },
+      {
+        "id": "265:580",
+        "name": "D / Web / W1 · 준비 대기"
+      },
+      {
+        "id": "265:688",
+        "name": "D / Web / R1 · 승리"
+      },
+      {
+        "id": "265:796",
+        "name": "D / Web / E1 · 연결 끊김"
+      }
+    ],
+    "dStateGaps": [
+      "무승부, 기권 확인, 관전자 시점 화면이 없다.",
+      "모바일은 진행 화면만 있고 상태 4종이 없다.",
+      "태블릿 브레이크포인트 프레임이 없다."
     ]
   },
   "readyNote": "This READY set documents what ships today, verified against OmokBoard.module.css. It is not a decision on the A/B/C redesign, which needs a human direction choice. When a direction is approved, promote it and move this baseline to DEPRECATED.",
