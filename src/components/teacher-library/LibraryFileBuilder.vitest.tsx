@@ -4,6 +4,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TeacherLibraryItemDto } from "@/lib/teacher-library-types";
+import { DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS } from "@/lib/teacher-library-print-layout";
 import { LibraryFileBuilder } from "./LibraryFileBuilder";
 
 const now = "2026-08-19T00:00:00.000Z";
@@ -36,12 +37,12 @@ describe("LibraryFileBuilder", () => {
       <LibraryFileBuilder
         selectedItems={[item("image", "image"), item("canva", "canva")]}
         filename="수업 자료"
-        layout="a4-auto"
+        printOptions={DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS}
         busy={false}
         canvaConnected={true}
         error={null}
         onFilename={vi.fn()}
-        onLayout={vi.fn()}
+        onPrintOptions={vi.fn()}
         onMove={onMove}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
@@ -64,12 +65,12 @@ describe("LibraryFileBuilder", () => {
       <LibraryFileBuilder
         selectedItems={[item("canva", "canva")]}
         filename="수업 자료"
-        layout="a4-fit"
+        printOptions={{ ...DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS, mode: "fit-page" }}
         busy={false}
         canvaConnected={false}
         error={null}
         onFilename={vi.fn()}
-        onLayout={vi.fn()}
+        onPrintOptions={vi.fn()}
         onMove={vi.fn()}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
@@ -83,6 +84,58 @@ describe("LibraryFileBuilder", () => {
     expect(reconnect).toHaveBeenCalledOnce();
   });
 
+  it("updates paper direction and spacing through one print options contract", () => {
+    const onPrintOptions = vi.fn();
+    render(
+      <LibraryFileBuilder
+        selectedItems={[item("image", "image")]}
+        filename="수업 자료"
+        printOptions={DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS}
+        busy={false}
+        canvaConnected={true}
+        error={null}
+        onFilename={vi.fn()}
+        onPrintOptions={onPrintOptions}
+        onMove={vi.fn()}
+        onRemove={vi.fn()}
+        onDownload={vi.fn()}
+        onReconnectCanva={vi.fn()}
+        onPageCount={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: "가로" }));
+    expect(onPrintOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ orientation: "landscape" }),
+    );
+
+    expect(screen.queryByRole("spinbutton", { name: "바깥 여백" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "고급 옵션" }));
+
+    fireEvent.change(screen.getByRole("spinbutton", { name: "바깥 여백" }), {
+      target: { value: "10" },
+    });
+    expect(onPrintOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ marginMm: 10 }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "좁게" }));
+    expect(onPrintOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ marginMm: 6.4 }),
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: "왼쪽 위" }));
+    expect(onPrintOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ lastPageAlignment: "start" }),
+    );
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /재단선 표시/ }));
+    expect(onPrintOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ cropMarks: true }),
+    );
+    expect(screen.getByText("원본 크기 우선")).toBeInTheDocument();
+  });
+
   it("shows every source page in a vertical preview sequence", () => {
     render(
       <LibraryFileBuilder
@@ -94,12 +147,12 @@ describe("LibraryFileBuilder", () => {
           },
         ]}
         filename="수업 자료"
-        layout="a4-fit"
+        printOptions={{ ...DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS, mode: "fit-page" }}
         busy={false}
         canvaConnected={true}
         error={null}
         onFilename={vi.fn()}
-        onLayout={vi.fn()}
+        onPrintOptions={vi.fn()}
         onMove={vi.fn()}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
@@ -120,12 +173,12 @@ describe("LibraryFileBuilder", () => {
       <LibraryFileBuilder
         selectedItems={[{ ...item("canva", "canva"), pageCount: 5 }]}
         filename="수업 자료"
-        layout="a4-auto"
+        printOptions={DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS}
         busy={false}
         canvaConnected={true}
         error={null}
         onFilename={vi.fn()}
-        onLayout={vi.fn()}
+        onPrintOptions={vi.fn()}
         onMove={vi.fn()}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
@@ -152,12 +205,12 @@ describe("LibraryFileBuilder", () => {
       <LibraryFileBuilder
         selectedItems={items}
         filename="자료"
-        layout="a4-fit"
+        printOptions={{ ...DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS, mode: "fit-page" }}
         busy={false}
         canvaConnected={true}
         error={null}
         onFilename={vi.fn()}
-        onLayout={vi.fn()}
+        onPrintOptions={vi.fn()}
         onMove={vi.fn()}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
@@ -172,5 +225,30 @@ describe("LibraryFileBuilder", () => {
     ).map((image) => image.getAttribute("src") ?? "");
     expect(thumbnails.filter((src) => src.includes("page=2"))).toHaveLength(3);
     expect(thumbnails.filter((src) => src.includes("page=3"))).toHaveLength(3);
+  });
+
+  it("renders an exact plan from measured source dimensions", () => {
+    render(
+      <LibraryFileBuilder
+        selectedItems={[item("image", "image"), item("canva", "canva")]}
+        filename="자료"
+        printOptions={DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS}
+        printSources={[{ width: 120, height: 80 }, { width: 240, height: 160 }]}
+        busy={false}
+        canvaConnected={true}
+        error={null}
+        onFilename={vi.fn()}
+        onPrintOptions={vi.fn()}
+        onMove={vi.fn()}
+        onRemove={vi.fn()}
+        onDownload={vi.fn()}
+        onReconnectCanva={vi.fn()}
+        onPageCount={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("정확한 배치")).toBeInTheDocument();
+    expect(screen.getByLabelText("정확한 PDF 배치 미리보기")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "실제 크기로 정확히 보기" })).not.toBeInTheDocument();
   });
 });

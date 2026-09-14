@@ -46,7 +46,11 @@ describe("teacher library PDF export route", () => {
     expect(mocks.buildPdf).toHaveBeenCalledWith(
       expect.objectContaining({
         userId: "teacher-1",
-        layout: "a4-auto",
+        options: expect.objectContaining({
+          mode: "auto-original",
+          paper: "a4",
+          orientation: "portrait",
+        }),
         items: [
           expect.objectContaining({ id: "canva-1" }),
           expect.objectContaining({ id: "image-1" }),

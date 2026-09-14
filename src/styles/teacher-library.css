@@ -519,7 +519,6 @@ body:has(.teacher-library-page) .board-toolkit-menu {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  margin-top: auto;
   color: #62697a;
   font-size: 12px;
   font-weight: 700;

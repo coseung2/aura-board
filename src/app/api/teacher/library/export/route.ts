@@ -8,6 +8,7 @@ import {
   buildTeacherLibraryPdf,
   TeacherLibraryPdfError,
 } from "@/lib/teacher-library-pdf";
+import { DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS } from "@/lib/teacher-library-print-layout";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -15,7 +16,16 @@ export const maxDuration = 300;
 const BodySchema = z.object({
   itemIds: z.array(z.string().min(1)).min(1).max(20),
   filename: z.string().trim().min(1).max(100).default("수업 자료"),
-  layout: z.enum(["a4-auto", "a4-fit", "original"]).default("a4-auto"),
+  layout: z.enum(["a4-auto", "a4-fit", "original"]).optional(),
+  options: z.object({
+    mode: z.enum(["auto-original", "fit-page", "original-pages"]),
+    paper: z.literal("a4"),
+    orientation: z.enum(["portrait", "landscape"]),
+    marginMm: z.number().min(0).max(30),
+    gapMm: z.number().min(0).max(30),
+    lastPageAlignment: z.enum(["start", "center"]).default("center"),
+    cropMarks: z.boolean().default(false),
+  }).optional(),
 });
 
 export async function POST(request: Request) {
@@ -50,7 +60,7 @@ export async function POST(request: Request) {
       userId: user.id,
       items: ordered,
       baseUrl: request.url,
-      layout: parsed.data.layout,
+      options: parsed.data.options ?? legacyOptions(parsed.data.layout),
     });
     const safeAscii = parsed.data.filename.replace(/[^a-zA-Z0-9._-]+/g, "_") || "aura-library";
     return new Response(bytes.buffer as ArrayBuffer, {
@@ -67,4 +77,13 @@ export async function POST(request: Request) {
     console.error("[POST /api/teacher/library/export]", error);
     return jsonPrivateNoStore({ error: "library_export_failed" }, { status: 500 });
   }
+}
+
+function legacyOptions(layout: "a4-auto" | "a4-fit" | "original" | undefined) {
+  const mode = layout === "a4-fit"
+    ? "fit-page"
+    : layout === "original"
+      ? "original-pages"
+      : "auto-original";
+  return { ...DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS, mode } as const;
 }

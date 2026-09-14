@@ -8,7 +8,11 @@ vi.mock("@/lib/canva", () => ({
   getAccessToken: vi.fn(async () => null),
 }));
 
-import { buildTeacherLibraryPdf, planAutoA4GridPages } from "./teacher-library-pdf";
+import {
+  buildTeacherLibraryPdf,
+  inspectTeacherLibraryPrintSources,
+} from "./teacher-library-pdf";
+import { DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS } from "./teacher-library-print-layout";
 
 let imageBytes: Buffer;
 
@@ -49,7 +53,7 @@ describe("buildTeacherLibraryPdf layouts", () => {
       userId: "teacher-1",
       items,
       baseUrl: "http://localhost/api/teacher/library/export",
-      layout: "a4-auto",
+      options: DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS,
     });
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(1);
   });
@@ -59,18 +63,21 @@ describe("buildTeacherLibraryPdf layouts", () => {
       userId: "teacher-1",
       items,
       baseUrl: "http://localhost/api/teacher/library/export",
-      layout: "a4-fit",
+      options: { ...DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS, mode: "fit-page" },
     });
     expect((await PDFDocument.load(bytes)).getPageCount()).toBe(2);
   });
 
-  it("keeps the first-page grid scale when the last A4 page has one item", () => {
-    const units = Array.from({ length: 5 }, () => ({ width: 900, height: 1600 }));
-    const pages = planAutoA4GridPages(units);
+  it("reads image density for an exact print source size", async () => {
+    const sources = await inspectTeacherLibraryPrintSources({
+      userId: "teacher-1",
+      items: [items[0]],
+      baseUrl: "http://localhost/api/teacher/library/print-sources",
+    });
 
-    expect(pages).toHaveLength(2);
-    expect(pages.map((page) => page.count)).toEqual([4, 1]);
-    expect(pages[1].grid).toEqual(pages[0].grid);
-    expect(pages[0].grid).toMatchObject({ columns: 2, rows: 2, count: 4 });
+    expect(sources).toHaveLength(1);
+    expect(sources[0].width).toBeCloseTo(90);
+    expect(sources[0].height).toBeCloseTo(60);
   });
+
 });

@@ -18,21 +18,29 @@ import { OptimizedImage } from "@/components/ui/OptimizedImage";
 import { canvaPageThumbnailUrl } from "@/lib/canva-url";
 import type {
   TeacherLibraryItemDto,
-  TeacherLibraryPdfLayout,
+  TeacherLibraryPrintMode,
+  TeacherLibraryPrintOptions,
 } from "@/lib/teacher-library-types";
+import {
+  planTeacherLibraryPrint,
+  type PrintSourcePage,
+} from "@/lib/teacher-library-print-layout";
 
 type Props = {
   selectedItems: TeacherLibraryItemDto[];
   filename: string;
-  layout: TeacherLibraryPdfLayout;
+  printOptions: TeacherLibraryPrintOptions;
+  printSources?: PrintSourcePage[] | null;
+  previewBusy?: boolean;
   busy: boolean;
   canvaConnected: boolean;
   error: string | null;
   onFilename: (value: string) => void;
-  onLayout: (value: TeacherLibraryPdfLayout) => void;
+  onPrintOptions: (value: TeacherLibraryPrintOptions) => void;
   onMove: (index: number, direction: -1 | 1) => void;
   onRemove: (id: string) => void;
   onDownload: () => Promise<void>;
+  onLoadExactPreview?: () => Promise<void>;
   onReconnectCanva: () => void;
   onPageCount: (itemId: string, pageCount: number) => void;
 };
@@ -40,19 +48,23 @@ type Props = {
 export function LibraryFileBuilder({
   selectedItems,
   filename,
-  layout,
+  printOptions,
+  printSources = null,
+  previewBusy = false,
   busy,
   canvaConnected,
   error,
   onFilename,
-  onLayout,
+  onPrintOptions,
   onMove,
   onRemove,
   onDownload,
+  onLoadExactPreview,
   onReconnectCanva,
   onPageCount,
 }: Props) {
   const [resolvedPageCounts, setResolvedPageCounts] = useState<Record<string, number>>({});
+  const [advancedOptionsOpen, setAdvancedOptionsOpen] = useState(false);
   const needsCanva = selectedItems.some((item) => item.kind === "canva");
   const blocked = selectedItems.length === 0 || (needsCanva && !canvaConnected);
   const canvaLookupKey = useMemo(
@@ -185,13 +197,13 @@ export function LibraryFileBuilder({
         {PDF_LAYOUT_OPTIONS.map((option) => {
           const Icon = option.Icon;
           return (
-            <label key={option.value} className={layout === option.value ? "is-active" : ""}>
+            <label key={option.value} className={printOptions.mode === option.value ? "is-active" : ""}>
               <input
                 type="radio"
                 name="teacher-library-layout"
                 value={option.value}
-                checked={layout === option.value}
-                onChange={() => onLayout(option.value)}
+                checked={printOptions.mode === option.value}
+                onChange={() => onPrintOptions({ ...printOptions, mode: option.value })}
               />
               <Icon size={17} aria-hidden="true" />
               <span>
@@ -203,17 +215,127 @@ export function LibraryFileBuilder({
         })}
       </fieldset>
 
-      <section className="teacher-library-preview" aria-labelledby="teacher-library-preview-title">
-        <div className="teacher-library-preview-head">
-          <strong id="teacher-library-preview-title">미리보기</strong>
-          <span>원본 {sourcePageCount}페이지</span>
+      {printOptions.mode !== "original-pages" ? (
+        <div className="teacher-library-paper-options">
+          <fieldset className="teacher-library-orientation-options">
+            <legend>용지 방향</legend>
+            <label className={printOptions.orientation === "portrait" ? "is-active" : ""}>
+              <input
+                type="radio"
+                name="teacher-library-orientation"
+                checked={printOptions.orientation === "portrait"}
+                onChange={() => onPrintOptions({ ...printOptions, orientation: "portrait" })}
+              />
+              세로
+            </label>
+            <label className={printOptions.orientation === "landscape" ? "is-active" : ""}>
+              <input
+                type="radio"
+                name="teacher-library-orientation"
+                checked={printOptions.orientation === "landscape"}
+                onChange={() => onPrintOptions({ ...printOptions, orientation: "landscape" })}
+              />
+              가로
+            </label>
+          </fieldset>
+          <p className="teacher-library-scale-status">
+            <strong>{scaleStatus(printOptions.mode).title}</strong>
+            <span>{scaleStatus(printOptions.mode).description}</span>
+          </p>
+          <button
+            type="button"
+            className="teacher-library-advanced-toggle"
+            aria-expanded={advancedOptionsOpen}
+            aria-controls="teacher-library-advanced-options"
+            onClick={() => setAdvancedOptionsOpen((current) => !current)}
+          >
+            <span>고급 옵션</span>
+            {advancedOptionsOpen
+              ? <ChevronUp size={16} aria-hidden="true" />
+              : <ChevronDown size={16} aria-hidden="true" />}
+          </button>
+          {advancedOptionsOpen ? (
+            <div id="teacher-library-advanced-options" className="teacher-library-advanced-options">
+              <fieldset className="teacher-library-margin-presets">
+                <legend>여백</legend>
+                {MARGIN_PRESETS.map((preset) => (
+                  <button
+                    key={preset.value}
+                    type="button"
+                    className={printOptions.marginMm === preset.value ? "is-active" : ""}
+                    onClick={() => onPrintOptions({ ...printOptions, marginMm: preset.value })}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </fieldset>
+              <div className="teacher-library-spacing-options">
+                <label>
+                  <span>바깥 여백</span>
+                  <span><input
+                    type="number"
+                    aria-label="바깥 여백"
+                    min="0"
+                    max="30"
+                    step="0.5"
+                    value={printOptions.marginMm}
+                    onChange={(event) => onPrintOptions({
+                      ...printOptions,
+                      marginMm: clampMillimeters(event.currentTarget.value, printOptions.marginMm),
+                    })}
+                  /> mm</span>
+                </label>
+                <label>
+                  <span>자료 간격</span>
+                  <span><input
+                    type="number"
+                    aria-label="자료 간격"
+                    min="0"
+                    max="30"
+                    step="0.5"
+                    value={printOptions.gapMm}
+                    onChange={(event) => onPrintOptions({
+                      ...printOptions,
+                      gapMm: clampMillimeters(event.currentTarget.value, printOptions.gapMm),
+                    })}
+                  /> mm</span>
+                </label>
+              </div>
+              {printOptions.mode === "auto-original" ? (
+                <fieldset className="teacher-library-finishing-options">
+                  <legend>마지막 장 정렬</legend>
+                  <label>
+                    <input
+                      type="radio"
+                      name="teacher-library-last-page-alignment"
+                      checked={printOptions.lastPageAlignment === "center"}
+                      onChange={() => onPrintOptions({ ...printOptions, lastPageAlignment: "center" })}
+                    />
+                    가운데
+                  </label>
+                  <label>
+                    <input
+                      type="radio"
+                      name="teacher-library-last-page-alignment"
+                      checked={printOptions.lastPageAlignment === "start"}
+                      onChange={() => onPrintOptions({ ...printOptions, lastPageAlignment: "start" })}
+                    />
+                    왼쪽 위
+                  </label>
+                </fieldset>
+              ) : null}
+              <label className="teacher-library-crop-marks">
+                <input
+                  type="checkbox"
+                  checked={printOptions.cropMarks}
+                  onChange={(event) => onPrintOptions({ ...printOptions, cropMarks: event.currentTarget.checked })}
+                />
+                <span><strong>재단선 표시</strong><small>오려 쓰는 자료의 모서리에 3mm 표시</small></span>
+              </label>
+            </div>
+          ) : null}
         </div>
-        <PdfLayoutPreview
-          items={selectedItems}
-          layout={layout}
-          pageCountForItem={pageCountForItem}
-        />
-      </section>
+      ) : null}
 
       {needsCanva && !canvaConnected ? (
         <div className="teacher-library-canva-warning" role="alert">
@@ -248,43 +370,157 @@ export function LibraryFileBuilder({
         <Download size={18} aria-hidden="true" />
         {busy ? "PDF 만드는 중…" : "한 파일로 다운로드"}
       </button>
+
+      <section className="teacher-library-preview" aria-labelledby="teacher-library-preview-title">
+        <div className="teacher-library-preview-head">
+          <strong id="teacher-library-preview-title">
+            {printSources ? "정확한 배치" : "배치 예시"}
+          </strong>
+          <span>{printSources ? `출력 ${planTeacherLibraryPrint(printSources, printOptions).pages.length}장` : `원본 ${sourcePageCount}페이지`}</span>
+        </div>
+        {printSources ? (
+          <ExactPrintPreview
+            items={selectedItems}
+            sources={printSources}
+            options={printOptions}
+            pageCountForItem={pageCountForItem}
+          />
+        ) : (
+          <>
+            <PdfLayoutPreview
+              items={selectedItems}
+              mode={printOptions.mode}
+              orientation={printOptions.orientation}
+              pageCountForItem={pageCountForItem}
+            />
+            {selectedItems.length > 0 ? (
+              <button
+                type="button"
+                className="teacher-library-exact-preview"
+                disabled={previewBusy || (needsCanva && !canvaConnected)}
+                onClick={() => void onLoadExactPreview?.()}
+              >
+                {previewBusy ? "실제 크기 읽는 중…" : "실제 크기로 정확히 보기"}
+              </button>
+            ) : null}
+          </>
+        )}
+      </section>
     </aside>
   );
 }
 
+function ExactPrintPreview({
+  items,
+  sources,
+  options,
+  pageCountForItem,
+}: {
+  items: TeacherLibraryItemDto[];
+  sources: PrintSourcePage[];
+  options: TeacherLibraryPrintOptions;
+  pageCountForItem: (item: TeacherLibraryItemDto) => number;
+}) {
+  const units = items.flatMap((item) =>
+    Array.from({ length: pageCountForItem(item) }, (_, pageIndex) => ({ item, pageIndex })),
+  );
+  const plan = planTeacherLibraryPrint(sources, options);
+  return (
+    <div className="teacher-library-preview-pages" aria-label="정확한 PDF 배치 미리보기">
+      {plan.pages.map((page, pageIndex) => (
+        <div className="teacher-library-preview-page" key={pageIndex}>
+          <div
+            className="teacher-library-exact-sheet"
+            style={{ aspectRatio: `${page.width} / ${page.height}` }}
+            aria-label={`정확한 PDF 미리보기 ${pageIndex + 1}페이지`}
+          >
+            {page.placements.map((placement) => {
+              const unit = units[placement.sourceIndex];
+              if (!unit) return null;
+              return (
+                <div
+                  className="teacher-library-exact-item"
+                  key={placement.sourceIndex}
+                  style={{
+                    left: `${(placement.x / page.width) * 100}%`,
+                    bottom: `${(placement.y / page.height) * 100}%`,
+                    width: `${(placement.width / page.width) * 100}%`,
+                    height: `${(placement.height / page.height) * 100}%`,
+                  }}
+                >
+                  {previewUrlForPage(unit.item, unit.pageIndex) ? (
+                    <OptimizedImage
+                      src={previewUrlForPage(unit.item, unit.pageIndex)!}
+                      alt=""
+                      sizes="160px"
+                      unoptimized={unit.item.kind === "canva"}
+                      fit="contain"
+                    />
+                  ) : <FileText size={18} aria-hidden="true" />}
+                  <span className="teacher-library-preview-index">{placement.sourceIndex + 1}</span>
+                </div>
+              );
+            })}
+          </div>
+          <span className="teacher-library-preview-page-number">{pageIndex + 1} / {plan.pages.length}</span>
+        </div>
+      ))}
+      {plan.warnings.includes("source_scaled_down") ? (
+        <p className="teacher-library-preview-warning">A4 인쇄 영역보다 큰 원본은 축소됩니다.</p>
+      ) : null}
+    </div>
+  );
+}
+
 const PDF_LAYOUT_OPTIONS: Array<{
-  value: TeacherLibraryPdfLayout;
+  value: TeacherLibraryPrintMode;
   label: string;
   description: string;
   Icon: typeof LayoutGrid;
 }> = [
   {
-    value: "a4-auto",
+    value: "auto-original",
     label: "A4 균등 배치",
-    description: "여러 자료를 A4 영역에 고르게 배치",
+    description: "원본 크기로 A4 영역에 고르게 배치",
     Icon: LayoutGrid,
   },
   {
-    value: "a4-fit",
+    value: "fit-page",
     label: "한 페이지에 하나",
     description: "자료 하나를 A4 한 장에 크게 맞춤",
     Icon: Maximize2,
   },
   {
-    value: "original",
+    value: "original-pages",
     label: "원본 크기",
     description: "원본 페이지 비율과 크기를 유지",
     Icon: Scan,
   },
 ];
 
+const MARGIN_PRESETS = [
+  { label: "없음", value: 0 },
+  { label: "좁게", value: 6.4 },
+  { label: "보통", value: 12.7 },
+  { label: "넓게", value: 20 },
+] as const;
+
+function scaleStatus(mode: TeacherLibraryPrintMode) {
+  if (mode === "fit-page") {
+    return { title: "A4에 맞춰 배율 조정", description: "자료가 인쇄 영역에 맞게 확대되거나 축소됩니다." };
+  }
+  return { title: "원본 크기 우선", description: "원본은 확대하지 않고, A4 인쇄 영역보다 클 때만 축소합니다." };
+}
+
 function PdfLayoutPreview({
   items,
-  layout,
+  mode,
+  orientation,
   pageCountForItem,
 }: {
   items: TeacherLibraryItemDto[];
-  layout: TeacherLibraryPdfLayout;
+  mode: TeacherLibraryPrintMode;
+  orientation: TeacherLibraryPrintOptions["orientation"];
   pageCountForItem: (item: TeacherLibraryItemDto) => number;
 }) {
   const previewUnits = items.flatMap((item) =>
@@ -299,7 +535,7 @@ function PdfLayoutPreview({
 
   // A4 auto export keeps the initial 2x2 scale on overflow pages. Mirror that
   // stable slot size here instead of previewing six items on a fictitious page.
-  const unitsPerPage = layout === "a4-auto" ? 4 : 1;
+  const unitsPerPage = mode === "auto-original" ? 4 : 1;
   const pages = Array.from(
     { length: Math.ceil(previewUnits.length / unitsPerPage) },
     (_, pageIndex) =>
@@ -311,7 +547,7 @@ function PdfLayoutPreview({
       {pages.map((page, pageIndex) => (
         <div className="teacher-library-preview-page" key={pageIndex}>
           <div
-            className={`teacher-library-preview-sheet is-${layout}`}
+            className={`teacher-library-preview-sheet is-${mode} is-${orientation}`}
             aria-label={`PDF 미리보기 ${pageIndex + 1}페이지`}
           >
             {page.map(({ item, pageIndex: itemPageIndex }, unitIndex) => {
@@ -358,4 +594,10 @@ function previewUrlForPage(
   const designUrl =
     item.canvaViewUrl ?? `https://www.canva.com/design/${item.canvaDesignId}/view`;
   return canvaPageThumbnailUrl(designUrl, pageIndex + 1, 320);
+}
+
+function clampMillimeters(raw: string, fallback: number): number {
+  const value = Number(raw);
+  if (!Number.isFinite(value)) return fallback;
+  return Math.min(30, Math.max(0, value));
 }

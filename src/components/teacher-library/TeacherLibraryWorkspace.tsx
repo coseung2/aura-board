@@ -6,9 +6,11 @@ import { buildCanvaConnectUrl } from "@/lib/canva-connect-return";
 import type {
   TeacherLibraryCollectionDto,
   TeacherLibraryItemDto,
-  TeacherLibraryPdfLayout,
+  TeacherLibraryPrintOptions,
   TeacherLibraryPayload,
 } from "@/lib/teacher-library-types";
+import { DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS } from "@/lib/teacher-library-print-layout";
+import type { PrintSourcePage } from "@/lib/teacher-library-print-layout";
 import { LibraryFileBuilder } from "./LibraryFileBuilder";
 import { LibraryItemList } from "./LibraryItemList";
 import { LibrarySidebar } from "./LibrarySidebar";
@@ -28,8 +30,13 @@ export function TeacherLibraryWorkspace({
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [filename, setFilename] = useState("수업 자료");
-  const [layout, setLayout] = useState<TeacherLibraryPdfLayout>("a4-auto");
+  const [printOptions, setPrintOptions] = useState<TeacherLibraryPrintOptions>(
+    DEFAULT_TEACHER_LIBRARY_PRINT_OPTIONS,
+  );
   const [busy, setBusy] = useState(false);
+  const [previewBusy, setPreviewBusy] = useState(false);
+  const [printSources, setPrintSources] = useState<PrintSourcePage[] | null>(null);
+  const [printSourcesKey, setPrintSourcesKey] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const visibleItems = useMemo(() => {
@@ -57,6 +64,7 @@ export function TeacherLibraryWorkspace({
       current.includes(id) ? current.filter((value) => value !== id) : [...current, id],
     );
     setError(null);
+    setPrintSources(null);
   }
 
   function toggleAll(ids: string[]) {
@@ -69,6 +77,7 @@ export function TeacherLibraryWorkspace({
       return [...current, ...ids.filter((id) => !currentIds.has(id))];
     });
     setError(null);
+    setPrintSources(null);
   }
 
   function moveSelected(index: number, direction: -1 | 1) {
@@ -79,6 +88,32 @@ export function TeacherLibraryWorkspace({
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
+    setPrintSources(null);
+  }
+
+  async function loadExactPreview() {
+    if (selectedIds.length === 0 || previewBusy) return;
+    const key = selectedIds.join("|");
+    if (printSources && printSourcesKey === key) return;
+    setPreviewBusy(true);
+    setError(null);
+    try {
+      const response = await fetch("/api/teacher/library/print-sources", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ itemIds: selectedIds }),
+      });
+      const body = (await response.json().catch(() => null)) as
+        | { sources?: PrintSourcePage[]; error?: string }
+        | null;
+      if (!response.ok || !body?.sources) throw new Error(exportErrorMessage(body?.error));
+      setPrintSources(body.sources);
+      setPrintSourcesKey(key);
+    } catch (previewError) {
+      setError(previewError instanceof Error ? previewError.message : "정확한 배치를 불러오지 못했습니다.");
+    } finally {
+      setPreviewBusy(false);
+    }
   }
 
   async function createCollection(name: string) {
@@ -136,7 +171,11 @@ export function TeacherLibraryWorkspace({
       const response = await fetch("/api/teacher/library/export", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ itemIds: selectedIds, filename: filename.trim(), layout }),
+        body: JSON.stringify({
+          itemIds: selectedIds,
+          filename: filename.trim(),
+          options: printOptions,
+        }),
       });
       if (!response.ok) {
         const body = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -182,15 +221,18 @@ export function TeacherLibraryWorkspace({
         <LibraryFileBuilder
           selectedItems={selectedItems}
           filename={filename}
-          layout={layout}
+          printOptions={printOptions}
+          printSources={printSourcesKey === selectedIds.join("|") ? printSources : null}
+          previewBusy={previewBusy}
           busy={busy}
           canvaConnected={initialCanvaConnected}
           error={error}
           onFilename={setFilename}
-          onLayout={setLayout}
+          onPrintOptions={setPrintOptions}
           onMove={moveSelected}
           onRemove={toggle}
           onDownload={download}
+          onLoadExactPreview={loadExactPreview}
           onPageCount={onPageCount}
           onReconnectCanva={() => {
             window.location.href = buildCanvaConnectUrl();

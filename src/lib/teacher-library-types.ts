@@ -7,7 +7,12 @@ export type TeacherLibraryCollectionDto = {
 };
 
 export type TeacherLibraryItemKind = "image" | "canva";
-export type TeacherLibraryPdfLayout = "a4-auto" | "a4-fit" | "original";
+export type {
+  TeacherLibraryOrientation,
+  TeacherLibraryLastPageAlignment,
+  TeacherLibraryPrintMode,
+  TeacherLibraryPrintOptions,
+} from "./teacher-library-print-layout";
 
 export type TeacherLibraryItemDto = {
   id: string;

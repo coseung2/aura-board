@@ -1,16 +1,18 @@
 import "server-only";
 
-import { PDFDocument, type PDFPage } from "pdf-lib";
+import { PDFDocument, rgb, type PDFPage } from "pdf-lib";
 import sharp from "sharp";
 
 import { canvaExportDesign, getAccessToken } from "@/lib/canva";
-import type { TeacherLibraryPdfLayout } from "@/lib/teacher-library-types";
+import {
+  planTeacherLibraryPrint,
+  type PrintSourcePage,
+  type TeacherLibraryPrintOptions,
+  type TeacherLibraryPrintPlan,
+} from "@/lib/teacher-library-print-layout";
 
-const A4 = { width: 595.28, height: 841.89 };
-const A4_MARGIN = 36;
-const A4_GAP = 10;
-const AUTO_MAX_CELLS = 16;
 const MAX_DOWNLOAD_BYTES = 100 * 1024 * 1024;
+const DEFAULT_IMAGE_DPI = 96;
 
 type DrawBox = { x: number; y: number; width: number; height: number };
 type RenderUnit = {
@@ -29,7 +31,7 @@ export async function buildTeacherLibraryPdf(args: {
   userId: string;
   items: TeacherLibraryPdfItem[];
   baseUrl: string;
-  layout: TeacherLibraryPdfLayout;
+  options: TeacherLibraryPrintOptions;
 }): Promise<Uint8Array> {
   const document = await PDFDocument.create();
   const hasCanva = args.items.some((item) => item.kind === "canva");
@@ -38,35 +40,61 @@ export async function buildTeacherLibraryPdf(args: {
     throw new TeacherLibraryPdfError("canva_reconnect_required", 401);
   }
 
-  if (args.layout === "original") {
-    for (const item of args.items) {
-      if (item.kind === "canva") {
-        for (const url of await canvaPdfUrls(item, canvaToken)) await appendPdf(document, url);
-      } else {
-        const unit = await imageUnit(document, item, args.baseUrl);
-        const page = document.addPage([unit.width, unit.height]);
-        unit.draw(page, { x: 0, y: 0, width: unit.width, height: unit.height });
+  const units: RenderUnit[] = [];
+  for (const item of args.items) {
+    if (item.kind === "canva") {
+      for (const url of await canvaPdfUrls(item, canvaToken)) {
+        units.push(...(await collectPdfUnits(document, url)));
       }
+    } else {
+      units.push(await imageUnit(document, item, args.baseUrl));
     }
-  } else {
-    const units: RenderUnit[] = [];
-    for (const item of args.items) {
-      if (item.kind === "canva") {
-        for (const url of await canvaPdfUrls(item, canvaToken)) {
-          units.push(...(await collectPdfUnits(document, url)));
-        }
-      } else {
-        units.push(await imageUnit(document, item, args.baseUrl));
-      }
-    }
-    if (args.layout === "a4-auto") appendUnitsAsAutoA4Grid(document, units);
-    else appendUnitsAsA4Pages(document, units);
   }
+  const plan = planTeacherLibraryPrint(units, args.options);
+  renderPrintPlan(document, units, plan, args.options.cropMarks);
 
   if (document.getPageCount() === 0) {
     throw new TeacherLibraryPdfError("pdf_has_no_pages", 422);
   }
   return document.save();
+}
+
+export async function inspectTeacherLibraryPrintSources(args: {
+  userId: string;
+  items: TeacherLibraryPdfItem[];
+  baseUrl: string;
+}): Promise<PrintSourcePage[]> {
+  const hasCanva = args.items.some((item) => item.kind === "canva");
+  const canvaToken = hasCanva ? await getAccessToken(args.userId) : null;
+  if (hasCanva && !canvaToken) {
+    throw new TeacherLibraryPdfError("canva_reconnect_required", 401);
+  }
+
+  const sources: PrintSourcePage[] = [];
+  for (const item of args.items) {
+    if (item.kind === "canva") {
+      for (const url of await canvaPdfUrls(item, canvaToken)) {
+        const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(30_000) });
+        if (!response.ok) throw new TeacherLibraryPdfError("canva_pdf_download_failed", 502);
+        const pdf = await PDFDocument.load(await readLimited(response, MAX_DOWNLOAD_BYTES));
+        if (pdf.getPageCount() === 0) throw new TeacherLibraryPdfError("canva_pdf_empty", 502);
+        sources.push(...pdf.getPages().map((page) => page.getSize()));
+      }
+      continue;
+    }
+
+    if (!item.assetUrl) throw new TeacherLibraryPdfError("image_item_missing", 422);
+    const response = await fetch(new URL(item.assetUrl, args.baseUrl), {
+      cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
+    });
+    if (!response.ok) throw new TeacherLibraryPdfError("image_download_failed", 502);
+    const metadata = await sharp(await readLimited(response, MAX_DOWNLOAD_BYTES), { pages: 1 }).metadata();
+    if (!metadata.width || !metadata.height) throw new TeacherLibraryPdfError("image_dimensions_missing", 422);
+    const density = metadata.density && metadata.density > 0 ? metadata.density : DEFAULT_IMAGE_DPI;
+    sources.push({ width: (metadata.width * 72) / density, height: (metadata.height * 72) / density });
+  }
+  return sources;
 }
 
 async function canvaPdfUrls(
@@ -81,21 +109,6 @@ async function canvaPdfUrls(
     throw new TeacherLibraryPdfError("canva_export_url_missing", 502);
   }
   return urls;
-}
-
-async function appendPdf(target: PDFDocument, url: string): Promise<void> {
-  const response = await fetch(url, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(30_000),
-  });
-  if (!response.ok) {
-    throw new TeacherLibraryPdfError("canva_pdf_download_failed", 502);
-  }
-  const bytes = await readLimited(response, MAX_DOWNLOAD_BYTES);
-  const source = await PDFDocument.load(bytes);
-  const pages = await target.copyPages(source, source.getPageIndices());
-  if (pages.length === 0) throw new TeacherLibraryPdfError("canva_pdf_empty", 502);
-  pages.forEach((page) => target.addPage(page));
 }
 
 async function collectPdfUnits(target: PDFDocument, url: string): Promise<RenderUnit[]> {
@@ -127,6 +140,8 @@ async function imageUnit(
   });
   if (!response.ok) throw new TeacherLibraryPdfError("image_download_failed", 502);
   const source = await readLimited(response, MAX_DOWNLOAD_BYTES);
+  const metadata = await sharp(source, { pages: 1 }).metadata();
+  const density = metadata.density && metadata.density > 0 ? metadata.density : DEFAULT_IMAGE_DPI;
   let embedded;
   try {
     embedded = await target.embedJpg(source);
@@ -140,107 +155,50 @@ async function imageUnit(
   }
 
   return {
-    width: embedded.width,
-    height: embedded.height,
+    width: (embedded.width * 72) / density,
+    height: (embedded.height * 72) / density,
     draw: (page, box) => page.drawImage(embedded, box),
   };
 }
 
-function appendUnitsAsA4Pages(document: PDFDocument, units: RenderUnit[]) {
-  for (const unit of units) {
-    const page = document.addPage([A4.width, A4.height]);
-    unit.draw(page, fitIntoBox(unit.width, unit.height, {
-      x: A4_MARGIN,
-      y: A4_MARGIN,
-      width: A4.width - A4_MARGIN * 2,
-      height: A4.height - A4_MARGIN * 2,
-    }));
-  }
-}
-
-function appendUnitsAsAutoA4Grid(document: PDFDocument, units: RenderUnit[]) {
-  for (const plannedPage of planAutoA4GridPages(units)) {
-    const grid = plannedPage.grid;
-    const page = document.addPage([A4.width, A4.height]);
-    const contentWidth = A4.width - A4_MARGIN * 2;
-    const contentHeight = A4.height - A4_MARGIN * 2;
-    const cellWidth = (contentWidth - A4_GAP * (grid.columns - 1)) / grid.columns;
-    const cellHeight = (contentHeight - A4_GAP * (grid.rows - 1)) / grid.rows;
-    for (let cellIndex = 0; cellIndex < plannedPage.count; cellIndex += 1) {
-      const unit = units[plannedPage.start + cellIndex];
-      const row = Math.floor(cellIndex / grid.columns);
-      const column = cellIndex % grid.columns;
-      unit.draw(page, fitIntoBox(unit.width, unit.height, {
-        x: A4_MARGIN + column * (cellWidth + A4_GAP),
-        y: A4.height - A4_MARGIN - (row + 1) * cellHeight - row * A4_GAP,
-        width: cellWidth,
-        height: cellHeight,
-      }));
+function renderPrintPlan(
+  document: PDFDocument,
+  units: RenderUnit[],
+  plan: TeacherLibraryPrintPlan,
+  cropMarks: boolean,
+) {
+  for (const plannedPage of plan.pages) {
+    const page = document.addPage([plannedPage.width, plannedPage.height]);
+    for (const placement of plannedPage.placements) {
+      units[placement.sourceIndex].draw(page, {
+        x: placement.x,
+        y: placement.y,
+        width: placement.width,
+        height: placement.height,
+      });
+      if (cropMarks) drawCropMarks(page, placement);
     }
   }
 }
 
-export function planAutoA4GridPages(
-  units: Array<{ width: number; height: number }>,
-): Array<{
-  start: number;
-  count: number;
-  grid: { columns: number; rows: number; count: number };
-}> {
-  if (units.length === 0) return [];
-  // Pick the visual scale once for the whole export. Recomputing from the
-  // remainder made a lone final item switch to a 1x1 grid and fill the page.
-  const grid = pickAutoGrid(units);
-  const pages = [];
-  for (let start = 0; start < units.length; start += grid.count) {
-    pages.push({
-      start,
-      count: Math.min(grid.count, units.length - start),
-      grid,
-    });
+function drawCropMarks(page: PDFPage, box: DrawBox) {
+  const offset = 0.7 * (72 / 25.4);
+  const length = 3 * (72 / 25.4);
+  const color = rgb(0.35, 0.35, 0.35);
+  const thickness = 0.35;
+  const segments = [
+    [[box.x - offset - length, box.y], [box.x - offset, box.y]],
+    [[box.x, box.y - offset - length], [box.x, box.y - offset]],
+    [[box.x + box.width + offset, box.y], [box.x + box.width + offset + length, box.y]],
+    [[box.x + box.width, box.y - offset - length], [box.x + box.width, box.y - offset]],
+    [[box.x - offset - length, box.y + box.height], [box.x - offset, box.y + box.height]],
+    [[box.x, box.y + box.height + offset], [box.x, box.y + box.height + offset + length]],
+    [[box.x + box.width + offset, box.y + box.height], [box.x + box.width + offset + length, box.y + box.height]],
+    [[box.x + box.width, box.y + box.height + offset], [box.x + box.width, box.y + box.height + offset + length]],
+  ] as const;
+  for (const [start, end] of segments) {
+    page.drawLine({ start: { x: start[0], y: start[1] }, end: { x: end[0], y: end[1] }, thickness, color });
   }
-  return pages;
-}
-
-function pickAutoGrid(
-  units: Array<{ width: number; height: number }>,
-): { columns: number; rows: number; count: number } {
-  const maxCount = Math.min(units.length, AUTO_MAX_CELLS);
-  let best = { columns: 1, rows: 1, count: 1, score: Number.NEGATIVE_INFINITY };
-  const contentWidth = A4.width - A4_MARGIN * 2;
-  const contentHeight = A4.height - A4_MARGIN * 2;
-  for (let columns = 1; columns <= 4; columns += 1) {
-    for (let rows = 1; rows <= 8; rows += 1) {
-      const cells = columns * rows;
-      if (cells > AUTO_MAX_CELLS) continue;
-      const count = Math.min(cells, units.length);
-      const cellWidth = (contentWidth - A4_GAP * (columns - 1)) / columns;
-      const cellHeight = (contentHeight - A4_GAP * (rows - 1)) / rows;
-      if (cellWidth < 90 || cellHeight < 90) continue;
-      const fill = units.slice(0, count).reduce((sum, unit) => {
-        const fitted = fitSize(unit.width, unit.height, cellWidth, cellHeight);
-        return sum + fitted.width * fitted.height;
-      }, 0) / (contentWidth * contentHeight);
-      const score = fill * 0.55 + (count / maxCount) * 0.45 - ((cells - count) / cells) * 0.12;
-      if (score > best.score) best = { columns, rows, count, score };
-    }
-  }
-  return { columns: best.columns, rows: best.rows, count: best.count };
-}
-
-function fitIntoBox(sourceWidth: number, sourceHeight: number, box: DrawBox): DrawBox {
-  const fitted = fitSize(sourceWidth, sourceHeight, box.width, box.height);
-  return {
-    x: box.x + (box.width - fitted.width) / 2,
-    y: box.y + (box.height - fitted.height) / 2,
-    width: fitted.width,
-    height: fitted.height,
-  };
-}
-
-function fitSize(sourceWidth: number, sourceHeight: number, maxWidth: number, maxHeight: number) {
-  const scale = Math.min(maxWidth / sourceWidth, maxHeight / sourceHeight);
-  return { width: sourceWidth * scale, height: sourceHeight * scale };
 }
 
 async function readLimited(response: Response, limit: number): Promise<Uint8Array> {
