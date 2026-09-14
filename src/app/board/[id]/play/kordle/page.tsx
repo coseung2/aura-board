@@ -29,6 +29,7 @@ function WaitingShell({
       title={`🟩 ${boardTitle}`}
       rulesLabel="꼬들"
       actions={<PlayBoardContinueButton />}
+      className="kordle-area"
     >
       <KordleWaitingRoom
         boardId={boardId}
@@ -114,6 +115,7 @@ export default async function KordlePlayPage({ params }: Props) {
       }
       rulesLabel="꼬들"
       actions={<PlayBoardContinueButton />}
+      className="kordle-area"
     >
       <KordleBoard
         boardId={board.id}

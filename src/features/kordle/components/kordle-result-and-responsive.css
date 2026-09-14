@@ -247,7 +247,7 @@
   border-radius: 0;
   background: transparent;
   box-shadow: none;
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .kordle-waiting::before {
@@ -261,23 +261,23 @@
 .kordle-waiting h1 {
   max-width: 760px;
   margin: 0 auto;
-  color: #ffffff;
+  color: #0f172a;
   font-family: "Jua", "Gamja Flower", "Arial Rounded MT Bold", "Segoe UI Rounded", "Noto Sans KR", sans-serif;
   text-wrap: balance;
   font-size: clamp(56px, 8vw, 84px);
   font-weight: 950;
   line-height: 1;
-  text-shadow: 0 5px 0 rgba(15, 23, 42, 0.18);
+  text-shadow: 0 4px 0 rgba(15, 23, 42, 0.08);
 }
 
 .kordle-lobby-pulse {
   margin: 34px auto 0 !important;
-  color: rgba(255, 255, 255, 0.94) !important;
+  color: #475569 !important;
   font-family: "Jua", "Gamja Flower", "Arial Rounded MT Bold", "Segoe UI Rounded", "Noto Sans KR", sans-serif;
   font-size: clamp(28px, 4vw, 38px) !important;
   font-weight: 950 !important;
   letter-spacing: 0;
-  text-shadow: 0 3px 0 rgba(15, 23, 42, 0.16);
+  text-shadow: none;
 }
 
 .kordle-lobby-pulse span {
@@ -295,33 +295,69 @@
 .kordle-waiting .game-waiting-participants {
   width: min(100%, 640px);
   margin: 44px auto 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: rgba(255, 255, 255, 0.94);
+  padding: 24px 20px;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  color: #475569;
   gap: 18px;
   font-family: "Jua", "Gamja Flower", "Arial Rounded MT Bold", "Segoe UI Rounded", "Noto Sans KR", sans-serif;
 }
 
 .kordle-waiting .game-waiting-participants > span {
-  color: #ffffff;
-  font-size: clamp(28px, 4vw, 40px);
+  color: #475569;
+  font-size: clamp(20px, 3vw, 26px);
   font-weight: 900;
-  text-shadow: 0 3px 0 rgba(15, 23, 42, 0.14);
+  text-shadow: none;
 }
 
 .kordle-waiting .game-participant-list div {
   justify-content: center;
-  gap: 12px 22px;
+  gap: 12px;
 }
 
 .kordle-waiting .game-participant-list strong {
   border: 0;
   background: transparent;
-  color: #ffffff;
-  font-size: clamp(26px, 3.6vw, 36px);
+  color: #0f172a;
+  font-size: clamp(20px, 2.6vw, 26px);
   font-weight: 900;
-  text-shadow: 0 3px 0 rgba(15, 23, 42, 0.18);
+  text-shadow: none;
+}
+
+/* Roster chip that pairs a student's representative pet with their name. */
+.game-participant-with-pet {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.kordle-waiting .game-participant-list strong.game-participant-with-pet {
+  padding: 6px 14px 6px 6px;
+  border-radius: 999px;
+  background: #f1f5f9;
+}
+
+.game-participant-pet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #64748b;
+  overflow: hidden;
+}
+
+.game-participant-pet > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 @keyframes kordle-ready-dot {

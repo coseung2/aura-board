@@ -194,6 +194,8 @@ docs/                     아키텍처, 현재 기능, 외부 API, 디자인 시
 - `docs/current-features.md`
 - `docs/architecture.md`
 - `docs/design-system.md`
+- `docs/design/figma-constitution.md`
+- `docs/ai/global-figma-design-ops.md`
 - `docs/mobile-android-build.md`
 - `docs/external-api.md`
 - `docs/mobile-tenancy-load-test-1000.md`

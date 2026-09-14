@@ -26,9 +26,9 @@
   flex-direction: column;
   gap: 18px;
   padding: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.42);
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.62);
+  background: #ffffff;
   box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
@@ -116,23 +116,35 @@
 .board-page:has(.kordle-shell--teacher-setup),
 .board-page:has(.kordle-shell--teacher-live) {
   position: relative;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.18) 0 2px, transparent 2px 18px),
-    repeating-linear-gradient(90deg, transparent 0 34px, rgba(255, 255, 255, 0.12) 34px 36px),
-    repeating-linear-gradient(0deg, transparent 0 34px, rgba(255, 255, 255, 0.1) 34px 36px),
-    linear-gradient(155deg, #304ffe 0%, #00a6d6 28%, #13b86a 55%, #ffb000 78%, #ff5f7e 100%);
+  /* Neutral board so the guess cells carry the only colour on screen. The
+     correct/present/absent states are the game's signal; a saturated backdrop
+     competes with them. */
+  background: linear-gradient(155deg, #e8edf4 0%, #cfd8e6 100%);
+}
+
+/* The student route renders through GameAreaShell, which paints `--color-bg`
+   on three nested surfaces instead of using `.board-page`. Repeat the board
+   background there and clear the inner fills so the gradient shows through. */
+.kordle-area,
+.kordle-area > section,
+.kordle-area > section > div {
+  background: transparent;
+}
+
+.kordle-area {
+  background: linear-gradient(155deg, #e8edf4 0%, #cfd8e6 100%);
 }
 
 .board-page.kordle-waiting-page {
-  color: #ffffff;
+  color: #0f172a;
 }
 
 .board-page.kordle-waiting-page .board-header,
 .board-page.kordle-play-page .board-header,
 .board-page:has(.kordle-shell--teacher-setup) .board-header,
 .board-page:has(.kordle-shell--teacher-live) .board-header {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.26);
-  background: rgba(255, 255, 255, 0.18);
+  border-bottom: 1px solid rgba(15, 23, 42, 0.1);
+  background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(12px);
 }
 
@@ -168,11 +180,10 @@
   flex-direction: column;
   gap: 18px;
   padding: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.24);
+  border: 1px solid #cbd5e1;
   border-radius: 28px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.1));
-  backdrop-filter: blur(18px);
-  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.16);
+  background: #ffffff;
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.1);
 }
 
 .kordle-shell--teacher-setup {

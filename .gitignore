@@ -61,6 +61,17 @@ oracle-*.cmd
 padlet-env-backup/
 output/
 
+# Local agent/tool scratch dirs and captured media. Large and machine-specific.
+.codex-remote-attachments/
+.codex/artifacts/
+.codex/config.toml
+.playwright-cli/
+.pr6-review-codex/
+.superloopy/
+videos/
+data/song-guess/clips/
+tmp-*.ts
+
 
 # Local mobile signing credentials and one-off build outputs
 .codex/tmp/

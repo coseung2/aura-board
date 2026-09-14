@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
+import { representativePetsByStudentId } from "@/features/kordle/server/kordleParticipantPets";
 
 type Params = { params: Promise<{ boardId: string }> };
 
@@ -75,7 +76,7 @@ async function GETHandler(req: Request, { params }: Params) {
         },
       },
     },
-    select: { id: true },
+    select: { id: true, classroomId: true },
   });
   if (!board) {
     return jsonPrivateNoStore({ error: "forbidden" }, { status: 403 });
@@ -122,6 +123,13 @@ async function GETHandler(req: Request, { params }: Params) {
   const round = puzzle
     ? getRoundSnapshot(puzzle.attempts, puzzle.game.maxGuesses, puzzle.currentGuessIndex)
     : null;
+  const petsByStudentId =
+    puzzle && board.classroomId
+      ? await representativePetsByStudentId(
+          board.classroomId,
+          puzzle.attempts.flatMap((attempt) => (attempt.student ? [attempt.student.id] : [])),
+        )
+      : new Map();
   return jsonPrivateNoStore({
     puzzle: puzzle
       ? {
@@ -134,6 +142,7 @@ async function GETHandler(req: Request, { params }: Params) {
               id: attempt.student!.id,
               name: attempt.student!.name,
               joinedAt: attempt.startedAt.toISOString(),
+              representativePet: petsByStudentId.get(attempt.student!.id) ?? null,
             })),
           round,
         }

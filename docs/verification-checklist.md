@@ -80,6 +80,24 @@ creating overlapping testing-notes documents.
   development DB and verified the new import table and round artist column.
   A fresh interactive Google login remains a separate user check.
 
+## Figma design operations
+
+- Read global Design Ops, the project constitution and feature handoff first.
+- Inventory all in-scope pages, sections, frames, components, instances,
+  variables/modes/aliases and styles; record inaccessible areas as unknown.
+- Compare current code and contracts; distinguish working-tree changes from
+  committed code and verified deployment, and approval from implementation fit.
+- Record canonical identities, selection evidence, migration batches, node and
+  parent IDs, dependencies, rollback steps and screenshot targets before writes.
+- Preserve approved originals, instance overrides, prototype links and bindings;
+  archive superseded designs without deleting their history.
+- Read back each batch and inspect before/after screenshots for layout, text,
+  clipping, state distinctions and applicable viewport differences.
+- Check component consumers and variable modes/aliases after consolidation;
+  update canonical manifests/handoff references and record unresolved gaps.
+- Report exactly which screenshots and interactive checks were performed.
+  Do not infer runtime behavior or full accessibility from static screenshots.
+
 ## Baseline checks
 
 - 2026-09-11 KST game rooms: student entry only provisions Omok/song-guess hubs;
@@ -792,6 +810,49 @@ change's unit tests do not measure production propagation latency.
 - Before a real batch: inspect `ready/review/warnings`, run with FFmpeg/FFprobe installed, then validate generated 15-second clips and the intended DB/storage environment. A skipped FFmpeg test does not verify real extraction. Production registration is a separate operation.
 
 - Student login code: `DCY366`
+
+## Teacher library print export
+
+- In `원본 크기 자동 배치`, verify Canva PDF pages retain their physical page
+  size and images use embedded DPI metadata (96 DPI fallback). Confirm the final
+  partially filled A4 page keeps the same item scale as preceding pages.
+- Verify A4 portrait and landscape output, including the configured outer margin
+  and item gap. Sources larger than the printable area may scale down, but
+  smaller sources must never be enlarged in this mode.
+- Verify margin presets and custom millimeter values produce the same plan,
+  partial final pages can be centered or aligned top-left without changing
+  scale, and crop marks reserve enough clearance without overlapping content.
+- In `한 장에 맞춤`, verify each source is fitted once per A4 page within the
+  printable area. In `원본 페이지`, verify each output page uses the source
+  page dimensions.
+- Open the exported PDF in the target print application and print at `실제 크기`
+  or `100%`. Disable printer-driver options such as `페이지에 맞춤` that rescale
+  the generated PDF, then measure one known-size source on paper.
+- Confirm the library download action and filename controls remain above the
+  layout example as the selection grows. Treat `배치 예시` as illustrative until
+  the user requests `실제 크기로 정확히 보기`. Confirm that action reads Canva
+  PDF dimensions and image DPI once, then margin, gap, direction, finishing and
+  layout changes redraw the exact plan without another metadata request.
+
+## Kordle waiting-room pets (2026-09-14 KST)
+
+- Fixture: board `game-hub-kordle-f1fa55762e0277e8`
+  (`cmsd3hje2000xvs2ggow0ixh0`), classroom 별무리반, class invite code `09W1G`.
+- Verify the student waiting room lists each entered student with the pet they
+  actually equipped. Scene furniture must not appear: backgrounds, floors and
+  vehicles are dropped, while wearables, drinks, food and props are kept.
+  A student without a representative pet falls back to a plain name row on web
+  and an initial-letter avatar on mobile.
+- Check both surfaces. Web renders through `GameAreaShell`, so background tokens
+  need the `kordle-area` class; `.board-page` is teacher-only and has no effect
+  on the student route.
+- On mobile the avatar box must match the sprite scene size
+  (`64 * imageScale * displayScale`). A smaller circle crops the character down
+  to its hat, which static CSS review does not catch.
+- Emulator notes: the Expo dev menu renders as a full-screen dim layer that
+  swallows every tap while `input keyevent` still works. If taps appear ignored
+  and screenshots are byte-identical, send `KEYCODE_BACK` before concluding the
+  JS thread is stuck.
 
 ## Omok native-paint and recovery qualification (2026-09-12 KST)
 

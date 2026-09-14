@@ -28,6 +28,11 @@ export function KordleWaitingRoom({ boardId, studentId, studentName }: Props) {
     null,
   );
   const [realtimeReady, setRealtimeReady] = useState(false);
+  // Presence carries only live connection identity. Pets come from the HTTP
+  // snapshot, so keep the last known mapping and merge it into presence rows.
+  const [petsByStudentId, setPetsByStudentId] = useState<
+    Record<string, GameParticipant["representativePet"]>
+  >({});
 
   const pollSnapshot = useCallback(async (): Promise<GameWaitingSnapshot | null> => {
     const res = await fetch(`/api/kordle/boards/${boardId}/puzzle`, {
@@ -36,9 +41,24 @@ export function KordleWaitingRoom({ boardId, studentId, studentName }: Props) {
     if (!res.ok) return null;
 
     const data = await res.json().catch(() => null);
+    const participants: GameParticipant[] = Array.isArray(data?.puzzle?.participants)
+      ? data.puzzle.participants
+      : [];
+    setPetsByStudentId((current) => {
+      let changed = false;
+      const next = { ...current };
+      for (const participant of participants) {
+        if (participant.representativePet === undefined) continue;
+        if (next[participant.id] !== participant.representativePet) {
+          next[participant.id] = participant.representativePet;
+          changed = true;
+        }
+      }
+      return changed ? next : current;
+    });
     return {
       status: data?.puzzle?.status ?? null,
-      participants: Array.isArray(data?.puzzle?.participants) ? data.puzzle.participants : [],
+      participants,
     };
   }, [boardId]);
 
@@ -110,8 +130,14 @@ export function KordleWaitingRoom({ boardId, studentId, studentName }: Props) {
   }, [boardId, onReady, studentId, studentName]);
 
   const participantsOverride = useMemo(
-    () => presenceParticipants?.map((participant) => ({ ...participant })) ?? null,
-    [presenceParticipants],
+    () =>
+      presenceParticipants?.map((participant) => ({
+        ...participant,
+        // `null` keeps the pet slot rendered as the fallback avatar; leaving it
+        // undefined would fall back to the legacy name-only chip.
+        representativePet: petsByStudentId[participant.id] ?? null,
+      })) ?? null,
+    [presenceParticipants, petsByStudentId],
   );
 
   return (

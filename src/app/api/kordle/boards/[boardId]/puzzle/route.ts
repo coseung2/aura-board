@@ -10,6 +10,7 @@ import { normalizeWord } from "@/features/kordle/engine";
 import {
   closeKordlePuzzleAttempts,
 } from "@/features/kordle/server/kordleServer";
+import { representativePetsByStudentId } from "@/features/kordle/server/kordleParticipantPets";
 import {
   IdempotencyConflictError,
   withPlayRequestReceipt,
@@ -203,6 +204,12 @@ async function GETHandler(_req: Request, { params }: Params) {
     orderBy: { startedAt: "desc" },
     select: { id: true },
   });
+  const petsByStudentId = puzzle
+    ? await representativePetsByStudentId(
+        student.classroomId,
+        puzzle.attempts.flatMap((attempt) => (attempt.student ? [attempt.student.id] : [])),
+      )
+    : new Map();
   return jsonPrivateNoStore({
     gameId: game.id,
     wordLength: game.wordLength,
@@ -218,6 +225,7 @@ async function GETHandler(_req: Request, { params }: Params) {
               id: attempt.student!.id,
               name: attempt.student!.name,
               joinedAt: attempt.startedAt.toISOString(),
+              representativePet: petsByStudentId.get(attempt.student!.id) ?? null,
             })),
         }
       : null,
