@@ -5,6 +5,40 @@ that can be registered as a global AI instruction for design work across
 projects. Project-specific taxonomy, naming, source-of-truth, and release rules
 belong in each repository's design constitution.
 
+## Project bootstrap gate
+
+Before the first production Figma write in any project, locate and read that
+project's design constitution or equivalent design-governance document. Do not
+start production Figma generation until the project has a minimum design-ops
+contract.
+
+Confirm that the project defines all of the following before writing:
+
+1. **Design asset roles** — where shared UI-library assets, canonical product
+   screens, and explorations live. The project may call them `UI Library`,
+   `Product`, and `Exploration` or use equivalent names. A single Figma file is
+   acceptable only when its pages or sections clearly separate these roles.
+2. **Lifecycle states** — at minimum equivalents of `[WIP]`, `[REVIEW]`,
+   `[READY]`, and `[DEPRECATED]`, including promotion and archival rules.
+3. **Naming and hierarchy** — conventions for Page, Section, Frame, Component,
+   Component Set, and Variant names, plus the expected location of canonical
+   screens.
+4. **Canonical ownership and source of truth** — which design is authoritative
+   for each product state, and how code, Figma, design-system assets, and
+   product documentation resolve conflicts.
+5. **Component and variable ownership** — where reusable masters and variables
+   are maintained, when feature-local UI is promoted to shared assets, and
+   whether detached instances are permitted.
+
+If any item is missing, establish the smallest project-specific contract before
+continuing with production Figma work. Prefer documenting it in the repository
+so future humans and agents inherit the same rules.
+
+If the project already has established conventions, adopt them. Do not replace
+working project taxonomy with a conflicting global naming scheme merely to
+match this document. Escalate only when existing rules conflict with each other
+or leave canonical ownership ambiguous.
+
 ## Default behavior
 
 - Default to **UPDATE**, not CREATE.
