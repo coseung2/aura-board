@@ -16,6 +16,7 @@ import {
   borders,
   colors,
   radii,
+  sizing,
   spacing,
   tapMin,
   typography,
@@ -551,8 +552,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     paddingLeft: spacing.xs,
     paddingRight: spacing.md,
-    borderRadius: 999,
+    borderRadius: radii.pill,
     backgroundColor: colors.surface,
   },
-  rosterName: { ...typography.body, color: colors.text, maxWidth: 120 },
+  rosterName: {
+    ...typography.body,
+    color: colors.text,
+    maxWidth: sizing.authorChipMaxWidth,
+  },
 });

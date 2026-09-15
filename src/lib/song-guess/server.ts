@@ -13,6 +13,7 @@ import {
   resolveSongGuessParticipantSeeds,
 } from "@/lib/play-platform/actor";
 import { playEngineFetch } from "@/lib/play-platform/server-client";
+import { announcePlaySessionChange } from "@/lib/realtime-broadcast";
 import {
   isSongGuessMimeType,
   isSongGuessSnapshot,
@@ -364,6 +365,7 @@ export async function buildSongGuessCreateRequest(
  */
 export async function enrichSongGuessPlayEngineResponse(
   response: Response,
+  options: { broadcastOnSuccess?: boolean } = {},
 ): Promise<Response> {
   const raw = await response.text();
   let payload: unknown = null;
@@ -378,6 +380,14 @@ export async function enrichSongGuessPlayEngineResponse(
     isRecord(payload) && isSongGuessSnapshot(payload.snapshot) ? payload.snapshot :
     null;
   if (!snapshot) return replaySongGuessResponse(response, raw);
+
+  if (response.ok && options.broadcastOnSuccess) {
+    await announcePlaySessionChange(
+      snapshot.boardId,
+      snapshot.sessionId,
+      snapshot.version,
+    );
+  }
 
   const enriched = await enrichSongGuessSnapshot(snapshot).catch(() => snapshot);
   const nextPayload = isSongGuessSnapshot(payload)

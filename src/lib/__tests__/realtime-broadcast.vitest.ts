@@ -61,6 +61,26 @@ describe("server realtime broadcasts", () => {
     expect(supabaseMocks.removeChannel).toHaveBeenCalledWith(channel);
   });
 
+  it("broadcasts committed play mutations immediately while outbox remains recovery", async () => {
+    configureClient();
+    const { announcePlaySessionChange } = await import("../realtime-broadcast");
+
+    await announcePlaySessionChange("board-1", "session-1", 7);
+
+    expect(supabaseMocks.channel).toHaveBeenCalledWith("board:board-1");
+    expect(supabaseMocks.httpSend).toHaveBeenCalledWith(
+      "play_session_changed",
+      {
+        type: "play_session_changed",
+        eventId: "immediate:session-1:7",
+        sessionId: "session-1",
+        boardId: "board-1",
+        version: 7,
+      },
+      { timeout: 1500 },
+    );
+  });
+
   it("prefers the runtime SUPABASE_URL for server broadcasts", async () => {
     vi.stubEnv("SUPABASE_URL", "https://runtime.example.supabase.co");
     configureClient();

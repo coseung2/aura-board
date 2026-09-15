@@ -34,6 +34,13 @@ export async function POST(request: Request, { params }: Params) {
     if (!parsed.success) return NextResponse.json({ error: "invalid_request" }, { status: 400 });
     const { actor } = await resolveSongGuessActorForBoard(boardId);
     const body = await buildStudentRoomRequest(boardId, parsed.data.requestId, parsed.data);
-    return enrichSongGuessPlayEngineResponse(await playEngineFetch(`/v1/boards/${encodeURIComponent(boardId)}/song-guess/sessions`, { actor, method: "POST", body }));
+    return enrichSongGuessPlayEngineResponse(
+      await playEngineFetch(`/v1/boards/${encodeURIComponent(boardId)}/song-guess/sessions`, {
+        actor,
+        method: "POST",
+        body,
+      }),
+      { broadcastOnSuccess: true },
+    );
   } catch (error) { return playRouteError(error); }
 }

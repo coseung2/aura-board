@@ -56,6 +56,26 @@ describe("SongGuessGame answer modes", () => {
     rerender(<SongGuessGame {...props} snapshot={{ ...state, phase: "guessing", viewer: { ...state.viewer, role: "host" } }} />);
     expect(screen.queryByRole("button", { name: "정답 공개" })).not.toBeInTheDocument();
   });
+  it("uses automatic-next copy for student-created rooms after a reveal", () => {
+    const state = snapshot();
+    state.roomMode = "student-free";
+    state.phase = "reveal";
+    state.currentRound.revealedAnswer = "밤편지";
+    state.participants[0]!.roundScore = 100;
+    renderGame(state);
+    expect(screen.getByText("다음 문제는 잠시 후 자동으로 시작해요")).toBeInTheDocument();
+    expect(screen.queryByText("다음 문제는 교사가 시작해요")).not.toBeInTheDocument();
+  });
+
+  it("keeps teacher-led next-round copy for teacher-created rooms", () => {
+    const state = snapshot();
+    state.phase = "reveal";
+    state.currentRound.revealedAnswer = "밤편지";
+    state.participants[0]!.roundScore = 100;
+    renderGame(state);
+    expect(screen.getByText("다음 문제는 교사가 시작해요")).toBeInTheDocument();
+  });
+
   it.each(["artist", "artist-title"] as const)("uses the persisted %s target for student prompts", (target) => {
     const state = snapshot();
     state.answerTarget = target;

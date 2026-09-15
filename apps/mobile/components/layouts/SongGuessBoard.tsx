@@ -37,7 +37,6 @@ import {
 } from "../../lib/song-guess";
 import {
   BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
-  shouldUseBoardFallbackPolling,
   useBoardRealtime,
 } from "../../lib/use-board-realtime";
 import { SongGuessScoreboard } from "../song-guess/SongGuessScoreboard";
@@ -189,20 +188,16 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     void refresh();
   }, [refresh]);
 
-  const realtime = useBoardRealtime({ slug: boardId, onReload: refresh });
+  useBoardRealtime({
+    slug: boardId,
+    onReload: refresh,
+    fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
+  });
   useEffect(() => {
-    if (snapshot?.roomMode !== "student-free" || snapshot.phase === "finished") return;
-    const timer = setInterval(() => void refresh(), 2000);
-    return () => clearInterval(timer);
-  }, [refresh, snapshot?.roomMode, snapshot?.phase]);
-  useEffect(() => {
-    if (!shouldUseBoardFallbackPolling(realtime.status)) return;
-    const timer = setInterval(
-      () => void refresh(),
-      BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS,
-    );
-    return () => clearInterval(timer);
-  }, [realtime.status, refresh]);
+    if (snapshot?.roomMode !== "student-free" || snapshot.phase === "finished" || snapshot.nextTransitionAtMs == null) return;
+    const timer = setTimeout(() => void refresh(), Math.max(0, snapshot.nextTransitionAtMs - snapshot.serverTimeMs + 150));
+    return () => clearTimeout(timer);
+  }, [refresh, snapshot]);
 
   const executePending = useCallback(
     async (pending: PendingSongGuessCommand, persist = true) => {
@@ -621,12 +616,10 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         </Text>
       </View>
 
-      {hasPending || syncing ? (
+      {hasPending ? (
         <View style={styles.syncBanner} accessibilityLiveRegion="polite">
           <ActivityIndicator />
-          <Text style={styles.syncBannerText}>
-            {hasPending ? "답을 서버로 보내는 중이에요" : "최신 상태를 확인하는 중이에요"}
-          </Text>
+          <Text style={styles.syncBannerText}>답을 서버로 보내는 중이에요</Text>
         </View>
       ) : null}
 

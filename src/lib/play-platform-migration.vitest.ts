@@ -13,6 +13,17 @@ const migration = readFileSync(
   "utf8",
 );
 
+const omokPrivateRoomsMigration = readFileSync(
+  join(
+    process.cwd(),
+    "prisma",
+    "migrations",
+    "20260915173000_add_omok_private_rooms",
+    "migration.sql",
+  ),
+  "utf8",
+);
+
 describe("authoritative play platform migration", () => {
   it("persists aggregate state, server-owned slots, receipts, and outbox", () => {
     expect(migration).toContain('CREATE TABLE public."PlaySession"');
@@ -48,5 +59,27 @@ describe("authoritative play platform migration", () => {
       );
     }
     expect(migration).not.toMatch(/CREATE\s+POLICY/i);
+  });
+
+  it("adds private Omok rooms without recreating legacy ticket indexes", () => {
+    expect(omokPrivateRoomsMigration).toContain('CREATE TABLE "OmokLobbyRoom"');
+    expect(omokPrivateRoomsMigration).toContain('ADD COLUMN "queueKind" TEXT');
+    expect(omokPrivateRoomsMigration).toContain('ADD COLUMN "joinMode" TEXT');
+    expect(omokPrivateRoomsMigration).toContain('ADD COLUMN "lobbyRoomId" TEXT');
+    expect(omokPrivateRoomsMigration).not.toContain(
+      'CREATE INDEX "OmokMatchTicket_matchBoardId_idx"',
+    );
+    expect(omokPrivateRoomsMigration).not.toContain(
+      'CREATE INDEX "OmokMatchTicket_sessionId_idx"',
+    );
+  });
+
+  it("keeps Omok private rooms server-only", () => {
+    expect(omokPrivateRoomsMigration).toContain(
+      'ALTER TABLE public."OmokLobbyRoom" ENABLE ROW LEVEL SECURITY',
+    );
+    expect(omokPrivateRoomsMigration).toContain(
+      'REVOKE ALL ON TABLE public."OmokLobbyRoom" FROM anon, authenticated',
+    );
   });
 });

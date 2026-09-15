@@ -353,11 +353,6 @@ export function OfficialSlimeSprite({
   const ballOffset = ballAsset
     ? slimePropFrameOffset(frameIndex, ballAsset, scale)
     : null;
-  const bounds = containEquipment ? participantSceneBounds(geometry, viewportHeight, Boolean(resolvedVehicleSpritePath), vehicleBobY ?? [], resolvedWearables) : null;
-  const viewportStyle: CSSProperties = {
-    width: bounds?.width ?? sceneWidth,
-    height: bounds?.height ?? viewportHeight,
-  };
   /**
    * Vehicle sheets share the character's frame clock, so a rider and its ride
    * stay in step. Authored durations match the slime idle timeline, which is why
@@ -420,6 +415,19 @@ export function OfficialSlimeSprite({
     slimeColor,
     wearables,
   ]);
+  const bounds = containEquipment
+    ? participantSceneBounds(
+        geometry,
+        viewportHeight,
+        Boolean(resolvedVehicleSpritePath),
+        vehicleBobY ?? [],
+        resolvedWearables,
+      )
+    : null;
+  const viewportStyle: CSSProperties = {
+    width: bounds?.width ?? sceneWidth,
+    height: bounds?.height ?? viewportHeight,
+  };
   const equipmentWearables = resolvedWearables.filter(
     (wearable) => wearable.role !== "drink",
   );

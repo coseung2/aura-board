@@ -53,7 +53,7 @@ export async function POST(request: Request, { params }: Params) {
       `/v1/boards/${encodeURIComponent(boardId)}/song-guess/sessions`,
       { actor, method: "POST", body },
     );
-    return enrichSongGuessPlayEngineResponse(response);
+    return enrichSongGuessPlayEngineResponse(response, { broadcastOnSuccess: true });
   } catch (error) {
     return playRouteError(error);
   }

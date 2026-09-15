@@ -31,7 +31,15 @@ export function SongGuessLobbyStatus({ snapshot, studentId, joined, pending, fai
         {joined ? (own?.displayName ?? "게임에 입장했어요") : failed ? "입장하지 못했어요" : "게임에 입장하는 중이에요"}
       </Text>
       <Text style={styles.muted} selectable>
-        {joined ? "입장 완료 · 선생님의 시작을 기다려요" : failed ? "다시 시도해 주세요." : "잠시만 기다려 주세요."}
+        {joined
+          ? snapshot.roomMode === "student-free"
+            ? snapshot.viewer.isRoomHost
+              ? "입장 완료 · 준비되면 직접 시작할 수 있어요"
+              : "입장 완료 · 방장의 시작을 기다려요"
+            : "입장 완료 · 선생님의 시작을 기다려요"
+          : failed
+            ? "다시 시도해 주세요."
+            : "잠시만 기다려 주세요."}
       </Text>
       {!joined ? (
         <>
@@ -76,8 +84,18 @@ export function SongGuessLobbyStatus({ snapshot, studentId, joined, pending, fai
             </View>
           </View>
           <View style={styles.waitCard}>
-            <Text style={styles.waitMuted}>선생님이 게임을 시작할 때까지</Text>
-            <Text style={styles.waitTitle}>이 화면에서 기다려 주세요</Text>
+            <Text style={styles.waitMuted}>
+              {snapshot.roomMode === "student-free"
+                ? snapshot.viewer.isRoomHost
+                  ? "준비되면 음악 퀴즈 시작을 눌러 주세요"
+                  : "방장이 게임을 시작할 때까지"
+                : "선생님이 게임을 시작할 때까지"}
+            </Text>
+            <Text style={styles.waitTitle}>
+              {snapshot.roomMode === "student-free" && snapshot.viewer.isRoomHost
+                ? "친구들과 바로 시작할 수 있어요"
+                : "이 화면에서 기다려 주세요"}
+            </Text>
           </View>
         </>
       ) : null}

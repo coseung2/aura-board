@@ -41,7 +41,11 @@ export function SongGuessScoreboard({
             <Text style={styles.resultMeta}>누적</Text>
             <Text style={styles.ownScore}>{own.score.toLocaleString("ko-KR")}점</Text>
           </View>
-          <Text style={styles.nextRound}>다음 문제는 선생님이 시작해요</Text>
+          <Text style={styles.nextRound}>
+            {snapshot.roomMode === "student-free"
+              ? "다음 문제는 잠시 후 자동으로 시작해요"
+              : "다음 문제는 선생님이 시작해요"}
+          </Text>
         </View>
       ) : null}
 

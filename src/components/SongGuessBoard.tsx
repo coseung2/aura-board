@@ -168,10 +168,10 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   }, [selectedSessionId, readPending]);
 
   useEffect(() => {
-    if (snapshot?.roomMode !== "student-free" || snapshot.phase === "finished") return;
-    const timer = setInterval(() => void refreshSession(), 2000);
-    return () => clearInterval(timer);
-  }, [snapshot?.roomMode, snapshot?.phase, refreshSession]);
+    if (snapshot?.roomMode !== "student-free" || snapshot.phase === "finished" || snapshot.nextTransitionAtMs == null) return;
+    const timer = window.setTimeout(() => void refreshSession(), Math.max(0, snapshot.nextTransitionAtMs - snapshot.serverTimeMs + 150));
+    return () => window.clearTimeout(timer);
+  }, [snapshot, refreshSession]);
 
   const reloadSetup = useCallback(async () => {
     if (viewer !== "teacher") return;

@@ -462,6 +462,37 @@ export async function announceOmokMatchmakingChange(boardId: string): Promise<vo
 }
 
 /**
+ * Fast path for a play mutation that already committed in the Rust engine.
+ * The durable PlayOutbox remains the recovery path if this delivery fails.
+ */
+export async function announcePlaySessionChange(
+  boardId: string,
+  sessionId: string,
+  version: number,
+): Promise<void> {
+  if (
+    !boardId ||
+    !sessionId ||
+    !Number.isSafeInteger(version) ||
+    version < 0
+  ) {
+    return;
+  }
+  const event: PlaySessionRealtimeEvent = {
+    type: PLAY_SESSION_CHANGED_EVENT,
+    eventId: `immediate:${sessionId}:${version}`,
+    sessionId,
+    boardId,
+    version,
+  };
+  await broadcastBestEffort(
+    boardChannelKey(boardId),
+    PLAY_SESSION_CHANGED_EVENT,
+    event,
+  );
+}
+
+/**
  * Strict delivery for the durable Rust play outbox. The caller completes an
  * outbox lease only after this succeeds; payloads are compact invalidations,
  * never hidden game state or client-authored commands.

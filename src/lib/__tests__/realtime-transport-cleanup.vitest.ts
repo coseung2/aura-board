@@ -34,6 +34,25 @@ describe("realtime transport cleanup", () => {
     expect(board).not.toContain('setInterval(() => void load("refresh"), 10_000)');
   });
 
+  it("keeps web song-guess broadcast-first without the student-free 2s poll", () => {
+    const board = source("src/components/SongGuessBoard.tsx");
+
+    expect(board).toContain("useRealtimeInvalidation");
+    expect(board).toContain("PLAY_SESSION_CHANGED_EVENT");
+    expect(board).toContain("nextTransitionAtMs");
+    expect(board).not.toContain("setInterval(() => void refreshSession(), 2000)");
+  });
+
+  it("keeps mobile song-guess broadcast-first with fallback owned by the realtime controller", () => {
+    const board = source("apps/mobile/components/layouts/SongGuessBoard.tsx");
+
+    expect(board).toContain("useBoardRealtime");
+    expect(board).toContain("fallbackPollMs: BOARD_REALTIME_FALLBACK_POLL_INTERVAL_MS");
+    expect(board).toContain("nextTransitionAtMs");
+    expect(board).not.toContain("setInterval(() => void refresh(), 2000)");
+    expect(board).not.toContain("shouldUseBoardFallbackPolling");
+  });
+
   it("subscribes the mobile assignment board to the existing assignment channel", () => {
     const board = source("apps/mobile/components/layouts/AssignmentBoard.tsx");
 

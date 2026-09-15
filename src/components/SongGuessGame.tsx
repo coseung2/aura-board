@@ -411,7 +411,11 @@ export function SongGuessGame({
                   )}
                 </div>
                 <div><span>누적</span><strong>{ownParticipant.score.toLocaleString("ko-KR")}점</strong></div>
-                <p>다음 문제는 교사가 시작해요</p>
+                <p>
+                  {snapshot.roomMode === "student-free"
+                    ? "다음 문제는 잠시 후 자동으로 시작해요"
+                    : "다음 문제는 교사가 시작해요"}
+                </p>
               </div>
             )}
             {isHost && <SongGuessScoreboard participants={participants} roundResults />}
