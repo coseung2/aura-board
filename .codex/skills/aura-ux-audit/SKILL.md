@@ -94,6 +94,8 @@ Before accepting any participant/count/status label, name the exact semantic sou
 
 The label must match the source. A historical attempt count is not "현재 접속", an invitation is not "참여 중", and a durable join row is not proof that a socket is still online. Use ephemeral Presence/lease/TTL semantics for live occupancy and durable authoritative rows for participation/history, then reconcile the two only for display enrichment such as names or avatars.
 
+When several features need "who is here now", prefer a shared ephemeral Presence layer over a shared durable membership table. The shared layer may answer current connection/occupancy, but feature-specific join/ready/match/forfeit/complete transitions should remain behind domain adapters unless their semantics are genuinely identical. A generic `joined` boolean that means queueing in one feature, socket presence in another, and historical participation in a third is a design defect even if it reduces code duplication.
+
 ### 2. Unnecessary actions and duplicated stages
 
 Look for:

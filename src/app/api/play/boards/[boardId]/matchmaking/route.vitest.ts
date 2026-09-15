@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   studentFindMany: vi.fn(),
   ticketFindUnique: vi.fn(),
   ticketFindFirst: vi.fn(),
+  ticketFindMany: vi.fn(),
   ticketCount: vi.fn(),
   ticketUpsert: vi.fn(),
   ticketUpdate: vi.fn(),
@@ -51,6 +52,7 @@ vi.mock("@/lib/db", () => {
     omokMatchTicket: {
       findUnique: mocks.ticketFindUnique,
       findFirst: mocks.ticketFindFirst,
+      findMany: mocks.ticketFindMany,
       count: mocks.ticketCount,
       upsert: mocks.ticketUpsert,
       update: mocks.ticketUpdate,
@@ -71,7 +73,7 @@ vi.mock("@/lib/db", () => {
   return { db };
 });
 
-import { GET, POST } from "./route";
+import { DELETE, GET, POST } from "./route";
 
 const context = { params: Promise.resolve({ boardId: "lobby-1" }) };
 const request = new Request("http://localhost/api/play/boards/lobby-1/matchmaking");
@@ -119,6 +121,7 @@ describe("Omok matchmaking", () => {
     mocks.ticketUpdate.mockResolvedValue({});
     mocks.ticketUpdateMany.mockResolvedValue({ count: 2 });
     mocks.ticketFindFirst.mockResolvedValue({ id: "ticket-1", studentId: "student-1" });
+    mocks.ticketFindMany.mockResolvedValue([]);
     mocks.roomFindMany.mockResolvedValue([]);
     mocks.roomCreate.mockResolvedValue({ id: "room-1" });
     mocks.roomUpdate.mockResolvedValue({});
@@ -158,13 +161,15 @@ describe("Omok matchmaking", () => {
     expect(mocks.boardFindFirst).not.toHaveBeenCalled();
   });
 
-  it("heartbeats a waiting ticket and returns its live player count", async () => {
+  it("heartbeats a live waiting ticket and returns its queue count", async () => {
     mocks.ticketFindUnique.mockResolvedValue({
       id: "ticket-2",
       status: "waiting",
+      queueKind: "random",
+      lobbyRoomId: null,
       matchBoardId: null,
       sessionId: null,
-      requestedAt: new Date(0),
+      requestedAt: new Date(Date.now() - 15_000),
     });
     const response = await GET(request, context);
     expect(response.status).toBe(200);
@@ -179,7 +184,61 @@ describe("Omok matchmaking", () => {
       status: "waiting",
       playerCount: 2,
       queueKind: "random",
+      lobbyRoomId: null,
       rooms: [],
+    });
+  });
+
+  it("expires a stale waiting lease instead of reviving a student who left", async () => {
+    mocks.ticketFindUnique.mockResolvedValue({
+      id: "ticket-2",
+      status: "waiting",
+      queueKind: "room",
+      lobbyRoomId: "room-1",
+      matchBoardId: null,
+      sessionId: null,
+      requestedAt: new Date(Date.now() - 31_000),
+    });
+    mocks.ticketUpdateMany.mockResolvedValueOnce({ count: 1 });
+
+    const response = await GET(request, context);
+
+    expect(await response.json()).toEqual({ status: "idle", playerCount: 0, rooms: [] });
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: expect.objectContaining({ id: "ticket-2", status: "waiting" }),
+      data: expect.objectContaining({ status: "idle", lobbyRoomId: null, sessionId: null }),
+    }));
+    expect(mocks.roomUpdateMany).toHaveBeenCalledWith({
+      where: { id: "room-1", status: "waiting" },
+      data: { status: "closed" },
+    });
+    expect(mocks.announceMatchmaking).toHaveBeenCalledWith("lobby-1");
+  });
+
+  it("closes a stale public room when no live room ticket remains", async () => {
+    mocks.ticketFindUnique.mockResolvedValue(null);
+    mocks.roomFindMany.mockResolvedValue([
+      {
+        id: "room-stale",
+        lobbyBoardId: "lobby-1",
+        classroomId: "classroom-1",
+        hostStudentId: "student-1",
+        name: "오래된 방",
+        status: "waiting",
+        matchBoardId: null,
+        sessionId: null,
+        createdAt: new Date(0),
+      },
+    ]);
+    mocks.studentFindMany.mockResolvedValue([{ id: "student-1", name: "학생 1" }]);
+    mocks.ticketFindMany.mockResolvedValue([]);
+
+    const response = await GET(request, context);
+
+    expect(await response.json()).toEqual({ status: "idle", playerCount: 0, rooms: [] });
+    expect(mocks.roomUpdateMany).toHaveBeenCalledWith({
+      where: { id: { in: ["room-stale"] }, status: "waiting" },
+      data: { status: "closed" },
     });
   });
 
@@ -202,6 +261,22 @@ describe("Omok matchmaking", () => {
       queueKind: "random",
       rooms: [],
     });
+  });
+
+  it("cancels a waiting queue and closes a hosted public room", async () => {
+    const response = await DELETE(request, context);
+
+    expect(response.status).toBe(200);
+    expect(mocks.transaction).toHaveBeenCalledTimes(1);
+    expect(mocks.ticketUpdateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { lobbyBoardId: "lobby-1", studentId: "student-2", status: "waiting" },
+      data: expect.objectContaining({ status: "idle", lobbyRoomId: null, sessionId: null }),
+    }));
+    expect(mocks.roomUpdateMany).toHaveBeenCalledWith({
+      where: { lobbyBoardId: "lobby-1", hostStudentId: "student-2", status: "waiting" },
+      data: { status: "closed" },
+    });
+    expect(await response.json()).toEqual({ status: "idle", playerCount: 0 });
   });
 
   it("pairs two students and starts the authoritative match without requiring teacher request auth", async () => {

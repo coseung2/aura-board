@@ -2,12 +2,21 @@ import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OmokSnapshot } from "@/lib/play-platform/contracts";
-const mocks = vi.hoisted(() => ({ current: vi.fn(), submit: vi.fn(), refresh: vi.fn(), push: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
+const mocks = vi.hoisted(() => ({
+  current: vi.fn(), submit: vi.fn(), refresh: vi.fn(), push: vi.fn(), replace: vi.fn(),
+  matchmaking: vi.fn(), requestMatchmaking: vi.fn(), releaseMatchmaking: vi.fn(),
+}));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push, replace: mocks.replace }) }));
 vi.mock("@/hooks/useRealtimeInvalidation", () => ({ useRealtimeInvalidation: ({ refresh, enabled }: { refresh: () => Promise<void>; enabled: boolean }) => { if (enabled) mocks.refresh.mockImplementation(refresh); } }));
+vi.mock("@/features/games/hooks/useGamePresence", () => ({
+  useGamePresence: () => [{ studentId: "student-1", name: "학생", joinedAt: "2026-09-15T00:00:00.000Z" }],
+}));
 vi.mock("@/lib/play-platform/browser-client", async (original) => ({
   ...await original<typeof import("@/lib/play-platform/browser-client")>(),
   fetchCurrentOmokSession: mocks.current, submitOmokCommand: mocks.submit,
+  fetchOmokMatchmaking: mocks.matchmaking,
+  requestOmokMatch: mocks.requestMatchmaking,
+  releaseOmokMatchBestEffort: mocks.releaseMatchmaking,
   fetchOmokPlayerProfiles: async () => ({ players: [], startedAtMs: null }),
 }));
 vi.mock("@/features/games/components/GameParticipantPet", () => ({ GameParticipantPet: () => null }));
@@ -19,7 +28,14 @@ function state(): OmokSnapshot {
     viewer: { role: "participant", slot: "first", capabilities: { canRematch: false } },
     game: { board: Array(225).fill(null), nextTurn: "first", status: { status: "playing" }, moveCount: 0, lastMove: null }, outcome: null };
 }
-beforeEach(() => { vi.resetAllMocks(); window.localStorage.clear(); mocks.current.mockResolvedValue(state()); vi.spyOn(window, "confirm").mockReturnValue(false); });
+beforeEach(() => {
+  vi.resetAllMocks();
+  window.localStorage.clear();
+  mocks.current.mockResolvedValue(state());
+  mocks.matchmaking.mockResolvedValue({ status: "idle", playerCount: 0, rooms: [] });
+  mocks.requestMatchmaking.mockResolvedValue({ status: "waiting", playerCount: 1, queueKind: "random", rooms: [] });
+  vi.spyOn(window, "confirm").mockReturnValue(false);
+});
 afterEach(() => { cleanup(); vi.restoreAllMocks(); window.localStorage.clear(); });
 describe("Omok task-focused controls", () => {
   it("keeps the board interactive during routine reconciliation without status noise", async () => {
@@ -57,6 +73,17 @@ describe("Omok task-focused controls", () => {
     await waitFor(() => expect(mocks.submit.mock.calls.length).toBeGreaterThan(previous));
     expect(mocks.submit.mock.calls[0][1]).toEqual(mocks.submit.mock.calls.at(-1)![1]);
   });
+  it("releases a waiting matchmaking lease when the student leaves the lobby", async () => {
+    const view = render(<OmokBoard boardId="b" boardTitle="오목" viewer="student" matchmakingEnabled student={{ id: "student-1", name: "학생" }} />);
+    expect(await screen.findByText("현재 오목 로비 접속 1명")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "랜덤 매칭" }));
+    await waitFor(() => expect(screen.getByText("입장 대기 중")).toBeTruthy());
+
+    view.unmount();
+
+    expect(mocks.releaseMatchmaking).toHaveBeenCalledWith("b");
+  });
+
   it.each(["teacher", "student"] as const)("returns the finished %s to its own game hub and respects rematch capability", async (viewer) => {
     const ended = state(); ended.roomStatus = "finished";
     ended.viewer.role = viewer === "teacher" ? "host" : "participant";

@@ -11,6 +11,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { GAME_HUB_CHANGED_EVENT } from "@/lib/realtime";
 import type { OfficialGameKind } from "@/lib/game-platform/contracts";
+import type { GamePresenceParticipant } from "@/lib/game-platform/presence";
+import { useGamePresenceScope } from "@/features/games/hooks/useGamePresence";
 import {
   GAME_HUB_ORDER,
   OFFICIAL_GAME_CATALOG,
@@ -40,10 +42,25 @@ type GameHubStatus = {
   phase: "open" | "waiting" | "active" | "paused" | "finished";
   label: string;
   playerCount: number;
+  countKind: "participants" | "queue";
 };
 
 function HubSubscription({ channelName, refresh }: { channelName: string; refresh: () => Promise<void> }) {
   useRealtimeInvalidation({ channelName, event: GAME_HUB_CHANGED_EVENT, refresh, initialRefresh: false });
+  return null;
+}
+
+function HubPresenceSubscription({
+  scopeId,
+  onChange,
+}: {
+  scopeId: string;
+  onChange: (scopeId: string, participants: GamePresenceParticipant[] | null) => void;
+}) {
+  const participants = useGamePresenceScope({ scopeId });
+  useEffect(() => {
+    onChange(scopeId, participants);
+  }, [onChange, participants, scopeId]);
   return null;
 }
 
@@ -74,6 +91,10 @@ export function GameHubCatalog({
     Partial<Record<OfficialGameKind, GameHubStatus>>
   >({});
   const [channels, setChannels] = useState<string[]>([]);
+  const [presenceScopeIds, setPresenceScopeIds] = useState<string[]>([]);
+  const [presenceByScope, setPresenceByScope] = useState<
+    Record<string, GamePresenceParticipant[] | null>
+  >({});
   const [statusError, setStatusError] = useState(false);
   const [nextRefresh, setNextRefresh] = useState<{ delay: number; received: number } | null>(null);
   const statusSequence = useRef(0);
@@ -86,6 +107,9 @@ export function GameHubCatalog({
       if (sequence !== statusSequence.current) return;
       if (body.statuses) setStatuses(body.statuses);
       if (Array.isArray(body.channels)) setChannels(body.channels.filter((channel: unknown): channel is string => typeof channel === "string"));
+      if (Array.isArray(body.presenceScopeIds)) {
+        setPresenceScopeIds(body.presenceScopeIds.filter((scopeId: unknown): scopeId is string => typeof scopeId === "string"));
+      }
       setStatusError(false);
       setNextRefresh(typeof body.nextRefreshAtMs === "number" && typeof body.serverTimeMs === "number"
         ? { delay: Math.max(0, body.nextRefreshAtMs - body.serverTimeMs), received: Date.now() } : null);
@@ -121,6 +145,28 @@ export function GameHubCatalog({
     }, nextRefresh.delay);
     return () => window.clearTimeout(timer);
   }, [nextRefresh, loadStatuses]);
+
+  const updatePresence = useCallback(
+    (scopeId: string, participants: GamePresenceParticipant[] | null) => {
+      setPresenceByScope((current) => ({ ...current, [scopeId]: participants }));
+    },
+    [],
+  );
+
+  const livePresenceCounts = GAME_HUB_ORDER.reduce(
+    (counts, kind) => {
+      const students = new Set<string>();
+      for (const participants of Object.values(presenceByScope)) {
+        if (!participants) continue;
+        for (const participant of participants) {
+          if (participant.gameKind === kind) students.add(participant.studentId);
+        }
+      }
+      counts[kind] = students.size;
+      return counts;
+    },
+    {} as Record<OfficialGameKind, number>,
+  );
 
   const gameEntryDisabled = teacherMode && classrooms.length === 0;
 
@@ -195,6 +241,7 @@ export function GameHubCatalog({
   return (
     <section className={styles.hub} aria-label="게임">
       {channels.map((channelName) => <HubSubscription key={channelName} channelName={channelName} refresh={loadStatuses} />)}
+      {presenceScopeIds.map((scopeId) => <HubPresenceSubscription key={`presence:${scopeId}`} scopeId={scopeId} onChange={updatePresence} />)}
       {statusError && <button type="button" onClick={() => void loadStatuses().catch(() => undefined)}>게임 상태 다시 확인</button>}
       <FeaturePreviewNotice />
       {teacherMode && classrooms.length === 0 ? (
@@ -253,8 +300,9 @@ export function GameHubCatalog({
           const pending = pendingKind === kind;
           const error = errors[kind];
           const status = statuses[kind];
+          const livePresenceCount = livePresenceCounts[kind] ?? 0;
           const statusText = statusError ? "상태 확인 필요" : status
-            ? `${status.label}${status.playerCount > 0 ? ` · ${status.playerCount}명` : ""}`
+            ? `${status.label}${status.playerCount > 0 ? ` · ${status.playerCount}명 ${status.countKind === "queue" ? "대기" : "참가"}` : ""}${livePresenceCount > 0 ? ` · 접속 ${livePresenceCount}명` : ""}`
             : "상태 확인 중";
           return (
             <article className={styles.card} key={kind}>

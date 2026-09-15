@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
 import { GameParticipantPet } from "@/features/games/components/GameParticipantPet";
+import { useGamePresence } from "@/features/games/hooks/useGamePresence";
 import {
   boardChannelKey,
   OMOK_MATCHMAKING_CHANGED_EVENT,
@@ -22,6 +23,7 @@ import {
   submitOmokCommand,
   requestOmokComputerMatch,
   requestOmokMatch,
+  releaseOmokMatchBestEffort,
 } from "@/lib/play-platform/browser-client";
 import {
   isOmokSnapshot,
@@ -41,6 +43,8 @@ type Props = {
   boardTitle: string;
   viewer: "teacher" | "student";
   matchmakingEnabled?: boolean;
+  student?: { id: string; name: string } | null;
+  presenceScopeId?: string;
 };
 
 type PendingCommand = {
@@ -51,7 +55,7 @@ type PendingCommand = {
 const STAR_POINTS = new Set(["3:3", "3:11", "7:7", "11:3", "11:11"]);
 const MATCHMAKING_HEARTBEAT_MS = 15_000;
 
-export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = false }: Props) {
+export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = false, student = null, presenceScopeId = boardId }: Props) {
   const router = useRouter();
   const [snapshot, setSnapshot] = useState<OmokSnapshot | null>(null);
   const [roster, setRoster] = useState<OmokRosterStudent[]>([]);
@@ -70,6 +74,17 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
   const requestSequence = useRef(0);
   const autoRetriedRequest = useRef<string | null>(null);
   const storageKey = `aura-play-pending:${boardId}`;
+  const matchmakingWaitingRef = useRef(false);
+  matchmakingWaitingRef.current = matchmakingEnabled && matchmaking.status === "waiting";
+  const lobbyPresence = useGamePresence({
+    gameKind: "omok",
+    scopeId: presenceScopeId,
+    scopeKind: presenceScopeId === boardId ? "board" : "classroom",
+    self: viewer === "student" && student
+      ? { studentId: student.id, name: student.name }
+      : null,
+    enabled: viewer === "student" || (viewer === "teacher" && matchmakingEnabled && !snapshot),
+  });
 
   const readPending = useCallback((): PendingCommand | null => {
     try {
@@ -171,6 +186,25 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
     const timer = window.setInterval(refreshMatchmaking, MATCHMAKING_HEARTBEAT_MS);
     return () => window.clearInterval(timer);
   }, [matchmaking.status, refreshMatchmaking]);
+
+  useEffect(() => {
+    if (viewer !== "student" || !matchmakingEnabled) return;
+    const releaseWaitingQueue = () => {
+      if (!matchmakingWaitingRef.current) return;
+      matchmakingWaitingRef.current = false;
+      releaseOmokMatchBestEffort(boardId);
+    };
+    const releaseWhenHidden = () => {
+      if (document.hidden) releaseWaitingQueue();
+    };
+    window.addEventListener("pagehide", releaseWaitingQueue);
+    document.addEventListener("visibilitychange", releaseWhenHidden);
+    return () => {
+      window.removeEventListener("pagehide", releaseWaitingQueue);
+      document.removeEventListener("visibilitychange", releaseWhenHidden);
+      releaseWaitingQueue();
+    };
+  }, [boardId, matchmakingEnabled, viewer]);
 
   useEffect(() => {
     if (!snapshot) return;
@@ -394,6 +428,9 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
                 ? matchmaking.queueKind === "room" ? "내 방에 들어올 플레이어를 기다리고 있어요." : `현재 ${matchmaking.playerCount}명이 랜덤 매칭을 기다리고 있어요.`
                 : "랜덤 매칭을 시작하거나 공개 방에 참여하세요."}
             </p>
+            {lobbyPresence !== null ? (
+              <p className={styles.message}>현재 오목 로비 접속 {lobbyPresence.length}명</p>
+            ) : null}
             <div className={styles.matchActions}>
               <button
                 className={waiting ? styles.secondaryButton : styles.button}
@@ -444,7 +481,11 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
             <h1 className={styles.title}>학생 매칭 대기</h1>
             <p className={styles.message}>
               학생이 직접 매칭을 잡으면 같은 학급의 상대와 대국이 시작됩니다.
-              현재 입장 인원과 대국 상태는 놀이보드에서 확인할 수 있어요.
+            </p>
+            <p className={styles.message} role="status">
+              {lobbyPresence === null
+                ? "현재 로비 접속을 확인하고 있어요."
+                : `현재 오목 로비 접속 ${lobbyPresence.length}명`}
             </p>
           </div>
         </section>

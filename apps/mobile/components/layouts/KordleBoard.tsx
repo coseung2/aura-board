@@ -13,6 +13,7 @@ import { ApiError, apiFetch } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
 import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 import { useKordleLobbyPresence } from "../../lib/use-kordle-lobby-presence";
+import { useGamePresence } from "../../lib/use-game-presence";
 import {
   borders,
   colors,
@@ -115,6 +116,12 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
   const [state, setState] = useState<PublicState | null>(null);
   const lobbyPresence = useKordleLobbyPresence(data.board.id, data.currentStudent,
     Boolean(puzzle && puzzle.puzzle?.status !== "LIVE" && !state));
+  useGamePresence({
+    gameKind: "kordle",
+    scopeId: data.board.id,
+    student: data.currentStudent,
+    enabled: Boolean(state),
+  });
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

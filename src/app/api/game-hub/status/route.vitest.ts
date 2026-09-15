@@ -37,13 +37,13 @@ describe("authorized game hub state", () => {
   it("returns the authorized classroom channel even before any game room exists", async () => {
     const body = await (await GET(new Request("http://localhost/api/game-hub/status"), undefined)).json();
     expect(body.channels).toEqual(["classroom:class:game-hub"]);
-    expect(body.statuses.omok).toEqual({ phase: "open", label: "입장 가능", playerCount: 0 });
+    expect(body.statuses.omok).toEqual({ phase: "open", label: "입장 가능", playerCount: 0, countKind: "participants" });
     expect(mocks.boards.mock.calls[0][0].where.classroomId).toEqual({ in: ["class"] });
   });
   it("aggregates all eligible song rooms rather than only the latest current one", async () => {
     mocks.boards.mockResolvedValue([songBoard()]);
     const body = await (await GET(new Request("http://localhost/api/game-hub/status"), undefined)).json();
-    expect(body.statuses["song-guess"]).toEqual({ phase: "active", label: "진행 중", playerCount: 2 });
+    expect(body.statuses["song-guess"]).toEqual({ phase: "active", label: "진행 중", playerCount: 2, countKind: "participants" });
     expect(mocks.boards.mock.calls[0][0].select.playSessions.take).toBeUndefined();
   });
   it("lets the engine commit overdue room completion before reporting status", async () => {

@@ -3,6 +3,7 @@ import { type Href, useRouter } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   ScrollView,
   StyleSheet,
   Text,
@@ -36,6 +37,7 @@ import {
   useOmokSessionRuntime,
 } from "../../lib/omok-session-runtime";
 import { useBoardRealtime } from "../../lib/use-board-realtime";
+import { useGamePresence } from "../../lib/use-game-presence";
 import { useOmokPlayerPets } from "../../lib/use-omok-player-pets";
 import {
   colors,
@@ -88,6 +90,15 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   });
   const { state, socketStatus, offline } = runtime;
   const snapshot = state.snapshot;
+  const matchmakingWaitingRef = useRef(false);
+  matchmakingWaitingRef.current = matchmakingEnabled && matchmaking.status === "waiting";
+  const lobbyPresence = useGamePresence({
+    gameKind: "omok",
+    scopeId: data.board.classroomId ?? boardId,
+    scopeKind: data.board.classroomId ? "classroom" : "board",
+    student: data.currentStudent,
+    enabled: true,
+  });
   const playerProfiles = useOmokPlayerPets(snapshot?.sessionId);
   const playerPets = playerProfiles.players;
 
@@ -175,6 +186,22 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
     return () => clearInterval(timer);
   }, [matchmaking.status, matchmakingEnabled, refreshMatchmaking]);
 
+  useEffect(() => {
+    if (!matchmakingEnabled) return;
+    const releaseWaitingQueue = () => {
+      if (!matchmakingWaitingRef.current) return;
+      matchmakingWaitingRef.current = false;
+      void cancelOmokMatch(boardId).catch(() => undefined);
+    };
+    const listener = AppState.addEventListener("change", (nextState) => {
+      if (nextState !== "active") releaseWaitingQueue();
+    });
+    return () => {
+      listener.remove();
+      releaseWaitingQueue();
+    };
+  }, [boardId, matchmakingEnabled]);
+
   const startMatchmaking = useCallback(
     async (request: Parameters<typeof requestOmokMatch>[1]) => {
       if (!matchmakingEnabled || matchmakingBusy) return;
@@ -245,6 +272,9 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
                 ? matchmaking.queueKind === "room" ? "내 방에 들어올 플레이어를 기다리고 있어요." : `현재 ${matchmaking.playerCount}명이 랜덤 매칭을 기다리고 있어요.`
                 : "랜덤 매칭을 시작하거나 공개 방에 참여하세요."}
             </Text>
+            {lobbyPresence !== null ? (
+              <Text style={styles.matchMessage}>현재 오목 로비 접속 {lobbyPresence.length}명</Text>
+            ) : null}
             <View style={styles.matchActions}>
               {waiting ? (
                 <>

@@ -1,14 +1,25 @@
 import type { OfficialGameKind } from "./contracts";
 
 export type HubPhase = "open" | "waiting" | "active" | "paused";
-export type HubStatus = { phase: HubPhase; label: string; playerCount: number };
+export type HubCountKind = "participants" | "queue";
+export type HubStatus = {
+  phase: HubPhase;
+  label: string;
+  playerCount: number;
+  countKind: HubCountKind;
+};
 type JsonRecord = Record<string, unknown>;
 
 export function asRecord(value: unknown): JsonRecord {
   return value && typeof value === "object" && !Array.isArray(value) ? value as JsonRecord : {};
 }
 
-export const OPEN_HUB_STATUS: HubStatus = { phase: "open", label: "입장 가능", playerCount: 0 };
+export const OPEN_HUB_STATUS: HubStatus = {
+  phase: "open",
+  label: "입장 가능",
+  playerCount: 0,
+  countKind: "participants",
+};
 
 /** These are acknowledged game entrants, NOT a claim that their socket is online. */
 export function playHubStatus(kind: OfficialGameKind, value: unknown, completedAt: unknown = null): HubStatus {
@@ -27,12 +38,12 @@ export function playHubStatus(kind: OfficialGameKind, value: unknown, completedA
     return true;
   }).length;
   if (kind === "shadow-alliance" && phase === "playing" && (state.pausedRemainingMs != null || state.timerRunning === false)) {
-    return { phase: "paused", label: "일시정지", playerCount };
+    return { phase: "paused", label: "일시정지", playerCount, countKind: "participants" };
   }
   if (["active", "playing", "guessing", "reveal", "revealing", "postround"].includes(phase)) {
-    return { phase: "active", label: "진행 중", playerCount };
+    return { phase: "active", label: "진행 중", playerCount, countKind: "participants" };
   }
-  return { phase: "waiting", label: "대기 중", playerCount };
+  return { phase: "waiting", label: "대기 중", playerCount, countKind: "participants" };
 }
 
 export function combineHubStatus(current: HubStatus, next: HubStatus): HubStatus {

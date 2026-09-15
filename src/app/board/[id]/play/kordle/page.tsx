@@ -5,6 +5,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { productFeatureDenial } from "@/lib/product-release-server";
 import { PlayBoardContinueButton } from "@/components/PlayBoardContinueButton";
 import { GameAreaShell } from "@/components/game-platform/GameAreaShell";
+import { GamePresenceBoundary } from "@/features/games/components/GamePresenceBoundary";
 import { KordleBoard } from "@/features/kordle/components/KordleBoard";
 import { KordleLiveToasts } from "@/features/kordle/components/KordleLiveToasts";
 import { KordleWaitingRoom } from "@/features/kordle/components/KordleWaitingRoom";
@@ -82,12 +83,19 @@ export default async function KordlePlayPage({ params }: Props) {
   const puzzle = game.puzzles[0];
   if (!puzzle || puzzle.status !== "LIVE") {
     return (
-      <WaitingShell
-        boardId={board.id}
-        boardTitle={board.title}
-        studentId={student.id}
-        studentName={student.name}
-      />
+      <GamePresenceBoundary
+        gameKind="kordle"
+        scopeKind="classroom"
+        scopeId={board.classroomId}
+        student={{ id: student.id, name: student.name }}
+      >
+        <WaitingShell
+          boardId={board.id}
+          boardTitle={board.title}
+          studentId={student.id}
+          studentName={student.name}
+        />
+      </GamePresenceBoundary>
     );
   }
 
@@ -106,25 +114,32 @@ export default async function KordlePlayPage({ params }: Props) {
   if (!state) notFound();
 
   return (
-    <GameAreaShell
-      title={`🟩 ${board.title}`}
-      roundLabel={
-        state.turn.currentGuessIndex
-          ? `${state.turn.currentGuessIndex}/${state.maxGuesses}줄`
-          : null
-      }
-      rulesLabel="꼬들"
-      actions={<PlayBoardContinueButton />}
-      className="kordle-area"
+    <GamePresenceBoundary
+      gameKind="kordle"
+      scopeKind="classroom"
+      scopeId={board.classroomId}
+      student={{ id: student.id, name: student.name }}
     >
-      <KordleBoard
-        boardId={board.id}
-        attemptId={attemptId}
-        initialState={state}
-        locale={game.locale}
-        viewer="student"
-      />
-      <KordleLiveToasts boardId={board.id} />
-    </GameAreaShell>
+      <GameAreaShell
+        title={`🟩 ${board.title}`}
+        roundLabel={
+          state.turn.currentGuessIndex
+            ? `${state.turn.currentGuessIndex}/${state.maxGuesses}줄`
+            : null
+        }
+        rulesLabel="꼬들"
+        actions={<PlayBoardContinueButton />}
+        className="kordle-area"
+      >
+        <KordleBoard
+          boardId={board.id}
+          attemptId={attemptId}
+          initialState={state}
+          locale={game.locale}
+          viewer="student"
+        />
+        <KordleLiveToasts boardId={board.id} />
+      </GameAreaShell>
+    </GamePresenceBoundary>
   );
 }

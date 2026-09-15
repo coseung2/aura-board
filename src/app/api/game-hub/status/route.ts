@@ -38,7 +38,8 @@ async function GETHandler() {
   }
   const statuses = Object.fromEntries(OFFICIAL_GAME_KINDS.map((kind) => [kind, { ...OPEN_HUB_STATUS }])) as Record<OfficialGameKind, HubStatus>;
   const channels = classroomIds.map(gameHubChannelKey);
-  if (classroomIds.length === 0) return jsonPrivateNoStore({ statuses, channels });
+  const presenceScopeIds = [...classroomIds];
+  if (classroomIds.length === 0) return jsonPrivateNoStore({ statuses, channels, presenceScopeIds });
   const now = Date.now();
   let nextRefreshAtMs: number | null = null;
   const boards = await db.board.findMany({
@@ -74,7 +75,7 @@ async function GETHandler() {
         await response.arrayBuffer();
         sessions = await db.playSession.findMany({ where: { boardId: board.id, ...activeSessionWhere }, select: sessionSelect });
       } catch {
-        statuses[kind] = { phase: "open", label: "상태 확인 필요", playerCount: 0 };
+        statuses[kind] = { phase: "open", label: "상태 확인 필요", playerCount: 0, countKind: "participants" };
         continue;
       }
     }
@@ -89,6 +90,7 @@ async function GETHandler() {
         phase: run.status === "running" ? "active" : "waiting",
         label: run.status === "running" ? "진행 중" : "대기 중",
         playerCount: new Set(run.participants.map((p) => p.studentId)).size,
+        countKind: "participants",
       });
     }
     if (kind === "kordle" && board.kordleGame?.puzzles[0]) {
@@ -97,6 +99,7 @@ async function GETHandler() {
         phase: puzzle.status === "LIVE" ? "active" : "waiting",
         label: puzzle.status === "LIVE" ? "진행 중" : "시작 대기",
         playerCount: new Set(puzzle.attempts.map((p) => p.studentId)).size,
+        countKind: "participants",
       });
     }
   }
@@ -118,8 +121,8 @@ async function GETHandler() {
   }).map((s) => s.boardId));
   const waiting = tickets.filter((t) => t.status === "waiting");
   const playing = tickets.filter((t) => t.status === "matched" && t.matchBoardId && liveIds.has(t.matchBoardId));
-  statuses.omok = playing.length ? { phase: "active", label: "대국 중", playerCount: new Set([...playing, ...waiting].map((t) => t.studentId)).size }
-    : waiting.length ? { phase: "waiting", label: "매칭 중", playerCount: new Set(waiting.map((t) => t.studentId)).size }
+  statuses.omok = playing.length ? { phase: "active", label: "대국 중", playerCount: new Set([...playing, ...waiting].map((t) => t.studentId)).size, countKind: "participants" }
+    : waiting.length ? { phase: "waiting", label: "매칭 중", playerCount: new Set(waiting.map((t) => t.studentId)).size, countKind: "queue" }
       : { ...OPEN_HUB_STATUS };
-  return jsonPrivateNoStore({ statuses, channels, serverTimeMs: Date.now(), nextRefreshAtMs });
+  return jsonPrivateNoStore({ statuses, channels, presenceScopeIds, serverTimeMs: Date.now(), nextRefreshAtMs });
 }

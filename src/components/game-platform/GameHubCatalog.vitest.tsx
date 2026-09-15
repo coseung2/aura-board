@@ -10,9 +10,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { GameHubCatalog } from "./GameHubCatalog";
 
 const push = vi.fn();
+const presence = vi.hoisted(() => ({ current: null as null | Array<{ studentId: string; name: string; gameKind: "omok"; joinedAt: string }> }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push }),
+}));
+vi.mock("@/features/games/hooks/useGamePresence", () => ({
+  useGamePresenceScope: () => presence.current,
 }));
 
 function json(body: unknown, status = 200) {
@@ -27,6 +31,7 @@ function json(body: unknown, status = 200) {
 afterEach(() => {
   cleanup();
   push.mockReset();
+  presence.current = null;
   vi.unstubAllGlobals();
 });
 
@@ -70,19 +75,26 @@ describe("GameHubCatalog teacher mode", () => {
   });
 
   it("shows live game state beside the game title with the entered-player count", async () => {
+    presence.current = [{
+      studentId: "student-1",
+      name: "학생",
+      gameKind: "omok",
+      joinedAt: "2026-09-15T00:00:00.000Z",
+    }];
     vi.stubGlobal("fetch", vi.fn(() => json({
       statuses: {
-        kordle: { phase: "open", label: "입장 가능", playerCount: 0 },
-        "speed-game": { phase: "open", label: "입장 가능", playerCount: 0 },
-        "shadow-alliance": { phase: "active", label: "진행 중", playerCount: 6 },
-        omok: { phase: "active", label: "대국 중", playerCount: 2 },
-        "song-guess": { phase: "open", label: "입장 가능", playerCount: 0 },
+        kordle: { phase: "open", label: "입장 가능", playerCount: 0, countKind: "participants" },
+        "speed-game": { phase: "open", label: "입장 가능", playerCount: 0, countKind: "participants" },
+        "shadow-alliance": { phase: "active", label: "진행 중", playerCount: 6, countKind: "participants" },
+        omok: { phase: "active", label: "대국 중", playerCount: 2, countKind: "participants" },
+        "song-guess": { phase: "open", label: "입장 가능", playerCount: 0, countKind: "participants" },
       },
+      presenceScopeIds: ["classroom-1"],
     })));
 
     render(<GameHubCatalog viewer="teacher" classrooms={classrooms} />);
 
-    const status = await screen.findByText("대국 중 · 2명");
+    const status = await screen.findByText("대국 중 · 2명 참가 · 접속 1명");
     const titleRow = status.parentElement;
     expect(titleRow).not.toBeNull();
     expect(within(titleRow!).getByRole("heading", { level: 3, name: "오목" })).toBeTruthy();

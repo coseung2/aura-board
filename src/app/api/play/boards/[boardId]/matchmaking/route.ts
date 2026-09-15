@@ -153,7 +153,7 @@ async function responseFor(
   studentId: string,
   options: { heartbeatWaiting?: boolean } = {},
 ) {
-  const ticket = await db.omokMatchTicket.findUnique({
+  let ticket = await db.omokMatchTicket.findUnique({
     where: { lobbyBoardId_studentId: { lobbyBoardId: boardId, studentId } },
   });
   if (!ticket || ticket.status === "idle") {
@@ -193,6 +193,54 @@ async function responseFor(
       boardSlug: board.slug,
       href: `/board/${encodeURIComponent(board.slug)}?view=student`,
     });
+  }
+  if (
+    ticket.status === "waiting" &&
+    ticket.requestedAt.getTime() < Date.now() - WAITING_HEARTBEAT_MS
+  ) {
+    const expired = await db.omokMatchTicket.updateMany({
+      where: {
+        id: ticket.id,
+        status: "waiting",
+        requestedAt: { lt: new Date(Date.now() - WAITING_HEARTBEAT_MS) },
+      },
+      data: {
+        status: "idle",
+        queueKind: "random",
+        lobbyRoomId: null,
+        opponentStudentId: null,
+        matchBoardId: null,
+        sessionId: null,
+        matchedAt: null,
+      },
+    });
+    if (expired.count > 0) {
+      if (ticket.queueKind === "room" && ticket.lobbyRoomId) {
+        await db.omokLobbyRoom.updateMany({
+          where: { id: ticket.lobbyRoomId, status: "waiting" },
+          data: { status: "closed" },
+        });
+      }
+      await announceOmokMatchmakingChange(boardId);
+      return jsonPrivateNoStore({
+        status: "idle",
+        playerCount: 0,
+        rooms: await listLobbyRooms(boardId, classroomId),
+      });
+    }
+    ticket = await db.omokMatchTicket.findUnique({
+      where: { lobbyBoardId_studentId: { lobbyBoardId: boardId, studentId } },
+    });
+    if (!ticket || ticket.status === "idle") {
+      return jsonPrivateNoStore({
+        status: "idle",
+        playerCount: 0,
+        rooms: await listLobbyRooms(boardId, classroomId),
+      });
+    }
+    if (ticket.status !== "waiting") {
+      return responseFor(boardId, classroomId, studentId);
+    }
   }
   if (
     options.heartbeatWaiting &&
@@ -255,9 +303,19 @@ async function listLobbyRooms(boardId: string, classroomId: string) {
     }),
   ]);
   const hostNames = new Map(hosts.map((host) => [host.id, host.name]));
+  const liveRoomIds = new Set(tickets.flatMap((ticket) => ticket.lobbyRoomId ? [ticket.lobbyRoomId] : []));
+  const staleWaitingRoomIds = rooms
+    .filter((room) => room.status === "waiting" && !liveRoomIds.has(room.id))
+    .map((room) => room.id);
+  if (staleWaitingRoomIds.length > 0) {
+    await db.omokLobbyRoom.updateMany({
+      where: { id: { in: staleWaitingRoomIds }, status: "waiting" },
+      data: { status: "closed" },
+    });
+  }
   return rooms
     .filter((room) => !room.sessionId || !retired.has(room.sessionId))
-    .filter((room) => tickets.some((ticket) => ticket.lobbyRoomId === room.id))
+    .filter((room) => liveRoomIds.has(room.id))
     .map((room) => ({
       id: room.id,
       name: room.name,
@@ -765,10 +823,28 @@ export async function DELETE(_request: Request, { params }: Params) {
   const student = await getCurrentStudentIdentity();
   if (!student) return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
   const { boardId } = await params;
-  await db.omokMatchTicket.updateMany({
-    where: { lobbyBoardId: boardId, studentId: student.id, status: "waiting" },
-    data: { status: "idle", queueKind: "random", lobbyRoomId: null },
-  });
+  await db.$transaction([
+    db.omokMatchTicket.updateMany({
+      where: { lobbyBoardId: boardId, studentId: student.id, status: "waiting" },
+      data: {
+        status: "idle",
+        queueKind: "random",
+        lobbyRoomId: null,
+        opponentStudentId: null,
+        matchBoardId: null,
+        sessionId: null,
+        matchedAt: null,
+      },
+    }),
+    db.omokLobbyRoom.updateMany({
+      where: {
+        lobbyBoardId: boardId,
+        hostStudentId: student.id,
+        status: "waiting",
+      },
+      data: { status: "closed" },
+    }),
+  ]);
   await announceOmokMatchmakingChange(boardId);
   return jsonPrivateNoStore({ status: "idle", playerCount: 0 });
 }

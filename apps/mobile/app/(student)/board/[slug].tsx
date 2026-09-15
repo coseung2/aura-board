@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import {
   BackHandler,
   KeyboardAvoidingView,
@@ -68,7 +68,9 @@ import { songGuessStudentTheme } from "../../../theme/song-guess";
 import {
   isMobileOfficialGameKind,
   MOBILE_GAME_CATALOG,
+  type MobileOfficialGameKind,
 } from "../../../lib/game-platform-contract";
+import { useGamePresence } from "../../../lib/use-game-presence";
 
 // 학생 앱 보드 상세 dispatcher. /api/student/board/:slug 한 번 fetch 후
 // board.layout 에 따라 맞는 레이아웃 컴포넌트 렌더.
@@ -358,18 +360,36 @@ function prefetchBoardPreviewImages(data: BoardDetailResponse): Promise<boolean>
     : Promise.resolve(true);
 }
 
+function GamePresenceTracked({
+  data,
+  gameKind,
+  children,
+}: {
+  data: BoardDetailResponse;
+  gameKind: MobileOfficialGameKind;
+  children: ReactNode;
+}) {
+  useGamePresence({
+    gameKind,
+    scopeId: data.board.classroomId ?? data.board.id,
+    scopeKind: data.board.classroomId ? "classroom" : "board",
+    student: data.currentStudent,
+  });
+  return <>{children}</>;
+}
+
 function renderOfficialGameLayout(data: BoardDetailResponse) {
   switch (data.board.layout) {
     case "kordle":
-      return <KordleBoard data={data} />;
+      return <GamePresenceTracked data={data} gameKind="kordle"><KordleBoard data={data} /></GamePresenceTracked>;
     case "speed-game":
-      return <SpeedGameBoard data={data} />;
+      return <GamePresenceTracked data={data} gameKind="speed-game"><SpeedGameBoard data={data} /></GamePresenceTracked>;
     case "shadow-alliance":
-      return <ShadowAllianceBoard data={data} />;
+      return <GamePresenceTracked data={data} gameKind="shadow-alliance"><ShadowAllianceBoard data={data} /></GamePresenceTracked>;
     case "omok":
       return <OmokBoard data={data} />;
     case "song-guess":
-      return <SongGuessBoard data={data} />;
+      return <GamePresenceTracked data={data} gameKind="song-guess"><SongGuessBoard data={data} /></GamePresenceTracked>;
     default:
       return null;
   }
@@ -410,21 +430,21 @@ function renderLayout(
     case "assessment":
       return <AssessmentBoard data={data} />;
     case "kordle":
-      return <KordleBoard data={data} />;
+      return <GamePresenceTracked data={data} gameKind="kordle"><KordleBoard data={data} /></GamePresenceTracked>;
     case "vibe-gallery":
       return <VibeGalleryBoard data={data} />;
     case "speed-game":
-      return <SpeedGameBoard data={data} />;
+      return <GamePresenceTracked data={data} gameKind="speed-game"><SpeedGameBoard data={data} /></GamePresenceTracked>;
     case "event-signup":
       return <EventSignupBoard data={data} />;
     case "breakout":
       return <BreakoutBoard data={data} onMutate={reload} />;
     case "shadow-alliance":
-      return <ShadowAllianceBoard data={data} />;
+      return <GamePresenceTracked data={data} gameKind="shadow-alliance"><ShadowAllianceBoard data={data} /></GamePresenceTracked>;
     case "omok":
       return <OmokBoard data={data} />;
     case "song-guess":
-      return <SongGuessBoard data={data} />;
+      return <GamePresenceTracked data={data} gameKind="song-guess"><SongGuessBoard data={data} /></GamePresenceTracked>;
     case "freeform":
     case "grid":
     case "stream":

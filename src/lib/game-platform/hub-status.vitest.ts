@@ -4,7 +4,7 @@ import { combineHubStatus, OPEN_HUB_STATUS, playHubStatus } from "./hub-status";
 describe("truthful play hub status", () => {
   it("counts acknowledged song entrants rather than the seeded classroom roster", () => {
     expect(playHubStatus("song-guess", { rulesVersion: 2, state: { phase: "lobby", participants: [{ joined: true }, { joined: false }, {}] } }))
-      .toEqual({ phase: "waiting", label: "대기 중", playerCount: 1 });
+      .toEqual({ phase: "waiting", label: "대기 중", playerCount: 1, countKind: "participants" });
   });
   it("retains the legacy joined contract, but never presents history as active", () => {
     expect(playHubStatus("song-guess", { rulesVersion: 1, state: { phase: "guessing", participants: [{}] } }).playerCount).toBe(1);
@@ -21,11 +21,11 @@ describe("truthful play hub status", () => {
   });
   it("counts shadow membership separately from forfeiture and timers", () => {
     expect(playHubStatus("shadow-alliance", { participants: { a: { joinedAtMs: 0 }, b: { joinedAtMs: null }, c: { joinedAtMs: 1, forfeitedAtMs: 2 } }, state: { phase: "playing", timerRunning: false } }))
-      .toEqual({ phase: "paused", label: "일시정지", playerCount: 1 });
+      .toEqual({ phase: "paused", label: "일시정지", playerCount: 1, countKind: "participants" });
   });
   it("combines multiple rooms without a finished room winning over a live one", () => {
-    const active = { phase: "active" as const, label: "진행 중", playerCount: 2 };
+    const active = { phase: "active" as const, label: "진행 중", playerCount: 2, countKind: "participants" as const };
     expect(combineHubStatus(active, OPEN_HUB_STATUS)).toEqual(active);
-    expect(combineHubStatus(active, { phase: "waiting", label: "대기 중", playerCount: 1 }).playerCount).toBe(3);
+    expect(combineHubStatus(active, { phase: "waiting", label: "대기 중", playerCount: 1, countKind: "participants" }).playerCount).toBe(3);
   });
 });

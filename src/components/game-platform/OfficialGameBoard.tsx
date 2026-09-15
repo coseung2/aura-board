@@ -12,6 +12,7 @@ import { ShadowAllianceBoard } from "@/components/ShadowAllianceBoard";
 import { OmokBoard } from "@/components/OmokBoard";
 import { SongGuessBoard } from "@/components/SongGuessBoard";
 import { KordleTeacherBoard } from "@/features/kordle/components/KordleTeacherBoard";
+import { GamePresenceBoundary } from "@/features/games/components/GamePresenceBoundary";
 import { GameAreaShell } from "./GameAreaShell";
 import styles from "./game-platform.module.css";
 
@@ -107,6 +108,8 @@ export async function OfficialGameBoard({
           boardTitle={board.title}
           viewer={viewer}
           matchmakingEnabled={board.systemGameKind === "omok"}
+          student={studentViewer ? { id: studentViewer.id, name: studentViewer.name } : null}
+          presenceScopeId={board.classroomId ?? board.id}
         />
       );
       break;
@@ -119,6 +122,24 @@ export async function OfficialGameBoard({
         />
       );
       break;
+  }
+
+  if (
+    studentViewer &&
+    (board.layout === "speed-game" ||
+      board.layout === "shadow-alliance" ||
+      board.layout === "song-guess")
+  ) {
+    content = (
+      <GamePresenceBoundary
+        gameKind={catalog.kind}
+        scopeId={board.classroomId ?? board.id}
+        scopeKind={board.classroomId ? "classroom" : "board"}
+        student={{ id: studentViewer.id, name: studentViewer.name }}
+      >
+        {content}
+      </GamePresenceBoundary>
+    );
   }
 
   // Purpose-built games own their complete game surface. The shared shell

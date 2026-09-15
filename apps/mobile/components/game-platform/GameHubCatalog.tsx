@@ -27,16 +27,50 @@ import {
 } from "../../theme/tokens";
 import { ControlPressable } from "../ui";
 import { useLiveSnapshot } from "../../lib/use-live-snapshot";
+import { useGamePresenceScope } from "../../lib/use-game-presence";
 
 type HubPayload = {
-  statuses: Partial<Record<MobileOfficialGameKind, { label: string; playerCount: number }>>;
+  statuses: Partial<Record<MobileOfficialGameKind, { label: string; playerCount: number; countKind: "participants" | "queue" }>>;
   channels: string[];
+  presenceScopeIds?: string[];
   serverTimeMs?: number;
   nextRefreshAtMs?: number | null;
 };
 
 function HubSubscription({ channelName, reload, enabled }: { channelName: string; reload: () => Promise<void>; enabled: boolean }) {
   useLiveSnapshot({ channelName, events: ["game_hub_changed"], reload, enabled });
+  return null;
+}
+
+type PresenceCounts = Partial<Record<MobileOfficialGameKind, number>>;
+
+function HubPresenceSubscription({
+  scopeId,
+  enabled,
+  onChange,
+}: {
+  scopeId: string;
+  enabled: boolean;
+  onChange: (scopeId: string, counts: PresenceCounts | null) => void;
+}) {
+  const participants = useGamePresenceScope({ scopeId, enabled });
+  useEffect(() => {
+    if (!participants) {
+      onChange(scopeId, null);
+      return;
+    }
+    const sets = new Map<MobileOfficialGameKind, Set<string>>();
+    for (const participant of participants) {
+      const kind = participant.gameKind as MobileOfficialGameKind;
+      const students = sets.get(kind) ?? new Set<string>();
+      students.add(participant.studentId);
+      sets.set(kind, students);
+    }
+    onChange(
+      scopeId,
+      Object.fromEntries([...sets].map(([kind, students]) => [kind, students.size])) as PresenceCounts,
+    );
+  }, [onChange, participants, scopeId]);
   return null;
 }
 
@@ -66,6 +100,9 @@ export function GameHubCatalog() {
     Partial<Record<MobileOfficialGameKind, string>>
   >({});
   const [hub, setHub] = useState<HubPayload | null>(null);
+  const [presenceByScope, setPresenceByScope] = useState<
+    Record<string, PresenceCounts | null>
+  >({});
   const [statusError, setStatusError] = useState(false);
   const [focused, setFocused] = useState(true);
   const sequence = useRef(0);
@@ -98,6 +135,13 @@ export function GameHubCatalog() {
     }, Math.max(0, hub.nextRefreshAtMs - hub.serverTimeMs));
     return () => clearTimeout(timer);
   }, [focused, hub, reloadStatus]);
+
+  const updatePresence = useCallback(
+    (scopeId: string, counts: PresenceCounts | null) => {
+      setPresenceByScope((current) => ({ ...current, [scopeId]: counts }));
+    },
+    [],
+  );
 
   async function enterGame(gameKind: MobileOfficialGameKind) {
     if (pendingKind) return;
@@ -133,12 +177,24 @@ export function GameHubCatalog() {
   return (
     <View style={styles.root}>
       {hub?.channels?.map((channelName) => <HubSubscription key={channelName} channelName={channelName} reload={reloadStatus} enabled={focused} />)}
+      {hub?.presenceScopeIds?.map((scopeId) => (
+        <HubPresenceSubscription
+          key={`presence:${scopeId}`}
+          scopeId={scopeId}
+          enabled={focused}
+          onChange={updatePresence}
+        />
+      ))}
       {statusError && <ControlPressable accessibilityLabel="게임 상태 다시 확인" onPress={() => void reloadStatus().catch(() => undefined)}><Text style={styles.errorText}>게임 상태 다시 확인</Text></ControlPressable>}
       <View style={styles.grid}>
         {MOBILE_GAME_HUB_ORDER.map((kind) => {
           const game = MOBILE_GAME_CATALOG[kind];
           const pending = pendingKind === kind;
           const error = errors[kind];
+          const livePresenceCount = Object.values(presenceByScope).reduce(
+            (sum, counts) => sum + (counts?.[kind] ?? 0),
+            0,
+          );
           return (
             <View style={[styles.card, { width: cardWidth }]} key={kind}>
               <Image
@@ -156,7 +212,7 @@ export function GameHubCatalog() {
                 </Text>
                 <Text style={styles.gameStatus}>
                   {statusError ? "상태 확인 필요" : hub?.statuses[kind]
-                    ? `${hub.statuses[kind]!.label}${hub.statuses[kind]!.playerCount ? ` · ${hub.statuses[kind]!.playerCount}명 참가` : ""}`
+                    ? `${hub.statuses[kind]!.label}${hub.statuses[kind]!.playerCount ? ` · ${hub.statuses[kind]!.playerCount}명 ${hub.statuses[kind]!.countKind === "queue" ? "대기" : "참가"}` : ""}${livePresenceCount > 0 ? ` · 접속 ${livePresenceCount}명` : ""}`
                     : "상태 확인 중"}
                 </Text>
                 <ControlPressable

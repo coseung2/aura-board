@@ -29,17 +29,17 @@ describe("kordle realtime helpers", () => {
     expect(
       kordleParticipantsFromPresenceState({
         a: [
-          { studentId: "s2", name: "Mina", joinedAt: "2026-07-09T00:00:03.000Z" },
-          { studentId: "s1", name: "Joon", joinedAt: "2026-07-09T00:00:02.000Z" },
+          { studentId: "s2", name: "Mina", gameKind: "kordle", joinedAt: "2026-07-09T00:00:03.000Z" },
+          { studentId: "s1", name: "Joon", gameKind: "kordle", joinedAt: "2026-07-09T00:00:02.000Z" },
         ],
         b: [
-          { studentId: "s1", name: "Joon", joinedAt: "2026-07-09T00:00:01.000Z" },
-          { studentId: "", name: "Nope", joinedAt: "2026-07-09T00:00:00.000Z" },
+          { studentId: "s1", name: "Joon", gameKind: "kordle", joinedAt: "2026-07-09T00:00:01.000Z" },
+          { studentId: "", name: "Nope", gameKind: "kordle", joinedAt: "2026-07-09T00:00:00.000Z" },
         ],
       }),
     ).toEqual([
-      { studentId: "s1", name: "Joon", joinedAt: "2026-07-09T00:00:01.000Z" },
-      { studentId: "s2", name: "Mina", joinedAt: "2026-07-09T00:00:03.000Z" },
+      { studentId: "s1", name: "Joon", gameKind: "kordle", joinedAt: "2026-07-09T00:00:01.000Z" },
+      { studentId: "s2", name: "Mina", gameKind: "kordle", joinedAt: "2026-07-09T00:00:03.000Z" },
     ]);
   });
 });

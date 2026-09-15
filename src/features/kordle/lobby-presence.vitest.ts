@@ -62,12 +62,12 @@ describe("kordle lobby presence", () => {
 
     fake.setState({
       one: [
-        { studentId: "student-1", name: "민지", joinedAt: "2026-09-15T00:00:01.000Z" },
+        { studentId: "student-1", name: "민지", gameKind: "kordle", joinedAt: "2026-09-15T00:00:01.000Z" },
       ],
     });
     fake.sync();
     expect(changes.at(-1)).toEqual([
-      { studentId: "student-1", name: "민지", joinedAt: "2026-09-15T00:00:01.000Z" },
+      { studentId: "student-1", name: "민지", gameKind: "kordle", joinedAt: "2026-09-15T00:00:01.000Z" },
     ]);
 
     unsubscribe();

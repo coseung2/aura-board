@@ -26,6 +26,19 @@
 
 ## 공통 제품 계약
 
+### 입장·접속 상태 계층
+
+공식 PLAY의 공통 계층은 게임별 규칙을 하나의 `joined` 상태로 합치지 않는다. 공통으로 다루는 것은 게임 허브 진입 대상 해석과 현재 화면 Presence이며, 실제 참가·매칭·준비·전적은 각 게임의 authoritative 모델이 소유한다.
+
+- **Presence**: 지금 해당 학급의 게임 화면에 연결된 학생. Supabase Presence 같은 ephemeral transport를 사용하며 권한, 점수, 승패의 근거가 아니다. 화면 이탈·background·연결 종료 시 사라진다.
+- **Queue**: 오목처럼 상대를 찾기 위해 잠시 유지되는 대기 상태. TTL/lease와 명시적 cancel을 가져야 하며, 만료된 queue를 단순 조회가 되살리면 안 된다.
+- **Participation**: 서버가 참가를 확인한 durable 상태. 노래 맞히기 join, 스피드게임 joinedAt, 그림자연합 joinedAt, 꼬들 LIVE attempt 등이 해당한다. 단순 화면 이탈만으로 임의 삭제하지 않고 각 게임의 leave/forfeit/terminal 규칙을 따른다.
+- **Ready / Active / History**: 참가 이후의 준비, 진행, 완료 기록은 게임별 규칙이 소유한다. 공통 Presence가 이 상태를 추론하거나 변경하지 않는다.
+
+허브와 로비는 숫자의 의미를 명시한다. `현재 접속`, `매칭 대기`, `참가`를 서로 바꾸어 쓰지 않는다. 하나의 학생이 durable 참가자로 남아 있어도 화면을 닫았다면 Presence에서는 즉시 빠질 수 있으며, 이는 모순이 아니다.
+
+현재 구조에서 `/api/student/game-hub/entry`는 canonical 게임 공간을 찾는 공통 진입점이다. 그 이후 오목 matchmaking, 노래 방 join/leave, 스피드게임·그림자연합 참가 명령, 꼬들 attempt 생성은 게임별 adapter가 처리한다. 이 차이를 숨기기 위해 범용 `join` mutation 하나를 만들지 않는다.
+
 1. 게임 입장
    - 학생은 게임 규칙, 참가 상태, 연결 상태와 준비/입장 행동을 명확히 본다.
    - 교사/호스트 제어와 학생 행동을 권한별로 분리한다.

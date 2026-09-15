@@ -1,4 +1,8 @@
 import type { GuessFeedback } from "./engine";
+import {
+  normalizeGamePresence,
+  type GamePresenceParticipant,
+} from "@/lib/game-platform/presence";
 
 export const KORDLE_GUESS_SUBMITTED_EVENT = "guess-submitted";
 export const KORDLE_PUZZLE_CHANGED_EVENT = "puzzle-changed";
@@ -22,11 +26,7 @@ export type KordlePuzzleChangedEvent = {
   currentGuessIndex?: number | null;
 };
 
-export type KordlePresencePayload = {
-  studentId: string;
-  name: string;
-  joinedAt: string;
-};
+export type KordlePresencePayload = GamePresenceParticipant;
 
 export function kordleBoardChannelKey(boardId: string): string {
   return `kordle:board:${boardId}`;
@@ -40,21 +40,5 @@ export function kordleCorrectCount(feedback: unknown): number {
 export function kordleParticipantsFromPresenceState(
   state: Record<string, KordlePresencePayload[]>,
 ): KordlePresencePayload[] {
-  const byStudent = new Map<string, KordlePresencePayload>();
-
-  for (const payloads of Object.values(state)) {
-    if (!Array.isArray(payloads)) continue;
-    for (const payload of payloads) {
-      if (!payload || typeof payload.studentId !== "string" || !payload.studentId || typeof payload.name !== "string" || !payload.name || typeof payload.joinedAt !== "string" || !payload.joinedAt) continue;
-      const current = byStudent.get(payload.studentId);
-      if (!current || payload.joinedAt < current.joinedAt) {
-        byStudent.set(payload.studentId, payload);
-      }
-    }
-  }
-
-  return [...byStudent.values()].sort((a, b) => {
-    const joinedCompare = a.joinedAt.localeCompare(b.joinedAt);
-    return joinedCompare || a.name.localeCompare(b.name);
-  });
+  return normalizeGamePresence(state);
 }

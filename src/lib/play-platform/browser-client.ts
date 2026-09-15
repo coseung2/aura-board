@@ -151,6 +151,16 @@ export async function cancelOmokMatch(boardId: string): Promise<OmokMatchmakingS
   );
 }
 
+/** Best-effort cleanup for route/page exit. The server lease remains the crash fallback. */
+export function releaseOmokMatchBestEffort(boardId: string): void {
+  void fetch(`/api/play/boards/${encodeURIComponent(boardId)}/matchmaking`, {
+    method: "DELETE",
+    headers: { Accept: "application/json" },
+    cache: "no-store",
+    keepalive: true,
+  }).catch(() => undefined);
+}
+
 export async function fetchOmokPlayerProfiles(sessionId: string): Promise<{
   startedAtMs: number | null;
   players: OmokPlayerProfile[];
