@@ -194,13 +194,13 @@ describe("song-guess gated clip retrieval", () => {
     mocks.loadSongGuessTeacherBoard.mockResolvedValue({ actor: { userId: "teacher-1" } });
     mocks.resolveSongGuessParticipantSeeds.mockResolvedValue([]);
     mocks.songGuessGameFindUnique.mockResolvedValue({ rounds: [{
-      id: "round-1", order: 0, representativeAnswer: "달리반피카소", normalizedAnswer: "달리반피카소",
+      id: "round-1", sourceCatalogSongId: "source-song", order: 0, representativeAnswer: "달리반피카소", normalizedAnswer: "달리반피카소",
       aliases: ["Dali, Van, Picasso"], normalizedAliases: ["dali, van, picasso"], accessibilityClue: null,
       clips: [{ id: "asset-1", tierMs: 15000, mimeType: "audio/wav", sizeBytes: 1323044, durationMs: 15000 }],
     }] });
     mocks.catalogFindMany.mockResolvedValue([
-      { title: "Dali, Van, Picasso", aliases: ["달리반피카소"] },
-      ...["밤편지", "봄날", "좋은 날"].map((title) => ({ title, aliases: [] })),
+      { id: "source-song", title: "Dali, Van, Picasso", aliases: ["달리반피카소"], categories: ["2010s"] },
+      ...["밤편지", "봄날", "좋은 날"].map((title) => ({ title, aliases: [], categories: ["2010s"] })),
     ]);
     const request = await buildSongGuessCreateRequest("board-1", "request-1", undefined, mode);
     expect(request.rounds).toHaveLength(1);
@@ -222,9 +222,10 @@ describe("song-guess gated clip retrieval", () => {
       clips: [{ id: "a1", tierMs: 15000, mimeType: "audio/wav", sizeBytes: 1323044, durationMs: 15000 }] };
     mocks.songGuessGameFindUnique.mockResolvedValue({ rounds: [song] });
     mocks.catalogFindMany.mockResolvedValue([
-      { title: "밤편지", artist: "아이유", aliases: ["Through the Night"] },
-      { title: "좋은 날", artist: "아이유", aliases: [] },
-      ...["방탄소년단", "베토벤", "쇼팽"].map((artist, i) => ({ title: `곡 ${i}`, artist, aliases: [] })),
+      { title: "밤편지", artist: "아이유", aliases: ["Through the Night"], categories: ["2010s"] },
+      { title: "좋은 날", artist: "아이유", aliases: [], categories: ["2010s"] },
+      ...["방탄소년단", "레드벨벳", "트와이스"].map((artist, i) => ({ title: `곡 ${i}`, artist, aliases: [], categories: ["2010s"] })),
+      { title: "피아노 협주곡", artist: "쇼팽", aliases: [], categories: ["classical"] },
     ]);
     const result = await buildSongGuessCreateRequest("board-1", "request-1", undefined, "multiple-choice", target);
     expect(result.answerTarget).toBe(target);
@@ -234,7 +235,8 @@ describe("song-guess gated clip retrieval", () => {
     expect(new Set(round.choices?.map((choice) => choice.label)).size).toBe(4);
     expect(round.representativeAnswer).toBe(target === "title" ? "밤편지" : target === "artist" ? "아이유" : "아이유 - 밤편지");
     if (target !== "title") expect(round.aliases).not.toContain("Through the Night");
-    if (target === "artist") expect(round.choices?.map((choice) => choice.label).sort()).toEqual(["아이유", "방탄소년단", "베토벤", "쇼팽"].sort());
+    if (target === "artist") expect(round.choices?.map((choice) => choice.label).sort()).toEqual(["아이유", "방탄소년단", "레드벨벳", "트와이스"].sort());
+    expect(round.choices?.some((choice) => /쇼팽|피아노 협주곡/.test(choice.label))).toBe(false);
   });
 
   it("rejects a legacy video-only setup before starting a session", async () => {

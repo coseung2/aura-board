@@ -219,9 +219,22 @@ fn song_guess_snapshot_reports_authoritative_round_points_and_previous_rank() {
 
     let snapshot = session.snapshot(&host(), 2_100).unwrap();
     assert_eq!(snapshot.participants[0].round_score, Some(0));
-    assert_eq!(snapshot.participants[1].round_score, Some(1_000));
+    assert_eq!(snapshot.participants[1].round_score, Some(0));
+    assert_eq!(snapshot.participants[0].score, 1_000);
+    assert_eq!(snapshot.participants[1].score, 0);
+    assert!(snapshot.participants.iter().all(|p| !p.scored_current_round));
     assert_eq!(snapshot.participants[0].previous_rank, Some(1));
     assert_eq!(snapshot.participants[1].previous_rank, Some(2));
+
+    // A reload or another viewer must not bypass the reveal boundary.
+    let stored = serde_json::to_string(&session).unwrap();
+    let mut restored: SongGuessSessionRecord = serde_json::from_str(&stored).unwrap();
+    assert_eq!(restored.snapshot(&actor("one"), 2_200).unwrap().participants, snapshot.participants);
+    restored.apply(&host(), &SongGuessIntent::Reveal).unwrap();
+    let revealed = restored.snapshot(&host(), 2_300).unwrap();
+    assert_eq!(revealed.participants[1].round_score, Some(1_000));
+    assert_eq!(revealed.participants[1].score, 1_000);
+    assert!(revealed.participants[1].scored_current_round);
 }
 
 fn assert_waiting_song_guess_wire(session: &SongGuessSessionRecord, phase: &str) {

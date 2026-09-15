@@ -32,10 +32,11 @@ import {
   type UploadedSongGuessClip,
 } from "./contracts";
 import { enrichSongGuessSnapshot } from "./participant-identity";
-import { buildSongGuessChoices } from "./choices";
+import { buildSongGuessChoices, resolveChoiceCategories } from "./choices";
 import type { SongGuessAnswerMode, SongGuessAnswerTarget } from "./contracts";
 import { resolveSongGuessArtist, transformSongGuessAnswer } from "./answer-target";
 import { loadCatalogSessionClip } from "./student-room-audio";
+import { projectSongGuessPublicSnapshot } from "./public-projection";
 
 export type {
   SongGuessTeacherClip,
@@ -57,6 +58,7 @@ type StoredSongGuessClip = {
 export async function saveSongGuessSetup(
   boardId: string,
   input: SongGuessSetupInput,
+  catalogSources: ReadonlyMap<string, string> = new Map(),
 ): Promise<SongGuessTeacherSetup> {
   const normalized = normalizeSongGuessSetup(input);
   const { actor } = await loadSongGuessTeacherBoard(boardId);
@@ -82,6 +84,11 @@ export async function saveSongGuessSetup(
       include: { rounds: { include: { clips: true } } },
     });
     const previousAssets = previous?.rounds.flatMap((round) => round.clips) ?? [];
+    const sourcesByAsset = new Map<string, string>();
+    for (const round of previous?.rounds ?? []) {
+      if (round.sourceCatalogSongId) for (const clip of round.clips) sourcesByAsset.set(clip.id, round.sourceCatalogSongId);
+    }
+    for (const [assetId, songId] of catalogSources) sourcesByAsset.set(assetId, songId);
     const previousAssetIds = previousAssets.map((asset) => asset.id);
     const selectedAssetIdSet = new Set(requestedAssetIds);
     const orphanedObjectKeys = previousAssets
@@ -112,12 +119,14 @@ export async function saveSongGuessSetup(
       clips: SongGuessTeacherClip[];
     }>;
     for (const round of normalized.rounds) {
+      const sources = [...new Set(round.clipAssetIds.flatMap((id) => sourcesByAsset.has(id) ? [sourcesByAsset.get(id)!] : []))];
       const createdRound = await tx.songGuessRound.create({
         data: {
           gameId: game.id,
           order: round.order,
           representativeAnswer: round.representativeAnswer,
           artist: round.artist ?? null,
+          sourceCatalogSongId: sources.length === 1 ? sources[0] : null,
           normalizedAnswer: round.normalizedAnswer,
           aliases: round.aliases,
           normalizedAliases: round.normalizedAliases,
@@ -307,14 +316,14 @@ export async function buildSongGuessCreateRequest(
   );
   const participants = await resolveSongGuessParticipantSeeds(boardId, studentIds);
   const catalog = answerMode === "multiple-choice" || (answerTarget !== "title" && game.rounds.some((round) => !round.artist?.trim()))
-    ? await db.songGuessCatalogSong.findMany({ select: { title: true, artist: true, aliases: true }, orderBy: { id: "asc" } })
+    ? await db.songGuessCatalogSong.findMany({ select: { id: true, title: true, artist: true, aliases: true, categories: true }, orderBy: { id: "asc" } })
     : [];
-  const catalogAnswers = catalog.map((song) => ({ ...song, aliases: readStringArray(song.aliases) }));
+  const catalogAnswers = catalog.map((song) => ({ ...song, aliases: readStringArray(song.aliases), categories: readStringArray(song.categories) }));
   let rounds;
   try {
     rounds = game.rounds.map((round) => {
       const source = { ...round, aliases: readStringArray(round.aliases) };
-      return { ...round, ...transformSongGuessAnswer({ ...source,
+      return { ...round, categories: resolveChoiceCategories(source, catalogAnswers), ...transformSongGuessAnswer({ ...source,
         artist: answerTarget === "title" ? round.artist : resolveSongGuessArtist(source, catalogAnswers),
       }, answerTarget) };
     });
@@ -328,7 +337,7 @@ export async function buildSongGuessCreateRequest(
       catalogAnswers.flatMap((song) => {
         try {
           const answer = transformSongGuessAnswer({ ...song, representativeAnswer: song.title }, answerTarget);
-          return [{ title: answer.representativeAnswer, aliases: answer.aliases }];
+          return [{ title: answer.representativeAnswer, aliases: answer.aliases, categories: song.categories }];
         } catch { return []; }
       })) : undefined;
   } catch {
@@ -365,7 +374,7 @@ export async function buildSongGuessCreateRequest(
  */
 export async function enrichSongGuessPlayEngineResponse(
   response: Response,
-  options: { broadcastOnSuccess?: boolean } = {},
+  options: { broadcastOnSuccess?: boolean; hubChanged?: boolean } = {},
 ): Promise<Response> {
   const raw = await response.text();
   let payload: unknown = null;
@@ -386,14 +395,16 @@ export async function enrichSongGuessPlayEngineResponse(
       snapshot.boardId,
       snapshot.sessionId,
       snapshot.version,
-      !(isRecord(payload) && payload.result != null),
+      options.hubChanged !== false && !(isRecord(payload) && payload.result != null),
     );
   }
 
-  const enriched = await enrichSongGuessSnapshot(snapshot).catch(() => snapshot);
+  const publicSnapshot = projectSongGuessPublicSnapshot(snapshot);
+  const enriched = await enrichSongGuessSnapshot(publicSnapshot).catch(() => publicSnapshot);
   const nextPayload = isSongGuessSnapshot(payload)
     ? enriched
-    : { ...(payload as Record<string, unknown>), snapshot: enriched };
+    : { ...(payload as Record<string, unknown>), snapshot: enriched,
+        ...(snapshot.phase === "guessing" && snapshot.answerMode === "multiple-choice" ? { result: null } : {}) };
   return replaySongGuessResponse(response, JSON.stringify(nextPayload));
 }
 

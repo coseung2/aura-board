@@ -189,7 +189,7 @@ export function messageForError(error: unknown): string {
       case "invalid_song_guess_target_answer":
         return "가수·작곡가와 제목을 합친 답안이 너무 길어요. 대표 정답이나 별칭을 200자 이내로 줄여 주세요.";
       case "insufficient_song_guess_choices":
-        return "노래 풀에 서로 다른 오답 후보가 부족해 보기를 자동으로 만들지 못했어요.";
+        return "같은 분류에 서로 다른 보기 후보가 부족해요. 다른 분류나 직접 입력 방식을 선택해 주세요.";
       case "song_guess_setup_locked":
         return "현재 게임 세션이 있어 라운드 편집이 잠겼어요.";
       case "song_guess_clip_assigned":

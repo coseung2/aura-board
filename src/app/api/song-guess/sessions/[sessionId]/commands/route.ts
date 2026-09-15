@@ -41,7 +41,10 @@ export async function POST(request: Request, { params }: Params) {
       `/v1/song-guess/sessions/${encodeURIComponent(sessionId)}/commands`,
       { actor, method: "POST", body: parsed.data },
     );
-    return enrichSongGuessPlayEngineResponse(response, { broadcastOnSuccess: true });
+    return enrichSongGuessPlayEngineResponse(response, {
+      broadcastOnSuccess: true,
+      hubChanged: !["guess", "unlock_clip"].includes(parsed.data.command.type),
+    });
   } catch (error) {
     return playRouteError(error);
   }

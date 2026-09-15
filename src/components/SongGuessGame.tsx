@@ -298,11 +298,6 @@ export function SongGuessGame({
                 </button>
               </form>
             )}
-            {isHost && (
-              <p className={styles.scored} data-song-correct-count>
-                {scoredCount} / {participants.length}명 정답
-              </p>
-            )}
           </div>
         )}
 

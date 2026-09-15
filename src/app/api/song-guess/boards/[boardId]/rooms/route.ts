@@ -6,6 +6,8 @@ import { playRouteError } from "@/lib/play-platform/route-utils";
 import { SONG_GUESS_CATALOG_CATEGORIES } from "@/lib/song-guess/catalog";
 import { buildStudentRoomRequest, studentRoomCatalog } from "@/lib/song-guess/student-rooms";
 import { enrichSongGuessPlayEngineResponse } from "@/lib/song-guess/server";
+import { isSongGuessSnapshot } from "@/lib/song-guess/contracts";
+import { projectSongGuessPublicSnapshot } from "@/lib/song-guess/public-projection";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,7 +29,9 @@ export async function GET(request: Request, { params }: Params) {
     if (!response.ok) return proxyPlayEngineResponse(response);
     const body = await response.json();
     if (!Array.isArray(body?.sessions)) throw new Error("invalid_song_guess_rooms");
-    return NextResponse.json({ sessions: body.sessions.filter((room: { phase?: string }) => room.phase !== "finished") }, { headers: { "cache-control": "private, no-store" } });
+    return NextResponse.json({ sessions: body.sessions.filter(isSongGuessSnapshot)
+      .filter((room: { phase: string }) => room.phase !== "finished")
+      .map(projectSongGuessPublicSnapshot) }, { headers: { "cache-control": "private, no-store" } });
   } catch (error) { return playRouteError(error); }
 }
 

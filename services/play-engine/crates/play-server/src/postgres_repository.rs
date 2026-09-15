@@ -461,7 +461,8 @@ impl PlayRepository for PostgresRepository {
             previous_version,
             version: updated.version,
             snapshot: updated.snapshot(actor, now_ms)?,
-            result,
+            result: result.filter(|_| updated.state.answer_mode != play_domain::song_guess::SongGuessAnswerMode::MultipleChoice
+                || updated.state.phase != play_domain::song_guess::SongGuessPhase::Guessing),
         };
         sqlx::query(
             r#"UPDATE "PlaySession"

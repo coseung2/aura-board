@@ -47,16 +47,13 @@ export const SongGuessScoreboard = memo(function SongGuessScoreboard({
   const visible = roundResults ? ranked.slice(0, 5) : ranked;
 
   if (liveTeacher) {
-    const correctCount = ranked.filter((participant) => participant.scoredCurrentRound).length;
     return (
-      <section className={teacherStyles.teacherScoreboard} aria-label="실시간 순위">
+      <section className={teacherStyles.teacherScoreboard} aria-label="누적 순위">
         <div className={teacherStyles.scoreboardHeader}>
-          <h2>실시간 순위</h2>
-          <span className={teacherStyles.liveBadge}>LIVE</span>
+          <h2>누적 순위</h2>
         </div>
         <div className={teacherStyles.scoreboardStats}>
           <div className={teacherStyles.scoreboardStat}><span>참여 중</span><strong>{ranked.length}명</strong></div>
-          <div className={teacherStyles.scoreboardStat} data-accent="true"><span>이번 문제 정답</span><strong>{correctCount}명</strong></div>
         </div>
         <div className={teacherStyles.scoreboardColumns} aria-hidden="true"><span>순위</span><span>학생</span><span>누적 점수</span></div>
         <ol className={teacherStyles.teacherScoreList} aria-label="현재 순위">

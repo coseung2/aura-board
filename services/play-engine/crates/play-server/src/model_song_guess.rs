@@ -532,9 +532,20 @@ impl SongGuessSessionRecord {
                 .iter()
                 .map(|participant| SongGuessParticipantSnapshot {
                     display_name: participant.display_name.clone(),
-                    score: participant.score,
+                    // Evaluation commits immediately, but shared scores remain
+                    // at the last revealed round until this answer is public.
+                    score: if round_is_revealed {
+                        participant.score
+                    } else {
+                        participant.score.saturating_sub(
+                            round.round_scores.iter()
+                                .find(|entry| entry.actor_subject == participant.actor_subject)
+                                .map(|entry| entry.score).unwrap_or(0)
+                        )
+                    },
                     joined: participant.joined,
                     round_score: has_v2_round_metrics.then(|| {
+                        if !round_is_revealed { return 0; }
                         round
                             .round_scores
                             .iter()
@@ -574,7 +585,7 @@ impl SongGuessSessionRecord {
                     } else {
                         None
                     },
-                    scored_current_round: round
+                    scored_current_round: round_is_revealed && round
                         .correct_participants
                         .iter()
                         .any(|subject| subject == &participant.actor_subject),
@@ -599,7 +610,8 @@ impl SongGuessSessionRecord {
                     .find(|selection| !is_host && selection.actor_subject == actor.subject)
                     .map(|selection| selection.choice_id.clone()),
                 role: actor.role,
-                scored_current_round,
+                scored_current_round: scored_current_round
+                    && (round_is_revealed || self.state.answer_mode == SongGuessAnswerMode::Text),
                 joined: viewer_joined,
                 participant_index: viewer_index,
             },

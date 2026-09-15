@@ -80,7 +80,9 @@ async fn mc_create_replay_and_concurrent_attempts_survive_repository_reload() {
         .execute_song_guess_command(&participant("first"), &session_id, &wrong, 1000)
         .await
         .unwrap();
-    assert!(!first.value.result.as_ref().unwrap().correct);
+    assert!(first.value.result.is_none());
+    assert!(first.value.snapshot.viewer.answered_current_round);
+    assert!(!first.value.snapshot.viewer.scored_current_round);
     let replay = repository
         .execute_song_guess_command(&participant("first"), &session_id, &wrong, 2000)
         .await

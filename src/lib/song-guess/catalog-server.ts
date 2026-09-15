@@ -96,6 +96,7 @@ export async function createSongGuessSetupFromCatalog(
   const entries = await loadSongGuessCatalog();
   const selected = selectSongGuessCatalogEntries(entries, selection);
   const uploadedIds: string[] = [];
+  const catalogSources = new Map<string, string>();
   try {
     const rounds: SongGuessSetupInput["rounds"] = [];
     for (const entry of selected) {
@@ -108,6 +109,7 @@ export async function createSongGuessSetupFromCatalog(
         clip,
       );
       uploadedIds.push(uploaded.id);
+      catalogSources.set(uploaded.id, entry.id);
       rounds.push({
         representativeAnswer: entry.title,
         artist: entry.artist,
@@ -116,7 +118,7 @@ export async function createSongGuessSetupFromCatalog(
         clipAssetIds: [uploaded.id],
       });
     }
-    const setup = await saveSongGuessSetup(boardId, { rounds });
+    const setup = await saveSongGuessSetup(boardId, { rounds }, catalogSources);
     return {
       segment: selection.segment,
       songs: selected.map(({ id, title, artist, categories, sourceUrl }) => ({

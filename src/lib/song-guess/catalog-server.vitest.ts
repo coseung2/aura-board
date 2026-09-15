@@ -98,7 +98,7 @@ describe("song-guess catalog WAV normalization", () => {
     expect(validateSongGuessWavBytes(bytes, 15_000)).toBeNull();
     expect(mocks.saveSetup).toHaveBeenCalledWith("board-1", {
       rounds: [{ representativeAnswer: result.songs[0]!.title, artist: result.songs[0]!.artist, aliases: expect.any(Array), accessibilityClue: null, clipAssetIds: ["asset-1"] }],
-    });
+    }, new Map([["asset-1", "chopin-waltz-no19"]]));
   });
 
   it("materializes a DB private clip into a board-owned setup asset", async () => {

@@ -41,7 +41,7 @@ export async function buildStudentRoomRequest(boardId: string, requestId: string
     };
   });
   let choices;
-  try { choices = buildSongGuessChoices(seed, rounds.map((round) => ({ ...round, id: round.roundId })), catalog); }
+  try { choices = buildSongGuessChoices(seed, rounds.map((round, index) => ({ ...round, id: round.roundId, categories: selected[index].categories })), catalog); }
   catch { throw new PlayAccessError(400, "insufficient_song_guess_choices"); }
   return {
     requestId, roomMode: "student-free", classroomTeacherSubject: `teacher:${classroom.teacherId}`,

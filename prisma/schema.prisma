@@ -2124,6 +2124,10 @@ model SongGuessRound {
 
   artist String?
 
+  // Trusted catalog provenance survives teacher setup save/reload. Private:
+  // never include this identity in participant snapshots before reveal.
+  sourceCatalogSongId String?
+
   normalizedAnswer String
 
   aliases Json

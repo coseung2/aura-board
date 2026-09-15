@@ -52,9 +52,10 @@ export function useSongGuessSounds(snapshot: SongGuessSnapshot, result: SongGues
   useEffect(() => {
     if (!result || result === lastResult.current) return;
     lastResult.current = result;
+    if (snapshot.answerMode === "multiple-choice" && snapshot.phase === "guessing") return;
     if (result.roundId !== snapshot.currentRound.roundId || result.alreadyScored || musicPlaying.current) return;
     void controller.current?.play(result.correct ? "correct" : "wrong");
-  }, [result, snapshot.currentRound.roundId]);
+  }, [result, snapshot.currentRound.roundId, snapshot.answerMode, snapshot.phase]);
 
   useEffect(() => {
     if (snapshot.phase === "guessing" && remainingSeconds !== null && remainingSeconds > 0 && remainingSeconds <= 3 && !musicPlaying.current) {
