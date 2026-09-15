@@ -39,41 +39,34 @@ function snapshot(): SongGuessSnapshot {
 
 function renderGame(state = snapshot(), overrides = {}) {
   const onIntent = vi.fn();
+  const onExit = vi.fn();
   const props = { snapshot: state, totalRounds: 10, canInteract: true, remainingSeconds: 20, expired: false,
-    guessText: "", onGuessText: vi.fn(), onIntent, result: null, onReloadSetup: vi.fn(), status: null, ...overrides };
-  return { ...render(<SongGuessGame {...props} />), onIntent, props };
+    guessText: "", onGuessText: vi.fn(), onIntent, onExit, result: null, onReloadSetup: vi.fn(), status: null, ...overrides };
+  return { ...render(<SongGuessGame {...props} />), onIntent, onExit, props };
 }
 
 describe("SongGuessGame answer modes", () => {
   it("lets the student room host start and finish without manual round controls", () => {
     const state = snapshot(); state.roomMode = "student-free"; state.phase = "lobby";
     state.viewer.canStart = true; state.viewer.canFinish = true; state.viewer.isRoomHost = true;
-    const { onIntent, rerender, props } = renderGame(state);
+    const { onIntent, onExit, rerender, props } = renderGame(state);
     fireEvent.click(screen.getByRole("button", { name: "음악 퀴즈 시작" }));
     expect(onIntent).toHaveBeenCalledWith({ type: "start" });
     fireEvent.click(screen.getByRole("button", { name: "게임 끝내기" }));
-    expect(onIntent).toHaveBeenCalledWith({ type: "finish" });
+    expect(onExit).toHaveBeenCalledTimes(1);
     rerender(<SongGuessGame {...props} snapshot={{ ...state, phase: "guessing", viewer: { ...state.viewer, role: "host" } }} />);
     expect(screen.queryByRole("button", { name: "정답 공개" })).not.toBeInTheDocument();
   });
-  it("uses automatic-next copy for student-created rooms after a reveal", () => {
-    const state = snapshot();
-    state.roomMode = "student-free";
-    state.phase = "reveal";
-    state.currentRound.revealedAnswer = "밤편지";
-    state.participants[0]!.roundScore = 100;
-    renderGame(state);
-    expect(screen.getByText("다음 문제는 잠시 후 자동으로 시작해요")).toBeInTheDocument();
-    expect(screen.queryByText("다음 문제는 교사가 시작해요")).not.toBeInTheDocument();
-  });
-
-  it("keeps teacher-led next-round copy for teacher-created rooms", () => {
+  it("reveals the answer without next-round or outcome copy", () => {
     const state = snapshot();
     state.phase = "reveal";
     state.currentRound.revealedAnswer = "밤편지";
     state.participants[0]!.roundScore = 100;
     renderGame(state);
-    expect(screen.getByText("다음 문제는 교사가 시작해요")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "밤편지" })).toBeInTheDocument();
+    for (const copy of ["다음 문제는", "정답이에요", "아쉬워요", "정답!", "내 답"]) {
+      expect(screen.queryByText(new RegExp(copy))).not.toBeInTheDocument();
+    }
   });
 
   it.each(["artist", "artist-title"] as const)("uses the persisted %s target for student prompts", (target) => {
@@ -93,6 +86,17 @@ describe("SongGuessGame answer modes", () => {
     expect(onIntent).toHaveBeenCalledWith({ type: "guess", choiceId: "option-2", roundId: "round-1" });
   });
 
+  it("lists only the choice labels, without numbers or submitted badges", () => {
+    const state = snapshot();
+    state.viewer.answeredCurrentRound = true;
+    state.viewer.selectedChoiceId = "option-0";
+    renderGame(state);
+    const group = screen.getByRole("group", { name: "노래 제목 보기" });
+    expect(group).toHaveTextContent("밤편지");
+    expect(group.textContent).not.toMatch(/[1-4]/u);
+    expect(screen.queryByText("내 답")).not.toBeInTheDocument();
+  });
+
   it("restores the submitted choice and locks all choices even after a wrong answer", () => {
     const state = snapshot();
     state.viewer.answeredCurrentRound = true;
@@ -102,7 +106,6 @@ describe("SongGuessGame answer modes", () => {
     for (const button of screen.getByRole("group").querySelectorAll("button")) expect(button).toBeDisabled();
     fireEvent.click(screen.getByRole("button", { name: "밤편지" }));
     expect(onIntent).not.toHaveBeenCalled();
-    expect(screen.getByRole("status")).toHaveTextContent("답변 제출 완료");
   });
 
   it("marks the revealed correct choice separately from the participant's wrong selection", () => {
@@ -135,10 +138,11 @@ describe("SongGuessGame answer modes", () => {
     expect(onIntent).not.toHaveBeenCalled();
   });
 
-  it("does not encourage retrying a wrong multiple-choice answer", () => {
+  it("does not narrate the round outcome after a wrong answer", () => {
     renderGame(snapshot(), { result: { roundId: "round-1", tierMs: 500, correct: false, alreadyScored: false, score: 0 } });
-    expect(screen.getByRole("status")).toHaveTextContent("정답 공개를 기다려 주세요");
-    expect(screen.queryByText("다시 도전해 보세요.")).not.toBeInTheDocument();
+    for (const copy of ["아쉬워요", "정답!", "다시 도전해 보세요."]) {
+      expect(screen.queryByText(new RegExp(copy))).not.toBeInTheDocument();
+    }
   });
 
   it("keeps direct title input for legacy sessions without a mode", () => {

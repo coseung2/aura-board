@@ -25,33 +25,10 @@ export function SongGuessEntrance({ snapshot, canInteract, onJoin, failed = fals
 
   return <div className={styles.entrance}>
     {isHost ? <>
-      {snapshot.phase === "draft" && (
-        <div className={styles.createdSummary}>
-          <span className={styles.createdEyebrow}>STEP 1</span>
-          <h2 className={styles.createdTitle}>게임이 만들어졌어요</h2>
-          <p className={styles.createdNote}>학생 입장을 받기 전에 로비를 열어 주세요.</p>
-          <div className={styles.createdCard}>
-            <strong>{snapshot.answerMode === "multiple-choice" ? "객관식 4지선다" : "직접 입력"}</strong>
-            <span>
-              {snapshot.answerTarget === "artist"
-                ? "가수·작곡가 맞히기"
-                : snapshot.answerTarget === "artist-title"
-                  ? "가수·작곡가와 제목 맞히기"
-                  : "곡명 맞히기"}
-            </span>
-            <span className={styles.createdClosed}>학생 입장 닫힘</span>
-          </div>
-        </div>
-      )}
       <div className={styles.invitation}>
         <Music2 size={40} strokeWidth={1.5} aria-hidden="true" />
         <div>
           <h2>{snapshot.phase === "draft" ? "게임 준비" : "학생 입장 대기"}</h2>
-          <p>
-            {snapshot.phase === "draft"
-              ? "로비를 열면 학생 기기에서 자동으로 입장을 시도합니다."
-              : "준비된 학생이 들어오면 대표 펫과 이름만 즉시 표시됩니다."}
-          </p>
         </div>
         <div className={styles.entryStat}>
           <span>입장</span>
@@ -71,12 +48,5 @@ export function SongGuessEntrance({ snapshot, canInteract, onJoin, failed = fals
       </div>)}
       {joined.length === 0 && <p className={styles.emptyEntrants}>입장한 학생이 아직 없어요</p>}
     </div>
-    {isHost && snapshot.phase === "lobby" && (
-      <p className={styles.entryHint}>
-        {joined.length > 0
-          ? `${joined.length}명 입장 완료 · 최소 1명 이상이면 시작할 수 있어요`
-          : "학생이 1명 이상 입장하면 시작할 수 있어요"}
-      </p>
-    )}
   </div>;
 }

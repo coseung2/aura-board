@@ -1,5 +1,6 @@
 "use client";
 
+import { CirclePlay } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlayRequestId } from "@/lib/play-platform/contracts";
 import {
@@ -27,6 +28,16 @@ function statusLabel(room: SongGuessSnapshot): string {
   if (room.phase === "finished") return "최종 결과";
   if (room.phase === "draft") return "준비 중";
   return "진행 중";
+}
+
+function entryLabel(room: SongGuessSnapshot): string {
+  if (room.phase === "lobby") return "입장하기";
+  if (room.phase === "finished") return "결과 보기";
+  return "관전하기";
+}
+
+function roomTitle(room: SongGuessSnapshot, index: number): string {
+  return room.hostDisplayName ? `${room.hostDisplayName}의 방` : `${index + 1}번 방`;
 }
 
 function joinedCount(room: SongGuessSnapshot): number {
@@ -60,23 +71,38 @@ export function SongGuessRooms({
       setRooms(await fetchSongGuessRooms(boardId));
       setLoadError(null);
     } catch {
-      setLoadError("방 목록을 불러오지 못했어요. 다시 시도해 주세요.");
+      setLoadError("방 목록을 불러오지 못했어요.");
     } finally {
       setLoading(false);
     }
   }, [boardId]);
 
+  const reloadCatalog = useCallback(async () => {
+    try {
+      setCatalog(await fetchSongGuessRoomCatalog(boardId));
+    } catch {
+      setError("곡 목록을 불러오지 못했어요.");
+    }
+  }, [boardId]);
+
   useEffect(() => {
     void reload();
-    const timer = setInterval(() => void reload(), 5000);
-    return () => clearInterval(timer);
+    const tick = () => {
+      if (document.visibilityState === "visible") void reload();
+    };
+    window.addEventListener("focus", tick);
+    document.addEventListener("visibilitychange", tick);
+    const timer = window.setInterval(tick, 5000);
+    return () => {
+      window.removeEventListener("focus", tick);
+      document.removeEventListener("visibilitychange", tick);
+      window.clearInterval(timer);
+    };
   }, [reload]);
 
   useEffect(() => {
-    void fetchSongGuessRoomCatalog(boardId)
-      .then(setCatalog)
-      .catch(() => setError("곡 목록을 불러오지 못했어요. 다시 시도해 주세요."));
-  }, [boardId]);
+    void reloadCatalog();
+  }, [reloadCatalog]);
 
   const available = useMemo(
     () =>
@@ -87,10 +113,6 @@ export function SongGuessRooms({
   );
   const maxCount = Math.min(MAX_COUNT, available);
   const canCreate = categories.length > 0 && count >= MIN_COUNT && count <= maxCount;
-  const selectedLabels = catalog
-    .filter((item) => categories.includes(item.id))
-    .map((item) => item.label)
-    .join(" + ");
 
   async function create() {
     if (busy || !canCreate) return;
@@ -118,99 +140,57 @@ export function SongGuessRooms({
 
   function refreshAll() {
     void reload();
-    void fetchSongGuessRoomCatalog(boardId)
-      .then(setCatalog)
-      .catch(() => setError("곡 목록을 불러오지 못했어요."));
+    void reloadCatalog();
   }
 
   return (
     <div className={entry.entry}>
-      <div className={entry.entryHeader}>
-        <span className={entry.eyebrow}>{teacher ? "TEACHER" : "AURA BOARD"}</span>
-        <h2 className={entry.entryTitle}>음악 퀴즈 방</h2>
-        <p className={entry.entrySubtitle}>
-          {teacher
-            ? "수업용 게임을 구성하거나 열린 방을 확인할 수 있어요."
-            : "열린 방에 들어가거나 새 게임을 만들 수 있어요."}
-        </p>
-      </div>
-
       <div className={entry.entryBody}>
         <section className={entry.card} aria-label="열린 방">
-          <div className={entry.sectionRow}>
-            <h3 className={entry.sectionTitle}>열린 방</h3>
-            <button type="button" className={styles.secondaryButton} onClick={refreshAll}>
-              새로고침
-            </button>
-          </div>
+          <h2 className={entry.sectionTitle}>열린 방</h2>
 
           {loading ? (
-            <p className={entry.loading} role="status">
+            <p className={entry.empty} role="status">
               방을 불러오는 중…
             </p>
           ) : loadError ? (
             <div className={entry.empty} role="alert">
-              <span className={entry.emptyIcon} aria-hidden="true">
-                !
-              </span>
-              <p className={entry.emptyTitle}>방 목록을 불러오지 못했어요</p>
-              <p className={entry.emptyBody}>
-                네트워크를 확인한 뒤 다시 시도해 주세요. 잠시 후 자동으로 다시 확인해요.
-              </p>
+              <p className={entry.emptyTitle}>{loadError}</p>
               <button type="button" className={styles.secondaryButton} onClick={refreshAll}>
                 다시 시도
               </button>
             </div>
           ) : rooms.length === 0 ? (
-            <div className={entry.empty}>
-              <span className={entry.emptyIcon} aria-hidden="true">
-                ♫
-              </span>
-              <p className={entry.emptyTitle}>아직 열린 방이 없어요</p>
-              <p className={entry.emptyBody}>
-                친구가 방을 열 때까지 기다리거나 내가 먼저 게임을 만들어 보세요.
-              </p>
-              <span className={entry.chip}>5초마다 자동 확인</span>
-            </div>
+            <p className={entry.empty}>아직 열린 방이 없어요</p>
           ) : (
             <ul className={entry.roomList}>
               {rooms.map((room, index) => {
-                const status = statusLabel(room);
-                const mode = room.roomMode === "student-free" ? "자유 게임" : "선생님 게임";
-                const host = room.hostDisplayName
-                  ? `${room.hostDisplayName}의 방`
-                  : `${index + 1}번 방`;
+                const title = roomTitle(room, index);
+                const label = entryLabel(room);
                 return (
-                  <li key={room.sessionId}>
+                  <li key={room.sessionId} className={entry.roomCard}>
+                    <span className={entry.roomTop}>
+                      <h3 className={entry.roomName}>{title}</h3>
+                      <span
+                        className={`${entry.chip} ${room.phase === "lobby" ? entry.chipWaiting : ""}`}
+                      >
+                        {statusLabel(room)}
+                      </span>
+                    </span>
+                    <p className={entry.roomMeta}>
+                      {room.roomMode === "student-free" ? "자유 게임" : "선생님 게임"} ·{" "}
+                      {room.answerMode === "multiple-choice" ? "객관식" : "직접 입력"} ·{" "}
+                      {joinedCount(room)}명 참여
+                    </p>
                     <button
                       type="button"
-                      className={entry.roomCard}
+                      className={entry.roomEnter}
                       disabled={busy}
-                      aria-label={`${mode} · ${status} · ${joinedCount(room)}명 · ${host}`}
+                      aria-label={`${title} ${label}`}
                       onClick={() => onSelect(room.sessionId)}
                     >
-                      <span className={entry.roomTop}>
-                        <span>
-                          <span className={entry.roomName}>{host}</span>
-                          <br />
-                          <span className={entry.roomMeta}>
-                            {mode} ·{" "}
-                            {room.answerMode === "multiple-choice" ? "객관식" : "직접 입력"}
-                          </span>
-                        </span>
-                        <span
-                          className={`${entry.chip} ${room.phase === "lobby" ? entry.chipWaiting : ""}`}
-                        >
-                          {status}
-                        </span>
-                      </span>
-                      <span className={entry.roomDivider} />
-                      <span className={entry.roomFoot}>
-                        <span className={entry.roomCount}>{joinedCount(room)}명 참여</span>
-                        <span className={entry.roomEnter}>
-                          {room.phase === "lobby" ? "입장하기  ›" : "이어서 보기  ›"}
-                        </span>
-                      </span>
+                      <CirclePlay aria-hidden size={18} strokeWidth={2.3} />
+                      {label}
                     </button>
                   </li>
                 );
@@ -220,53 +200,33 @@ export function SongGuessRooms({
         </section>
 
         {teacher ? (
-          <section className={entry.card} aria-label="수업용 게임 구성">
-            <h3 className={entry.createHeading}>수업용 게임</h3>
-            <p className={entry.createNote}>
-              출제 방식을 고르면 학생 입장 준비까지 이어집니다.
-            </p>
+          <section className={entry.card} aria-label="수업용 게임">
+            <h2 className={entry.sectionTitle}>수업용 게임</h2>
             <div className={entry.teacherOptions}>
-              <div className={entry.teacherCard}>
-                <span className={entry.chip}>권장</span>
-                <h4 className={entry.teacherCardTitle}>자동 출제</h4>
-                <p className={entry.teacherCardBody}>
-                  저장된 곡에서 문제를 자동으로 뽑아 바로 게임을 만들어요.
-                </p>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  disabled={busy}
-                  onClick={onTeacherSetup}
-                >
-                  선생님 게임 구성
-                </button>
-              </div>
-              <div className={entry.teacherCard}>
-                <span className={entry.chip}>직접 구성</span>
-                <h4 className={entry.teacherCardTitle}>직접 음원 구성</h4>
-                <p className={entry.teacherCardBody}>
-                  내 컴퓨터의 음원으로 라운드를 직접 만들고 저장해요.
-                </p>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  disabled={busy}
-                  onClick={onTeacherSetup}
-                >
-                  음원 편집 열기
-                </button>
-              </div>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={busy}
+                onClick={onTeacherSetup}
+              >
+                자동 출제
+              </button>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                disabled={busy}
+                onClick={onTeacherSetup}
+              >
+                직접 음원 구성
+              </button>
             </div>
           </section>
         ) : (
-          <section className={entry.card} aria-label="자유 게임 만들기">
-            <h3 className={entry.createHeading}>자유 게임 만들기</h3>
-            <p className={entry.createNote}>
-              장르와 재생 구간, 문제 수를 정하면 방이 만들어져요.
-            </p>
+          <section className={entry.card} aria-label="새 게임 만들기">
+            <h2 className={entry.sectionTitle}>새 게임 만들기</h2>
 
             <fieldset className={entry.fieldset} disabled={busy}>
-              <legend className={entry.legend}>카테고리</legend>
+              <legend className={entry.legend}>장르</legend>
               <div className={entry.optionRow}>
                 {catalog.map((item) => (
                   <label key={item.id} className={entry.option}>
@@ -307,8 +267,8 @@ export function SongGuessRooms({
               </div>
             </fieldset>
 
-            <div className={entry.fieldset}>
-              <span className={entry.legend}>문제 수</span>
+            <fieldset className={entry.fieldset} disabled={busy}>
+              <legend className={entry.legend}>문제 수</legend>
               <div className={entry.counter}>
                 <button
                   type="button"
@@ -333,31 +293,7 @@ export function SongGuessRooms({
                   ＋
                 </button>
               </div>
-              <label className={entry.createNote}>
-                문제 수 직접 입력
-                <input
-                  type="number"
-                  min={MIN_COUNT}
-                  max={maxCount}
-                  value={count}
-                  disabled={busy}
-                  onChange={(event) => setCount(Number(event.target.value))}
-                />
-              </label>
-            </div>
-
-            <div className={entry.summary}>
-              <span className={entry.summaryRow}>
-                <span className={entry.summaryKey}>선택한 게임</span>
-                <span className={entry.summaryValue}>
-                  {selectedLabels || "장르 미선택"} · {segmentLabel(segment)} · {count}문제
-                </span>
-              </span>
-              <span className={entry.summaryRow}>
-                <span className={entry.summaryKey}>사용 가능한 곡</span>
-                <span className={entry.summaryValue}>{available}곡 · 최대 {MAX_COUNT}문제</span>
-              </span>
-            </div>
+            </fieldset>
 
             <button
               type="button"
@@ -365,7 +301,7 @@ export function SongGuessRooms({
               disabled={busy || !canCreate}
               onClick={() => void create()}
             >
-              {busy ? "만드는 중…" : "방 만들기"}
+              {busy ? "만드는 중…" : "게임 만들기"}
             </button>
           </section>
         )}

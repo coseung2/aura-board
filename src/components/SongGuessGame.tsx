@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, type ReactNode } from "react";
-import { Check, Users, Volume2, VolumeX, X } from "lucide-react";
+import { ArrowLeft, Check, LogOut, Users, Volume2, VolumeX, X } from "lucide-react";
 import type {
   SongGuessGuessResult,
   SongGuessIntent,
@@ -33,6 +33,7 @@ type Props = {
   onReloadSetup: () => void;
   status: ReactNode;
   entryFailed?: boolean;
+  onExit: () => void;
 };
 
 function teacherQuestion(target: SongGuessSnapshot["answerTarget"]) {
@@ -54,6 +55,7 @@ export function SongGuessGame({
   onReloadSetup,
   status,
   entryFailed,
+  onExit,
 }: Props) {
   const { phase, currentRound } = snapshot;
   const participants = useMemo(
@@ -63,6 +65,13 @@ export function SongGuessGame({
   const sound = useSongGuessSounds(snapshot, result, remainingSeconds);
   const isHost = snapshot.viewer.role === "host";
   const studentView = !isHost;
+  /** Leaving already ends the room for its host, so the host only gets one
+   * exit action: 끝내기. */
+  const finishesRoom =
+    snapshot.viewer.isRoomHost === true || snapshot.viewer.role === "host";
+  const exitKind = phase === "finished" ? "back" : finishesRoom ? "finish" : "leave";
+  const exitLabel =
+    exitKind === "back" ? "방 목록" : exitKind === "finish" ? "게임 끝내기" : "방 나가기";
   const waiting = phase === "draft" || phase === "lobby";
   const finished = phase === "finished";
   const roundResults = phase === "reveal";
@@ -75,7 +84,6 @@ export function SongGuessGame({
       : 30;
   const hasNextRound =
     totalRounds === null ? null : currentRound.order + 1 < totalRounds;
-  const feedback = result?.roundId === currentRound.roundId ? result : null;
   const multipleChoice = snapshot.answerMode === "multiple-choice";
   const answerPrompt = songGuessAnswerPrompt(snapshot.answerTarget);
   const questionText = studentView
@@ -140,6 +148,20 @@ export function SongGuessGame({
                 <VolumeX size={18} aria-hidden="true" />
               ) : (
                 <Volume2 size={18} aria-hidden="true" />
+              )}
+            </button>
+            <button
+              type="button"
+              className={controls.iconButton}
+              onClick={onExit}
+              aria-label={exitLabel}
+            >
+              {exitKind === "finish" ? (
+                <X size={18} aria-hidden="true" />
+              ) : exitKind === "back" ? (
+                <ArrowLeft size={18} aria-hidden="true" />
+              ) : (
+                <LogOut size={18} aria-hidden="true" />
               )}
             </button>
           </div>
@@ -207,7 +229,6 @@ export function SongGuessGame({
                 role="group"
                 aria-label={`${answerPrompt} 보기`}
               >
-                {studentView && <p className={styles.choicePrompt}>정답이라고 생각하는 곡을 골라요</p>}
                 {currentRound.choices?.map((choice, index) => (
                   <button
                     key={choice.id}
@@ -225,15 +246,7 @@ export function SongGuessGame({
                       })
                     }
                   >
-                    <span className={styles.choiceNumber} aria-hidden="true">
-                      {index + 1}
-                    </span>
-                    <span>{choice.label}</span>
-                    {snapshot.viewer.selectedChoiceId === choice.id && (
-                      <span className={styles.choiceBadge}>
-                        <Check size={14} aria-label="선택한 답" /> 내 답
-                      </span>
-                    )}
+                    <span className={styles.choiceLabel}>{choice.label}</span>
                   </button>
                 ))}
               </div>
@@ -285,45 +298,6 @@ export function SongGuessGame({
                 </button>
               </form>
             )}
-            {feedback && (
-              <div
-                className={`${styles.answerFeedback} ${styles.feedbackCard}`}
-                data-outcome={
-                  feedback.timedOut ? "timeout" : feedback.correct ? "correct" : "miss"
-                }
-                role="status"
-              >
-                <strong>
-                  {feedback.timedOut
-                    ? "시간이 끝났어요"
-                    : feedback.alreadyScored
-                      ? "이미 점수를 받았어요"
-                      : feedback.correct
-                        ? `정답! +${feedback.score}점`
-                        : "아쉬워요"}
-                </strong>
-                <span>
-                  {feedback.timedOut
-                    ? "이번 문제는 답을 고르지 못했어요. 다음 문제에서 다시 도전할 수 있어요."
-                    : feedback.correct
-                      ? "정답 공개에서 순위 변화를 확인해요."
-                      : multipleChoice
-                        ? "정답 공개를 기다려 주세요. 다음 문제에서 만회할 수 있어요."
-                        : "다시 도전해 보세요."}
-                </span>
-              </div>
-            )}
-            {!feedback && snapshot.viewer.scoredCurrentRound && (
-              <p className={styles.scored} role="status">
-                <Check size={18} aria-hidden="true" />정답 제출 완료
-              </p>
-            )}
-            {!feedback && answered && !snapshot.viewer.scoredCurrentRound && (
-              <div className={styles.submittedCard} role="status">
-                <strong>답변 제출 완료</strong>
-                <span>정답 공개를 기다리는 중…</span>
-              </div>
-            )}
             {isHost && (
               <p className={styles.scored} data-song-correct-count>
                 {scoredCount} / {participants.length}명 정답
@@ -336,7 +310,7 @@ export function SongGuessGame({
           <>
             <div className={styles.roundAnswer} data-song-reveal-answer>
               <div>
-                <p>{studentView && snapshot.viewer.scoredCurrentRound ? "정답이에요!" : "정답"}</p>
+                <p>정답</p>
                 <h2>{currentRound.revealedAnswer ?? "정답을 불러오는 중…"}</h2>
               </div>
               {studentView ? (
@@ -363,7 +337,6 @@ export function SongGuessGame({
                 role="group"
                 aria-label={`${answerPrompt} 제출 결과`}
               >
-                <p className={styles.choicePrompt}>내 답과 정답</p>
                 {currentRound.choices.map((choice, index) => {
                   const selected = snapshot.viewer.selectedChoiceId === choice.id;
                   const correct =
@@ -381,14 +354,13 @@ export function SongGuessGame({
                       aria-pressed={selected}
                       disabled
                     >
-                      <span className={styles.choiceNumber} aria-hidden="true">
-                        {index + 1}
-                      </span>
-                      <span>{choice.label}</span>
+                      <span className={styles.choiceLabel}>{choice.label}</span>
                       {correct ? (
                         <span className={styles.choiceBadge}>
-                          <Check size={14} aria-label="정답" />
-                          {selected ? "정답 · 내 답" : "정답"}
+                          <Check
+                            size={18}
+                            aria-label={selected ? "정답 · 내 답" : "정답"}
+                          />
                         </span>
                       ) : selected ? (
                         <X size={20} aria-label="제출한 오답" />
@@ -411,11 +383,6 @@ export function SongGuessGame({
                   )}
                 </div>
                 <div><span>누적</span><strong>{ownParticipant.score.toLocaleString("ko-KR")}점</strong></div>
-                <p>
-                  {snapshot.roomMode === "student-free"
-                    ? "다음 문제는 잠시 후 자동으로 시작해요"
-                    : "다음 문제는 교사가 시작해요"}
-                </p>
               </div>
             )}
             {isHost && <SongGuessScoreboard participants={participants} roundResults />}
@@ -426,7 +393,6 @@ export function SongGuessGame({
 
         {snapshot.roomMode === "student-free" && !finished && <div className={styles.hostActions}>
           {snapshot.viewer.canStart && phase === "lobby" && <button type="button" className={controls.primaryButton} disabled={!canInteract} onClick={() => onIntent({ type: "start" })}>음악 퀴즈 시작</button>}
-          {snapshot.viewer.canFinish && <button type="button" className={controls.secondaryButton} disabled={!canInteract} onClick={() => onIntent({ type: "finish" })}>게임 끝내기</button>}
         </div>}
         {isHost && snapshot.roomMode !== "student-free" && !finished && (
           <div className={styles.hostActions} data-song-host-actions>

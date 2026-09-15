@@ -328,19 +328,9 @@
   overflow-wrap: anywhere;
 }
 
-.choice > span:nth-child(2) {
+.choiceLabel {
   flex: 1;
   min-width: 0;
-}
-
-.choiceNumber {
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border: 1px solid currentColor;
-  border-radius: 50%;
 }
 
 .choice:hover:not(:disabled) {
@@ -393,18 +383,6 @@
   background: var(--song-answer-4);
 }
 
-.layout[data-viewer="student"] .choiceNumber {
-  width: 36px;
-  height: 36px;
-  border: 0;
-  background: rgb(255 255 255 / 14%);
-  font-size: 14px;
-}
-
-.layout[data-viewer="student"] .choice[data-option="2"] .choiceNumber {
-  background: rgb(56 44 20 / 12%);
-}
-
 .layout[data-viewer="student"] .choice[aria-pressed="true"] {
   border-color: #fff;
   box-shadow: none;
@@ -418,28 +396,18 @@
 }
 
 .layout[data-viewer="student"] .choices[data-reveal="true"] .choice[data-result="wrong"] {
-  border-color: #fff;
+  border-color: var(--color-danger);
   filter: saturate(0.65);
 }
 
 .layout[data-viewer="student"] .choices[data-reveal="true"] .choice[data-result="correct"] {
-  border-color: #fff;
+  border-color: var(--color-status-reviewed-text);
   box-shadow: none;
 }
 
 .scored {
   margin: 0;
   min-height: 24px;
-}
-
-.answerFeedback {
-  text-align: center;
-  font-weight: 700;
-}
-
-.layout[data-viewer="student"] .answerFeedback {
-  border-color: rgb(255 255 255 / 14%);
-  color: var(--song-student-text);
 }
 
 .waiting,
@@ -545,15 +513,11 @@
 .layout[data-viewer="student"] .roundAnswer > span { color: #45d398; font-size: 18px; font-weight: 900; }
 .layout[data-viewer="student"] .roundAnswer > span { display: grid; justify-items: center; }
 .layout[data-viewer="student"] .roundAnswer > span small { color: var(--song-student-muted); font-size: 11px; font-weight: 600; }
-.submittedCard { display: grid; gap: 5px; padding: 18px 20px; border: 1px solid #40345f; border-radius: 16px; background: var(--song-student-surface); text-align: center; }
-.submittedCard strong { color: var(--song-student-text); font-size: 15px; }
-.submittedCard span { color: var(--song-student-muted); font-size: 12px; }
 .studentRankCard { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; margin-top: 4px; border: 1px solid #40345f; border-radius: 16px; background: var(--song-student-surface); }
 .studentRankCard > div { display: grid; gap: 6px; padding: 18px 20px; }
 .studentRankCard > div + div { border-left: 1px solid #40345f; }
-.studentRankCard span, .studentRankCard p { color: var(--song-student-muted); font-size: 11px; }
+.studentRankCard span { color: var(--song-student-muted); font-size: 11px; }
 .studentRankCard strong { color: var(--song-student-text); font-size: 22px; }
-.studentRankCard p { grid-column: 1 / -1; margin: 0; padding: 13px 20px; border-top: 1px solid #40345f; text-align: center; }
 
 .studentMusicCard {
   position: relative;
@@ -614,8 +578,6 @@
 .studentPlayerInfo small { font-size: 12px; }
 .studentWaveTrack { height: 5px; overflow: hidden; border-radius: 5px; background: #40345f; }
 .studentWaveTrack > span { display: block; height: 100%; border-radius: inherit; background: var(--song-student-accent); }
-.choicePrompt { grid-column: 1 / -1; margin: 0 0 2px; color: var(--song-student-muted); font-size: 12px; font-weight: 600; }
-
 .layout[data-viewer="student"] .roundAnswer h2 {
   font-size: clamp(24px, 5vw, 32px);
 }
@@ -634,11 +596,6 @@
 
 .invitation h2 {
   margin: 0 0 12px;
-}
-
-.invitation p {
-  margin: 0;
-  color: var(--color-text-muted);
 }
 
 .myEntry {
@@ -692,8 +649,8 @@
   color: var(--color-text-muted);
 }
 
-/* Teacher lobby (`T3`) shows a live entry count and a start hint so the host
-   can judge readiness without counting pets. */
+/* Teacher lobby (`T3`) shows a live entry count so the host can judge
+   readiness without counting pets. */
 .entryStat {
   display: grid;
   grid-template-columns: auto auto;
@@ -727,77 +684,6 @@
   border: 1px solid var(--color-border);
   border-radius: 10px;
   color: var(--color-status-reviewed-text);
-  background: var(--color-surface-alt);
-}
-
-.entryHint {
-  margin: 24px 0 0;
-  text-align: center;
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
-
-/* Created-game step (`T2`). The host previously landed straight on the game
-   surface with no confirmation of what was built. */
-.createdSummary {
-  display: grid;
-  gap: 10px;
-  justify-items: center;
-  margin-bottom: 32px;
-  text-align: center;
-}
-
-.createdEyebrow {
-  padding: 6px 16px;
-  font-size: 12px;
-  font-weight: 700;
-  border-radius: 10px;
-  color: var(--color-on-accent);
-  background: var(--color-accent);
-}
-
-.createdTitle {
-  margin: 0;
-  font-size: 32px;
-}
-
-.createdNote {
-  margin: 0;
-  font-size: 14px;
-  color: var(--color-text-muted);
-}
-
-.createdCard {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 8px 20px;
-  width: min(500px, 100%);
-  margin-top: 8px;
-  padding: 20px 24px;
-  border: 1px solid var(--color-border);
-  border-radius: 16px;
-  background: var(--color-surface);
-}
-
-.createdCard strong {
-  font-size: 20px;
-  color: var(--color-accent);
-}
-
-.createdCard > span:not(.createdClosed) {
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
-
-.createdClosed {
-  padding: 6px 14px;
-  font-size: 12px;
-  font-weight: 700;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  color: var(--color-text-muted);
   background: var(--color-surface-alt);
 }
 
@@ -910,45 +796,4 @@
   font-size: 11px;
   font-weight: 700;
   color: var(--color-accent);
-}
-/* Round outcome card (`N6` / `N7` / `V3`). The previous single tinted line could
-   not carry the score and the next-step hint together. */
-.feedbackCard {
-  display: grid;
-  gap: 6px;
-  justify-items: center;
-  padding: 16px 20px;
-  text-align: center;
-  border: 2px solid var(--color-border);
-  border-radius: 16px;
-  background: var(--color-surface);
-}
-
-.feedbackCard strong {
-  font-size: 18px;
-}
-
-.feedbackCard span {
-  font-size: 13px;
-  color: var(--color-text-muted);
-}
-
-.feedbackCard[data-outcome="correct"] {
-  border-color: var(--color-status-reviewed-text);
-}
-
-.feedbackCard[data-outcome="correct"] strong {
-  color: var(--color-status-reviewed-text);
-}
-
-.feedbackCard[data-outcome="miss"] {
-  border-color: var(--color-danger);
-}
-
-.feedbackCard[data-outcome="miss"] strong {
-  color: var(--color-danger);
-}
-
-.feedbackCard[data-outcome="timeout"] {
-  border-color: var(--color-text-muted);
 }

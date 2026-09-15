@@ -739,10 +739,10 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
       aria-label={boardTitle}
     >
       <BoardHeading title={boardTitle} />
-      <button type="button" className={styles.secondaryButton} disabled={busy || hasPending} onClick={exitRoom}>{snapshot.phase === "finished" ? "방 목록" : "방 나가기"}</button>
       {snapshot.phase === "finished" && viewer === "teacher" && snapshot.roomMode !== "student-free" && <button type="button" className={styles.primaryButton} onClick={() => { setSelectedSessionId(null); setSnapshot(null); setTeacherSetup(true); }}>다시 구성하기</button>}
       <SongGuessGame
         snapshot={snapshot}
+        onExit={exitRoom}
         totalRounds={setup?.rounds.length ?? null}
         canInteract={!busy && !(hasPending && snapshot.answerMode === "multiple-choice")}
         remainingSeconds={remainingSeconds}

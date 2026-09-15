@@ -477,7 +477,7 @@ describe("SongGuessBoard authoritative web flow", () => {
     expect(mocks.fetchSetup).not.toHaveBeenCalled();
   });
 
-  it("shows the server-awarded score after a correct participant command", async () => {
+  it("accepts a correct participant command without outcome commentary", async () => {
     const before = snapshot("participant");
     const after = snapshot("participant", {
       version: 3,
@@ -505,7 +505,9 @@ describe("SongGuessBoard authoritative web flow", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "정답 제출" }));
 
-    expect(await screen.findByText("정답! +1000점")).toBeInTheDocument();
+    await waitFor(() => expect(mocks.submitCommand).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(/정답!/u)).not.toBeInTheDocument();
+    expect(screen.queryByText("아쉬워요")).not.toBeInTheDocument();
     expect(screen.getByText("1000점")).toBeInTheDocument();
   });
 

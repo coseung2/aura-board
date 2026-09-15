@@ -10,20 +10,29 @@ vi.mock("./SongGuessScoreboard", () => ({ SongGuessScoreboard: () => <div>점수
 import { SongGuessBoard } from "./SongGuessBoard";
 import { SongGuessRooms } from "./song-guess-rooms";
 function room(id = "room-1"): SongGuessSnapshot { return { sessionId: id, boardId: "board-1", gameKind: "song-guess", roomMode: "student-free", version: 1, serverTimeMs: 1000, rulesVersion: 2, stateSchemaVersion: 1, previousSessionId: null, phase: "lobby", currentRound: { roundId: "r1", order: 0, accessibilityClue: null, revealedAnswer: null, currentClip: null }, participants: [], viewer: { role: "participant", joined: true, scoredCurrentRound: false } }; }
-async function enter() { render(<SongGuessBoard boardId="board-1" boardTitle="음악" viewer="student" />); fireEvent.click(await screen.findByRole("button", { name: /자유 게임 · 대기 중.*1번 방/ })); await screen.findByText("시작 대기"); }
+async function enter() { render(<SongGuessBoard boardId="board-1" boardTitle="음악" viewer="student" />); fireEvent.click(await screen.findByRole("button", { name: "1번 방 입장하기" })); await screen.findByText("시작 대기"); }
 describe("music room selection and exit", () => {
   beforeEach(() => { vi.clearAllMocks(); window.localStorage.clear(); mocks.rooms.mockResolvedValue([room()]); mocks.catalog.mockResolvedValue([{ id: "pop", label: "가요", counts: { intro: 10, highlight: 10 } }]); mocks.snapshot.mockResolvedValue(room()); vi.spyOn(window, "confirm").mockReturnValue(true); });
   it("waits for an explicit room choice", async () => {
     render(<SongGuessBoard boardId="board-1" boardTitle="음악" viewer="student" />);
-    await screen.findByRole("button", { name: /자유 게임 · 대기 중/ });
+    await screen.findByRole("button", { name: "1번 방 입장하기" });
     expect(mocks.snapshot).not.toHaveBeenCalled(); expect(mocks.submit).not.toHaveBeenCalled();
+  });
+  it("shows only actionable room labels without explanatory copy", async () => {
+    render(<SongGuessBoard boardId="board-1" boardTitle="음악" viewer="student" />);
+    await screen.findByRole("button", { name: "1번 방 입장하기" });
+    expect(screen.getByRole("button", { name: "게임 만들기" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "열린 방" })).toBeInTheDocument();
+    for (const copy of ["5초마다", "새로고침", "열린 방에 들어가거나", "친구가 방을 열 때까지", "방을 불러오는 중"]) {
+      expect(screen.queryByText(new RegExp(copy))).not.toBeInTheDocument();
+    }
   });
   it("keeps category settings and creation request id on retry", async () => {
     const onSelect = vi.fn(); mocks.create.mockRejectedValueOnce(new Error("offline")).mockResolvedValue(room());
     render(<SongGuessRooms boardId="board-1" teacher={false} onSelect={onSelect} onTeacherSetup={vi.fn()} />);
     fireEvent.click(await screen.findByRole("radio", { name: "가요 (10)" }));
-    fireEvent.click(screen.getByRole("button", { name: "방 만들기" })); await screen.findByRole("alert");
-    fireEvent.click(screen.getByRole("button", { name: "방 만들기" }));
+    fireEvent.click(screen.getByRole("button", { name: "게임 만들기" })); await screen.findByRole("alert");
+    fireEvent.click(screen.getByRole("button", { name: "게임 만들기" }));
     await waitFor(() => expect(onSelect).toHaveBeenCalledWith("room-1"));
     expect(mocks.create.mock.calls[0][1]).toEqual(mocks.create.mock.calls[1][1]);
   });
@@ -48,11 +57,11 @@ describe("music room selection and exit", () => {
   it("returns to the list after a successful leave without rejoining", async () => {
     mocks.submit.mockImplementation(async (_id, request) => ({ requestId: request.requestId, snapshot: { ...room(), version: 2, viewer: { ...room().viewer, joined: false } } }));
     await enter(); fireEvent.click(screen.getByRole("button", { name: "방 나가기" }));
-    await screen.findByRole("heading", { name: "음악 퀴즈 방" }); expect(mocks.submit).toHaveBeenCalledTimes(1);
+    await screen.findByRole("heading", { name: "열린 방" }); expect(mocks.submit).toHaveBeenCalledTimes(1);
   });
   it("allows retry after a room list error", async () => {
     mocks.rooms.mockRejectedValueOnce(new Error("offline")); render(<SongGuessRooms boardId="board-1" teacher={false} onSelect={vi.fn()} onTeacherSetup={vi.fn()} />);
-    await screen.findByRole("alert"); fireEvent.click(screen.getByRole("button", { name: "새로고침" }));
-    await screen.findByRole("button", { name: /자유 게임 · 대기 중/ });
+    await screen.findByRole("alert"); fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    await screen.findByRole("button", { name: "1번 방 입장하기" });
   });
 });
