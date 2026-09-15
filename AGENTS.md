@@ -68,6 +68,14 @@ Use `docs/verification-checklist.md#figma-design-operations` for verification.
 For frontend verification after design changes, clear `.next` and restart the
 dev server before browser checks when practical.
 
+## Interaction-cost audits
+
+For "왜 이 동작은 두 단계인가", "이 버튼을 왜 눌러야 하나", or a before/after comparison of a
+flow change, read `.codex/skills/ux-flow-audit/SKILL.md` and score both paths with its
+script. Lifecycle, state-truth and parity findings stay with the UX review guidance in
+`docs/verification-checklist.md`; this skill supplies the measured cost (ΔM, seconds) that
+severity claims cite. Score web and mobile separately.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know
