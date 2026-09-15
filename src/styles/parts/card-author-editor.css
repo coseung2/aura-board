@@ -86,6 +86,7 @@
 }
 .card-author-name-input {
   flex: 1;
+  min-width: 0;
   padding: 6px 10px;
   font-size: 14px;
   border: 1px solid var(--color-border);

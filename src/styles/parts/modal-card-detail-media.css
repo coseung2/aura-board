@@ -34,6 +34,13 @@
   animation: modalIn 200ms ease;
 }
 
+/* The author picker is a two-column workspace. Give it enough room while it
+   is open; the default card form width would clip the selected-author column. */
+.add-card-create-modal-author-expanded {
+  width: min(760px, calc(100vw - 32px));
+  max-width: calc(100vw - 32px);
+}
+
 /* Card detail lightbox — 2-column near-fullscreen layout:
    left = media (image/iframe, fills pane, contain-fit),
    right = narrow side panel (title + content + link + author). */

@@ -19,6 +19,72 @@
   object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
+  transform-origin: center;
+  transition: transform 160ms ease-out;
+  will-change: transform;
+  pointer-events: none;
+}
+
+.card-image-lightbox-stage {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  touch-action: none;
+  cursor: zoom-in;
+}
+
+.card-image-lightbox-stage.is-zoomed {
+  cursor: grab;
+}
+
+.card-image-lightbox-stage.is-zoomed:active {
+  cursor: grabbing;
+}
+
+.card-image-lightbox-zoom {
+  position: absolute;
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 12px;
+  background: rgba(18, 18, 22, 0.82);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+}
+
+.card-image-lightbox-zoom button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #fff;
+  font: inherit;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.card-image-lightbox-zoom button:hover:not(:disabled),
+.card-image-lightbox-zoom button:focus-visible {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.card-image-lightbox-zoom button:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+
+.card-image-lightbox-zoom .card-image-lightbox-zoom-value {
+  min-width: 68px;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 .card-image-lightbox-close,
@@ -274,7 +340,7 @@
 
 .add-card-author-picker {
   display: grid;
-  grid-template-columns: minmax(200px, 1fr) minmax(260px, 1fr);
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
   gap: 16px;
 }
 

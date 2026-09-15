@@ -140,7 +140,13 @@ export function AddCardModal({
   return createPortal(
     <>
       <div className="modal-backdrop" onClick={busy ? undefined : onClose} />
-      <div className="add-card-modal">
+      <div
+        className={`add-card-modal add-card-create-modal ${
+          canAssignAuthors && showAuthors
+            ? "add-card-create-modal-author-expanded"
+            : ""
+        }`}
+      >
         <div className="modal-header">
           <h2 className="modal-title">새 카드 만들기</h2>
           <button type="button" className="modal-close" onClick={onClose} disabled={busy}>
