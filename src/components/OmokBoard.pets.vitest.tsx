@@ -2,9 +2,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { OmokPlayerProfile, OmokSnapshot } from "@/lib/play-platform/contracts";
 
-const mocks = vi.hoisted(() => ({ current: vi.fn(), profiles: vi.fn() }));
+const mocks = vi.hoisted(() => ({ current: vi.fn(), profiles: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
-vi.mock("@/hooks/useRealtimeInvalidation", () => ({ useRealtimeInvalidation: vi.fn() }));
+vi.mock("@/hooks/useRealtimeInvalidation", () => ({ useRealtimeInvalidation: ({ refresh, enabled }: { refresh: () => Promise<void>; enabled: boolean }) => { if (enabled) mocks.refresh.mockImplementation(refresh); } }));
 vi.mock("@/lib/play-platform/browser-client", async (original) => ({
   ...await original<typeof import("@/lib/play-platform/browser-client")>(),
   fetchCurrentOmokSession: mocks.current, fetchOmokPlayerProfiles: mocks.profiles,
@@ -66,7 +66,7 @@ describe("Omok player pet integration", () => {
     await waitFor(() => expect(mocks.profiles).toHaveBeenCalledWith("one"));
     mocks.current.mockResolvedValue(snapshot("two"));
     mocks.profiles.mockResolvedValue(profiles("blue"));
-    fireEvent.click(screen.getByRole("button", { name: "최신 상태 확인" }));
+    await act(async () => { await mocks.refresh(); });
     await waitFor(() => expect(pets()[0]?.color).toBe("blue"));
     await act(async () => resolveOld(profiles("pink")));
     expect(pets()[0].color).toBe("blue");

@@ -58,6 +58,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
   const [selected, setSelected] = useState<[string, string]>(["", ""]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const commandInFlight = useRef(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasPending, setHasPending] = useState(false);
@@ -194,6 +195,8 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
 
   const executeCommand = useCallback(
     async (pending: PendingCommand, persist = true) => {
+      if (commandInFlight.current) return;
+      commandInFlight.current = true;
       if (persist) {
         try {
           window.localStorage.setItem(storageKey, JSON.stringify(pending));
@@ -225,6 +228,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
         }
         setError(messageForError(cause));
       } finally {
+        commandInFlight.current = false;
         setBusy(false);
       }
     },
@@ -247,13 +251,14 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
 
   const sendIntent = useCallback(
     (command: OmokIntent) => {
-      if (!snapshot || busy || syncing) return;
+      if (!snapshot || busy || hasPending || commandInFlight.current) return;
+      if (command.type === "resign" && !window.confirm("기권할까요? 이번 대국은 패배로 기록돼요.")) return;
       void executeCommand({
         sessionId: snapshot.sessionId,
         request: makeOmokCommand(snapshot, command),
       });
     },
-    [busy, executeCommand, snapshot, syncing],
+    [busy, executeCommand, snapshot, hasPending],
   );
 
   async function createSession() {
@@ -278,7 +283,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
   }
 
   async function rematch() {
-    if (!snapshot || busy) return;
+    if (!snapshot || busy || hasPending || !snapshot.viewer.capabilities.canRematch) return;
     setBusy(true);
     setError(null);
     try {
@@ -518,7 +523,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
     snapshot.roomStatus === "active" &&
     snapshot.viewer.slot === snapshot.game.nextTurn &&
     !busy &&
-    !syncing;
+    !hasPending;
   const statusText = describeStatus(snapshot, turnParticipant?.displayName ?? null);
   return (
     <section className={styles.shell} aria-label={boardTitle}>
@@ -527,14 +532,13 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
           <p className={styles.eyebrow}>1:1 온라인 대국</p>
           <h1 className={styles.title}>{boardTitle || "오목 대국"}</h1>
         </div>
-        <span className={styles.version} role="status">
-          {syncing ? "동기화 중" : "실시간 연결"}
-        </span>
+
       </header>
 
-      <div className={styles.panel}>
+      <div className={styles.playLayout}>
         <div className={styles.content}>
           <div className={styles.boardWrap}>
+            <p className={styles.currentStatus} role="status">{statusText}</p>
             <div className={styles.board} role="grid" aria-label="15줄 오목판">
               {snapshot.game.board.map((cell, index) => {
                 const row = Math.floor(index / 15);
@@ -568,7 +572,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
           </div>
 
           <aside className={styles.sidebar}>
-            {snapshot.participants.map((participant, index) => {
+            {snapshot.participants.map((participant) => {
               const profile = profileSessionId === snapshot.sessionId
                 ? profileFor(profiles, participant.slot)
                 : null;
@@ -600,18 +604,16 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
                       {recordLabel(profile)}
                     </span>
                   </div>
-                  <span className={styles.badge}>
+                  {(snapshot.roomStatus === "waiting" || snapshot.roomStatus === "ready") && <span className={styles.badge}>
                     {participant.ready ? "준비됨" : "대기"}
-                  </span>
+                  </span>}
                 </div>
-                  {index === 0 ? <span className={styles.currentStatus}>{statusText}</span> : null}
                 </div>
               );
             })}
 
             <div className={styles.timerCard} role="timer" aria-label={`대국 시간 ${formatElapsed(startedAtMs, clockNow)}`}>
               <strong>{formatElapsed(startedAtMs, clockNow)}</strong>
-              <div className={styles.timerTrack}><span style={{ width: `${((clockNow / 1000) % 60) / 60 * 100}%` }} /></div>
             </div>
 
             <div className={styles.actions}>
@@ -621,7 +623,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
                   <button
                     className={styles.button}
                     type="button"
-                    disabled={busy || syncing}
+                    disabled={busy || hasPending}
                     onClick={() => sendIntent({ type: "ready" })}
                   >
                     준비 완료
@@ -631,7 +633,7 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
                 <button
                   className={styles.button}
                   type="button"
-                  disabled={busy || syncing}
+                  disabled={busy || hasPending}
                   onClick={() => sendIntent({ type: "start" })}
                 >
                   대국 시작
@@ -641,17 +643,17 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
                 <button
                   className={styles.dangerButton}
                   type="button"
-                  disabled={busy || syncing}
+                  disabled={busy || hasPending}
                   onClick={() => sendIntent({ type: "resign" })}
                 >
                   기권하기
                 </button>
               )}
-              {snapshot.viewer.role === "host" && snapshot.roomStatus === "finished" && (
+              {snapshot.viewer.capabilities.canRematch && snapshot.roomStatus === "finished" && (
                 <button
                   className={styles.button}
                   type="button"
-                  disabled={busy || syncing}
+                  disabled={busy || hasPending}
                   onClick={() => void rematch()}
                 >
                   자리 바꿔 재대국
@@ -670,14 +672,18 @@ export function OmokBoard({ boardId, boardTitle, viewer, matchmakingEnabled = fa
                   미확인 요청 다시 보내기
                 </button>
               )}
-              <button
+              {(error || hasPending) && <button
                 className={styles.secondaryButton}
                 type="button"
                 disabled={busy || syncing}
                 onClick={() => void refresh()}
               >
                 최신 상태 확인
-              </button>
+              </button>}
+              {snapshot.roomStatus === "finished" && <button className={styles.secondaryButton} type="button"
+                onClick={() => router.push(viewer === "teacher" ? "/dashboard?category=play" : "/student/boards?category=play")}>
+                게임 목록
+              </button>}
             </div>
 
             {error && (
@@ -748,7 +754,7 @@ function actionHint(snapshot: OmokSnapshot): string {
       ? "모든 착수는 Rust 규칙 엔진에서 검증되고 확정됩니다."
       : snapshot.viewer.slot === snapshot.game.nextTurn
         ? "내 차례예요. 빈 교차점을 선택해 주세요."
-        : "상대 차례예요. 최신 상태는 자동으로 동기화됩니다.";
+        : "상대 차례예요.";
   }
   if (!snapshot.outcome) return "대국이 종료됐습니다.";
   if (snapshot.outcome.reason === "resignation") return "기권으로 대국이 종료됐습니다.";

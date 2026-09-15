@@ -61,6 +61,9 @@
   padding: clamp(18px, 3vw, 34px);
 }
 
+.playLayout { max-width: 1380px; margin: 0 auto; }
+.playLayout > .content { padding: 0; }
+
 .matchPanel {
   width: min(520px, calc(100% - 32px));
   margin: clamp(60px, 12vh, 140px) auto;
