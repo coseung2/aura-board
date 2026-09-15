@@ -164,7 +164,7 @@ class BuildScriptContractTests(unittest.TestCase):
         build = text.index("cargo build --locked --release")
         generator = text.index("create-cutover-build-manifest.py")
         app_check = text.index("test -f .next/standalone/server.js")
-        engine_check = text.index("test -f services/play-engine/target/release/play-server")
+        engine_check = text.index('test -f "${engine_binary}"') if path.name == "build-ci-artifact.sh" else text.index("test -f services/play-engine/target/release/play-server")
         self.assertLess(build, app_check)
         self.assertLess(build, engine_check)
         self.assertLess(app_check, generator)

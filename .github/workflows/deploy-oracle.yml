@@ -37,6 +37,9 @@ jobs:
       PLAYTOKEN_JWT_SECRET: build-only-not-a-runtime-secret
       CARGO_INCREMENTAL: "0"
       CARGO_PROFILE_DEV_DEBUG: "0"
+      # runner.tool_cache survives both checkout cleanup and RUNNER_TEMP cleanup.
+      AURA_BUILD_CACHE_ROOT: ${{ runner.tool_cache }}/aura-board-build-cache-v1
+      AURA_NEXT_BUILD_CACHE: "1"
 
     steps:
       - name: Checkout exact revision
@@ -81,6 +84,8 @@ jobs:
             infra.oracle.tests.test_create_cutover_build_manifest \
             -v
           bash -n infra/oracle/build-ci-artifact.sh
+          bash -n infra/oracle/build-cache.sh
+          python3 -m unittest infra.oracle.tests.test_build_cache -v
           bash -n infra/oracle/build-release.sh
 
       - name: Build verified release artifact

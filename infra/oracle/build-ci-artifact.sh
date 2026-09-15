@@ -17,21 +17,37 @@ fi
 test -f "${source_dir}/package-lock.json"
 test -f "${source_dir}/services/play-engine/Cargo.lock"
 
-npm ci --include=dev --no-audit --no-fund
-npm run typecheck
-npx prisma validate
-npm run build
+source "${source_dir}/infra/oracle/build-cache.sh"
+prepare_build_cache
 
+timed() {
+  local label=$1 started=${SECONDS}
+  shift
+  "$@"
+  echo "build_timing_${label}_seconds=$((SECONDS - started))"
+}
+
+# npm ci runs the existing postinstall Prisma generation once. Keep install
+# scripts enabled for native modules. Next's build performs the typecheck.
+timed install npm ci --include=dev --no-audit --no-fund
+timed native npm run ensure-native
+timed schema npx prisma validate
+timed web node --max-old-space-size=4096 node_modules/next/dist/bin/next build
+save_build_cache
+
+engine_started=${SECONDS}
 cargo test --locked --manifest-path services/play-engine/Cargo.toml --workspace
 cargo build --locked --release --manifest-path services/play-engine/Cargo.toml -p play-server
+echo "build_timing_engine_seconds=$((SECONDS - engine_started))"
+engine_binary="${CARGO_TARGET_DIR:-${source_dir}/services/play-engine/target}/release/play-server"
 
 if [[ ${AURA_BUILD_CUTOVER_MANIFEST:-0} == 1 ]]; then
   test -f .next/standalone/server.js
-  test -f services/play-engine/target/release/play-server
+  test -f "${engine_binary}"
   python3 infra/oracle/create-cutover-build-manifest.py \
     --build-sha "${release_id}" \
     --app-artifact .next/standalone/server.js \
-    --engine-artifact services/play-engine/target/release/play-server \
+    --engine-artifact "${engine_binary}" \
     --output .next/standalone/cutover-build-manifest.json \
     --write
   test -s .next/standalone/cutover-build-manifest.json
@@ -46,7 +62,7 @@ trap cleanup EXIT
 mkdir -p "${bundle_dir}/app/.next" "${bundle_dir}/engine" "${output_dir}"
 cp -a .next/standalone/. "${bundle_dir}/app/"
 cp -a .next/static "${bundle_dir}/app/.next/static"
-install -m 0755 services/play-engine/target/release/play-server \
+install -m 0755 "${engine_binary}" \
   "${bundle_dir}/engine/play-server"
 printf '%s\n' "${release_id}" > "${bundle_dir}/release-id"
 

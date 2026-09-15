@@ -13,6 +13,10 @@ const FRAME_SRC_ALLOWLIST = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Build-only opt-in: no change to the local dev cache or runtime data cache.
+  experimental: {
+    turbopackFileSystemCacheForBuild: process.env.AURA_NEXT_BUILD_CACHE === "1",
+  },
   output: "standalone",
   outputFileTracingIncludes: {
     "/api/song-guess/boards/*/imports": ["./scripts/song-guess-extract-link.py"],
