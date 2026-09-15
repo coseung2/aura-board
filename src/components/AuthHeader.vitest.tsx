@@ -2,12 +2,14 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AuthHeader } from "./AuthHeader";
 
+const sessionUser = vi.hoisted(() => ({
+  current: { name: "김교사", image: null as string | null },
+}));
+
 vi.mock("next-auth/react", () => ({
   useSession: () => ({
     status: "authenticated",
-    data: {
-      user: { name: "김교사", image: null },
-    },
+    data: { user: sessionUser.current },
   }),
   signOut: vi.fn(),
 }));
@@ -24,6 +26,7 @@ vi.mock("next/link", () => ({
 
 afterEach(() => {
   cleanup();
+  sessionUser.current = { name: "김교사", image: null };
   vi.unstubAllGlobals();
 });
 
@@ -33,7 +36,10 @@ describe("AuthHeader teacher actions", () => {
     const { container } = render(<AuthHeader />);
     await waitFor(() => expect(container.querySelector("summary.auth-profile-trigger")).not.toBeNull());
     const trigger = container.querySelector("summary")!;
-    expect(trigger.textContent).toBe("김교사");
+    // 사진이 없으면 이름 첫 글자 자리표시자가 이름 앞에 선다.
+    expect(trigger.querySelector(".auth-name")?.textContent).toBe("김교사");
+    expect(trigger.querySelector(".auth-avatar-fallback")?.textContent).toBe("김");
+    expect(trigger.querySelector("img.auth-avatar")).toBeNull();
     expect(screen.getAllByText("김교사")).toHaveLength(1);
     expect(trigger.querySelector(".auth-role-chevron")).toBeTruthy();
     expect(trigger.querySelector(".auth-role-icon")).toBeNull();
@@ -64,5 +70,24 @@ describe("AuthHeader teacher actions", () => {
     expect(screen.queryByText("📡")).toBeNull();
     expect(screen.getByText("김교사")).toBeTruthy();
     expect(container.querySelector(".auth-role-chevron")).toBeNull();
+  });
+
+  it("keeps the name readable when the provider photo is missing or broken", () => {
+    sessionUser.current = { name: "김교사", image: "https://example.com/a.png" };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(JSON.stringify({ canSwitchToParent: false }))),
+    );
+    const { container } = render(<AuthHeader />);
+
+    const photo = container.querySelector("img.auth-avatar") as HTMLImageElement;
+    expect(photo.getAttribute("src")).toBe("https://example.com/a.png");
+    expect(photo.getAttribute("referrerpolicy")).toBe("no-referrer");
+
+    fireEvent.error(photo);
+
+    expect(container.querySelector("img.auth-avatar")).toBeNull();
+    expect(container.querySelector(".auth-avatar-fallback")?.textContent).toBe("김");
+    expect(screen.getByText("김교사")).toBeTruthy();
   });
 });

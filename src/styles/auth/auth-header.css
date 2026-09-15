@@ -64,10 +64,25 @@
 }
 
 .auth-avatar {
+  display: inline-flex;
+  flex: 0 0 auto;
   width: 28px;
   height: 28px;
   border-radius: 50%;
   object-fit: cover;
+}
+
+/* 사진이 없는 계정(첫 가입 직후)의 자리표시자 — 이름 첫 글자. */
+.auth-avatar-fallback {
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface));
+  color: var(--color-accent-tinted-text);
+  font-size: 12.5px;
+  font-weight: 600;
+  line-height: 1;
+  text-transform: uppercase;
+  user-select: none;
 }
 
 .auth-name {

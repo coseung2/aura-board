@@ -13,6 +13,11 @@ export function AuthHeader() {
     session?.user?.name?.trim() ||
     session?.user?.email?.split("@")[0] ||
     "";
+  const avatarSource = session?.user?.image?.trim() || null;
+  // 로그인 공급자가 사진을 주지 않거나 URL이 깨졌으면 이름 첫 글자 자리표시자로
+  // 대체한다. 실패한 URL 을 기억해 두면 같은 주소로 다시 시도하지 않는다.
+  const [failedAvatar, setFailedAvatar] = useState<string | null>(null);
+  const showAvatar = avatarSource !== null && failedAvatar !== avatarSource;
   const [canSwitchToParent, setCanSwitchToParent] = useState(false);
   const [switchingToParent, setSwitchingToParent] = useState(false);
   const roleMenuRef = useRef<HTMLDetailsElement>(null);
@@ -87,14 +92,20 @@ export function AuthHeader() {
   }
 
   const profile = <>
-      {session.user.image && (
+      {showAvatar ? (
         <img
-          src={session.user.image}
+          src={avatarSource}
           alt=""
           className="auth-avatar"
           width={28}
           height={28}
+          referrerPolicy="no-referrer"
+          onError={() => setFailedAvatar(avatarSource)}
         />
+      ) : (
+        <span className="auth-avatar auth-avatar-fallback" aria-hidden="true">
+          {teacherDisplayName.slice(0, 1)}
+        </span>
       )}
       <span className="auth-name">{teacherDisplayName}</span>
   </>;
