@@ -392,7 +392,7 @@ export function ShadowAllianceTeacherGame({
     setSessionAction("continue");
     try {
       const canLeave = (await onContinueGame?.()) ?? true;
-      if (canLeave) router.push("/dashboard");
+      if (canLeave) router.push("/dashboard?category=play");
     } finally {
       setSessionAction(null);
     }
@@ -405,37 +405,28 @@ export function ShadowAllianceTeacherGame({
       const ended = onExitGame
         ? await onExitGame()
         : (onResetGame(), true);
-      if (ended) router.push("/dashboard");
+      if (ended) router.push("/dashboard?category=play");
     } finally {
       setSessionAction(null);
     }
   };
 
+  const toolbar = <div className="shadow-alliance-topbar-status">
+    {connection !== "connected" && <span className={`shadow-alliance-connection is-${connection}`} role="status">연결 복구 중</span>}
+    {game.phase !== "final" && <details className="shadow-alliance-session-menu">
+      <summary>게임 관리</summary>
+      <div className="shadow-alliance-action-row">
+        <button type="button" className="shadow-alliance-button secondary" disabled={sessionActionBusy || sessionAction !== null} onClick={() => void leaveAndContinueLater()}>다음에 이어하기</button>
+        <button type="button" className="shadow-alliance-button secondary" disabled={sessionActionBusy || sessionAction !== null} onClick={() => void endGameAndLeave()}>게임 종료</button>
+      </div>
+    </details>}
+  </div>;
+
   if (game.phase === "postround" && result) {
     return (
       <main className="shadow-alliance-game shadow-alliance-teacher shadow-alliance-postround-shell">
         <header className="shadow-alliance-topbar shadow-alliance-postround-topbar">
-          <div className="shadow-alliance-topbar-status">
-            <span className={`shadow-alliance-connection is-${connection}`}>
-              {connection === "connected" ? "실시간 연결" : "연결 복구 중"}
-            </span>
-            <button
-              type="button"
-              className="play-board-continue-button"
-              disabled={sessionActionBusy || sessionAction !== null}
-              onClick={() => void leaveAndContinueLater()}
-            >
-              다음에 이어하기
-            </button>
-            <button
-              type="button"
-              className="shadow-alliance-button shadow-alliance-connection shadow-alliance-end-game-button"
-              disabled={sessionActionBusy || sessionAction !== null}
-              onClick={() => void endGameAndLeave()}
-            >
-              게임 종료
-            </button>
-          </div>
+          {toolbar}
         </header>
         <ShadowAlliancePostroundPage
           round={game.round}
@@ -453,62 +444,15 @@ export function ShadowAllianceTeacherGame({
     <main className="shadow-alliance-game shadow-alliance-teacher">
       <header className="shadow-alliance-topbar">
         <div>
-          <p className="shadow-alliance-eyebrow">교사 본부</p>
           <h1>그림자연합</h1>
         </div>
-        <div className="shadow-alliance-topbar-status">
-          <span className={`shadow-alliance-connection is-${connection}`}>
-            {connection === "connected" ? "실시간 연결" : "연결 복구 중"}
-          </span>
-          <button
-            type="button"
-            className="play-board-continue-button"
-            disabled={sessionActionBusy || sessionAction !== null}
-            onClick={() => void leaveAndContinueLater()}
-          >
-            다음에 이어하기
-          </button>
-          {(
-            <button
-              type="button"
-              className="shadow-alliance-button shadow-alliance-connection shadow-alliance-end-game-button"
-              disabled={sessionActionBusy || sessionAction !== null}
-              onClick={() => void endGameAndLeave()}
-            >
-              게임 종료
-            </button>
-          )}
-        </div>
+        {toolbar}
       </header>
 
       {lobby && (
         <section className="shadow-alliance-teacher-grid">
-          <section
-            className="shadow-alliance-panel shadow-alliance-lobby-guide"
-            aria-labelledby="shadow-alliance-guide-title"
-          >
-            <header className="shadow-alliance-guide-header">
-              <div>
-                <p className="shadow-alliance-eyebrow">게임 설명</p>
-                <p className="shadow-alliance-guide-count">
-                  설명 {guideIndex + 1} / {LOBBY_GUIDES.length}
-                </p>
-              </div>
-              <div className="shadow-alliance-guide-pagination" aria-label="게임 설명 선택">
-                {LOBBY_GUIDES.map((item, index) => (
-                  <button
-                    key={item.title}
-                    type="button"
-                    className={guideIndex === index ? "is-active" : ""}
-                    aria-label={`설명 ${index + 1} 보기`}
-                    aria-current={guideIndex === index ? "step" : undefined}
-                    onClick={() => changeGuide(index)}
-                  >
-                    {index + 1}
-                  </button>
-                ))}
-              </div>
-            </header>
+          <details className="shadow-alliance-panel shadow-alliance-lobby-guide">
+            <summary>게임 방법</summary>
 
             <div className="shadow-alliance-guide-content" aria-live="polite">
               <span className="shadow-alliance-guide-number" aria-hidden="true">
@@ -559,7 +503,7 @@ export function ShadowAllianceTeacherGame({
                 다음 설명 →
               </button>
             </nav>
-          </section>
+          </details>
 
           <div className="shadow-alliance-panel shadow-alliance-roster">
             <div className="shadow-alliance-panel-heading">
@@ -627,7 +571,7 @@ export function ShadowAllianceTeacherGame({
         </section>
       )}
 
-      {!lobby && game.phase !== "revealing" && (
+      {!lobby && game.phase !== "revealing" && game.phase !== "final" && (
         <section className="shadow-alliance-round-layout">
           <div className="shadow-alliance-round-focus">
             <p className="shadow-alliance-eyebrow">ROUND {game.round} / {game.totalRounds}</p>
@@ -698,12 +642,12 @@ export function ShadowAllianceTeacherGame({
           <button
             type="button"
             className="shadow-alliance-button secondary shadow-alliance-new-game"
-            onClick={() => {
-              if (window.confirm("현재 결과를 닫고 새 게임을 준비할까요?")) onResetGame();
-            }}
+            disabled={sessionActionBusy}
+            onClick={onResetGame}
           >
-            새 게임 준비
+            새 게임
           </button>
+          <button type="button" className="shadow-alliance-button secondary" onClick={() => router.push("/dashboard?category=play")}>게임 목록</button>
         </section>
       )}
     </main>

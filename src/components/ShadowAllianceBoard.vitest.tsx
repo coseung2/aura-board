@@ -77,7 +77,7 @@ afterEach(() => {
 });
 
 describe("ShadowAllianceBoard legacy presentation adapter", () => {
-  it("renders the pre-platform command-center UI and uses realtime invalidation", async () => {
+  it("renders the task-focused teacher lobby and uses realtime invalidation", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn(async () =>
@@ -95,9 +95,11 @@ describe("ShadowAllianceBoard legacy presentation adapter", () => {
       />,
     );
 
-    expect(await screen.findByText("교사 본부")).toBeTruthy();
-    expect(screen.getByRole("heading", { level: 1, name: "그림자연합" })).toBeTruthy();
-    expect(screen.getByText("게임 설명")).toBeTruthy();
+    expect(await screen.findByRole("heading", { level: 1, name: "그림자연합" })).toBeTruthy();
+    expect(screen.getByText("게임 방법")).toBeTruthy();
+    expect(screen.getByText("게임 관리")).toBeTruthy();
+    expect(screen.queryByText("교사 본부")).toBeNull();
+    expect(screen.queryByText("실시간 연결")).toBeNull();
     expect(screen.queryByText("Lobby")).toBeNull();
 
     await waitFor(() => {
@@ -382,7 +384,9 @@ describe("ShadowAllianceBoard legacy presentation adapter", () => {
       await screen.findByRole("button", { name: "다음에 이어하기" }),
     );
 
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/dashboard"));
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith("/dashboard?category=play"),
+    );
     const request = fetchMock.mock.calls[1]?.[1] as RequestInit;
     expect(JSON.parse(String(request.body))).toMatchObject({ action: "pause" });
   });
@@ -466,7 +470,9 @@ describe("ShadowAllianceBoard legacy presentation adapter", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "게임 종료" }));
 
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/dashboard"));
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith("/dashboard?category=play"),
+    );
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
@@ -503,7 +509,9 @@ describe("ShadowAllianceBoard legacy presentation adapter", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "게임 종료" }));
 
-    await waitFor(() => expect(mocks.push).toHaveBeenCalledWith("/dashboard"));
+    await waitFor(() =>
+      expect(mocks.push).toHaveBeenCalledWith("/dashboard?category=play"),
+    );
     const request = fetchMock.mock.calls[1]?.[1] as RequestInit;
     expect(JSON.parse(String(request.body))).toMatchObject({ action: "end-early" });
   });
