@@ -41,11 +41,6 @@ export function SongGuessScoreboard({
             <Text style={styles.resultMeta}>누적</Text>
             <Text style={styles.ownScore}>{own.score.toLocaleString("ko-KR")}점</Text>
           </View>
-          <Text style={styles.nextRound}>
-            {snapshot.roomMode === "student-free"
-              ? "다음 문제는 잠시 후 자동으로 시작해요"
-              : "다음 문제는 선생님이 시작해요"}
-          </Text>
         </View>
       ) : null}
 
@@ -182,7 +177,6 @@ const styles = StyleSheet.create({
   resultMeta: { ...typography.micro, color: song.muted },
   ownRank: { ...typography.display, color: song.text },
   ownScore: { ...typography.title, color: song.accent },
-  nextRound: { ...typography.body, width: "100%", color: song.muted },
   finalSummary: { minHeight: song.finalSummaryMinHeight, flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: spacing.lg, borderRadius: song.answerRadius, backgroundColor: song.track },
   finalRank: { ...typography.display, color: song.text },
   finalScore: { ...typography.label, color: song.muted },

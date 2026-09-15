@@ -62,12 +62,12 @@ function StatusChip({ label, selected }: { label: string; selected?: boolean }) 
   );
 }
 
-function Header({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle: string }) {
+function Header({ eyebrow, title, subtitle }: { eyebrow: string; title: string; subtitle?: string }) {
   return (
     <View style={styles.header}>
       <Text style={styles.eyebrow}>{eyebrow}</Text>
       <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{subtitle}</Text>
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
 }
@@ -474,7 +474,6 @@ export function SongGuessRooms({
       <Header
         eyebrow="AURA BOARD"
         title="음악 퀴즈"
-        subtitle="친구들과 함께할 방을 고르거나 새 게임을 만들어요."
       />
       <AppButton
         variant="secondary"
@@ -489,7 +488,6 @@ export function SongGuessRooms({
           </View>
           <View style={styles.quickCopy}>
             <Text style={styles.quickTitle}>내 자유 게임 만들기</Text>
-            <Text style={styles.quickNote}>원하는 장르와 문제 수를 골라요</Text>
           </View>
         </View>
       </AppButton>
@@ -509,9 +507,6 @@ export function SongGuessRooms({
             <Text style={styles.emptyIconText}>!</Text>
           </View>
           <Text style={styles.emptyTitle}>방 목록을 불러오지 못했어요</Text>
-          <Text style={styles.emptyBody}>
-            {"네트워크를 확인한 뒤 다시 시도해 주세요.\n잠시 후 자동으로 다시 확인해요."}
-          </Text>
           <AppButton
             {...actionProps("secondary")}
             onPress={() => {
@@ -528,10 +523,6 @@ export function SongGuessRooms({
             <Text style={styles.emptyIconText}>♫</Text>
           </View>
           <Text style={styles.emptyTitle}>아직 열린 방이 없어요</Text>
-          <Text style={styles.emptyBody}>
-            {"친구가 방을 열 때까지 기다리거나\n내가 먼저 게임을 만들어 보세요."}
-          </Text>
-          <StatusChip label="5초마다 자동 확인" />
         </View>
       ) : (
         rooms.map((room, index) => {
@@ -571,17 +562,11 @@ export function SongGuessRooms({
         })
       )}
 
-      <View style={styles.spacer} />
       {error ? (
         <Text style={styles.errorText} accessibilityRole="alert">
           {error}
         </Text>
       ) : null}
-      <View style={styles.footer}>
-        <AppButton {...actionProps("primary")} disabled={busy} onPress={startCreate}>
-          새 자유 게임 만들기
-        </AppButton>
-      </View>
     </ScrollView>
   );
 }

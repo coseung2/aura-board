@@ -68,7 +68,6 @@ export const songGuessRoomsStyles = StyleSheet.create({
   quickIconText: { ...typography.title, color: song.bg },
   quickCopy: { flex: 1, minWidth: 0, gap: spacing.xxs },
   quickTitle: { ...typography.subtitle, color: song.text },
-  quickNote: { ...typography.micro, color: song.muted },
 
   sectionRow: {
     minHeight: tapMin,
@@ -124,7 +123,6 @@ export const songGuessRoomsStyles = StyleSheet.create({
   },
   emptyIconText: { ...typography.display, color: song.accent },
   emptyTitle: { ...typography.title, color: song.text, textAlign: "center" },
-  emptyBody: { ...typography.body, color: song.muted, textAlign: "center" },
 
   stepRow: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
   stepBar: {
