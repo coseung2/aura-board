@@ -10,6 +10,8 @@ Use this skill for any user-facing Aura Board feature, not only games. The targe
 
 This is not a visual-only review. A useful UX audit follows the user's task through the actual implementation and checks whether the UI accurately represents the product state, authority boundary, synchronization model, and recovery behavior.
 
+When a finding is specifically about how many decisions/actions a flow costs, use `.codex/skills/ux-flow-audit/SKILL.md` as the measurement companion. This skill owns lifecycle/state-truth/realtime/missing-or-redundant UX review; `ux-flow-audit` supplies reproducible KLM/excise cost for before/after comparisons.
+
 ## Source-of-truth order
 
 Before judging a screen, read only the documents relevant to the target and then compare them with current code.
