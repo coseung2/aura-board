@@ -6,6 +6,11 @@ const realtime = vi.hoisted(() => ({
   broadcast: null as null | (() => void),
   status: null as null | ((status: string) => void),
   removeChannel: vi.fn().mockResolvedValue(undefined),
+  push: vi.fn(),
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: realtime.push }),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -147,7 +152,7 @@ describe("SpeedGameBoard realtime transport", () => {
 
     await act(async () => realtime.status?.("CHANNEL_ERROR"));
 
-    expect(screen.getByRole("status").textContent).toContain("다시 확인");
+    expect(screen.getByRole("status").textContent).toContain("실시간 연결 복구 중");
     expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 15_000);
     const fallbackTick = setTimeoutSpy.mock.calls.find(([, delay]) => delay === 15_000)?.[0];
     fetchMock.mockClear();
@@ -239,6 +244,26 @@ describe("SpeedGameBoard realtime transport", () => {
     await act(async () => Promise.resolve());
     expect(realtime.status).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { viewerKind: "teacher" as const, studentId: null, href: "/dashboard?category=play" },
+    { viewerKind: "student" as const, studentId: "a", href: "/student/boards?category=play" },
+  ])("returns a finished $viewerKind to the correct game list", ({ viewerKind, studentId, href }) => {
+    render(
+      <SpeedGameBoard
+        boardId="board-1"
+        boardSlug="speed"
+        classroomId="classroom-1"
+        viewerKind={viewerKind}
+        currentStudentId={studentId}
+        initialGame={{ ...game, status: "finished", participants }}
+      />,
+    );
+
+    expect(screen.getByRole("link", { name: "게임 목록" }).getAttribute("href")).toBe(href);
+    expect(screen.queryByText(/run run-1/)).toBeNull();
+    expect(screen.queryByText(/classroom-1/)).toBeNull();
   });
 
   it("does not let an older in-flight snapshot revive a finished game", async () => {

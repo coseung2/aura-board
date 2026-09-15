@@ -75,6 +75,7 @@ export function SpeedGameBoard({ data }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exitVisible, setExitVisible] = useState(false);
+  const mutationInFlight = useRef(false);
   const participantRef = useRef<PendingCommand | null>(null);
   const answerRef = useRef<PendingCommand | null>(null);
   const joinedRunRef = useRef<string | null>(null);
@@ -171,7 +172,8 @@ export function SpeedGameBoard({ data }: Props) {
 
   const participantCommand = useCallback(
     async (action: ParticipantAction) => {
-      if (!game) return null;
+      if (!game || mutationInFlight.current) return null;
+      mutationInFlight.current = true;
       const fingerprint = `${action}:${game.runId}`;
       const pending = participantRef.current;
       const command =
@@ -216,6 +218,7 @@ export function SpeedGameBoard({ data }: Props) {
         setError(errorLabel(body.error));
         return null;
       } finally {
+        mutationInFlight.current = false;
         setLoading(false);
       }
     },
@@ -239,7 +242,7 @@ export function SpeedGameBoard({ data }: Props) {
   }, [game, participant, participantCommand]);
 
   const submit = useCallback(async () => {
-    if (!game || !round || !group || !canAnswer) return;
+    if (!game || !round || !group || !canAnswer || mutationInFlight.current) return;
     const answer = draft.trim();
     if (!answer) return;
     const fingerprint = `${game.runId}:${round.id}:${group.id}:${answer}`;
@@ -257,6 +260,7 @@ export function SpeedGameBoard({ data }: Props) {
             fingerprint,
           };
     answerRef.current = command;
+    mutationInFlight.current = true;
     setLoading(true);
     setError(null);
     try {
@@ -287,6 +291,7 @@ export function SpeedGameBoard({ data }: Props) {
       }
       setError(errorLabel(body.error));
     } finally {
+      mutationInFlight.current = false;
       setLoading(false);
     }
   }, [canAnswer, draft, game, group, round]);
@@ -294,10 +299,9 @@ export function SpeedGameBoard({ data }: Props) {
   if (!game) {
     return (
       <View style={styles.stateBox}>
-        <Text selectable style={styles.title}>스피드게임 준비 중</Text>
-        <Text selectable style={styles.muted}>
-          게임 설정이나 모둠 구성이 아직 완료되지 않았어요.
-        </Text>
+        <Text selectable style={styles.title}>{error ? "게임을 불러오지 못했어요" : "스피드게임 준비 중"}</Text>
+        {error && <Text style={styles.error} accessibilityRole="alert">{error}</Text>}
+        <ActionButton label="게임 목록" onPress={() => router.replace("/(student)/boards?filter=play")} />
       </View>
     );
   }
@@ -311,7 +315,7 @@ export function SpeedGameBoard({ data }: Props) {
         renderParticipantLeading={({ id, name }) => (
           <GameParticipantPet name={name} pet={game.participants.find((candidate) => candidate.studentId === id)?.representativePet} size={GAME_PET_SIZES.compact} />
         )}
-        description="내 모둠을 확인하고 준비가 끝나면 준비하기를 눌러 주세요."
+        description={group ? `${group.name} · 내 순서를 확인해 주세요.` : "모둠 배정을 기다리는 중이에요."}
         participants={game.participants.map((candidate) => ({
           id: candidate.studentId,
           name: candidate.name,
@@ -325,12 +329,14 @@ export function SpeedGameBoard({ data }: Props) {
         }))}
         error={error}
         actions={
-          participant ? (
+          participant?.joinedAt && !participant.forfeitedAt && !participant.readyAt ? (
             <ActionButton
-              label={participant.readyAt ? "준비 완료" : "준비하기"}
-              disabled={loading || Boolean(participant.readyAt)}
+              label="준비하기"
+              disabled={loading}
               onPress={() => void participantCommand("ready")}
             />
+          ) : participant && !participant.joinedAt && !participant.forfeitedAt && error ? (
+            <ActionButton label="다시 입장" disabled={loading} onPress={() => void participantCommand("join")} />
           ) : null
         }
         />
@@ -363,10 +369,10 @@ export function SpeedGameBoard({ data }: Props) {
                 { label: "라운드", value: `${game.rounds.length}개` },
               ]
         }
-        message="서버가 확정한 결과가 나의 전적에 기록됩니다."
+        message={game.terminalReason === "host_ended" ? "진행자가 게임을 종료했어요." : "게임이 끝났어요."}
         actions={
           <View style={styles.actions}>
-            <ActionButton label="게임 목록" onPress={() => router.back()} />
+            <ActionButton label="게임 목록" onPress={() => router.replace("/(student)/boards?filter=play")} />
           </View>
         }
       />
@@ -386,8 +392,8 @@ export function SpeedGameBoard({ data }: Props) {
           </Text>
         </View>
         <AppButton
-          disabled={loading || Boolean(participant?.forfeitedAt)}
-          onPress={() => setExitVisible(true)}
+          disabled={loading}
+          onPress={() => participant?.forfeitedAt ? router.replace("/(student)/boards?filter=play") : setExitVisible(true)}
           style={styles.dangerButton}
           textStyle={styles.dangerText}
           variant="quiet"
@@ -457,20 +463,16 @@ export function SpeedGameBoard({ data }: Props) {
         ))}
       </View>
 
-      <Text selectable style={styles.runtimeMeta}>
-        run {game.runId} · v{game.version}
-      </Text>
-
       <GameExitDialog
         visible={exitVisible}
         title="스피드게임에서 나갈까요?"
-        description="진행 중 나가면 이번 run은 기권으로 기록됩니다. 서버가 종료 결과를 확정한 뒤 나갈 수 있어요."
+        description="진행 중 나가면 이번 게임은 기권으로 기록돼요."
         confirmLabel="기권하고 나가기"
         busy={loading}
         onCancel={() => setExitVisible(false)}
         onConfirm={async () => {
           const result = await participantCommand("forfeit");
-          if (result) setExitVisible(false);
+          if (result) { setExitVisible(false); router.replace("/(student)/boards?filter=play"); }
         }}
       />
     </View>

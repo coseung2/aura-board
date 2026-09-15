@@ -2,6 +2,7 @@
 "use client";
 
 import { SpeedGamePlayers } from "./SpeedGamePlayers";
+import { useRouter } from "next/navigation";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GameExitDialog } from "@/components/game-platform/GameExitDialog";
@@ -36,19 +37,18 @@ type Props = {
 };
 
 export function SpeedGameBoard({
-  boardId,
-  boardSlug,
-  classroomId,
   viewerKind,
   currentStudentId,
   initialGame,
 }: Props) {
+  const router = useRouter();
   const [game, setGame] = useState<SpeedGameWire | null>(initialGame);
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [exitOpen, setExitOpen] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const mutationInFlight = useRef(false);
   const runCommandRef = useRef<PendingCommand | null>(null);
   const participantCommandRef = useRef<PendingCommand | null>(null);
   const answerCommandRef = useRef<PendingCommand | null>(null);
@@ -316,7 +316,8 @@ export function SpeedGameBoard({
 
   const executeParticipantCommand = useCallback(
     async (action: ParticipantAction) => {
-      if (!game || !currentStudentId || viewerKind !== "student") return null;
+      if (!game || !currentStudentId || viewerKind !== "student" || mutationInFlight.current) return null;
+      mutationInFlight.current = true;
       const fingerprint = `${action}:${game.runId}`;
       const pending = participantCommandRef.current;
       const command =
@@ -369,7 +370,11 @@ export function SpeedGameBoard({
         participantCommandRef.current = null;
         setGame(body.game);
         return body;
+      } catch {
+        setError("요청을 확인하지 못했어요. 연결을 확인하고 다시 시도해 주세요.");
+        return null;
       } finally {
+        mutationInFlight.current = false;
         setBusy(false);
       }
     },
@@ -395,7 +400,9 @@ export function SpeedGameBoard({
 
   const mutateRun = useCallback(
     async (action: RunAction) => {
-      if (!game || viewerKind !== "teacher") return;
+      if (!game || viewerKind !== "teacher" || mutationInFlight.current) return;
+      if (action === "end-early" && !window.confirm("게임을 조기 종료할까요? 모든 학생의 이번 게임이 끝나요.")) return;
+      mutationInFlight.current = true;
       const fingerprint = `${action}:${game.runId}`;
       const pending = runCommandRef.current;
       const command =
@@ -443,7 +450,10 @@ export function SpeedGameBoard({
         joinedRunRef.current = null;
         setGame(body.game);
         setAnswer("");
+      } catch {
+        setError("요청을 확인하지 못했어요. 연결을 확인하고 다시 시도해 주세요.");
       } finally {
+        mutationInFlight.current = false;
         setBusy(false);
       }
     },
@@ -451,9 +461,10 @@ export function SpeedGameBoard({
   );
 
   const submitAnswer = useCallback(async () => {
-    if (!game || !currentRound || !currentGroup || !canAnswer) return;
+    if (!game || !currentRound || !currentGroup || !canAnswer || mutationInFlight.current) return;
     const rawText = answer.trim();
     if (!rawText) return;
+    mutationInFlight.current = true;
     const fingerprint = `${game.runId}:${currentRound.id}:${currentGroup.id}:${rawText}`;
     const pending = answerCommandRef.current;
     const command =
@@ -505,14 +516,18 @@ export function SpeedGameBoard({
       answerCommandRef.current = null;
       setGame(body.game);
       setAnswer("");
+    } catch {
+      setError("제출을 확인하지 못했어요. 답을 유지했으니 다시 제출해 주세요.");
     } finally {
+      mutationInFlight.current = false;
       setBusy(false);
     }
   }, [answer, canAnswer, currentGroup, currentRound, game]);
 
   const reviewAnswer = useCallback(
     async (answerId: string, decision: "accepted" | "rejected") => {
-      if (!game || viewerKind !== "teacher") return;
+      if (!game || viewerKind !== "teacher" || mutationInFlight.current) return;
+      mutationInFlight.current = true;
       const fingerprint = `${answerId}:${decision}`;
       const pending = reviewCommandRef.current;
       const command =
@@ -559,7 +574,10 @@ export function SpeedGameBoard({
         if (!body?.game) return;
         reviewCommandRef.current = null;
         setGame(body.game);
+      } catch {
+        setError("판정을 확인하지 못했어요. 같은 답변을 다시 확인해 주세요.");
       } finally {
+        mutationInFlight.current = false;
         setBusy(false);
       }
     },
@@ -590,7 +608,7 @@ export function SpeedGameBoard({
       : undefined;
 
   return (
-    <section className="speed-game-shell" aria-busy={busy || reconnecting || undefined}>
+    <section className="speed-game-shell" aria-busy={busy || undefined}>
       <header className="speed-game-round-header">
         <div>
           <p className="speed-game-eyebrow">ROUND</p>
@@ -603,22 +621,21 @@ export function SpeedGameBoard({
         <div className="speed-game-round-actions">
           {viewerKind === "teacher" ? (
             <>
-              <button
-                type="button"
-                className="speed-game-secondary-button"
-                disabled={busy || !currentRound || currentRound.order >= game.rounds.length - 1}
-                onClick={() => void mutateRun("next")}
-              >
-                다음 라운드
-              </button>
-              <button
+              {currentRound && currentRound.order < game.rounds.length - 1 ? <button
                 type="button"
                 className="speed-game-primary-button"
                 disabled={busy}
+                onClick={() => void mutateRun("next")}
+              >
+                다음 라운드
+              </button> : <button
+                type="button"
+                className="speed-game-primary-button"
+                disabled={busy || !currentRound}
                 onClick={() => void mutateRun("finish")}
               >
                 게임 완료
-              </button>
+              </button>}
               <button
                 type="button"
                 className="speed-game-danger-button"
@@ -632,8 +649,8 @@ export function SpeedGameBoard({
             <button
               type="button"
               className="speed-game-danger-button"
-              disabled={busy || Boolean(currentParticipant?.forfeitedAt)}
-              onClick={() => setExitOpen(true)}
+              disabled={busy}
+              onClick={() => currentParticipant?.forfeitedAt ? router.push("/student/boards?category=play") : setExitOpen(true)}
             >
               게임 나가기
             </button>
@@ -643,7 +660,7 @@ export function SpeedGameBoard({
 
       {reconnecting ? (
         <p className="speed-game-notice" role="status">
-          최신 게임 상태를 다시 확인하고 있어요. 입력은 잠시 잠깁니다.
+            실시간 연결 복구 중이에요.
         </p>
       ) : null}
       {error ? <p className="speed-game-error" role="alert">{error}</p> : null}
@@ -688,7 +705,7 @@ export function SpeedGameBoard({
                   id="speed-game-answer"
                   value={answer}
                   maxLength={200}
-                  disabled={!canAnswer || busy || reconnecting}
+                  disabled={!canAnswer || busy}
                   onChange={(event) => setAnswer(event.target.value)}
                   placeholder={canAnswer ? "답을 입력하세요" : "내 순서를 기다려 주세요"}
                   autoComplete="off"
@@ -696,7 +713,7 @@ export function SpeedGameBoard({
                 <button
                   type="submit"
                   className="speed-game-primary-button"
-                  disabled={!canAnswer || busy || reconnecting || !answer.trim()}
+                  disabled={!canAnswer || busy || !answer.trim()}
                 >
                   정답 제출
                 </button>
@@ -753,24 +770,16 @@ export function SpeedGameBoard({
         </section>
       ) : null}
 
-      <footer className="speed-game-runtime-meta">
-        <span>run {game.runId}</span>
-        <span>v{game.version}</span>
-        <span>{boardSlug}</span>
-        <span>{classroomId}</span>
-        <span>{boardId}</span>
-      </footer>
-
       <GameExitDialog
         open={exitOpen}
         title="스피드게임에서 나갈까요?"
-        description="진행 중 나가면 이번 run은 기권으로 기록됩니다. 서버가 결과를 확정한 뒤 나갈 수 있어요."
+        description="진행 중 나가면 이번 게임은 기권으로 기록돼요."
         confirmLabel="기권하고 나가기"
         busy={busy}
         onCancel={() => setExitOpen(false)}
         onConfirm={async () => {
           const result = await executeParticipantCommand("forfeit");
-          if (result) setExitOpen(false);
+          if (result) { setExitOpen(false); router.push("/student/boards?category=play"); }
         }}
       />
     </section>
