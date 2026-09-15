@@ -29,6 +29,8 @@ import type {
 } from "./realtime";
 import {
   boardChannelKey,
+  gameHubChannelKey,
+  GAME_HUB_CHANGED_EVENT,
   classroomMorningChannelKey,
   OMOK_MATCHMAKING_CHANGED_EVENT,
   PLAY_SESSION_CHANGED_EVENT,
@@ -445,6 +447,34 @@ export async function announceSpeedGameChange(
   await broadcastBestEffort(speedGameChannelKey(gameId), SPEED_GAME_CHANGED_EVENT, {
     type: SPEED_GAME_CHANGED_EVENT,
   });
+  if (changeType !== "answer" && changeType !== "answer-review") {
+    try {
+      const { db } = await import("./db");
+      const game = await db.speedGame.findUnique({ where: { id: gameId }, select: { boardId: true } });
+      if (game) await announceGameHubChange(game.boardId);
+    } catch {
+      // A failed secondary invalidation must not undo a committed command.
+    }
+  }
+}
+
+/** Notify all open hubs, including hubs that have not seen a board created yet. */
+export async function announceGameHubClassroomChange(classroomId: string): Promise<void> {
+  if (!classroomId) return;
+  await broadcastBestEffort(gameHubChannelKey(classroomId), GAME_HUB_CHANGED_EVENT, {
+    type: GAME_HUB_CHANGED_EVENT,
+  });
+}
+
+export async function announceGameHubChange(boardId: string): Promise<void> {
+  if (!boardId) return;
+  try {
+    const { db } = await import("./db");
+    const board = await db.board.findUnique({ where: { id: boardId }, select: { classroomId: true } });
+    if (board?.classroomId) await announceGameHubClassroomChange(board.classroomId);
+  } catch {
+    // The authoritative write has already succeeded. Focus/recovery reconciles.
+  }
 }
 
 /** Broadcast a committed Omok lobby ticket change; clients refetch status. */
@@ -459,6 +489,7 @@ export async function announceOmokMatchmakingChange(boardId: string): Promise<vo
       updatedAt: new Date().toISOString(),
     },
   );
+  await announceGameHubChange(boardId);
 }
 
 /**
@@ -469,6 +500,7 @@ export async function announcePlaySessionChange(
   boardId: string,
   sessionId: string,
   version: number,
+  hubChanged = true,
 ): Promise<void> {
   if (
     !boardId ||
@@ -490,6 +522,7 @@ export async function announcePlaySessionChange(
     PLAY_SESSION_CHANGED_EVENT,
     event,
   );
+  if (hubChanged) await announceGameHubChange(boardId);
 }
 
 /**
@@ -546,4 +579,5 @@ export async function announceKordlePuzzleChange(
     KORDLE_PUZZLE_CHANGED_EVENT,
     event,
   );
+  await announceGameHubChange(boardId);
 }

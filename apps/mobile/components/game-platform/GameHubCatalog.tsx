@@ -1,6 +1,7 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  AppState,
   StyleSheet,
   Text,
   View,
@@ -25,6 +26,19 @@ import {
   typography,
 } from "../../theme/tokens";
 import { ControlPressable } from "../ui";
+import { useLiveSnapshot } from "../../lib/use-live-snapshot";
+
+type HubPayload = {
+  statuses: Partial<Record<MobileOfficialGameKind, { label: string; playerCount: number }>>;
+  channels: string[];
+  serverTimeMs?: number;
+  nextRefreshAtMs?: number | null;
+};
+
+function HubSubscription({ channelName, reload, enabled }: { channelName: string; reload: () => Promise<void>; enabled: boolean }) {
+  useLiveSnapshot({ channelName, events: ["game_hub_changed"], reload, enabled });
+  return null;
+}
 
 type EntryResponse = {
   gameKind: MobileOfficialGameKind;
@@ -51,13 +65,39 @@ export function GameHubCatalog() {
   const [errors, setErrors] = useState<
     Partial<Record<MobileOfficialGameKind, string>>
   >({});
+  const [hub, setHub] = useState<HubPayload | null>(null);
+  const [statusError, setStatusError] = useState(false);
+  const [focused, setFocused] = useState(true);
+  const sequence = useRef(0);
+  const reloadStatus = useCallback(async () => {
+    const current = ++sequence.current;
+    try {
+      const next = await apiFetch<HubPayload>("/api/game-hub/status");
+      if (current !== sequence.current) return;
+      setHub(next);
+      setStatusError(false);
+    } catch (error) {
+      if (current === sequence.current) setStatusError(true);
+      throw error;
+    }
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
       setPendingKind(null);
-      return undefined;
-    }, []),
+      setFocused(true);
+      void reloadStatus().catch(() => undefined);
+      return () => { ++sequence.current; setFocused(false); };
+    }, [reloadStatus]),
   );
+
+  useEffect(() => {
+    if (!focused || hub?.nextRefreshAtMs == null || hub.serverTimeMs == null) return;
+    const timer = setTimeout(() => {
+      if (AppState.currentState === "active") void reloadStatus().catch(() => undefined);
+    }, Math.max(0, hub.nextRefreshAtMs - hub.serverTimeMs));
+    return () => clearTimeout(timer);
+  }, [focused, hub, reloadStatus]);
 
   async function enterGame(gameKind: MobileOfficialGameKind) {
     if (pendingKind) return;
@@ -92,6 +132,8 @@ export function GameHubCatalog() {
 
   return (
     <View style={styles.root}>
+      {hub?.channels?.map((channelName) => <HubSubscription key={channelName} channelName={channelName} reload={reloadStatus} enabled={focused} />)}
+      {statusError && <ControlPressable accessibilityLabel="게임 상태 다시 확인" onPress={() => void reloadStatus().catch(() => undefined)}><Text style={styles.errorText}>게임 상태 다시 확인</Text></ControlPressable>}
       <View style={styles.grid}>
         {MOBILE_GAME_HUB_ORDER.map((kind) => {
           const game = MOBILE_GAME_CATALOG[kind];
@@ -111,6 +153,11 @@ export function GameHubCatalog() {
               <View style={styles.cardBody}>
                 <Text selectable style={styles.cardTitle}>
                   {game.displayName}
+                </Text>
+                <Text style={styles.gameStatus}>
+                  {statusError ? "상태 확인 필요" : hub?.statuses[kind]
+                    ? `${hub.statuses[kind]!.label}${hub.statuses[kind]!.playerCount ? ` · ${hub.statuses[kind]!.playerCount}명 참가` : ""}`
+                    : "상태 확인 중"}
                 </Text>
                 <ControlPressable
                   disabled={pendingKind !== null}
@@ -183,6 +230,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   cardTitle: { ...typography.subtitle, color: colors.text },
+  gameStatus: { ...typography.micro, color: colors.textMuted },
   entryButton: {
     minHeight: tapMin,
     flexDirection: "row",

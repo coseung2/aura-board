@@ -15,6 +15,8 @@ import {
   proxyPlayEngineResponse,
 } from "@/lib/play-platform/server-client";
 import { playRouteError } from "@/lib/play-platform/route-utils";
+import { announcePlaySessionChange } from "@/lib/realtime-broadcast";
+import { retireFinishedOmokSession } from "@/lib/play-platform/omok-lobby-lifecycle";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -61,14 +63,20 @@ export async function POST(request: Request, { params }: Params) {
       { actor, method: "POST", body: parsed.data },
     );
     if (parsed.data.command.type !== "place_stone" || !response.ok) {
-      return proxyPlayEngineResponse(response);
+      if (response.ok && parsed.data.command.type === "resign") {
+        await retireFinishedOmokSession(sessionId).catch(() => undefined);
+      }
+      return proxyPlayEngineResponse(response, { broadcastOnSuccess: true });
     }
 
     const payload = (await response.clone().json().catch(() => null)) as unknown;
     if (!isPlayCommandResponse(payload)) return proxyPlayEngineResponse(response);
 
     try {
-      return jsonPrivateNoStore(await advanceOmokBotTurn(sessionId, payload));
+      const result = await advanceOmokBotTurn(sessionId, payload);
+      if (result.snapshot.roomStatus === "finished") await retireFinishedOmokSession(sessionId).catch(() => undefined);
+      await announcePlaySessionChange(result.snapshot.boardId, sessionId, result.snapshot.version, result.snapshot.roomStatus === "finished");
+      return jsonPrivateNoStore(result);
     } catch (error) {
       if (!(error instanceof OmokBotTurnError)) throw error;
       console.error("[omok bot turn] failed", {

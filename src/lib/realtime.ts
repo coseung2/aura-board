@@ -41,6 +41,13 @@ export function classroomMorningChannelKey(classroomId: string): string {
 }
 
 export const SPEED_GAME_CHANGED_EVENT = "speed_game_changed";
+export const GAME_HUB_CHANGED_EVENT = "game_hub_changed";
+
+/** Invalidation only; never put participant identities or game answers here. */
+export function gameHubChannelKey(classroomId: string): string {
+  if (!classroomId) throw new Error("gameHubChannelKey: classroomId required");
+  return `classroom:${classroomId}:game-hub`;
+}
 export const PLAY_SESSION_CHANGED_EVENT = "play_session_changed";
 export const OMOK_MATCHMAKING_CHANGED_EVENT = "omok_matchmaking_changed";
 

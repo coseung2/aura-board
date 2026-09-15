@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, AppState, ScrollView, Text, View } from "react-native";
 import {
   createSongGuessRoom,
   fetchSongGuessRooms,
@@ -9,6 +9,7 @@ import {
 import type { SongGuessSnapshot } from "../../lib/song-guess-contract";
 import { AppButton } from "../ui";
 import { songGuessRoomsStyles as styles } from "./songGuessRoomsStyles";
+import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 
 const MAX_COUNT = 20;
 const MIN_COUNT = 1;
@@ -122,7 +123,7 @@ export function SongGuessRooms({
 
   const reload = useCallback(async () => {
     try {
-      setRooms(await fetchSongGuessRooms(boardId));
+      setRooms((await fetchSongGuessRooms(boardId)).filter((room) => room.phase !== "finished"));
       setLoadError(null);
     } catch {
       setLoadError("방 목록을 불러오지 못했어요.");
@@ -138,11 +139,19 @@ export function SongGuessRooms({
   }, [boardId]);
 
   useEffect(() => {
-    void reload();
     reloadCatalog();
-    const timer = setInterval(() => void reload(), 5000);
-    return () => clearInterval(timer);
-  }, [reload, reloadCatalog]);
+  }, [reloadCatalog]);
+
+  useLiveSnapshot({ channelName: `board:${boardId}`, events: ["play_session_changed"], reload });
+
+  useEffect(() => {
+    const delays = rooms.flatMap((room) => room.nextTransitionAtMs == null ? [] : [Math.max(0, room.nextTransitionAtMs - room.serverTimeMs)]);
+    if (!delays.length) return;
+    const timer = setTimeout(() => {
+      if (AppState.currentState === "active") void reload();
+    }, Math.min(...delays));
+    return () => clearTimeout(timer);
+  }, [rooms, reload]);
 
   const available = useMemo(
     () =>

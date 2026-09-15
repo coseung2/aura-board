@@ -7,7 +7,9 @@ import {
   CirclePlay,
   Radio,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
+import { GAME_HUB_CHANGED_EVENT } from "@/lib/realtime";
 import type { OfficialGameKind } from "@/lib/game-platform/contracts";
 import {
   GAME_HUB_ORDER,
@@ -40,6 +42,11 @@ type GameHubStatus = {
   playerCount: number;
 };
 
+function HubSubscription({ channelName, refresh }: { channelName: string; refresh: () => Promise<void> }) {
+  useRealtimeInvalidation({ channelName, event: GAME_HUB_CHANGED_EVENT, refresh, initialRefresh: false });
+  return null;
+}
+
 const ARTWORK: Record<OfficialGameKind, string> = {
   kordle: "/game-hub/kordle.png",
   "speed-game": "/game-hub/speed-game.png",
@@ -66,6 +73,27 @@ export function GameHubCatalog({
   const [statuses, setStatuses] = useState<
     Partial<Record<OfficialGameKind, GameHubStatus>>
   >({});
+  const [channels, setChannels] = useState<string[]>([]);
+  const [statusError, setStatusError] = useState(false);
+  const [nextRefresh, setNextRefresh] = useState<{ delay: number; received: number } | null>(null);
+  const statusSequence = useRef(0);
+  const loadStatuses = useCallback(async () => {
+    const sequence = ++statusSequence.current;
+    try {
+      const response = await fetch("/api/game-hub/status", { cache: "no-store" });
+      if (!response.ok) throw new Error("hub_status_unavailable");
+      const body = await response.json();
+      if (sequence !== statusSequence.current) return;
+      if (body.statuses) setStatuses(body.statuses);
+      if (Array.isArray(body.channels)) setChannels(body.channels.filter((channel: unknown): channel is string => typeof channel === "string"));
+      setStatusError(false);
+      setNextRefresh(typeof body.nextRefreshAtMs === "number" && typeof body.serverTimeMs === "number"
+        ? { delay: Math.max(0, body.nextRefreshAtMs - body.serverTimeMs), received: Date.now() } : null);
+    } catch (error) {
+      if (sequence === statusSequence.current) setStatusError(true);
+      throw error;
+    }
+  }, []);
 
   useEffect(() => {
     setPendingKind(null);
@@ -73,33 +101,26 @@ export function GameHubCatalog({
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    const loadStatuses = async () => {
-      const response = await fetch("/api/game-hub/status", {
-        cache: "no-store",
-        headers: { accept: "application/json" },
-      }).catch(() => null);
-      if (!response?.ok) return;
-      const body = (await response.json().catch(() => null)) as
-        | { statuses?: Partial<Record<OfficialGameKind, GameHubStatus>> }
-        | null;
-      if (!cancelled && body?.statuses) setStatuses(body.statuses);
-    };
-    void loadStatuses();
+    void loadStatuses().catch(() => undefined);
     const loadVisibleStatuses = () => {
-      if (document.visibilityState === "visible") void loadStatuses();
+      if (!document.hidden) void loadStatuses().catch(() => undefined);
     };
-    const onFocus = () => void loadStatuses();
-    window.addEventListener("focus", onFocus);
+    window.addEventListener("focus", loadVisibleStatuses);
     document.addEventListener("visibilitychange", loadVisibleStatuses);
-    const timer = window.setInterval(loadVisibleStatuses, 15_000);
     return () => {
-      cancelled = true;
-      window.removeEventListener("focus", onFocus);
+      ++statusSequence.current;
+      window.removeEventListener("focus", loadVisibleStatuses);
       document.removeEventListener("visibilitychange", loadVisibleStatuses);
-      window.clearInterval(timer);
     };
-  }, []);
+  }, [loadStatuses]);
+
+  useEffect(() => {
+    if (!nextRefresh) return;
+    const timer = window.setTimeout(() => {
+      if (!document.hidden) void loadStatuses().catch(() => undefined);
+    }, nextRefresh.delay);
+    return () => window.clearTimeout(timer);
+  }, [nextRefresh, loadStatuses]);
 
   const gameEntryDisabled = teacherMode && classrooms.length === 0;
 
@@ -173,6 +194,8 @@ export function GameHubCatalog({
 
   return (
     <section className={styles.hub} aria-label="게임">
+      {channels.map((channelName) => <HubSubscription key={channelName} channelName={channelName} refresh={loadStatuses} />)}
+      {statusError && <button type="button" onClick={() => void loadStatuses().catch(() => undefined)}>게임 상태 다시 확인</button>}
       <FeaturePreviewNotice />
       {teacherMode && classrooms.length === 0 ? (
         <div className={styles.emptyState} role="status">
@@ -230,7 +253,7 @@ export function GameHubCatalog({
           const pending = pendingKind === kind;
           const error = errors[kind];
           const status = statuses[kind];
-          const statusText = status
+          const statusText = statusError ? "상태 확인 필요" : status
             ? `${status.label}${status.playerCount > 0 ? ` · ${status.playerCount}명` : ""}`
             : "상태 확인 중";
           return (

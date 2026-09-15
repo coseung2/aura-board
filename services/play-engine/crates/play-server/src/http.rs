@@ -209,6 +209,11 @@ async fn list_song_guess_sessions(
             .advance_song_guess_session(&actor, &record.session_id, state.now_ms())
             .await
             .map_err(|e| ApiError::from_repository(e, &actor, state.now_ms()))?;
+        // Catch-up can finish a room in this request. Do not expose it once more
+        // merely because it was active when the initial list query ran.
+        if record.state.phase == play_domain::song_guess::SongGuessPhase::Finished {
+            continue;
+        }
         sessions.push(
             record
                 .snapshot(&actor, state.now_ms())

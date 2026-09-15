@@ -11,6 +11,10 @@ const supabaseMocks = vi.hoisted(() => ({
 vi.mock("@supabase/supabase-js", () => ({
   createClient: supabaseMocks.createClient,
 }));
+vi.mock("../db", () => ({ db: {
+  board: { findUnique: vi.fn().mockResolvedValue(null) },
+  speedGame: { findUnique: vi.fn().mockResolvedValue(null) },
+} }));
 
 function configureClient() {
   const channel = { httpSend: supabaseMocks.httpSend };

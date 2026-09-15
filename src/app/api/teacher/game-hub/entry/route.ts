@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { OFFICIAL_GAME_KINDS } from "@/lib/game-platform/contracts";
 import { resolveOrCreateCanonicalGameRoom } from "@/lib/game-platform/hub-room";
+import { announceGameHubClassroomChange } from "@/lib/realtime-broadcast";
 
 const entrySchema = z
   .object({
@@ -45,6 +46,7 @@ async function POSTHandler(request: Request) {
       { id: user.id, classroomId: classroom.id },
       parsed.data.gameKind,
     );
+    await announceGameHubClassroomChange(classroom.id);
     return jsonPrivateNoStore({
       gameKind: parsed.data.gameKind,
       boardId: room.id,

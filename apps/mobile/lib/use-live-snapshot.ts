@@ -66,7 +66,6 @@ export function useLiveSnapshot({
     let stopped = false;
     let active = AppState.currentState === "active";
     let currentStatus: BoardRealtimeStatus = "connecting";
-    let hasSubscribed = false;
     let failures = 0;
     let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
     let inFlight: Promise<void> | null = null;
@@ -90,12 +89,12 @@ export function useLiveSnapshot({
       clearFallback();
       if (
         stopped ||
-        !shouldScheduleLiveSnapshotFallback({
+        (failures === 0 && !shouldScheduleLiveSnapshotFallback({
           active,
           enabled,
           status: currentStatus,
           terminal,
-        })
+        })) || !active || terminal
       ) {
         return;
       }
@@ -103,7 +102,9 @@ export function useLiveSnapshot({
         fallbackTimer = null;
         if (!channel) void connectRealtime();
         void runRefresh();
-      }, liveSnapshotFallbackDelay(failures));
+      }, failures > 0 && currentStatus === "subscribed"
+        ? Math.min(LIVE_SNAPSHOT_FALLBACK_BASE_MS, 1_000 * 2 ** Math.min(failures - 1, 4))
+        : liveSnapshotFallbackDelay(failures));
     };
 
     const runRefresh = (): Promise<void> => {
@@ -161,11 +162,11 @@ export function useLiveSnapshot({
           if (stopped) return;
           const normalized = nextStatus.toUpperCase();
           if (normalized === "SUBSCRIBED") {
-            const reconnecting = hasSubscribed || currentStatus === "error";
-            hasSubscribed = true;
             updateStatus("subscribed");
             clearFallback();
-            if (reconnecting && active) void runRefresh();
+            // Initial HTTP can race the subscription handshake and miss a join.
+            // Reconcile at every handoff, not only after reconnecting.
+            if (active) void runRefresh();
           } else if (
             normalized === "CHANNEL_ERROR" ||
             normalized === "TIMED_OUT" ||

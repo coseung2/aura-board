@@ -14,6 +14,7 @@ import {
 } from "@/lib/play-platform/shadow-session-board-cache";
 import { getBoardRole } from "@/lib/rbac";
 import type { ShadowAllianceSnapshot } from "@/lib/shadow-alliance/contracts";
+import { announcePlaySessionChange } from "@/lib/realtime-broadcast";
 import { createShadowAllianceNicknames } from "@/lib/shadow-alliance/nicknames";
 import { getCurrentStudent } from "@/lib/student-auth";
 
@@ -386,6 +387,9 @@ async function PATCHHandler(request: Request, { params }: Params) {
       typeof responseSnapshot.boardId === "string"
     ) {
       rememberShadowSessionBoard(responseSnapshot.id, responseSnapshot.boardId);
+      if (typeof responseSnapshot.version === "number") {
+        await announcePlaySessionChange(responseSnapshot.boardId, responseSnapshot.id, responseSnapshot.version, parsed.data.action !== "submit");
+      }
     }
     return jsonPrivateNoStore({
       ...body,

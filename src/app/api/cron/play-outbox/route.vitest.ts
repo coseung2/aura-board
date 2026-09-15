@@ -4,6 +4,7 @@ const mocks = vi.hoisted(() => ({
   authorized: vi.fn(),
   internalFetch: vi.fn(),
   publish: vi.fn(),
+  retire: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -16,7 +17,9 @@ vi.mock("@/lib/play-platform/server-client", () => ({
 }));
 vi.mock("@/lib/realtime-broadcast", () => ({
   publishPlaySessionInvalidation: mocks.publish,
+  announceGameHubChange: vi.fn().mockResolvedValue(undefined),
 }));
+vi.mock("@/lib/play-platform/omok-lobby-lifecycle", () => ({ retireFinishedOmokSession: mocks.retire }));
 vi.mock("@/lib/play-platform/route-utils", () => ({
   playRouteError: () => Response.json({ error: "internal_error" }, { status: 500 }),
 }));
@@ -39,6 +42,7 @@ describe("/api/cron/play-outbox", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.authorized.mockReturnValue(true);
+    mocks.retire.mockResolvedValue(false);
   });
 
   it("rejects unauthorized requests before claiming rows", async () => {
@@ -76,5 +80,14 @@ describe("/api/cron/play-outbox", () => {
       { body: { ids: ["event-1", "event-2"], lockToken: "lease-a" } },
     );
     expect(mocks.internalFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a failed terminal cleanup in the durable outbox for retry", async () => {
+    mocks.internalFetch.mockResolvedValue(Response.json({ events: [event("cleanup", "lease")] }));
+    mocks.retire.mockRejectedValueOnce(new Error("storage unavailable"));
+    const response = await GET(new Request("http://localhost/api/cron/play-outbox"));
+    expect(await response.json()).toEqual({ claimed: 1, delivered: 0, pendingRetry: 1 });
+    expect(mocks.publish).not.toHaveBeenCalled();
+    expect(mocks.internalFetch).toHaveBeenCalledTimes(1);
   });
 });

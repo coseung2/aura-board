@@ -225,6 +225,16 @@ async function listLobbyRooms(boardId: string, classroomId: string) {
     take: 30,
   });
   if (rooms.length === 0) return [];
+  // Reconcile durable completion for WebSocket matches too. A missing session
+  // during reservation is not a reason to delete an in-progress creation.
+  const sessionIds = rooms.flatMap((room) => room.status === "active" && room.sessionId ? [room.sessionId] : []);
+  const retired = new Set<string>();
+  if (sessionIds.length) {
+    const { retireFinishedOmokSession } = await import("@/lib/play-platform/omok-lobby-lifecycle");
+    for (const sessionId of sessionIds) {
+      if (await retireFinishedOmokSession(sessionId)) retired.add(sessionId);
+    }
+  }
   const hostIds = rooms.map((room) => room.hostStudentId);
   const [hosts, tickets] = await Promise.all([
     db.student.findMany({
@@ -246,6 +256,7 @@ async function listLobbyRooms(boardId: string, classroomId: string) {
   ]);
   const hostNames = new Map(hosts.map((host) => [host.id, host.name]));
   return rooms
+    .filter((room) => !room.sessionId || !retired.has(room.sessionId))
     .filter((room) => tickets.some((ticket) => ticket.lobbyRoomId === room.id))
     .map((room) => ({
       id: room.id,

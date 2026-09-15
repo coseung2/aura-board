@@ -386,6 +386,7 @@ export async function enrichSongGuessPlayEngineResponse(
       snapshot.boardId,
       snapshot.sessionId,
       snapshot.version,
+      !(isRecord(payload) && payload.result != null),
     );
   }
 

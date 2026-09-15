@@ -1,71 +1,29 @@
 import { getCurrentUser } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { OFFICIAL_GAME_KINDS, type OfficialGameKind } from "@/lib/game-platform/contracts";
+import { asRecord, combineHubStatus, OPEN_HUB_STATUS, playHubStatus, type HubStatus } from "@/lib/game-platform/hub-status";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { getCurrentStudent } from "@/lib/student-auth";
+import { gameHubChannelKey } from "@/lib/realtime";
+import { withProductFeature } from "@/lib/product-release-server";
+import { resolveSongGuessActorForBoard } from "@/lib/play-platform/actor";
+import { playEngineFetch } from "@/lib/play-platform/server-client";
+import type { Prisma } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type HubPhase = "open" | "waiting" | "active" | "paused" | "finished";
-
-type HubStatus = {
-  phase: HubPhase;
-  label: string;
-  playerCount: number;
+// Student-created rooms are intentionally non-current. The canonical teacher
+// session and student rooms must both be considered, but terminal history must not.
+const activeSessionWhere: Prisma.PlaySessionWhereInput = {
+  completedAtMs: null,
+  OR: [
+    { current: true },
+    { gameKind: "song-guess", state: { path: ["roomMode"], equals: "student-free" } },
+  ],
+  NOT: { state: { path: ["state", "phase"], equals: "finished" } },
 };
-
-type JsonRecord = Record<string, unknown>;
-
-function record(value: unknown): JsonRecord {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? (value as JsonRecord)
-    : {};
-}
-
-function playState(value: unknown): JsonRecord {
-  const aggregate = record(value);
-  return record(aggregate.state);
-}
-
-function joinedPlayerCount(value: unknown, fallback: number): number {
-  const aggregate = record(value);
-  const identities = Object.values(record(aggregate.participants));
-  if (identities.length === 0) return fallback;
-  return identities.filter((identity) => {
-    const joinedAt = record(identity).joinedAtMs;
-    return typeof joinedAt === "number" || typeof joinedAt === "string";
-  }).length;
-}
-
-function playStatus(kind: OfficialGameKind, session: { state: unknown; completedAtMs: bigint | null; participants: unknown[] }): HubStatus {
-  const state = playState(session.state);
-  const phase = String(state.phase ?? state.roomStatus ?? "");
-  const playerCount = kind === "omok"
-    ? session.participants.length
-    : joinedPlayerCount(session.state, session.participants.length);
-  if (session.completedAtMs != null || ["finished", "host-ended"].includes(phase)) {
-    return { phase: "finished", label: "종료됨", playerCount };
-  }
-  if (kind === "shadow-alliance" && state.pausedRemainingMs != null) {
-    return { phase: "paused", label: "이어하기", playerCount };
-  }
-  if (["active", "playing", "guessing", "revealing", "postround", "ready"].includes(phase)) {
-    return { phase: "active", label: "진행 중", playerCount };
-  }
-  return { phase: "waiting", label: "대기 중", playerCount };
-}
-
-function chooseStatus(current: HubStatus, candidate: HubStatus): HubStatus {
-  const priority: Record<HubPhase, number> = { active: 5, paused: 4, waiting: 3, finished: 2, open: 1 };
-  if (priority[candidate.phase] > priority[current.phase]) return candidate;
-  if (candidate.phase === current.phase) {
-    return { ...current, playerCount: current.playerCount + candidate.playerCount };
-  }
-  return current;
-}
-
-import { withProductFeature } from "@/lib/product-release-server";
+const sessionSelect = { state: true, completedAtMs: true } as const;
 
 export const GET = withProductFeature("play", GETHandler);
 async function GETHandler() {
@@ -76,115 +34,92 @@ async function GETHandler() {
   } else {
     const user = await getCurrentUser().catch(() => null);
     if (!user) return jsonPrivateNoStore({ error: "unauthorized" }, { status: 401 });
-    const classrooms = await db.classroom.findMany({
-      where: { teacherId: user.id },
-      select: { id: true },
-    });
-    classroomIds = classrooms.map((classroom) => classroom.id);
+    classroomIds = (await db.classroom.findMany({ where: { teacherId: user.id }, select: { id: true } })).map((c) => c.id);
   }
-
-  const statuses = Object.fromEntries(
-    OFFICIAL_GAME_KINDS.map((kind) => [
-      kind,
-      { phase: "open", label: "입장 가능", playerCount: 0 } satisfies HubStatus,
-    ]),
-  ) as Record<OfficialGameKind, HubStatus>;
-  if (classroomIds.length === 0) return jsonPrivateNoStore({ statuses });
-
+  const statuses = Object.fromEntries(OFFICIAL_GAME_KINDS.map((kind) => [kind, { ...OPEN_HUB_STATUS }])) as Record<OfficialGameKind, HubStatus>;
+  const channels = classroomIds.map(gameHubChannelKey);
+  if (classroomIds.length === 0) return jsonPrivateNoStore({ statuses, channels });
+  const now = Date.now();
+  let nextRefreshAtMs: number | null = null;
   const boards = await db.board.findMany({
-    where: {
-      classroomId: { in: classroomIds },
-      systemGameKind: { in: [...OFFICIAL_GAME_KINDS] },
-    },
+    where: { classroomId: { in: classroomIds }, systemGameKind: { in: [...OFFICIAL_GAME_KINDS] } },
     select: {
+      id: true,
       systemGameKind: true,
-      playSessions: {
-        where: { current: true },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: {
-          state: true,
-          completedAtMs: true,
-          participants: { select: { id: true } },
-        },
-      },
+      playSessions: { where: activeSessionWhere, select: sessionSelect },
       speedGameRuns: {
-        where: { current: true },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: {
-          status: true,
-          completedAt: true,
-          participants: { select: { joinedAt: true } },
-        },
+        where: { current: true, completedAt: null },
+        orderBy: { createdAt: "desc" }, take: 1,
+        select: { status: true, participants: { where: { joinedAt: { not: null }, forfeitedAt: null }, select: { studentId: true } } },
       },
       kordleGame: {
-        select: {
-          puzzles: {
-            orderBy: { updatedAt: "desc" },
-            take: 1,
-            select: { status: true, attempts: { select: { id: true } } },
-          },
-        },
+        select: { puzzles: { orderBy: { updatedAt: "desc" }, take: 1, select: { status: true, attempts: { where: { studentId: { not: null } }, select: { studentId: true } } } } },
       },
     },
   });
-
   for (const board of boards) {
-    const kind = board.systemGameKind as OfficialGameKind | null;
-    if (!kind || !OFFICIAL_GAME_KINDS.includes(kind)) continue;
-    let next: HubStatus | null = null;
-    const session = board.playSessions[0];
-    if (session) next = playStatus(kind, session);
+    const kind = board.systemGameKind as OfficialGameKind;
+    if (!OFFICIAL_GAME_KINDS.includes(kind)) continue;
+    let sessions = board.playSessions;
+    // Automatic rooms must finish even when every gameplay screen has closed.
+    // Ask the existing authority to catch up; never infer a terminal result locally.
+    if (kind === "song-guess" && sessions.some((s) => {
+      const due = asRecord(s.state).nextTransitionAtMs;
+      return typeof due === "number" && due <= now;
+    })) {
+      try {
+        const { actor } = await resolveSongGuessActorForBoard(board.id);
+        const response = await playEngineFetch(`/v1/boards/${encodeURIComponent(board.id)}/song-guess/sessions`, { actor });
+        if (!response.ok) throw new Error("song_rooms_unavailable");
+        await response.arrayBuffer();
+        sessions = await db.playSession.findMany({ where: { boardId: board.id, ...activeSessionWhere }, select: sessionSelect });
+      } catch {
+        statuses[kind] = { phase: "open", label: "상태 확인 필요", playerCount: 0 };
+        continue;
+      }
+    }
+    for (const session of sessions) {
+      statuses[kind] = combineHubStatus(statuses[kind], playHubStatus(kind, session.state, session.completedAtMs));
+      const due = asRecord(session.state).nextTransitionAtMs;
+      if (typeof due === "number" && due > now) nextRefreshAtMs = Math.min(nextRefreshAtMs ?? due, due);
+    }
     if (kind === "speed-game" && board.speedGameRuns[0]) {
       const run = board.speedGameRuns[0];
-      const playerCount = run.participants.filter((participant) => participant.joinedAt != null).length;
-      next = run.completedAt || run.status === "finished"
-        ? { phase: "finished", label: "종료됨", playerCount }
-        : run.status === "running"
-          ? { phase: "active", label: "진행 중", playerCount }
-          : { phase: "waiting", label: "대기 중", playerCount };
+      if (run.status !== "finished") statuses[kind] = combineHubStatus(statuses[kind], {
+        phase: run.status === "running" ? "active" : "waiting",
+        label: run.status === "running" ? "진행 중" : "대기 중",
+        playerCount: new Set(run.participants.map((p) => p.studentId)).size,
+      });
     }
     if (kind === "kordle" && board.kordleGame?.puzzles[0]) {
       const puzzle = board.kordleGame.puzzles[0];
-      next = puzzle.status === "LIVE"
-        ? { phase: "active", label: "진행 중", playerCount: puzzle.attempts.length }
-        : puzzle.status === "CLOSED" || puzzle.status === "ARCHIVED"
-          ? { phase: "finished", label: "종료됨", playerCount: puzzle.attempts.length }
-          : { phase: "waiting", label: "대기 중", playerCount: puzzle.attempts.length };
+      if (!["CLOSED", "ARCHIVED"].includes(puzzle.status)) statuses[kind] = combineHubStatus(statuses[kind], {
+        phase: puzzle.status === "LIVE" ? "active" : "waiting",
+        label: puzzle.status === "LIVE" ? "진행 중" : "시작 대기",
+        playerCount: new Set(puzzle.attempts.map((p) => p.studentId)).size,
+      });
     }
-    if (next) statuses[kind] = chooseStatus(statuses[kind], next);
   }
-
-  const omokTickets = await db.omokMatchTicket.findMany({
-    where: {
-      classroomId: { in: classroomIds },
-      OR: [
-        { status: "waiting", requestedAt: { gte: new Date(Date.now() - 30_000) } },
-        { status: "matched" },
-      ],
-    },
-    select: { status: true, matchBoardId: true },
+  const tickets = await db.omokMatchTicket.findMany({
+    where: { classroomId: { in: classroomIds }, OR: [
+      { status: "waiting", requestedAt: { gte: new Date(now - 30_000) } },
+      { status: "matched" },
+    ] },
+    select: { status: true, matchBoardId: true, studentId: true },
   });
-  const matchedBoardIds = omokTickets.flatMap((ticket) =>
-    ticket.status === "matched" && ticket.matchBoardId ? [ticket.matchBoardId] : [],
-  );
-  const liveMatches = matchedBoardIds.length > 0
-    ? await db.playSession.findMany({
-        where: { boardId: { in: matchedBoardIds }, current: true, completedAtMs: null },
-        select: { boardId: true },
-      })
-    : [];
-  const liveBoardIds = new Set(liveMatches.map((session) => session.boardId));
-  const waitingCount = omokTickets.filter((ticket) => ticket.status === "waiting").length;
-  const playingCount = omokTickets.filter(
-    (ticket) => ticket.status === "matched" && ticket.matchBoardId && liveBoardIds.has(ticket.matchBoardId),
-  ).length;
-  statuses.omok = playingCount > 0
-    ? { phase: "active", label: "대국 중", playerCount: playingCount + waitingCount }
-    : waitingCount > 0
-      ? { phase: "waiting", label: "매칭 중", playerCount: waitingCount }
-      : { phase: "open", label: "입장 가능", playerCount: 0 };
-
-  return jsonPrivateNoStore({ statuses });
+  const matchedIds = [...new Set(tickets.flatMap((t) => t.status === "matched" && t.matchBoardId ? [t.matchBoardId] : []))];
+  const matches = matchedIds.length ? await db.playSession.findMany({
+    where: { boardId: { in: matchedIds }, current: true, completedAtMs: null },
+    select: { boardId: true, state: true },
+  }) : [];
+  const liveIds = new Set(matches.filter((s) => {
+    const state = asRecord(asRecord(s.state).state);
+    return state.roomStatus !== "finished";
+  }).map((s) => s.boardId));
+  const waiting = tickets.filter((t) => t.status === "waiting");
+  const playing = tickets.filter((t) => t.status === "matched" && t.matchBoardId && liveIds.has(t.matchBoardId));
+  statuses.omok = playing.length ? { phase: "active", label: "대국 중", playerCount: new Set([...playing, ...waiting].map((t) => t.studentId)).size }
+    : waiting.length ? { phase: "waiting", label: "매칭 중", playerCount: new Set(waiting.map((t) => t.studentId)).size }
+      : { ...OPEN_HUB_STATUS };
+  return jsonPrivateNoStore({ statuses, channels, serverTimeMs: Date.now(), nextRefreshAtMs });
 }

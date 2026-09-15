@@ -3,6 +3,7 @@ import { getCurrentStudent } from "@/lib/student-auth";
 import { jsonPrivateNoStore } from "@/lib/http-cache";
 import { OFFICIAL_GAME_KINDS } from "@/lib/game-platform/contracts";
 import { resolveOrCreateCanonicalGameRoom } from "@/lib/game-platform/hub-room";
+import { announceGameHubClassroomChange } from "@/lib/realtime-broadcast";
 
 const entrySchema = z
   .object({
@@ -33,6 +34,7 @@ async function POSTHandler(request: Request) {
       parsed.data.gameKind,
       { allowCreate: ["omok", "song-guess"].includes(parsed.data.gameKind) },
     );
+    await announceGameHubClassroomChange(student.classroomId);
     return jsonPrivateNoStore({
       gameKind: parsed.data.gameKind,
       boardId: room.id,

@@ -5,6 +5,8 @@ import { publishPlaySessionInvalidation } from "@/lib/realtime-broadcast";
 import { PLAY_SESSION_CHANGED_EVENT } from "@/lib/realtime";
 import { playEngineInternalFetch } from "@/lib/play-platform/server-client";
 import { playRouteError } from "@/lib/play-platform/route-utils";
+import { retireFinishedOmokSession } from "@/lib/play-platform/omok-lobby-lifecycle";
+import { announceGameHubChange } from "@/lib/realtime-broadcast";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -39,6 +41,7 @@ async function consume(request: Request) {
     const failedIds: string[] = [];
     for (const event of claimed.events) {
       try {
+        await retireFinishedOmokSession(event.sessionId);
         await publishPlaySessionInvalidation({
           type: PLAY_SESSION_CHANGED_EVENT,
           eventId: event.id,
@@ -46,6 +49,7 @@ async function consume(request: Request) {
           boardId: event.boardId,
           version: event.version,
         });
+        await announceGameHubChange(event.boardId);
         const ids = successfulByLockToken.get(event.lockToken) ?? [];
         ids.push(event.id);
         successfulByLockToken.set(event.lockToken, ids);

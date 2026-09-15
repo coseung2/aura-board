@@ -1,6 +1,8 @@
 "use client";
 
 import { CirclePlay } from "lucide-react";
+import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
+import { boardChannelKey, PLAY_SESSION_CHANGED_EVENT } from "@/lib/realtime";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPlayRequestId } from "@/lib/play-platform/contracts";
 import {
@@ -68,10 +70,11 @@ export function SongGuessRooms({
 
   const reload = useCallback(async () => {
     try {
-      setRooms(await fetchSongGuessRooms(boardId));
+      setRooms((await fetchSongGuessRooms(boardId)).filter((room) => room.phase !== "finished"));
       setLoadError(null);
     } catch {
       setLoadError("방 목록을 불러오지 못했어요.");
+      throw new Error("song_guess_rooms_unavailable");
     } finally {
       setLoading(false);
     }
@@ -85,20 +88,24 @@ export function SongGuessRooms({
     }
   }, [boardId]);
 
+  useRealtimeInvalidation({
+    channelName: boardChannelKey(boardId),
+    event: PLAY_SESSION_CHANGED_EVENT,
+    refresh: reload,
+    initialRefresh: false,
+    fallbackPollMs: 10_000,
+  });
+
+  useEffect(() => { void reload().catch(() => undefined); }, [reload]);
+
   useEffect(() => {
-    void reload();
-    const tick = () => {
-      if (document.visibilityState === "visible") void reload();
-    };
-    window.addEventListener("focus", tick);
-    document.addEventListener("visibilitychange", tick);
-    const timer = window.setInterval(tick, 5000);
-    return () => {
-      window.removeEventListener("focus", tick);
-      document.removeEventListener("visibilitychange", tick);
-      window.clearInterval(timer);
-    };
-  }, [reload]);
+    const delays = rooms.flatMap((room) => room.nextTransitionAtMs == null ? [] : [Math.max(0, room.nextTransitionAtMs - room.serverTimeMs)]);
+    if (!delays.length) return;
+    const timer = window.setTimeout(() => {
+      if (!document.hidden) void reload().catch(() => undefined);
+    }, Math.min(...delays));
+    return () => window.clearTimeout(timer);
+  }, [rooms, reload]);
 
   useEffect(() => {
     void reloadCatalog();
@@ -139,7 +146,7 @@ export function SongGuessRooms({
   }
 
   function refreshAll() {
-    void reload();
+    void reload().catch(() => undefined);
     void reloadCatalog();
   }
 

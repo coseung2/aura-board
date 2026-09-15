@@ -346,8 +346,11 @@ impl PlayRepository for PostgresRepository {
         let mut record = lock_song_guess_session(&mut tx, session_id).await?;
         record.authorize(actor)?;
         if record.advance_due(now_ms)? {
-            sqlx::query(r#"UPDATE "PlaySession" SET "version" = $2, "state" = $3, "updatedAt" = NOW() WHERE "id" = $1 AND "gameKind" = 'song-guess'"#)
+            sqlx::query(r#"UPDATE "PlaySession" SET "version" = $2, "state" = $3,
+                "completedAtMs" = CASE WHEN $4 THEN COALESCE("completedAtMs", $5) ELSE "completedAtMs" END,
+                "updatedAt" = NOW() WHERE "id" = $1 AND "gameKind" = 'song-guess'"#)
                 .bind(session_id).bind(as_i64(record.version)?).bind(Json(&record))
+                .bind(record.state.phase == play_domain::song_guess::SongGuessPhase::Finished).bind(now_ms)
                 .execute(&mut *tx).await.map_err(storage)?;
             insert_song_guess_outbox(&mut tx, &record, "session_changed").await?;
         }
@@ -462,12 +465,16 @@ impl PlayRepository for PostgresRepository {
         };
         sqlx::query(
             r#"UPDATE "PlaySession"
-               SET "version" = $2, "state" = $3, "updatedAt" = NOW()
+               SET "version" = $2, "state" = $3,
+                   "completedAtMs" = CASE WHEN $4 THEN COALESCE("completedAtMs", $5) ELSE "completedAtMs" END,
+                   "updatedAt" = NOW()
                WHERE "id" = $1 AND "gameKind" = 'song-guess'"#,
         )
         .bind(session_id)
         .bind(as_i64(updated.version)?)
         .bind(Json(&updated))
+        .bind(updated.state.phase == play_domain::song_guess::SongGuessPhase::Finished)
+        .bind(now_ms)
         .execute(&mut *tx)
         .await
         .map_err(storage)?;

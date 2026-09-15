@@ -2,6 +2,8 @@ import "server-only";
 
 import type { PlayActor } from "./actor";
 import { signPlayActorAssertion } from "./actor";
+import { isPlayCommandResponse } from "./contracts";
+import { announcePlaySessionChange } from "../realtime-broadcast";
 
 const REQUEST_TIMEOUT_MS = 5_000;
 
@@ -72,7 +74,14 @@ export async function playEngineInternalFetch(
   });
 }
 
-export async function proxyPlayEngineResponse(response: Response): Promise<Response> {
+export async function proxyPlayEngineResponse(response: Response, options: { broadcastOnSuccess?: boolean } = {}): Promise<Response> {
+  if (response.ok && options.broadcastOnSuccess) {
+    const payload: unknown = await response.clone().json().catch(() => null);
+    if (isPlayCommandResponse(payload)) {
+      const snapshot = payload.snapshot;
+      await announcePlaySessionChange(snapshot.boardId, snapshot.sessionId, snapshot.version, snapshot.roomStatus !== "active");
+    }
+  }
   const body = await response.arrayBuffer();
   const headers = new Headers();
   headers.set("content-type", response.headers.get("content-type") ?? "application/json");
