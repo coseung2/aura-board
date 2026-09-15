@@ -20,7 +20,10 @@ for bounded specialist tasks. The project source of truth is the current code,
   truth, especially for save/publish flows, optimistic UI, production issues,
   and test fixture notes.
 
-## Local Commands
+## UX audit
+
+For user-facing UX review, simplification, or cleanup anywhere in Aura Board, load `.codex/skills/aura-ux-audit/SKILL.md` before changing code. The audit must trace the actual user journey, mutations, authoritative state, and synchronization path rather than only rendered components. Reuse the relevant product docs and `docs/verification-checklist.md`; never invent stable feature rules from current DB contents, fixtures, or incidental production data.
+
 ## Figma design governance
 
 Before any Figma task, read `docs/ai/global-figma-design-ops.md` and
