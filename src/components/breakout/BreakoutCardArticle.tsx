@@ -33,12 +33,17 @@ export function BreakoutCardArticle({
       tabIndex={0}
       role="button"
     >
-      <CardBody card={card} titleAs="h4" />
-      {canEdit && (
-        <div className="card-ctx-menu" onClick={(e) => e.stopPropagation()}>
-          <ContextMenu items={menuItems} />
-        </div>
-      )}
+      <CardBody
+        card={card}
+        titleAs="h4"
+        cardMenu={
+          canEdit ? (
+            <div className="card-ctx-menu" onClick={(e) => e.stopPropagation()}>
+              <ContextMenu items={menuItems} />
+            </div>
+          ) : null
+        }
+      />
     </article>
   );
 }

@@ -75,6 +75,40 @@ export function GridBoardCard({
         boardId={boardId}
         isStudentViewer={isStudentViewer}
         onEditAuthors={onEditAuthors}
+        cardMenu={
+          canModify ? (
+            <div
+              className="card-ctx-menu"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <ContextMenu
+                items={[
+                  {
+                    label: "수정",
+                    onClick: onEdit,
+                  },
+                  ...(canEdit && !!card.authorId && !card.studentAuthorId
+                    ? [
+                        {
+                          label: card.guidePinned ? "가이드 해제" : "가이드 고정",
+                          onClick: () => onToggleGuide(!card.guidePinned),
+                        },
+                      ]
+                    : []),
+                  {
+                    label: "복제",
+                    onClick: onDuplicate,
+                  },
+                  {
+                    label: "삭제",
+                    danger: true,
+                    onClick: onDelete,
+                  },
+                ]}
+              />
+            </div>
+          ) : null
+        }
       />
       {showAuraControl && (
         <AuraEvaluationControl
@@ -82,38 +116,6 @@ export function GridBoardCard({
           initialLevel={auraLevel}
           onSaved={onAuraSaved}
         />
-      )}
-      {canModify && (
-        <div
-          className="card-ctx-menu"
-          onClick={(event) => event.stopPropagation()}
-        >
-          <ContextMenu
-            items={[
-              {
-                label: "수정",
-                onClick: onEdit,
-              },
-              ...(canEdit && !!card.authorId && !card.studentAuthorId
-                ? [
-                    {
-                      label: card.guidePinned ? "가이드 해제" : "가이드 고정",
-                      onClick: () => onToggleGuide(!card.guidePinned),
-                    },
-                  ]
-                : []),
-              {
-                label: "복제",
-                onClick: onDuplicate,
-              },
-              {
-                label: "삭제",
-                danger: true,
-                onClick: onDelete,
-              },
-            ]}
-          />
-        </div>
       )}
     </article>
   );

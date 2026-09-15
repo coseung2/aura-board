@@ -471,12 +471,11 @@
     border-color 150ms ease,
     opacity 150ms ease;
   user-select: none;
-  /* overflow:hidden 의도적으로 미설정 — card-ctx-menu 드롭다운이
-     `position:absolute; top:100%`로 카드 아래로 나와야 하는데 hidden은
-     stacking context를 만들어 카드 내부로 가두어버림(메뉴 잘림 증상).
-     이미지/비디오/Canva 임베드 썸네일은 각 래퍼 클래스(.card-attach-image,
-     .card-attach-video, .card-canva-embed)에 개별 overflow:hidden이 이미
-     걸려 있어 border-radius 클립은 유지됨. */
+  /* overflow:hidden 의도적으로 미설정 — 카드 메뉴 드롭다운(portal +
+     position:fixed)과 카드 경계가 어긋나면 잘림 증상이 나므로 카드에는
+     클립을 걸지 않는다. 이미지/비디오/Canva 임베드 썸네일은 각 래퍼
+     클래스(.card-attach-image, .card-attach-video, .card-canva-embed)에
+     개별 overflow:hidden이 이미 걸려 있어 border-radius 클립은 유지됨. */
 }
 
 .column-card.is-drop-preview {
@@ -566,10 +565,6 @@
 
 .column-card:has(.card-attachments) .card-attachments {
   margin-top: 0;
-}
-
-.column-card:has(> .card-ctx-menu):has(.card-attachments) {
-  padding-top: 0;
 }
 
 .column-card .card-author-footer {

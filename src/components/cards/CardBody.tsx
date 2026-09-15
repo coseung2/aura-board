@@ -1,6 +1,6 @@
 "use client";
 
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, useState, type ReactNode } from "react";
 import { CardAttachments } from "../CardAttachments";
 import { CardAuthorFooter } from "./CardAuthorFooter";
 import { CanvaAttribution } from "../canva/CanvaAttribution";
@@ -64,6 +64,9 @@ type Props = {
   // Some surfaces (stream posts) already render author metadata in their own
   // header, but should still reuse CardBody for attachments/content.
   showAuthorFooter?: boolean;
+  // 카드별 메뉴(⋯) 토글. 작성자 줄 오른쪽 끝에 붙어야 하므로 호출처가
+  // 형제 엘리먼트로 두지 않고 이 슬롯으로 넘긴다.
+  cardMenu?: ReactNode;
   // engagement chips 렌더 여부. card.id 가 있을 때만 의미. 기본 true.
   showEngagement?: boolean;
   onEditAuthors?: () => void;
@@ -87,6 +90,7 @@ export const CardBody = memo(function CardBody({
   card,
   titleAs = "h3",
   showAuthorFooter = true,
+  cardMenu,
   showEngagement = true,
   onEditAuthors,
   attachmentsVariant = "thumbnail",
@@ -210,14 +214,16 @@ export const CardBody = memo(function CardBody({
           <span aria-hidden="true">{isExpanded ? "▴" : "▾"}</span>
         </button>
       )}
-      {showAuthorFooter && (
+      {(showAuthorFooter || cardMenu) && (
         <CardAuthorFooter
+          showMeta={showAuthorFooter}
           authors={card.authors}
           externalAuthorName={card.externalAuthorName}
           studentAuthorName={card.studentAuthorName}
           authorName={card.authorName}
           createdAt={card.createdAt}
           anonymousAuthor={card.anonymousAuthor}
+          menu={cardMenu}
         />
       )}
       {showEngagement && card.id ? (

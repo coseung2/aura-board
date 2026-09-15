@@ -378,10 +378,6 @@
   padding-top: 0;
   overflow: hidden;
 }
-.portfolio-card:has(> .card-ctx-menu):has(.card-attachments),
-.showcase-chip:has(> .card-ctx-menu):has(.card-attachments) {
-  padding-top: 0;
-}
 .portfolio-card:has(.card-attachments) .card-attachments,
 .showcase-chip:has(.card-attachments) .card-attachments {
   margin: 0 -18px 14px;

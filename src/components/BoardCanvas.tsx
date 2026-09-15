@@ -341,6 +341,51 @@ export function BoardCanvas({
                   ? () => setAuthorEditCard(c)
                   : undefined
               }
+              cardMenu={
+                currentRole === "owner" ||
+                (currentRole === "editor" && c.authorId === currentUserId) ||
+                c.studentAuthorId === currentUserId ? (
+                  <div
+                    className="card-ctx-menu"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <ContextMenu
+                      items={[
+                        {
+                          label: "수정",
+                          onClick: () => setEditingCard(c),
+                        },
+                        ...(canEdit && !!c.authorId && !c.studentAuthorId
+                          ? [
+                              {
+                                label: c.guidePinned
+                                  ? "가이드 해제"
+                                  : "가이드 고정",
+                                onClick: () =>
+                                  handleToggleGuide(c, !c.guidePinned),
+                              },
+                            ]
+                          : []),
+                        {
+                          label: "복제",
+                          onClick: () => handleDuplicate(c),
+                        },
+                        {
+                          label: "삭제",
+                          danger: true,
+                          onClick: () => {
+                            if (
+                              window.confirm(`"${c.title}" 카드를 삭제할까요?`)
+                            ) {
+                              handleDelete(c.id);
+                            }
+                          },
+                        },
+                      ]}
+                    />
+                  </div>
+                ) : null
+              }
             />
             {showAuraControl && (
               <AuraEvaluationControl
@@ -348,46 +393,6 @@ export function BoardCanvas({
                 initialLevel={auraLevels[c.id] ?? null}
                 onSaved={(level) => handleAuraSaved(c.id, level)}
               />
-            )}
-            {(currentRole === "owner" ||
-              (currentRole === "editor" && c.authorId === currentUserId) ||
-              c.studentAuthorId === currentUserId) && (
-              <div
-                className="card-ctx-menu"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <ContextMenu
-                  items={[
-                    {
-                      label: "수정",
-                      onClick: () => setEditingCard(c),
-                    },
-                    ...(canEdit && !!c.authorId && !c.studentAuthorId
-                      ? [
-                          {
-                            label: c.guidePinned
-                              ? "가이드 해제"
-                              : "가이드 고정",
-                            onClick: () => handleToggleGuide(c, !c.guidePinned),
-                          },
-                        ]
-                      : []),
-                    {
-                      label: "복제",
-                      onClick: () => handleDuplicate(c),
-                    },
-                    {
-                      label: "삭제",
-                      danger: true,
-                      onClick: () => {
-                        if (window.confirm(`"${c.title}" 카드를 삭제할까요?`)) {
-                          handleDelete(c.id);
-                        }
-                      },
-                    },
-                  ]}
-                />
-              </div>
             )}
           </article>
         ))}

@@ -66,59 +66,27 @@
   background: #000;
 }
 
-/* Card context menu positioning — always visible on touch devices
-   (no hover signal there), hover-reveal on pointer-fine devices so
-   desktop cards keep their cleaner default state. */
+/* Card context menu — 작성자 줄(.card-author-footer) 오른쪽 끝에 붙는다.
+   예전에는 카드 우상단(top:8px/right:8px) 절대 배치라 첨부 이미지·타이틀
+   위를 덮었고, 그래서 카드마다 상단 클리어런스(padding-top)와
+   mix-blend-mode 색 반전 보정이 따라붙었다. 이제 작성자 줄의 일반 흐름
+   안이라 그 보정이 모두 필요 없다. */
 .card-ctx-menu {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  display: block;
+  display: flex;
+  justify-content: flex-end;
 }
 
-.column-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger,
-.grid-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger,
-.stream-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger,
-.padlet-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger {
-  background: transparent;
-  color: #fff;
-  mix-blend-mode: difference;
-  text-shadow: none;
+.card-author-footer > .card-ctx-menu {
+  margin-left: auto;
+  flex: 0 0 auto;
 }
 
-.column-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger:hover,
-.column-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger:focus-visible,
-.column-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger[aria-expanded="true"],
-.grid-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger:hover,
-.grid-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger:focus-visible,
-.grid-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger[aria-expanded="true"],
-.stream-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger:hover,
-.stream-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger:focus-visible,
-.stream-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger[aria-expanded="true"],
-.padlet-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger:hover,
-.padlet-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger:focus-visible,
-.padlet-card:has(.card-attachments) > .card-ctx-menu .ctx-menu-trigger[aria-expanded="true"] {
-  background: transparent;
-  color: #fff;
-}
-
-/* ⋯ 토글이 있는 카드는 상단에 여유 — 28×28 트리거가 top:8 에 절대 위치라
-   기본 padding-top(14~20px) 으로는 첨부 이미지/타이틀 우상단이 토글과
-   겹친다. :has() 로 토글이 실제로 렌더된 카드에만 적용 → 읽기전용 뷰엔
-   영향 X. 터치 디바이스는 트리거가 --tap-min(≥44px) 라 더 큰 클리어런스. */
-.column-card:has(> .card-ctx-menu),
-.grid-card:has(> .card-ctx-menu),
-.stream-card:has(> .card-ctx-menu),
-.padlet-card:has(> .card-ctx-menu) {
-  padding-top: 12px;
-}
-@media (pointer: coarse) {
-  .column-card:has(> .card-ctx-menu),
-  .grid-card:has(> .card-ctx-menu),
-  .stream-card:has(> .card-ctx-menu),
-  .padlet-card:has(> .card-ctx-menu) {
-    padding-top: 12px;
-  }
+/* 작성자·시간 없이 메뉴만 있는 카드 — 구분선 없이 토글만 오른쪽에. */
+.card-author-footer.is-menu-only {
+  justify-content: flex-end;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
 }
 
 @media (hover: hover) {

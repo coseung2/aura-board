@@ -628,46 +628,48 @@ export function ColumnView(props: Props) {
                           ? () => onCardEditAuthors(c)
                           : undefined
                       }
+                      cardMenu={
+                        canModify ? (
+                          <div
+                            className="card-ctx-menu"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <ContextMenu
+                              items={[
+                                {
+                                  label: "수정",
+                                  icon: "✏️",
+                                  onClick: () => onCardEdit(c),
+                                },
+                                ...(canEdit && !!c.authorId && !c.studentAuthorId
+                                  ? [
+                                      {
+                                        label: c.guidePinned
+                                          ? "가이드 해제"
+                                          : "가이드 고정",
+                                        icon: "📌",
+                                        onClick: () =>
+                                          onCardToggleGuide(c, !c.guidePinned),
+                                      },
+                                    ]
+                                  : []),
+                                {
+                                  label: "복제",
+                                  icon: "📋",
+                                  onClick: () => onCardDuplicate(c),
+                                },
+                                {
+                                  label: "삭제",
+                                  icon: "🗑️",
+                                  danger: true,
+                                  onClick: () => onCardDelete(c.id),
+                                },
+                              ]}
+                            />
+                          </div>
+                        ) : null
+                      }
                     />
-                    {canModify && (
-                      <div
-                        className="card-ctx-menu"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <ContextMenu
-                          items={[
-                            {
-                              label: "수정",
-                              icon: "✏️",
-                              onClick: () => onCardEdit(c),
-                            },
-                            ...(canEdit && !!c.authorId && !c.studentAuthorId
-                              ? [
-                                  {
-                                    label: c.guidePinned
-                                      ? "가이드 해제"
-                                      : "가이드 고정",
-                                    icon: "📌",
-                                    onClick: () =>
-                                      onCardToggleGuide(c, !c.guidePinned),
-                                  },
-                                ]
-                              : []),
-                            {
-                              label: "복제",
-                              icon: "📋",
-                              onClick: () => onCardDuplicate(c),
-                            },
-                            {
-                              label: "삭제",
-                              icon: "🗑️",
-                              danger: true,
-                              onClick: () => onCardDelete(c.id),
-                            },
-                          ]}
-                        />
-                      </div>
-                    )}
                   </article>
                   <div
                     className="column-card-drop-placeholder"
