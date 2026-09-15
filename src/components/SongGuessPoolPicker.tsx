@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import type {
   SongGuessCatalogCategory,
   SongGuessCatalogSegment,
@@ -9,6 +9,7 @@ import type {
 import type { SongGuessTeacherSetup } from "@/lib/song-guess/contracts";
 import { estimateSongGuessDuration } from "@/lib/song-guess/setup-estimate";
 import styles from "./SongGuessTeacher.module.css";
+import { messageForError } from "./song-guess-board-utils";
 
 const SEGMENT_OPTIONS: { value: SongGuessCatalogSegment; label: string }[] = [
   { value: "highlight", label: "하이라이트" },
@@ -26,12 +27,14 @@ export function SongGuessPoolPicker({
   onPrepared,
   onPreparingChange,
   onSetupLocked,
+  children,
 }: {
   boardId: string;
   busy: boolean;
   onPrepared: (setup: SongGuessTeacherSetup) => void | Promise<void>;
   onPreparingChange?: (preparing: boolean) => void;
   onSetupLocked?: () => void;
+  children?: ReactNode;
 }) {
   const [catalog, setCatalog] = useState<SongGuessCatalogSummary | null>(null);
   const [categories, setCategories] = useState<SongGuessCatalogCategory[]>([]);
@@ -42,6 +45,8 @@ export function SongGuessPoolPicker({
   const [error, setError] = useState<string | null>(null);
   const [setupLocked, setSetupLocked] = useState(false);
   const [retry, setRetry] = useState(0);
+  const prepared = useRef<{ key: string; setup: SongGuessTeacherSetup } | null>(null);
+  const inFlight = useRef(false);
   const endpoint = `/api/song-guess/boards/${encodeURIComponent(boardId)}/catalog`;
 
   useEffect(() => {
@@ -89,36 +94,38 @@ export function SongGuessPoolPicker({
     .filter((value) => value > 0 && value <= available.length)
     .sort((left, right) => left - right);
   const disabled = busy || preparing;
-  const totalPoolSize = catalog?.songs.length ?? 0;
-  const poolRatio =
-    totalPoolSize === 0
-      ? 0
-      : Math.max(2, Math.round((available.length / totalPoolSize) * 100));
   const estimate = estimateSongGuessDuration(roundCount);
 
   async function prepare() {
-    if (disabled || roundCount < 1) return;
+    if (disabled || roundCount < 1 || inFlight.current) return;
+    inFlight.current = true;
     setPreparing(true);
     onPreparingChange?.(true);
     setError(null);
     setSetupLocked(false);
     try {
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ categories, segment, count: roundCount }),
-      });
-      const body = await response.json();
-      if (!response.ok) throw new Error(body.error ?? "prepare_failed");
-      await onPrepared(body.setup as SongGuessTeacherSetup);
+      const key = JSON.stringify({ categories: [...categories].sort(), segment, count: roundCount });
+      if (prepared.current?.key !== key) {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ categories, segment, count: roundCount }),
+        });
+        const body = await response.json();
+        if (!response.ok) throw new Error(body.error ?? "prepare_failed");
+        prepared.current = { key, setup: body.setup as SongGuessTeacherSetup };
+      }
+      await onPrepared(prepared.current.setup);
     } catch (cause) {
       if (cause instanceof Error && cause.message === "song_guess_setup_locked") {
         setSetupLocked(true);
         setError("진행 중인 노래 맞히기 게임이 있어 새 문제를 준비할 수 없어요. 방 목록에서 기존 게임을 끝낸 뒤 다시 준비해 주세요.");
       } else {
-        setError("노래를 준비하지 못했어요.");
+        if (cause instanceof Error && cause.message === "song_guess_setup_changed") prepared.current = null;
+        setError(messageForError(cause));
       }
     } finally {
+      inFlight.current = false;
       setPreparing(false);
       onPreparingChange?.(false);
     }
@@ -134,7 +141,7 @@ export function SongGuessPoolPicker({
 
   return (
     <section className={styles.setupCard} aria-label="노래 선택">
-      <h2>노래 선택</h2>
+      <h2>게임 만들기</h2>
       {loading ? (
         <div className={styles.setupLoading} role="status">
           노래 풀을 불러오는 중이에요…
@@ -144,7 +151,7 @@ export function SongGuessPoolPicker({
           <>
             <fieldset className={styles.categoryFieldset} disabled={disabled}>
               <legend className={styles.categoryLegendRow}>
-                <strong>1 · 노래 분류</strong>
+                <strong>카테고리</strong>
                 <span>복수 선택 가능</span>
               </legend>
               <div className={styles.categoryGrid}>
@@ -185,7 +192,7 @@ export function SongGuessPoolPicker({
 
             <div className={styles.setupControls}>
               <fieldset className={styles.choiceFieldset} disabled={disabled}>
-                <legend className={styles.setupLabel}>2 · 듣기 구간</legend>
+                <legend className={styles.setupLabel}>듣기 구간</legend>
                 <div className={styles.choiceRow}>
                   {SEGMENT_OPTIONS.map((option) => (
                     <button
@@ -205,7 +212,7 @@ export function SongGuessPoolPicker({
                 className={styles.choiceFieldset}
                 disabled={disabled || available.length === 0}
               >
-                <legend className={styles.setupLabel}>3 · 문제 수</legend>
+                <legend className={styles.setupLabel}>문제 수</legend>
                 <div className={styles.choiceRow}>
                   {countOptions.length === 0 ? (
                     <span className={styles.choiceHint}>선택한 조건에 맞는 곡이 없어요.</span>
@@ -226,38 +233,18 @@ export function SongGuessPoolPicker({
               </fieldset>
             </div>
 
-            <div className={styles.poolSummary}>
-              <div className={styles.poolSummaryHead}>
-                <span className={styles.setupLabel}>선택 조건에서 출제 가능한 곡</span>
-                <strong className={styles.poolTotal}>
-                  {available.length === 0 ? "0곡" : `${available.length}곡`}
-                </strong>
-              </div>
-              <div
-                className={styles.poolTrack}
-                role="img"
-                aria-label={`전체 ${totalPoolSize}곡 중 조건에 맞는 ${available.length}곡`}
-              >
-                <span className={styles.poolFill} style={{ inlineSize: `${poolRatio}%` }} />
-              </div>
-              {estimate && (
-                <p className={styles.poolEstimate}>
-                  예상 진행 <strong>{estimate.label}</strong>
-                  <span>{`곡 풀 ${available.length}곡에서 ${roundCount}문제 무작위 구성`}</span>
-                </p>
-              )}
-            </div>
+            {children}
+            <p className={styles.poolEstimate}>
+              {available.length}곡 중 {roundCount}문제{estimate ? ` · 예상 ${estimate.label}` : ""}
+            </p>
             <div className={styles.setupActions}>
-              <span className={styles.poolCount}>
-                {available.length === 0 ? "등록된 곡 없음" : `곡 풀 ${available.length}곡`}
-              </span>
               <button
                 className={styles.prepareButton}
                 type="button"
                 disabled={disabled || roundCount === 0}
                 onClick={() => void prepare()}
               >
-                {preparing ? "노래 준비 중…" : `${roundCount}문제 준비하기`}
+                {preparing ? "게임 만드는 중…" : "게임 만들기"}
               </button>
             </div>
           </>
@@ -268,7 +255,7 @@ export function SongGuessPoolPicker({
           <p className={styles.setupError} role="alert">
             {error}
           </p>
-          <button
+          {(setupLocked || !catalog) && <button
             className={styles.retryButton}
             type="button"
             disabled={disabled}
@@ -280,8 +267,8 @@ export function SongGuessPoolPicker({
               setRetry((current) => current + 1);
             }}
           >
-            {setupLocked && onSetupLocked ? "방 목록으로 돌아가기" : "다시 확인"}
-          </button>
+            {setupLocked && onSetupLocked ? "방 목록으로 돌아가기" : "다시 시도"}
+          </button>}
         </>
       )}
     </section>

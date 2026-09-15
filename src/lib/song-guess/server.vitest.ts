@@ -204,6 +204,7 @@ describe("song-guess gated clip retrieval", () => {
     ]);
     const request = await buildSongGuessCreateRequest("board-1", "request-1", undefined, mode);
     expect(request.rounds).toHaveLength(1);
+    expect(request.openLobby).toBe(true);
     if (mode === "multiple-choice") {
       expect(request.rounds[0].choices?.map((choice) => choice.label).sort()).toEqual(["달리반피카소", "밤편지", "봄날", "좋은 날"].sort());
       expect(mocks.catalogFindMany).toHaveBeenCalledOnce();
@@ -237,6 +238,14 @@ describe("song-guess gated clip retrieval", () => {
     if (target !== "title") expect(round.aliases).not.toContain("Through the Night");
     if (target === "artist") expect(round.choices?.map((choice) => choice.label).sort()).toEqual(["아이유", "방탄소년단", "레드벨벳", "트와이스"].sort());
     expect(round.choices?.some((choice) => /쇼팽|피아노 협주곡/.test(choice.label))).toBe(false);
+  });
+
+  it("rejects a setup replaced by another screen instead of creating the wrong questions", async () => {
+    mocks.loadSongGuessTeacherBoard.mockResolvedValue({ actor: { userId: "teacher-1" } });
+    mocks.songGuessGameFindUnique.mockResolvedValue({ rounds: [{ id: "replaced-round" }] });
+    await expect(buildSongGuessCreateRequest("board-1", "request-1", undefined, "text", "title", ["selected-round"]))
+      .rejects.toMatchObject({ status: 409, code: "song_guess_setup_changed" });
+    expect(mocks.resolveSongGuessParticipantSeeds).not.toHaveBeenCalled();
   });
 
   it("rejects a legacy video-only setup before starting a session", async () => {

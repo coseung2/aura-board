@@ -1,4 +1,4 @@
-import { ArrowLeft, LogOut, X } from "lucide-react-native";
+import { ArrowLeft, LogOut, Volume2, VolumeX, X } from "lucide-react-native";
 import { StyleSheet, View } from "react-native";
 import { iconSizes, radii, spacing } from "../../theme/tokens";
 import { songGuessStudentTheme as song } from "../../theme/song-guess";
@@ -14,6 +14,9 @@ type Props = {
   exitLabel: string;
   onExit: () => void;
   disabled?: boolean;
+  roundAudioActive?: boolean;
+  muted?: boolean;
+  onToggleMute?: () => void;
 };
 
 /** Compact top-right controls for the song-guess lobby and rounds. The room
@@ -25,14 +28,20 @@ export function SongGuessHeaderActions({
   exitLabel,
   onExit,
   disabled = false,
+  roundAudioActive = false,
+  muted = false,
+  onToggleMute,
 }: Props) {
   return (
     <View style={styles.row}>
-      <LobbyBackgroundMusic
-        active={musicActive}
-        iconOnly
-        iconTone={{ on: song.accent, off: song.muted }}
-      />
+      {roundAudioActive && onToggleMute ? (
+        <IconButton accessibilityLabel={muted ? "소리 켜기" : "음소거"} onPress={onToggleMute}>
+          {muted ? <VolumeX size={iconSizes.md} color={song.muted} accessible={false} />
+            : <Volume2 size={iconSizes.md} color={song.accent} accessible={false} />}
+        </IconButton>
+      ) : musicActive ? (
+        <LobbyBackgroundMusic active iconOnly iconTone={{ on: song.accent, off: song.muted }} />
+      ) : null}
       <IconButton
         accessibilityLabel={exitLabel}
         disabled={disabled}

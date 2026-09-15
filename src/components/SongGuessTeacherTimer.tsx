@@ -5,13 +5,14 @@ export function SongGuessTeacherTimer({
   roundDurationSeconds,
 }: {
   remainingSeconds: number | null;
-  roundDurationSeconds: number;
+  roundDurationSeconds: number | null;
 }) {
+  if (remainingSeconds === null) return null;
   const progress = Math.max(
     0,
     Math.min(
       1,
-      (remainingSeconds ?? 0) / Math.max(1, roundDurationSeconds),
+      remainingSeconds / Math.max(1, roundDurationSeconds ?? remainingSeconds),
     ),
   );
 
@@ -22,12 +23,12 @@ export function SongGuessTeacherTimer({
         {remainingSeconds === null ? "—" : Math.max(0, remainingSeconds)}
       </strong>
       <span className={teacherStyles.timerUnit}>초</span>
-      <div className={teacherStyles.timerTrack} aria-hidden="true">
+      {roundDurationSeconds !== null && <div className={teacherStyles.timerTrack} aria-hidden="true">
         <div
           className={teacherStyles.timerFill}
           style={{ width: `${progress * 100}%` }}
         />
-      </div>
+      </div>}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import { useAudioPlayer } from "expo-audio";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,7 +22,6 @@ import {
   clearPendingSongGuessCommand,
   fetchSongGuessSnapshot,
   loadPendingSongGuessCommand,
-  loadSongGuessAudioSource,
   messageForError,
   monotonicNow,
   phaseLabel,
@@ -40,7 +39,7 @@ import { SongGuessScoreboard } from "../song-guess/SongGuessScoreboard";
 import { SongGuessLobbyStatus } from "../song-guess/SongGuessLobbyStatus";
 import { SongGuessAnswer } from "../song-guess/SongGuessAnswer";
 import { SongGuessHeaderActions } from "../song-guess/song-guess-header-actions";
-import { SongGuessPlayerCard } from "../song-guess/SongGuessPlayerCard";
+import { useSongGuessRoundAudio } from "../song-guess/use-song-guess-round-audio";
 import { songGuessBoardStyles as styles } from "../song-guess/songGuessBoardStyles";
 import { songGuessRoomsStyles as stateStyles } from "../song-guess/songGuessRoomsStyles";
 import { AppButton } from "../ui";
@@ -53,9 +52,8 @@ type SongGuessSound =
   | "round-results"
   | "start"
   | "wrong";
-/** Cues that mark a phase change stop the round clip; answer feedback plays
- * over it so a right/wrong ding never cuts the song off. */
-const CLIP_STOPPING_SOUNDS: SongGuessSound[] = ["start", "round-results", "podium"];
+/** Result cues replace the round clip, never interrupt its start. */
+const CLIP_STOPPING_SOUNDS: SongGuessSound[] = ["round-results", "podium"];
 export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const boardId = data.board.id;
   const [snapshot, setSnapshot] = useState<SongGuessSnapshot | null>(null);
@@ -70,19 +68,12 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const [pendingChoiceId, setPendingChoiceId] = useState<string | null>(null);
   const [hasPending, setHasPending] = useState(false);
   const [failedJoinSessionId, setFailedJoinSessionId] = useState<string | null>(null);
-  const [audioPreparing, setAudioPreparing] = useState(false);
-  const [audioError, setAudioError] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const sequenceRef = useRef(0);
   const retriedRef = useRef<string | null>(null);
   const autoJoinedSessionRef = useRef<string | null>(null);
   const pendingRequestIdRef = useRef<string | null>(null);
-  const autoPlayedClipRef = useRef<string | null>(null);
-  const player = useAudioPlayer(null, {
-    downloadFirst: true,
-    updateInterval: 100,
-  });
-  const playerStatus = useAudioPlayerStatus(player);
+  const { player, preparing: audioPreparing, error: audioError, playing: audioPlaying, retry: retryAudio } = useSongGuessRoundAudio(snapshot, muted);
   const soundPlayer = useAudioPlayer(null, { downloadFirst: true });
   const phaseSoundKeyRef = useRef<string | null>(null);
   const appStateRef = useRef(AppState.currentState);
@@ -100,10 +91,8 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     [muted, player, soundPlayer],
   );
 
-  useEffect(() => {
-    player.muted = muted;
-    soundPlayer.muted = muted;
-  }, [muted, player, soundPlayer]);
+  useEffect(() => { soundPlayer.muted = muted; }, [muted, soundPlayer]);
+  useEffect(() => { if (audioPlaying) soundPlayer.pause(); }, [audioPlaying, soundPlayer]);
 
   useEffect(
     () => () => {
@@ -333,44 +322,6 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
 
   const clip =
     snapshot?.phase === "guessing" ? snapshot.currentRound.currentClip : null;
-  useEffect(() => {
-    let active = true;
-    try {
-      player.pause();
-    } catch {}
-    setAudioError(null);
-    if (!snapshot || !clip) {
-      setAudioPreparing(false);
-      return () => {
-        active = false;
-      };
-    }
-    if (clip.mimeType === "video/youtube") {
-      setAudioPreparing(false);
-      setAudioError("음원 파일이 없는 문제예요.");
-      return () => {
-        active = false;
-      };
-    }
-    setAudioPreparing(true);
-    void loadSongGuessAudioSource(snapshot.sessionId, clip.assetId)
-      .then((source) => {
-        if (!active || !source) return;
-        player.replace(source);
-      })
-      .catch(() => {
-        if (active) setAudioError("음원을 불러오지 못했어요.");
-      })
-      .finally(() => {
-        if (active) setAudioPreparing(false);
-      });
-    return () => {
-      active = false;
-      try {
-        player.pause();
-      } catch {}
-    };
-  }, [clip?.assetId, clip?.mimeType, player, snapshot?.sessionId]);
 
   useEffect(() => {
     if (!snapshot) return;
@@ -427,48 +378,6 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     snapshotClockKey,
   ]);
 
-  const playClip = useCallback(async () => {
-    if (
-      !clip ||
-      clip.mimeType === "video/youtube" ||
-      audioPreparing ||
-      !playerStatus.isLoaded
-    )
-      return;
-    try {
-      if (
-        playerStatus.currentTime >= Math.max(0, playerStatus.duration - 0.05)
-      ) {
-        await player.seekTo(0);
-      }
-      player.play();
-      setAudioError(null);
-    } catch {
-      setAudioError("재생을 시작하지 못했어요.");
-    }
-  }, [
-    audioPreparing,
-    clip,
-    player,
-    playerStatus.currentTime,
-    playerStatus.duration,
-    playerStatus.isLoaded,
-  ]);
-
-  /** A round starts on its own, so the first clip has to play on its own too.
-   * Students can still pause or replay from the player card. */
-  useEffect(() => {
-    if (!clip || clip.mimeType === "video/youtube") return;
-    if (snapshot?.phase !== "guessing") return;
-    if (!playerStatus.isLoaded || audioPreparing || audioError) return;
-    if (autoPlayedClipRef.current === clip.assetId) return;
-    autoPlayedClipRef.current = clip.assetId;
-    try {
-      player.play();
-    } catch {
-      setAudioError("재생을 시작하지 못했어요.");
-    }
-  }, [audioError, audioPreparing, clip, player, playerStatus.isLoaded, snapshot?.phase]);
 
   /** Only the room host can end the room, and the engine rejects a host
    * `leave`, so the host's exit always finishes. Guests get a plain leave. */
@@ -592,10 +501,6 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     !(snapshot.answerMode === "multiple-choice" &&
       (snapshot.viewer.answeredCurrentRound || snapshot.viewer.selectedChoiceId != null)) &&
     !deadlineReached;
-  const progress =
-    playerStatus.duration > 0
-      ? Math.min(1, playerStatus.currentTime / playerStatus.duration)
-      : 0;
   const entryFailed =
     failedJoinSessionId === snapshot.sessionId &&
     snapshot.viewer.joined === false &&
@@ -609,8 +514,8 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       : "노래 제목";
   const roundDurationSeconds = snapshot.currentRound.deadlineAtMs != null && snapshot.currentRound.startedAtMs != null
     ? Math.max(1, (snapshot.currentRound.deadlineAtMs - snapshot.currentRound.startedAtMs) / 1000)
-    : 30;
-  const roundTimerProgress = remainingSeconds === null
+    : null;
+  const roundTimerProgress = remainingSeconds === null || roundDurationSeconds === null
     ? 0
     : Math.max(0, Math.min(1, remainingSeconds / roundDurationSeconds));
   const ownParticipant = snapshot.viewer.participantIndex == null
@@ -630,6 +535,9 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         exitLabel={snapshot.phase === "finished" ? "방 목록" : viewerFinishesRoom ? "게임 끝내기" : "방 나가기"}
         disabled={busy || hasPending}
         onExit={exitRoom}
+        roundAudioActive={snapshot.phase === "guessing"}
+        muted={muted}
+        onToggleMute={() => setMuted((value) => !value)}
       />
       {snapshot.viewer.canStart && snapshot.phase === "lobby" ? <AppButton disabled={busy || hasPending} onPress={() => void executePending({ sessionId: snapshot.sessionId, request: makeSongGuessCommand(snapshot, { type: "start" }) })}>음악 퀴즈 시작</AppButton> : null}
       <View style={styles.phaseRow} accessibilityLiveRegion="polite">
@@ -660,7 +568,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         />
       ) : null}
 
-      {snapshot.phase === "guessing" ? (
+      {snapshot.phase === "guessing" && roundDurationSeconds !== null ? (
         <View
           style={styles.roundTimerTrack}
           accessibilityRole="progressbar"
@@ -671,49 +579,20 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         </View>
       ) : null}
 
-      {snapshot.phase === "guessing" && clip?.mimeType === "video/youtube" ? (
-        <View style={styles.playerCard} accessibilityLiveRegion="polite">
-          <Text style={styles.questionText}>{`이 노래의 ${answerPrompt}은?`}</Text>
-          <Text style={styles.playerError} accessibilityRole="alert">
-            음원 파일이 없는 문제예요.
-          </Text>
-        </View>
-      ) : null}
+      {snapshot.phase === "guessing" && <Text style={styles.questionText}>{`이 노래의 ${answerPrompt}은?`}</Text>}
+      {snapshot.phase === "guessing" && !clip && <Text style={styles.playerError} accessibilityRole="alert">음원 파일이 없는 문제예요.</Text>}
 
-      {snapshot.phase === "guessing" && clip && clip.mimeType !== "video/youtube" ? (
-        <SongGuessPlayerCard
-          clip={clip}
-          answerPrompt={answerPrompt}
-          muted={muted}
-          loaded={playerStatus.isLoaded}
-          playing={playerStatus.playing}
-          preparing={audioPreparing}
-          failed={!!audioError}
-          currentTime={playerStatus.currentTime}
-          progress={progress}
-          onPlay={() => void playClip()}
-          onPause={() => player.pause()}
-          onToggleMute={() => setMuted((value) => !value)}
-        />
-      ) : null}
-
-      {snapshot.phase === "guessing" && audioError ? (
-        <View style={styles.audioErrorCard} accessibilityRole="alert">
-          <Text style={styles.audioErrorTitle}>노래를 재생할 수 없어요</Text>
-          <Text style={styles.audioErrorBody}>
-            {snapshot.currentRound.accessibilityClue
-              ? "볼륨과 무음 모드를 확인해 주세요. 소리 없이도 힌트로 답을 고를 수 있어요."
-              : "볼륨과 무음 모드를 확인한 뒤 다시 재생해 주세요."}
-          </Text>
+      {snapshot.phase === "guessing" && audioError && !deadlineReached ? (
+        <View accessibilityRole="alert">
           <Text style={styles.playerError}>{audioError}</Text>
-          <AppButton
+          {clip?.mimeType.startsWith("audio/") && <AppButton
             variant="secondary"
             style={styles.actionButton}
             textStyle={styles.actionButtonText}
-            onPress={() => void playClip()}
-          >
-            다시 재생
-          </AppButton>
+            loading={audioPreparing}
+            disabled={audioPreparing}
+            onPress={retryAudio}
+          >다시 재생</AppButton>}
         </View>
       ) : null}
 

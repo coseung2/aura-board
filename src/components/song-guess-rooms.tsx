@@ -55,7 +55,7 @@ export function SongGuessRooms({
   boardId: string;
   teacher: boolean;
   onSelect: (id: string) => void;
-  onTeacherSetup: () => void;
+  onTeacherSetup: (custom?: boolean) => void;
 }) {
   const [rooms, setRooms] = useState<SongGuessSnapshot[]>([]);
   const [catalog, setCatalog] = useState<SongGuessRoomCategory[]>([]);
@@ -214,7 +214,7 @@ export function SongGuessRooms({
                 type="button"
                 className={styles.primaryButton}
                 disabled={busy}
-                onClick={onTeacherSetup}
+                onClick={() => onTeacherSetup(false)}
               >
                 자동 출제
               </button>
@@ -222,7 +222,7 @@ export function SongGuessRooms({
                 type="button"
                 className={styles.secondaryButton}
                 disabled={busy}
-                onClick={onTeacherSetup}
+                onClick={() => onTeacherSetup(true)}
               >
                 직접 음원 구성
               </button>

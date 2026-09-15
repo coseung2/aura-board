@@ -58,6 +58,7 @@ async fn setup() -> (MemoryRepository, String) {
 
 fn song_guess_request(id: &str) -> CreateSongGuessSessionRequest {
     CreateSongGuessSessionRequest {
+        open_lobby: false,
         room_mode: crate::model::SongGuessRoomMode::TeacherLed,
         classroom_teacher_subject: None,
         answer_target: crate::model::SongGuessAnswerTarget::Title,

@@ -24,6 +24,7 @@ export function SongGuessSetupControls({
   onSave,
   onCreate,
   onRemove,
+  settingsOnly = false,
 }: {
   boardId: string;
   setup: SongGuessTeacherSetup | null;
@@ -38,6 +39,7 @@ export function SongGuessSetupControls({
   onSave?: () => void;
   onCreate: () => void;
   onRemove: () => void;
+  settingsOnly?: boolean;
 }) {
   const cardClass = compact ? controls.sidebarCard : teacherStyles.setupCard;
   const fieldClass = compact ? controls.field : teacherStyles.selectField;
@@ -45,9 +47,8 @@ export function SongGuessSetupControls({
   const createClass = compact ? controls.secondaryButton : teacherStyles.prepareButton;
 
   return (
-    <section className={cardClass} aria-label="게임 설정">
-      <h2>저장 및 시작</h2>
-      {setup && <p>{setup.rounds.length}문제 준비됨</p>}
+    <section className={settingsOnly ? undefined : cardClass} aria-label="게임 설정">
+      {!settingsOnly && <h2>게임 설정</h2>}
       <label className={fieldClass}>
         <span>출제 모드</span>
         <select
@@ -86,13 +87,8 @@ export function SongGuessSetupControls({
           />
           객관식 (4지선다)
         </label>
-        <p>
-          {answerMode === "text"
-            ? "선택한 정답 대상을 직접 입력해요. 등록된 별칭도 정답으로 인정돼요."
-            : "선택한 정답 대상과 오답 보기 3개를 자동으로 채워요. 문제마다 한 번만 제출할 수 있어요."}
-        </p>
       </fieldset>
-      {showSave && onSave && (
+      {!settingsOnly && showSave && onSave && (
         <button
           type="button"
           className={controls.primaryButton}
@@ -102,15 +98,15 @@ export function SongGuessSetupControls({
           {busy ? "저장 중…" : "라운드 팩 저장"}
         </button>
       )}
-      <button
+      {!settingsOnly && <button
         type="button"
         className={createClass}
-        disabled={busy || !setup?.rounds.length}
+        disabled={busy || (!showSave && !setup?.rounds.length)}
         onClick={onCreate}
       >
         {busy ? "처리 중…" : "게임 만들기"}
-      </button>
-      {setup && (
+      </button>}
+      {!settingsOnly && setup && (
         <button
           type="button"
           className={compact ? controls.dangerButton : teacherStyles.removeButton}

@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SongGuessSnapshot, SongGuessTeacherSetup } from "@/lib/song-guess/contracts";
 import { SongGuessClientError } from "@/lib/song-guess/browser-client";
@@ -30,7 +30,11 @@ vi.mock("@/lib/song-guess/browser-client", async (importOriginal) => {
     fetchSongGuessSnapshot: mocks.fetchCurrent,
     fetchSongGuessTeacherSetup: mocks.fetchSetup,
     submitSongGuessCommand: mocks.submitCommand,
-    createSongGuessSession: mocks.createSession,
+    createSongGuessSession: async (...args: unknown[]) => {
+      const result = await mocks.createSession(...args);
+      if (result?.snapshot) mocks.fetchCurrent.mockResolvedValue(result.snapshot);
+      return result;
+    },
     saveSongGuessTeacherSetup: mocks.saveSetup,
     deleteSongGuessTeacherSetup: mocks.deleteSetup,
     uploadSongGuessClip: mocks.uploadClip,
@@ -111,7 +115,15 @@ function setup(): SongGuessTeacherSetup {
 
 describe("SongGuessBoard authoritative web flow", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+    vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, init?: RequestInit) => new Response(JSON.stringify(
+      _url.includes("/imports") ? { items: [] } : init?.method === "POST" ? { setup: setup() } : {
+        categories: [{ id: "classical", label: "클래식", counts: { intro: 1, highlight: 1 } }],
+        songs: [{ id: "s1", categories: ["classical"], segments: { intro: true, highlight: true } }],
+      },
+    ), { status: init?.method === "POST" ? 201 : 200 })));
     window.localStorage.clear();
     mocks.fetchSetup.mockResolvedValue(setup());
     mocks.fetchCurrent.mockResolvedValue(null);
@@ -125,8 +137,10 @@ describe("SongGuessBoard authoritative web flow", () => {
   });
 
   afterEach(() => {
+    cleanup();
     window.localStorage.clear();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it.each(["text", "multiple-choice"] as const)("creates a game using the selected %s answer mode", async (answerMode) => {
@@ -136,7 +150,7 @@ describe("SongGuessBoard authoritative web flow", () => {
     expect(textMode).toBeChecked();
     if (answerMode === "multiple-choice") fireEvent.click(screen.getByRole("radio", { name: "객관식 (4지선다)" }));
     fireEvent.click(screen.getByRole("button", { name: "게임 만들기" }));
-    await waitFor(() => expect(mocks.createSession).toHaveBeenCalledWith("board-1", answerMode, "title"));
+    await waitFor(() => expect(mocks.createSession).toHaveBeenCalledWith("board-1", answerMode, "title", expect.objectContaining({ requestId: expect.any(String), expectedRoundIds: ["round-1"] })));
     await screen.findByText("시작 대기");
   });
 
@@ -146,10 +160,10 @@ describe("SongGuessBoard authoritative web flow", () => {
     fireEvent.change(await screen.findByRole("combobox", { name: "출제 모드" }), { target: { value: target } });
     fireEvent.click(screen.getByRole("radio", { name: "객관식 (4지선다)" }));
     fireEvent.click(screen.getByRole("button", { name: "게임 만들기" }));
-    await waitFor(() => expect(mocks.createSession).toHaveBeenCalledWith("board-1", "multiple-choice", target));
+    await waitFor(() => expect(mocks.createSession).toHaveBeenCalledWith("board-1", "multiple-choice", target, expect.objectContaining({ requestId: expect.any(String), expectedRoundIds: ["round-1"] })));
   });
 
-  it("reviews an automatically prepared pack before creating it with the selected settings", async () => {
+  it("shows all settings up front and prepares plus creates with one action", async () => {
     mocks.fetchSetup.mockResolvedValue(null);
     const prepared = setup();
     const catalog = {
@@ -190,13 +204,9 @@ describe("SongGuessBoard authoritative web flow", () => {
         viewer="teacher"
       />,
     );
-    fireEvent.click(await screen.findByRole("button", { name: "1문제 준비하기" }));
-    const guideButton = await screen.findByRole("button", {
-      name: "교사용 정답 목록",
-    });
+    await screen.findByRole("combobox", { name: "출제 모드" });
+    expect(screen.queryByRole("button", { name: /문제 준비하기/ })).toBeNull();
     expect(mocks.createSession).not.toHaveBeenCalled();
-    fireEvent.click(guideButton);
-    expect(screen.getByText("비밀 정답")).toBeVisible();
     fireEvent.change(screen.getByRole("combobox", { name: "출제 모드" }), {
       target: { value: "artist-title" },
     });
@@ -208,6 +218,7 @@ describe("SongGuessBoard authoritative web flow", () => {
         "board-1",
         "multiple-choice",
         "artist-title",
+        expect.objectContaining({ expectedRoundIds: ["round-1"], requestId: expect.any(String) }),
       ),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -253,7 +264,9 @@ describe("SongGuessBoard authoritative web flow", () => {
       "board-1",
       "multiple-choice",
       "artist",
+      mocks.createSession.mock.calls[0][3],
     );
+    expect((fetch as ReturnType<typeof vi.fn>).mock.calls.filter(([, init]) => init?.method === "POST")).toHaveLength(1);
     await screen.findByText("시작 대기");
   });
 
@@ -282,11 +295,12 @@ describe("SongGuessBoard authoritative web flow", () => {
   it.each([null, "draft", "guessing"] as const)("lets teachers inspect saved answers in %s without revealing them to the game", async (phase) => {
     mocks.fetchCurrent.mockResolvedValue(phase ? snapshot("host", { phase }) : null);
     render(<SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="teacher" />);
+    if (phase === null) fireEvent.click(await screen.findByRole("button", { name: "직접 음원 구성" }));
     const button = await screen.findByRole("button", { name: "교사용 정답 목록" });
     expect(screen.queryByText("비밀 정답")).not.toBeInTheDocument();
     fireEvent.click(button);
     expect(screen.getByText("비밀 정답")).toBeVisible();
-    expect(screen.getByText("별칭")).toBeVisible();
+    for (const alias of screen.getAllByText("별칭")) expect(alias).toBeVisible();
     expect(screen.getByText(/영어 대소문자와 앞뒤 공백/)).toBeVisible();
     if (phase) expect(screen.getByText("현재 문제")).toBeVisible();
     expect(mocks.submitCommand).not.toHaveBeenCalled();
@@ -449,7 +463,7 @@ describe("SongGuessBoard authoritative web flow", () => {
       <SongGuessBoard boardId="board-1" boardTitle="우리 반 음악" viewer="student" />,
     );
 
-    const audio = await screen.findByLabelText("0.5초 음악 클립");
+    const audio = await screen.findByLabelText("현재 문제 음원");
     expect(audio).toHaveAttribute(
       "src",
       "/api/song-guess/sessions/session-1/clips/asset-current-500",

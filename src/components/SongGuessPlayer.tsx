@@ -1,230 +1,97 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Pause, Play, RotateCcw } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SongGuessClipSnapshot } from "@/lib/song-guess/contracts";
 import { songGuessClipUrl } from "@/lib/song-guess/browser-client";
 import { SongGuessTeacherTimer } from "./SongGuessTeacherTimer";
+import controls from "./SongGuessBoard.module.css";
 import styles from "./SongGuessGame.module.css";
-import teacherStyles from "./SongGuessTeacher.module.css";
 
-const WAVE_HEIGHTS = [
-  18, 34, 24, 40, 28, 14, 31, 20, 37, 26, 42, 30, 19, 36, 25, 41, 29, 16,
-  33, 22, 38, 27, 43, 31, 20, 35, 24, 39, 28, 15, 32, 21, 37, 26, 41, 29,
-];
-
-function formatTime(seconds: number) {
-  const safe = Math.max(0, Math.floor(seconds));
-  return `${Math.floor(safe / 60)}:${String(safe % 60).padStart(2, "0")}`;
-}
-
-export function SongGuessPlayer({
-  sessionId,
-  clip,
-  onPlayingChange,
-  teacher = false,
-  remainingSeconds = null,
-  roundDurationSeconds = 30,
-}: {
+type Props = {
   sessionId: string;
   clip: SongGuessClipSnapshot;
   onPlayingChange?: (playing: boolean) => void;
   teacher?: boolean;
+  muted?: boolean;
   remainingSeconds?: number | null;
-  roundDurationSeconds?: number;
-}) {
-  const audio = useRef<HTMLAudioElement>(null);
-  const active = useRef(true);
-  const [playing, setPlaying] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [played, setPlayed] = useState(false);
-  const [currentTime, setCurrentTime] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const hasAudio = clip.mimeType.startsWith("audio/");
-  const clipDurationSeconds = Math.max(1, clip.tierMs / 1000);
-  const audioProgress = Math.max(0, Math.min(1, currentTime / clipDurationSeconds));
-  useEffect(() => {
-    active.current = true;
-    const media = audio.current;
-    function stopWhenHidden() {
-      if (!document.hidden) return;
-      media?.pause();
-      setPlaying(false);
-      setLoading(false);
-      onPlayingChange?.(false);
-    }
-    document.addEventListener("visibilitychange", stopWhenHidden);
-    return () => {
-      active.current = false;
-      document.removeEventListener("visibilitychange", stopWhenHidden);
-      media?.pause();
-      onPlayingChange?.(false);
-    };
-  }, [onPlayingChange]);
+  remainingMs?: number | null;
+  roundDurationSeconds?: number | null;
+};
 
-  async function play() {
+/** Playback belongs to the round timeline. HTML media looping uses the actual
+ * asset boundary; it must not be implemented as a hardcoded-duration interval. */
+export function SongGuessPlayer({ sessionId, clip, onPlayingChange, teacher = false,
+  muted = false, remainingSeconds = null, remainingMs, roundDurationSeconds = null }: Props) {
+  const audio = useRef<HTMLAudioElement>(null);
+  const active = useRef(false);
+  const deadline = useRef<number | null>(null);
+  const notify = useRef(onPlayingChange);
+  notify.current = onPlayingChange;
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<"blocked" | "failed" | null>(null);
+  const hasAudio = clip.mimeType.startsWith("audio/");
+  const source = songGuessClipUrl(sessionId, clip.assetId);
+  const timeLeft = remainingMs === undefined ? (remainingSeconds === null ? null : remainingSeconds * 1000) : remainingMs;
+  const expired = timeLeft !== null && timeLeft <= 0;
+
+  const allowed = useCallback(() => active.current && !document.hidden
+    && (deadline.current === null || performance.now() < deadline.current), []);
+  const play = useCallback(async () => {
     const player = audio.current;
-    if (!player || document.hidden) return;
-    if (!player.paused) {
-      player.pause();
-      return;
-    }
-    setError(null);
-    setLoading(true);
-    onPlayingChange?.(true);
+    if (!player || !allowed()) return;
+    setLoading(true); setError(null);
     try {
       if (player.error) player.load();
       if (player.ended) player.currentTime = 0;
       await player.play();
-      if (!active.current || document.hidden) {
-        player.pause();
-        return;
-      }
-      setPlayed(true);
-    } catch {
-      onPlayingChange?.(false);
-      if (active.current && !document.hidden) {
-        setError("음악을 재생하지 못했어요. 다시 시도해 주세요.");
-      }
+      if (!allowed()) player.pause();
+    } catch (cause) {
+      if (allowed()) setError(cause instanceof DOMException && cause.name === "NotAllowedError" ? "blocked" : "failed");
+      notify.current?.(false);
     } finally {
       if (active.current) setLoading(false);
     }
-  }
+  }, [allowed]);
 
-  const media = hasAudio ? (
-    <audio
-      ref={audio}
-      preload="none"
-      src={songGuessClipUrl(sessionId, clip.assetId)}
-      aria-label={`${clip.tierMs / 1000}초 음악 클립`}
-      onPlay={() => {
-        setPlaying(true);
-        onPlayingChange?.(true);
-      }}
-      onPause={() => {
-        setPlaying(false);
-        onPlayingChange?.(false);
-      }}
-      onEnded={() => {
-        setPlaying(false);
-        setCurrentTime(clipDurationSeconds);
-        onPlayingChange?.(false);
-      }}
-      onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
-      onError={() => {
-        setPlaying(false);
-        setLoading(false);
-        onPlayingChange?.(false);
-        setError("음악을 불러오지 못했어요. 다시 시도해 주세요.");
-      }}
-    />
-  ) : null;
+  useEffect(() => {
+    deadline.current = timeLeft === null ? null : performance.now() + Math.max(0, timeLeft);
+    if (timeLeft === null) return;
+    const timer = window.setTimeout(() => { audio.current?.pause(); notify.current?.(false); }, Math.max(0, timeLeft));
+    return () => window.clearTimeout(timer);
+  }, [timeLeft]);
 
-  if (teacher) {
-    if (!hasAudio) {
-      return <p className={styles.playerError}>음원 파일이 없는 문제예요.</p>;
+  useEffect(() => {
+    active.current = true;
+    const player = audio.current;
+    if (hasAudio && !expired) void play();
+    function visibilityChanged() {
+      if (document.hidden) { player?.pause(); notify.current?.(false); }
+      else if (hasAudio && !expired && allowed()) void play();
     }
-    return (
-      <div className={teacherStyles.teacherPlayer}>
-        <button
-          type="button"
-          className={teacherStyles.recordButton}
-          onClick={() => void play()}
-          disabled={loading}
-          aria-label={playing ? "음악 일시정지" : played ? "음악 다시 재생" : "음악 재생"}
-          aria-pressed={playing}
-        >
-          <span className={teacherStyles.recordIcon} aria-hidden="true">
-            {playing ? <Pause size={34} /> : played ? <RotateCcw size={31} /> : <Play size={34} />}
-          </span>
-        </button>
+    document.addEventListener("visibilitychange", visibilityChanged);
+    return () => {
+      active.current = false;
+      document.removeEventListener("visibilitychange", visibilityChanged);
+      player?.pause(); notify.current?.(false);
+    };
+  }, [source, hasAudio, expired, play, allowed]);
 
-        <div className={teacherStyles.teacherPlayerInfo}>
-          <span className={teacherStyles.nowPlaying}>NOW PLAYING</span>
-          <h3 className={teacherStyles.playerTitle}>오디오 재생</h3>
-          <div className={teacherStyles.waveform} aria-hidden="true">
-            {WAVE_HEIGHTS.map((height, index) => (
-              <span
-                key={`${height}-${index}`}
-                className={teacherStyles.waveBar}
-                data-active={index / WAVE_HEIGHTS.length <= audioProgress}
-                style={{ height }}
-              />
-            ))}
-          </div>
-          <div className={teacherStyles.playerControls}>
-            <button
-              type="button"
-              className={teacherStyles.playerControlButton}
-              onClick={() => void play()}
-              disabled={loading}
-              aria-label={playing ? "일시정지" : "재생"}
-            >
-              {playing ? <Pause size={20} aria-hidden="true" /> : <Play size={20} aria-hidden="true" />}
-            </button>
-            <div>
-              <span className={teacherStyles.playerTime}>
-                {formatTime(currentTime)} / {formatTime(clipDurationSeconds)}
-              </span>
-              <span className={teacherStyles.playerMeta}>
-                {loading ? "불러오는 중…" : `${clip.tierMs / 1000}초 클립`}
-              </span>
-            </div>
-          </div>
-          {error && (
-            <p className={styles.playerError} role="alert">
-              {error}
-            </p>
-          )}
-        </div>
-
-        <SongGuessTeacherTimer
-          remainingSeconds={remainingSeconds}
-          roundDurationSeconds={roundDurationSeconds}
-        />
-        {media}
-      </div>
-    );
-  }
-
-  return (
-    <div className={styles.player}>
-      {hasAudio ? (
-        <>
-          <button
-            type="button"
-            className={styles.playButton}
-            onClick={() => void play()}
-            disabled={loading}
-            aria-label={playing ? "음악 일시정지" : played ? "음악 다시 재생" : "음악 재생"}
-            aria-pressed={playing}
-          >
-            <span className={styles.studentRecord} aria-hidden="true">
-              <span className={styles.studentRecordHub}>
-                {playing ? <Pause size={16} /> : played ? <RotateCcw size={15} /> : <Play size={16} />}
-              </span>
-            </span>
-          </button>
-          <div className={styles.studentPlayerInfo}>
-            <strong>{loading ? "불러오는 중" : playing ? "재생 중" : played ? "재생 완료" : "재생 준비"}</strong>
-            <span>{clip.tierMs / 1000}초 하이라이트</span>
-            <small>{formatTime(currentTime)} / {formatTime(clipDurationSeconds)}</small>
-            <span className={styles.studentWaveTrack} aria-hidden="true">
-              <span style={{ width: `${audioProgress * 100}%` }} />
-            </span>
-          </div>
-          {media}
-        </>
-      ) : (
-        <p className={styles.playerError} role="alert">
-          음원 파일이 없는 문제예요.
-        </p>
-      )}
-      {error && (
-        <p className={styles.playerError} role="alert">
-          {error}
-        </p>
-      )}
-    </div>
-  );
+  return <div className={styles.roundAudio}>
+    {teacher && <SongGuessTeacherTimer remainingSeconds={remainingSeconds} roundDurationSeconds={roundDurationSeconds} />}
+    {!hasAudio && <p className={styles.playerError} role="alert">음원 파일이 없는 문제예요.</p>}
+    {hasAudio && <audio ref={audio} src={source} loop muted={muted} preload="auto" hidden
+      aria-label="현재 문제 음원"
+      onPlay={() => {
+        if (allowed()) notify.current?.(true);
+        else audio.current?.pause();
+      }}
+      onPause={() => notify.current?.(false)}
+      onError={() => { if (active.current) { setLoading(false); setError("failed"); } notify.current?.(false); }} />}
+    {hasAudio && error && !expired && <div className={styles.audioRecovery}>
+      <p className={styles.playerError} role="alert">{error === "blocked" ? "자동 재생이 차단됐어요." : "음원을 재생하지 못했어요."}</p>
+      <button type="button" className={controls.secondaryButton} disabled={loading} onClick={() => void play()}>
+        {loading ? "불러오는 중…" : error === "blocked" ? "소리 켜기" : "다시 재생"}
+      </button>
+    </div>}
+  </div>;
 }

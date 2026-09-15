@@ -3,6 +3,33 @@ use crate::model::SongGuessRoomMode;
 use play_domain::song_guess::SongGuessPhase;
 
 #[tokio::test]
+async fn teacher_can_create_an_open_lobby_in_one_idempotent_request() {
+    let repository = MemoryRepository::new();
+    let mut request = song_guess_request("one-create");
+    request.open_lobby = true;
+    let created = repository
+        .create_song_guess_session(&host(), "board-song", &request, 100)
+        .await
+        .unwrap();
+    assert_eq!(created.value.snapshot.phase, SongGuessPhase::Lobby);
+    let retried = repository
+        .create_song_guess_session(&host(), "board-song", &request, 200)
+        .await
+        .unwrap();
+    assert_eq!(created.value.snapshot.session_id, retried.value.snapshot.session_id);
+    assert_eq!(repository.list_song_guess_sessions("board-song").await.unwrap().len(), 1);
+}
+
+#[test]
+fn legacy_create_hash_and_default_phase_option_are_preserved() {
+    let request = song_guess_request("legacy-create");
+    let value = serde_json::to_value(&request).unwrap();
+    assert!(value.get("openLobby").is_none());
+    let restored: CreateSongGuessSessionRequest = serde_json::from_value(value).unwrap();
+    assert!(!restored.open_lobby);
+}
+
+#[tokio::test]
 async fn finished_teacher_session_can_be_replaced_without_removing_results() {
     let (repository, id) = setup_song_guess().await;
     let ended = repository

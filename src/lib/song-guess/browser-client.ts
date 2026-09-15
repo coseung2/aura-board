@@ -132,11 +132,12 @@ export async function createSongGuessSession(
   boardId: string,
   answerMode: import("./contracts").SongGuessAnswerMode = "text",
   answerTarget: import("./contracts").SongGuessAnswerTarget = "title",
+  options: { requestId?: string; expectedRoundIds?: string[] } = {},
 ): Promise<SongGuessSessionResponse> {
-  const requestId = createPlayRequestId("song_guess_create");
+  const requestId = options.requestId ?? createPlayRequestId("song_guess_create");
   const value = await requestJson<unknown>(
     `/api/song-guess/boards/${encodeURIComponent(boardId)}/session`,
-    { method: "POST", body: JSON.stringify({ requestId, answerMode, answerTarget }) },
+    { method: "POST", body: JSON.stringify({ requestId, answerMode, answerTarget, expectedRoundIds: options.expectedRoundIds }) },
   );
   if (!isRecord(value) || value.requestId !== requestId || !isSongGuessSnapshot(value.snapshot)) {
     throw new Error("invalid_song_guess_session_response");

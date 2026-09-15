@@ -18,6 +18,7 @@ const CreateSchema = z.object({
   answerMode: z.enum(["text", "multiple-choice"]).default("text"),
   answerTarget: z.enum(["title", "artist", "artist-title"]).default("title"),
   studentIds: z.array(z.string().min(1)).max(100).optional(),
+  expectedRoundIds: z.array(z.string().min(1)).min(1).max(50).optional(),
 });
 
 export async function GET(_request: Request, { params }: Params) {
@@ -48,6 +49,7 @@ export async function POST(request: Request, { params }: Params) {
       parsed.data.studentIds,
       parsed.data.answerMode,
       parsed.data.answerTarget,
+      parsed.data.expectedRoundIds,
     );
     const response = await playEngineFetch(
       `/v1/boards/${encodeURIComponent(boardId)}/song-guess/sessions`,

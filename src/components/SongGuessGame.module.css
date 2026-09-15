@@ -351,6 +351,9 @@
   box-shadow: 0 0 0 2px var(--color-text);
 }
 
+.roundAudio { display: grid; justify-items: center; min-width: 0; gap: 12px; }
+.audioRecovery { display: grid; justify-items: center; gap: 8px; }
+
 .choices:has([aria-pressed="true"]) .choice[aria-pressed="false"] {
   opacity: 0.55;
 }

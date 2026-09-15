@@ -30,6 +30,10 @@ fn is_title_target(target: &SongGuessAnswerTarget) -> bool {
     *target == SongGuessAnswerTarget::Title
 }
 
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SongGuessSessionRecord {
@@ -169,6 +173,8 @@ pub enum SongGuessIntent {
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CreateSongGuessSessionRequest {
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub open_lobby: bool,
     #[serde(default)]
     pub room_mode: SongGuessRoomMode,
     #[serde(default)]
@@ -258,11 +264,13 @@ impl SongGuessSessionRecord {
                 .map_err(|error| ModelError::DomainRejected(error.to_string()))?,
         };
         record = record.with_answer_mode(request.answer_mode)?;
-        if record.room_mode == SongGuessRoomMode::StudentFree {
+        if record.room_mode == SongGuessRoomMode::StudentFree || request.open_lobby {
             record
                 .state
                 .open_lobby()
                 .map_err(|e| ModelError::DomainRejected(e.to_string()))?;
+        }
+        if record.room_mode == SongGuessRoomMode::StudentFree {
             record
                 .state
                 .join(&actor.subject)

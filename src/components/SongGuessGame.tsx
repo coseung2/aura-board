@@ -25,6 +25,7 @@ type Props = {
   totalRounds: number | null;
   canInteract: boolean;
   remainingSeconds: number | null;
+  remainingMs?: number | null;
   expired: boolean;
   guessText: string;
   onGuessText: (text: string) => void;
@@ -47,6 +48,7 @@ export function SongGuessGame({
   totalRounds,
   canInteract,
   remainingSeconds,
+  remainingMs,
   expired,
   guessText,
   onGuessText,
@@ -81,7 +83,7 @@ export function SongGuessGame({
   const roundDuration =
     currentRound.deadlineAtMs != null && currentRound.startedAtMs != null
       ? Math.max(1, (currentRound.deadlineAtMs - currentRound.startedAtMs) / 1000)
-      : 30;
+      : null;
   const hasNextRound =
     totalRounds === null ? null : currentRound.order + 1 < totalRounds;
   const multipleChoice = snapshot.answerMode === "multiple-choice";
@@ -141,7 +143,7 @@ export function SongGuessGame({
               type="button"
               className={controls.iconButton}
               onClick={sound.toggleMuted}
-              aria-label={sound.muted ? "효과음 켜기" : "효과음 끄기"}
+              aria-label={sound.muted ? "소리 켜기" : "소리 끄기"}
               aria-pressed={!sound.muted}
             >
               {sound.muted ? (
@@ -167,7 +169,7 @@ export function SongGuessGame({
           </div>
         </div>
 
-        {studentView && phase === "guessing" && remainingSeconds !== null && (
+        {studentView && phase === "guessing" && remainingSeconds !== null && roundDuration !== null && (
           <div className={styles.clock} data-expired={expired}>
             <progress
               max={roundDuration}
@@ -190,18 +192,20 @@ export function SongGuessGame({
           <div className={styles.question} data-song-question>
             {!studentView && <p className={teacherStyles.teacherQuestion}>{questionText}</p>}
             {currentRound.currentClip && (
-              <div className={studentView ? styles.studentMusicCard : undefined}>
+              <>
                 <SongGuessPlayer
-                  key={`${snapshot.sessionId}:${currentRound.currentClip.assetId}`}
+                  key={`${snapshot.sessionId}:${currentRound.roundId}:${currentRound.currentClip.assetId}`}
                   sessionId={snapshot.sessionId}
                   clip={currentRound.currentClip}
                   onPlayingChange={sound.onMusicPlaying}
                   teacher={isHost}
+                  muted={sound.muted}
+                  remainingMs={remainingMs}
                   remainingSeconds={remainingSeconds}
                   roundDurationSeconds={roundDuration}
                 />
                 {studentView && <p className={styles.studentQuestion}>{questionText}</p>}
-              </div>
+              </>
             )}
             {isHost &&
               (!currentRound.currentClip ||

@@ -288,6 +288,7 @@ export async function buildSongGuessCreateRequest(
   studentIds?: readonly string[],
   answerMode: SongGuessAnswerMode = "text",
   answerTarget: SongGuessAnswerTarget = "title",
+  expectedRoundIds?: readonly string[],
 ) {
   const { actor } = await loadSongGuessTeacherBoard(boardId);
   if (!actor.userId) throw new PlayAccessError(403, "forbidden");
@@ -301,6 +302,9 @@ export async function buildSongGuessCreateRequest(
     },
   });
   if (!game) throw new PlayAccessError(404, "song_guess_setup_not_found");
+  if (expectedRoundIds && JSON.stringify(expectedRoundIds) !== JSON.stringify(game.rounds.map((round) => round.id))) {
+    throw new PlayAccessError(409, "song_guess_setup_changed");
+  }
   if (game.rounds.length < 1) throw new PlayAccessError(400, "invalid_rounds");
   validateSetupAssets(
     game.rounds.map((round) => ({
@@ -345,6 +349,7 @@ export async function buildSongGuessCreateRequest(
   }
   return {
     requestId,
+    openLobby: true,
     answerMode,
     answerTarget,
     participants,

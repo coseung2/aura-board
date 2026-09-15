@@ -23,6 +23,7 @@ export function useSongGuessClock(snapshot: SongGuessSnapshot | null) {
   }, [deadline, serverTime, phase]);
 
   return {
+    remainingMs,
     remainingSeconds: remainingMs === null ? null : Math.ceil(remainingMs / 1000),
     expired: phase === "guessing" && deadline != null &&
       ((serverTime != null && serverTime >= deadline) || remainingMs === 0),

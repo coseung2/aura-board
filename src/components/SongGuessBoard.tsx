@@ -8,12 +8,14 @@ import {
   type ChangeEvent,
 } from "react";
 import { useRealtimeInvalidation } from "@/hooks/useRealtimeInvalidation";
+import { createPlayRequestId } from "@/lib/play-platform/contracts";
 import { boardChannelKey, PLAY_SESSION_CHANGED_EVENT } from "@/lib/realtime";
 import {
   createSongGuessSession,
   deleteSongGuessClip,
   deleteSongGuessTeacherSetup,
   fetchSongGuessSnapshot,
+  fetchCurrentSongGuessSession,
   fetchSongGuessTeacherSetup,
   makeSongGuessCommand,
   saveSongGuessTeacherSetup,
@@ -107,8 +109,10 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
   const draftsRef = useRef<RoundDraft[]>([]);
   const autoRetriedRequest = useRef<string | null>(null);
   const commandInFlight = useRef(false);
+  const createInFlight = useRef(false);
+  const createRequest = useRef<{ key: string; id: string } | null>(null);
   const storageKey = `aura-song-guess-pending:${boardId}`;
-  const { remainingSeconds, expired } = useSongGuessClock(snapshot);
+  const { remainingSeconds, remainingMs, expired } = useSongGuessClock(snapshot);
   const entryFailed =
     failedJoinSessionId === snapshot?.sessionId &&
     snapshot?.viewer.joined === false &&
@@ -306,35 +310,56 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     [busy, executeCommand, snapshot, expired, hasPending],
   );
 
-  async function createSession() {
-    if (!setup?.rounds.length || busy) return;
+  async function createSession(prepared = setup, automatic = false) {
+    if (!prepared?.rounds.length || (busy && !automatic) || createInFlight.current) return;
+    createInFlight.current = true;
+    const expectedRoundIds = prepared.rounds.map((round) => round.id);
+    const key = JSON.stringify({ expectedRoundIds, answerMode, answerTarget });
+    if (createRequest.current?.key !== key) createRequest.current = { key, id: createPlayRequestId("song_guess_create") };
     setBusy(true);
     setError(null);
     setNotice(null);
     try {
-      const response = await createSongGuessSession(boardId, answerMode, answerTarget);
+      const response = await createSongGuessSession(boardId, answerMode, answerTarget, {
+        requestId: createRequest.current.id, expectedRoundIds,
+      });
+      let created = response.snapshot;
+      // Rolling engine compatibility: a legacy engine may still create Draft.
+      // Use one replayable command internally, never a second normal UX step.
+      if (created.phase === "draft") {
+        const request = makeSongGuessCommand(created, { type: "open_lobby" });
+        request.requestId = `open-${response.requestId}`;
+        created = (await submitSongGuessCommand(created.sessionId, request)).snapshot;
+      }
       ++sessionSequence.current;
-      setSelectedSessionId(response.snapshot.sessionId);
-      setSnapshot(response.snapshot);
+      setSelectedSessionId(created.sessionId);
+      setSnapshot(created);
       setNotice(null);
     } catch (cause) {
-      if (cause instanceof SongGuessClientError && cause.status === 409) {
-        await refreshSession();
-        return;
+      if (cause instanceof SongGuessClientError && cause.status === 409 && cause.body.error === "session_already_exists") {
+        const current = await fetchCurrentSongGuessSession(boardId).catch(() => null);
+        if (current && current.phase !== "finished") {
+          setSelectedSessionId(current.sessionId); setSnapshot(current);
+          setNotice("이미 열린 게임으로 이동했어요.");
+          return;
+        }
       }
+      if (automatic) throw cause;
       setError(messageForError(cause));
     } finally {
+      createInFlight.current = false;
       setBusy(false);
     }
   }
 
-  function prepareAutoGame(prepared: SongGuessTeacherSetup) {
+  async function prepareAutoGame(prepared: SongGuessTeacherSetup) {
     revokeDraftUrls(draftsRef.current);
     setSetup(prepared);
     setDrafts(draftsFromSetup(prepared));
     setError(null);
     setSetupError(null);
     setNotice(null);
+    await createSession(prepared, true);
   }
 
   async function handleSourceFile(roundId: string, event: ChangeEvent<HTMLInputElement>) {
@@ -467,6 +492,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
       setSetupError(null);
       setDrafts(draftsFromSetup(saved));
       setNotice("저장됨");
+      return saved;
     } catch (cause) {
       if (
         cause instanceof SongGuessClientError &&
@@ -540,7 +566,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
     );
   }
 
-  if (!selectedSessionId && !teacherSetup) return <section className={styles.shell} aria-label={boardTitle}><BoardHeading title={boardTitle} /><SongGuessRooms boardId={boardId} teacher={viewer === "teacher"} onSelect={(id) => { setSnapshot(null); setSelectedSessionId(id); }} onTeacherSetup={() => setTeacherSetup(true)} /></section>;
+  if (!selectedSessionId && !teacherSetup) return <section className={styles.shell} aria-label={boardTitle}><BoardHeading title={boardTitle} /><SongGuessRooms boardId={boardId} teacher={viewer === "teacher"} onSelect={(id) => { setSnapshot(null); setSelectedSessionId(id); }} onTeacherSetup={(custom = false) => { setCustomEditor(custom); setTeacherSetup(true); }} /></section>;
 
   if (!snapshot && viewer === "teacher" && teacherSetup) {
     return (
@@ -560,14 +586,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
               onPreparingChange={setBusy}
               onPrepared={prepareAutoGame}
               onSetupLocked={() => setTeacherSetup(false)}
-            />
-            {setup && (
-              <>
-                <SongGuessAnswerGuide
-                  key={boardId}
-                  setup={setup}
-                  answerTarget={answerTarget}
-                />
+            >
                 <SongGuessSetupControls
                   boardId={boardId}
                   setup={setup}
@@ -578,9 +597,9 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
                   onAnswerTargetChange={setAnswerTarget}
                   onCreate={() => void createSession()}
                   onRemove={() => void removeSetup()}
+                  settingsOnly
                 />
-              </>
-            )}
+            </SongGuessPoolPicker>
             <button
               type="button"
               className={teacherStyles.advancedButton}
@@ -677,7 +696,10 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
                   onAnswerModeChange={setAnswerMode}
                   onAnswerTargetChange={setAnswerTarget}
                   onSave={() => void savePack()}
-                  onCreate={() => void createSession()}
+                  onCreate={() => void (async () => {
+                    const saved = await savePack();
+                    if (saved) await createSession(saved, true).catch((cause) => setError(messageForError(cause)));
+                  })()}
                   onRemove={() => void removeSetup()}
                 />
                 <StatusMessages error={error ?? setupError} notice={notice} />
@@ -746,6 +768,7 @@ export function SongGuessBoard({ boardId, boardTitle, viewer }: Props) {
         totalRounds={setup?.rounds.length ?? null}
         canInteract={!busy && !(hasPending && snapshot.answerMode === "multiple-choice")}
         remainingSeconds={remainingSeconds}
+        remainingMs={remainingMs}
         expired={expired}
         entryFailed={entryFailed}
         guessText={guessText}

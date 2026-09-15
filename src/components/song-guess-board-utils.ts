@@ -192,6 +192,8 @@ export function messageForError(error: unknown): string {
         return "같은 분류에 서로 다른 보기 후보가 부족해요. 다른 분류나 직접 입력 방식을 선택해 주세요.";
       case "song_guess_setup_locked":
         return "현재 게임 세션이 있어 라운드 편집이 잠겼어요.";
+      case "song_guess_setup_changed":
+        return "다른 화면에서 문제 구성이 바뀌었어요. 설정을 확인하고 게임 만들기를 다시 눌러 주세요.";
       case "song_guess_clip_assigned":
         return "이미 저장된 라운드의 클립은 개별 정리할 수 없어요.";
       case "song_guess_audio_clip_missing":
@@ -213,6 +215,11 @@ export function messageForError(error: unknown): string {
   }
   if (error instanceof Error) {
     switch (error.message) {
+      case "song_guess_catalog_insufficient_songs":
+        return "선택한 조건에 맞는 음원이 부족해요. 카테고리나 문제 수를 바꿔 주세요.";
+      case "song_guess_catalog_clip_unavailable":
+      case "song_guess_catalog_invalid_clip":
+        return "사용할 수 없는 음원이 있어요. 다른 조건으로 다시 시도해 주세요.";
       case "rights_confirmation_required":
         return "새 파생 클립을 저장하려면 음원 사용 권한을 확인해 주세요.";
       case "clips_not_generated":
@@ -236,5 +243,5 @@ export function messageForError(error: unknown): string {
         if (error.message.startsWith("invalid_")) return `입력값을 확인해 주세요 (${error.message}).`;
     }
   }
-  return "네트워크 연결을 확인해 주세요. 업로드에 실패한 임시 파생 클립은 정리되고 다시 시도할 수 있어요.";
+  return "요청을 확인하지 못했어요. 네트워크를 확인하고 같은 설정으로 다시 시도해 주세요.";
 }

@@ -1,87 +1,106 @@
 import "@testing-library/jest-dom/vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SongGuessClipSnapshot } from "@/lib/song-guess/contracts";
 import { SongGuessPlayer } from "./SongGuessPlayer";
 
 const clip: SongGuessClipSnapshot = { assetId: "private-clip", tierMs: 15000, durationMs: 15000, mimeType: "audio/wav", sizeBytes: 1323044 };
+let play: ReturnType<typeof vi.spyOn>;
+let pause: ReturnType<typeof vi.spyOn>;
+const hiddenDescriptor = Object.getOwnPropertyDescriptor(document, "hidden");
+function visibility(hidden: boolean) {
+  Object.defineProperty(document, "hidden", { configurable: true, value: hidden });
+  fireEvent(document, new Event("visibilitychange"));
+}
 
 beforeEach(() => {
+  play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
+  pause = vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
+  vi.spyOn(HTMLMediaElement.prototype, "load").mockImplementation(() => undefined);
   Object.defineProperty(document, "hidden", { configurable: true, value: false });
-  vi.spyOn(HTMLMediaElement.prototype, "pause").mockImplementation(() => undefined);
 });
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+  if (hiddenDescriptor) Object.defineProperty(document, "hidden", hiddenDescriptor);
+  else Reflect.deleteProperty(document, "hidden");
+});
 
-describe("song-guess audio player", () => {
-  it("plays the authorized file only after a gesture and reports play/pause", async () => {
-    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
-    const onPlayingChange = vi.fn();
-    const { container } = render(<SongGuessPlayer sessionId="session-1" clip={clip} onPlayingChange={onPlayingChange} />);
-    const audio = screen.getByLabelText("15초 음악 클립") as HTMLAudioElement;
-    expect(audio).toHaveAttribute("src", "/api/song-guess/sessions/session-1/clips/private-clip");
-    expect(audio).toHaveAttribute("preload", "none");
-    expect(audio.autoplay).toBe(false);
-    expect(container.querySelector("iframe")).toBeNull();
-    expect(play).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: "음악 재생" }));
-    await waitFor(() => expect(play).toHaveBeenCalledOnce());
+describe("round-owned song playback", () => {
+  it.each([500, 7200, 15000, 41000])("loops the actual asset (%dms metadata) without a separate clip timeline", async (durationMs) => {
+    const change = vi.fn();
+    const { container } = render(<SongGuessPlayer sessionId="session" clip={{ ...clip, durationMs }} remainingMs={23000} onPlayingChange={change} />);
+    await waitFor(() => expect(play).toHaveBeenCalledTimes(1));
+    const audio = container.querySelector("audio")!;
+    expect(audio).toHaveAttribute("src", "/api/song-guess/sessions/session/clips/private-clip");
+    expect(audio.loop).toBe(true);
+    expect(screen.queryByRole("button")).toBeNull();
+    expect(container.textContent).not.toContain("하이라이트");
     fireEvent.play(audio);
-    Object.defineProperty(audio, "paused", { configurable: true, value: false });
-    expect(screen.getByRole("button", { name: "음악 일시정지" })).toHaveAttribute("aria-pressed", "true");
-    expect(onPlayingChange).toHaveBeenLastCalledWith(true);
-    fireEvent.click(screen.getByRole("button", { name: "음악 일시정지" }));
-    fireEvent.pause(audio);
-    expect(audio.pause).toHaveBeenCalled();
-    expect(onPlayingChange).toHaveBeenLastCalledWith(false);
+    expect(change).toHaveBeenLastCalledWith(true);
   });
 
-  it("restarts the file from zero after it ends", async () => {
-    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockResolvedValue();
-    render(<SongGuessPlayer sessionId="session-1" clip={clip} />);
-    const audio = screen.getByLabelText("15초 음악 클립") as HTMLAudioElement;
-    fireEvent.click(screen.getByRole("button", { name: "음악 재생" }));
-    await waitFor(() => expect(screen.getByRole("button", { name: "음악 다시 재생" })).toBeEnabled());
-    audio.currentTime = 15;
-    Object.defineProperty(audio, "ended", { configurable: true, value: true });
-    fireEvent.ended(audio);
-    fireEvent.click(screen.getByRole("button", { name: "음악 다시 재생" }));
+  it("shows an unlock control only when autoplay is rejected", async () => {
+    play.mockRejectedValueOnce(new DOMException("blocked", "NotAllowedError"));
+    render(<SongGuessPlayer sessionId="s" clip={clip} remainingMs={8000} />);
+    fireEvent.click(await screen.findByRole("button", { name: "소리 켜기" }));
     await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
-    expect(audio.currentTime).toBe(0);
+    await waitFor(() => expect(screen.queryByRole("button")).toBeNull());
   });
 
-  it("allows retry after playback is rejected", async () => {
-    const play = vi.spyOn(HTMLMediaElement.prototype, "play").mockRejectedValueOnce(new Error("not allowed")).mockResolvedValue();
-    render(<SongGuessPlayer sessionId="session-1" clip={clip} />);
-    fireEvent.click(screen.getByRole("button", { name: "음악 재생" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("다시 시도");
-    fireEvent.click(screen.getByRole("button", { name: "음악 재생" }));
+  it("retries loading failures rather than exposing a permanently disabled play button", async () => {
+    const { container } = render(<SongGuessPlayer sessionId="s" clip={clip} remainingMs={8000} />);
+    await act(async () => undefined);
+    fireEvent.error(container.querySelector("audio")!);
+    fireEvent.click(screen.getByRole("button", { name: "다시 재생" }));
     await waitFor(() => expect(play).toHaveBeenCalledTimes(2));
-    expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("stops on background, unmount, and a late play completion", async () => {
+  it("stops at the server deadline even without another snapshot and cannot resume after it", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "performance"] });
+    render(<SongGuessPlayer sessionId="s" clip={clip} remainingMs={2300} />);
+    await act(async () => undefined);
+    const initial = pause.mock.calls.length;
+    await act(async () => { await vi.advanceTimersByTimeAsync(2299); });
+    expect(pause).toHaveBeenCalledTimes(initial);
+    await act(async () => { await vi.advanceTimersByTimeAsync(1); });
+    expect(pause.mock.calls.length).toBeGreaterThan(initial);
+    act(() => { visibility(true); visibility(false); });
+    expect(play).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not play an already expired round", async () => {
+    render(<SongGuessPlayer sessionId="s" clip={clip} remainingMs={0} />);
+    await act(async () => undefined);
+    expect(play).not.toHaveBeenCalled();
+  });
+
+  it("preserves playback through routine countdown, mute and callback updates", async () => {
+    const { rerender, container } = render(<SongGuessPlayer sessionId="s" clip={clip} remainingMs={10000} />);
+    await act(async () => undefined);
+    rerender(<SongGuessPlayer sessionId="s" clip={{ ...clip }} remainingMs={9000} muted onPlayingChange={() => undefined} />);
+    await act(async () => undefined);
+    expect(play).toHaveBeenCalledTimes(1);
+    expect(container.querySelector("audio")!.muted).toBe(true);
+  });
+
+  it("stops on background/unmount and ignores a late play completion", async () => {
     let finish!: () => void;
-    const pending = new Promise<void>((resolve) => { finish = resolve; });
-    vi.spyOn(HTMLMediaElement.prototype, "play").mockReturnValue(pending);
-    const onPlayingChange = vi.fn();
-    const { unmount } = render(<SongGuessPlayer sessionId="session-1" clip={clip} onPlayingChange={onPlayingChange} />);
-    const audio = screen.getByLabelText("15초 음악 클립") as HTMLAudioElement;
-    fireEvent.click(screen.getByRole("button", { name: "음악 재생" }));
-    Object.defineProperty(document, "hidden", { configurable: true, value: true });
-    fireEvent(document, new Event("visibilitychange"));
-    expect(audio.pause).toHaveBeenCalledOnce();
-    expect(onPlayingChange).toHaveBeenLastCalledWith(false);
+    play.mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve; }));
+    const { unmount } = render(<SongGuessPlayer sessionId="s" clip={clip} remainingMs={10000} />);
+    act(() => visibility(true));
+    expect(pause).toHaveBeenCalled();
     unmount();
-    await act(async () => { finish(); await pending; });
-    expect(audio.pause).toHaveBeenCalledTimes(3);
+    const previous = pause.mock.calls.length;
+    await act(async () => finish());
+    expect(pause.mock.calls.length).toBeGreaterThan(previous);
   });
 
-  it("never loads a video provider for a legacy entry without an audio file", () => {
-    const fetch = vi.fn();
-    vi.stubGlobal("fetch", fetch);
-    const { container } = render(<SongGuessPlayer sessionId="session-1" clip={{ ...clip, mimeType: "video/youtube", sizeBytes: 0 }} />);
-    expect(screen.getByRole("alert")).toHaveTextContent("음원 파일이 없는 문제");
+  it("never loads a video provider or fabricates a timer for legacy missing audio", () => {
+    const { container } = render(<SongGuessPlayer sessionId="s" clip={{ ...clip, mimeType: "video/youtube" }} />);
+    expect(screen.getByRole("alert")).toHaveTextContent("음원 파일이 없는 문제예요.");
     expect(container.querySelector("audio, iframe")).toBeNull();
-    expect(fetch).not.toHaveBeenCalled();
+    expect(play).not.toHaveBeenCalled();
   });
 });
