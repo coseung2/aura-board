@@ -58,19 +58,12 @@ export function StudentRandomPickerPanel({
   onChooseFilter,
   onChangePickerCount,
   onDraw,
-  soundEnabled = true,
-  onToggleSound,
 }: StudentRandomPickerPanelProps) {
-  const movement = useToolkitMovement();
+  const movement = useToolkitMovement({ initialHeight: 560 });
   const pickedStudentIds = new Set(pickedStudents.map((student) => student.id));
   const highlightedStudent = highlightedStudentId
     ? eligibleStudents.find((student) => student.id === highlightedStudentId) ?? null
     : null;
-  const pickerStage = !activeClassroomId
-    ? 1
-    : drawingStudents || pickedStudents.length > 0
-      ? 3
-      : 2;
   // The spotlight name changes every 95ms while drawing, so it must not sit in
   // a live region. Announce stable stage text instead.
   const drawAnnouncement = drawingStudents
@@ -98,56 +91,19 @@ export function StudentRandomPickerPanel({
       role="dialog"
       aria-label="학생 랜덤뽑기"
     >
-      <button type="button" className="board-toolkit-move-handle" aria-label="학생 랜덤뽑기 이동" title="드래그 또는 방향키로 이동" {...movement.handleProps}>
-        <span aria-hidden="true">⠿</span> 학생 랜덤뽑기
-      </button>
-      <div className="board-picker-hero">
-        <div className="board-picker-hero-copy">
-          <span className="board-picker-eyebrow">
-            <span aria-hidden="true">✦</span>
-            RANDOM PICK
-          </span>
-          <h2>오늘의 주인공은?</h2>
-          <p>학급과 조건을 정한 뒤, 버튼 한 번으로 랜덤하게 뽑아보세요.</p>
-        </div>
-        <button
-          type="button"
-          className="board-timer-close board-picker-close"
-          onClick={onClose}
-          aria-label="학생 랜덤뽑기 닫기"
-        >
-          <CloseIcon size={18} />
-        </button>
-      </div>
 
-      <div className="board-picker-progress" aria-label={`현재 ${pickerStage}단계`}>
-        {[
-          { step: 1, label: "학급 선택" },
-          { step: 2, label: "조건 설정" },
-          { step: 3, label: "랜덤 뽑기" },
-        ].map(({ step, label }) => (
-          <div
-            key={step}
-            className={[
-              "board-picker-progress-item",
-              pickerStage === step ? "is-active" : "",
-              pickerStage > step ? "is-complete" : "",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <span>{pickerStage > step ? "✓" : step}</span>
-            <strong>{label}</strong>
-          </div>
-        ))}
+      <div className="board-picker-toolbar">
+        <div className="board-picker-window-actions">
+          <button type="button" className="board-picker-move-handle" aria-label="학생 랜덤뽑기 이동" title="드래그 또는 방향키로 이동" {...movement.handleProps}>
+            <span aria-hidden="true">⠇</span>
+          </button>
+          <button type="button" className="board-timer-close board-picker-close" onClick={onClose} aria-label="학생 랜덤뽑기 닫기">
+            <CloseIcon size={18} />
+          </button>
+        </div>
       </div>
 
       <div className="board-picker-content">
-        {onToggleSound ? (
-          <button type="button" className="board-picker-sound-toggle" aria-label="학생 뽑기 효과음" aria-pressed={soundEnabled} onClick={onToggleSound}>
-            효과음 {soundEnabled ? "켜짐" : "꺼짐"}
-          </button>
-        ) : null}
         {classroomsError ? (
           <div className="board-picker-message is-error">
             <strong>학급을 불러오지 못했어요.</strong>
@@ -163,16 +119,7 @@ export function StudentRandomPickerPanel({
             <strong>선택할 수 있는 학급이 없어요.</strong>
           </div>
         ) : (
-          <label className="board-classroom-picker board-picker-control-card board-picker-classroom-card">
-            <span className="board-picker-control-heading">
-              <span className="board-picker-control-icon" aria-hidden="true">
-                01
-              </span>
-              <span>
-                <strong>학급 선택</strong>
-                <small>학생 명단을 가져올 학급을 골라주세요.</small>
-              </span>
-            </span>
+          <label className="board-classroom-picker board-picker-classroom-card">
             <select
               value={activeClassroomId ?? ""}
               onChange={(event) => onChooseClassroom(event.target.value)}
@@ -192,17 +139,7 @@ export function StudentRandomPickerPanel({
           </label>
         )}
 
-        {!activeClassroomId ? (
-          classroomsLoaded && classrooms.length > 0 ? (
-            <div className="board-picker-ready-card">
-              <div className="board-picker-ready-orbit" aria-hidden="true">
-                <span>?</span>
-              </div>
-              <strong>누가 뽑힐까요?</strong>
-              <p>먼저 위에서 학급을 선택하면 게임판이 열립니다.</p>
-            </div>
-          ) : null
-        ) : studentsError ? (
+        {!activeClassroomId ? null : studentsError ? (
           <div className="board-picker-message is-error">
             <strong>학생 명단을 불러오지 못했어요.</strong>
             <p>{studentsError}</p>
@@ -220,15 +157,7 @@ export function StudentRandomPickerPanel({
           <>
             <div className="board-picker-controls">
               <div className="board-picker-control-card">
-                <span className="board-picker-control-heading">
-                  <span className="board-picker-control-icon" aria-hidden="true">
-                    02
-                  </span>
-                  <span>
-                    <strong>뽑을 인원</strong>
-                    <small>{eligibleStudents.length}명 중 선택</small>
-                  </span>
-                </span>
+                <strong>인원 선택</strong>
                 <div className="board-picker-stepper">
                   <button
                     type="button"
@@ -258,21 +187,8 @@ export function StudentRandomPickerPanel({
               </div>
 
               <div className="board-picker-control-card">
-                <span className="board-picker-control-heading">
-                  <span
-                    className="board-picker-control-icon is-alt"
-                    aria-hidden="true"
-                  >
-                    03
-                  </span>
-                  <span>
-                    <strong>뽑기 대상</strong>
-                    <small>필요한 그룹만 골라요.</small>
-                  </span>
-                </span>
-                <div
-                  className="board-picker-segments"
-                  role="group"
+                <strong>뽑기 대상</strong>
+                <div className="board-picker-segments"
                   aria-label="뽑기 대상"
                 >
                   {(
@@ -402,28 +318,18 @@ export function StudentRandomPickerPanel({
                   {drawAnnouncement}
                 </p>
 
-                {pickedStudents.length > 0 ? (
-                  <div className="board-picker-summary">
-                    <span>선택 결과</span>
-                    <div>
-                      {pickedStudents.map((student) => (
-                        <strong key={student.id}>
-                          {student.number ? `${student.number}번 ` : ""}
-                          {student.name}
-                        </strong>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="board-picker-hint">
-                    모든 학생에게 같은 확률이 적용됩니다.
-                  </p>
-                )}
               </>
             )}
           </>
         )}
       </div>
+      <button
+        type="button"
+        className="board-picker-resize-handle"
+        aria-label="학생 랜덤뽑기 크기 조절"
+        title="드래그해서 크기 조절"
+        {...movement.resizeHandleProps}
+      />
     </section>
   );
 }

@@ -7,51 +7,53 @@
   --picker-sun: #ffd966;
   --picker-mint: #7edfc9;
   --picker-line: #ded8f4;
-  /* Panel bottom offset comes from .board-toolkit-panel:
-     var(--fab-bottom-safe) + 72px. Mirror it here so the height cap also
-     reserves the 24px top margin instead of overflowing above the viewport. */
-  --picker-bottom-offset: calc(var(--fab-bottom-safe, 32px) + 72px);
-  --picker-top-margin: 24px;
-  bottom: var(--picker-bottom-offset);
-  width: min(640px, calc(100vw - 32px));
-  max-height: min(
-    760px,
-    calc(100dvh - var(--picker-bottom-offset) - var(--picker-top-margin))
-  );
+  display: flex;
+  flex-direction: column;
   padding: 0;
   border: 1px solid rgba(73, 56, 144, 0.18);
   border-radius: 28px;
   background: #f9f8ff;
   color: var(--picker-ink);
   box-shadow: 0 28px 80px rgba(45, 34, 96, 0.24), 0 8px 24px rgba(45, 34, 96, 0.12);
-  overflow: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--picker-lilac-strong) transparent;
+  overflow: hidden;
 }
 
-.board-toolkit-move-handle {
-  position: sticky;
-  top: 0;
+.board-picker-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+  padding: 10px 12px 0;
+}
+
+.board-picker-window-actions {
+  position: relative;
   z-index: 2;
   display: flex;
   align-items: center;
+  gap: 6px;
+}
+
+.board-picker-move-handle {
+  display: flex;
+  align-items: center;
   justify-content: center;
-  gap: 8px;
-  width: 100%;
-  min-height: 44px;
+  width: var(--tap-min, 44px);
+  height: var(--tap-min, 44px);
   border: 0;
-  background: var(--color-surface, #fff);
-  color: var(--color-text, #29234f);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #635a81;
   font: inherit;
   cursor: grab;
   touch-action: none;
   user-select: none;
 }
 
-.board-toolkit-move-handle:active { cursor: grabbing; }
-.board-toolkit-move-handle:focus-visible {
+.board-picker-move-handle:hover { background: #fff; color: var(--picker-ink); }
+.board-picker-move-handle:active { cursor: grabbing; }
+.board-picker-move-handle:focus-visible {
   outline: 2px solid var(--color-accent, #6d57e7);
-  outline-offset: -4px;
+  outline-offset: 2px;
 }
 
 .board-picker-sound-toggle {
@@ -65,21 +67,7 @@
   cursor: pointer;
 }
 
-.board-picker-hero {
-  position: relative;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  min-height: 138px;
-  padding: 24px 24px 28px;
-  overflow: hidden;
-  border-radius: 27px 27px 0 0;
-  background:
-    radial-gradient(circle at 82% 16%, rgba(255, 217, 102, 0.95) 0 34px, transparent 35px),
-    radial-gradient(circle at 92% 82%, rgba(126, 223, 201, 0.65) 0 52px, transparent 53px),
-    linear-gradient(135deg, #f0ecff 0%, #e6deff 52%, #d8ccff 100%);
-}
+.board-picker-hero { display: none; }
 
 .board-picker-hero::after {
   content: "✦";
@@ -166,6 +154,7 @@
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 8px 24px rgba(63, 47, 127, 0.1);
+  flex: 0 0 auto;
 }
 
 .board-picker-progress-item {
@@ -221,8 +210,38 @@
 .board-picker-content {
   display: flex;
   flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
   gap: 14px;
   padding: 18px 24px 24px;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--picker-lilac-strong) transparent;
+}
+
+.board-picker-resize-handle {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 0 0 27px 0;
+  background:
+    linear-gradient(135deg, transparent 52%, rgba(81, 57, 207, 0.2) 52%),
+    linear-gradient(135deg, transparent 66%, rgba(81, 57, 207, 0.5) 66%);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.board-picker-resize-handle:hover,
+.board-picker-resize-handle:focus-visible {
+  background:
+    linear-gradient(135deg, transparent 52%, rgba(81, 57, 207, 0.34) 52%),
+    linear-gradient(135deg, transparent 66%, rgba(81, 57, 207, 0.72) 66%);
+  outline: 2px solid var(--picker-primary);
+  outline-offset: -5px;
 }
 
 .board-picker-controls {
@@ -644,10 +663,6 @@
 
 @media (max-width: 640px) {
   .board-student-picker-panel {
-    --picker-bottom-offset: calc(var(--fab-bottom-safe, 32px) + 66px);
-    --picker-top-margin: 20px;
-    right: 12px;
-    width: calc(100vw - 24px);
     border-radius: 22px;
   }
 

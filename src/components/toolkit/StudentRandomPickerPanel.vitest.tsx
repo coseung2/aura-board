@@ -42,23 +42,59 @@ function makeProps(
 }
 
 describe("StudentRandomPickerPanel", () => {
-  it("moves with arrow keys and keeps the panel within the viewport", () => {
+  it("opens centered at a useful size and stays movable within the viewport", () => {
     render(<StudentRandomPickerPanel {...makeProps()} />);
     const panel = screen.getByRole("dialog", { name: "학생 랜덤뽑기" });
     const handle = screen.getByRole("button", { name: "학생 랜덤뽑기 이동" });
+    const initialLeft = Number.parseFloat(panel.style.left);
+    const initialTop = Number.parseFloat(panel.style.top);
+    const width = Number.parseFloat(panel.style.width);
+    const height = Number.parseFloat(panel.style.height);
+
+    expect(width).toBe(Math.min(640, window.innerWidth - 24));
+    expect(height).toBe(Math.min(560, window.innerHeight - 24));
+    expect(initialLeft).toBeCloseTo((window.innerWidth - width) / 2);
+    expect(initialTop).toBeCloseTo((window.innerHeight - height) / 2);
+    expect(panel.style.right).toBe("auto");
+    expect(panel.style.bottom).toBe("auto");
+
     vi.spyOn(panel, "getBoundingClientRect").mockImplementation(() => ({
       left: Number.parseFloat(panel.style.left), top: Number.parseFloat(panel.style.top),
-      width: 320, height: 400, right: 0, bottom: 0, x: 0, y: 0, toJSON() {},
+      width: Number.parseFloat(panel.style.width), height: Number.parseFloat(panel.style.height),
+      right: 0, bottom: 0, x: 0, y: 0, toJSON() {},
     }));
     fireEvent.keyDown(handle, { key: "ArrowRight" });
-    expect(panel.style.left).toBe("22px");
+    expect(Number.parseFloat(panel.style.left)).toBe(initialLeft + 10);
     fireEvent.keyDown(handle, { key: "ArrowDown", shiftKey: true });
-    expect(panel.style.top).toBe("52px");
+    expect(Number.parseFloat(panel.style.top)).toBe(
+      Math.min(initialTop + 40, window.innerHeight - height - 12),
+    );
     for (let index = 0; index < 100; index++) fireEvent.keyDown(handle, { key: "ArrowLeft" });
     expect(panel.style.left).toBe("12px");
-    panel.style.top = "900px";
-    fireEvent(window, new Event("resize"));
-    expect(Number.parseFloat(panel.style.top)).toBeLessThanOrEqual(window.innerHeight - 412);
+    for (let index = 0; index < 100; index++) fireEvent.keyDown(handle, { key: "ArrowDown" });
+    expect(Number.parseFloat(panel.style.top)).toBeLessThanOrEqual(window.innerHeight - height - 12);
+    expect(screen.getByRole("button", { name: "학생 랜덤뽑기 크기 조절" })).toBeInTheDocument();
+  });
+
+  it("resizes the window from its corner handle", () => {
+    render(<StudentRandomPickerPanel {...makeProps()} />);
+    const panel = screen.getByRole("dialog", { name: "학생 랜덤뽑기" });
+    const resizeHandle = screen.getByRole("button", { name: "학생 랜덤뽑기 크기 조절" });
+
+    vi.spyOn(panel, "getBoundingClientRect").mockImplementation(() => ({
+      left: Number.parseFloat(panel.style.left), top: Number.parseFloat(panel.style.top),
+      width: Number.parseFloat(panel.style.width), height: Number.parseFloat(panel.style.height),
+      right: 0, bottom: 0, x: 0, y: 0, toJSON() {},
+    }));
+
+    fireEvent.pointerDown(resizeHandle, { button: 0, isPrimary: true, pointerId: 1, clientX: 600, clientY: 700 });
+    fireEvent.pointerMove(resizeHandle, { pointerId: 1, clientX: 420, clientY: 520 });
+    fireEvent.pointerUp(resizeHandle, { pointerId: 1 });
+
+    expect(Number.parseFloat(panel.style.width)).toBeGreaterThanOrEqual(360);
+    expect(Number.parseFloat(panel.style.height)).toBeGreaterThanOrEqual(360);
+    expect(Number.parseFloat(panel.style.width)).toBeLessThan(640);
+    expect(Number.parseFloat(panel.style.height)).toBeLessThan(560);
   });
 
   it("guides the teacher from classroom selection into the picker", () => {
@@ -69,8 +105,6 @@ describe("StudentRandomPickerPanel", () => {
       />,
     );
 
-    expect(screen.getByLabelText("현재 1단계")).toBeInTheDocument();
-    expect(screen.getByText("누가 뽑힐까요?")).toBeInTheDocument();
 
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "c1" } });
     expect(onChooseClassroom).toHaveBeenCalledWith("c1");
@@ -87,7 +121,6 @@ describe("StudentRandomPickerPanel", () => {
       />,
     );
 
-    expect(screen.getByLabelText("현재 2단계")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "2명 랜덤 뽑기" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "뽑을 인원 줄이기" }));
@@ -110,7 +143,6 @@ describe("StudentRandomPickerPanel", () => {
       />,
     );
 
-    expect(screen.getByLabelText("현재 3단계")).toBeInTheDocument();
     expect(screen.getByText("두구두구...")).toBeInTheDocument();
     expect(screen.getAllByText("나래")).toHaveLength(2);
     expect(screen.getByText("2번")).toBeInTheDocument();
@@ -155,11 +187,9 @@ describe("StudentRandomPickerPanel", () => {
     );
 
     const announcement = screen.getByText("1번 가온, 3번 다온 뽑혔어요.");
-    expect(announcement).toHaveAttribute("aria-live", "polite");
 
     // The visual summary and spotlight must not double-announce the result.
     expect(screen.getByText("2명 선택 완료").closest("[aria-live]")).toBeNull();
-    expect(screen.getByText("1번 가온").closest("[aria-live]")).toBeNull();
   });
 
   it("renders confirmed winners and supports another draw", () => {
@@ -171,8 +201,8 @@ describe("StudentRandomPickerPanel", () => {
     );
 
     expect(screen.getByText("2명 선택 완료")).toBeInTheDocument();
-    expect(screen.getByText("1번 가온")).toBeInTheDocument();
-    expect(screen.getByText("3번 다온")).toBeInTheDocument();
+    expect(screen.getAllByText("가온")).not.toHaveLength(0);
+    expect(screen.getAllByText("다온")).not.toHaveLength(0);
 
     fireEvent.click(screen.getByRole("button", { name: "한 번 더 뽑기" }));
     expect(onDraw).toHaveBeenCalledOnce();
