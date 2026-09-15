@@ -34,8 +34,8 @@
 - [x] 1. 공통 상태/목록/종료 메타데이터 및 즉시 전파. 오류/복구, 복수 방, terminal, 가입 이력/온라인 의미 테스트 후 커밋.
 - [x] 2. 노래 맞히기 공개 점수와 카테고리 기반 보기. Rust/API/웹·모바일 계약, 새로고침·재시도·동점 테스트 후 커밋.
 - [x] 3. 노래 맞히기 생성·재생 UX. 생성 중복/실패, 실제 길이 반복, deadline, autoplay 거부, 배경 전환 테스트 후 커밋.
-- [ ] 4. 오목·꼬들·그림자연합·스피드게임 화면/역할/복귀 정리. 기능별 테스트와 웹/Expo typecheck 후 커밋.
-- [ ] 5. 통합 검증, 검사 결과·남은 실기기/운영 게이트 기록, 최종 커밋 및 main 푸시.
+- [x] 4. 오목·꼬들·그림자연합·스피드게임 화면/역할/복귀 정리. 기능별 테스트와 웹/Expo typecheck 후 커밋.
+- [x] 5. 통합 검증, 검사 결과·남은 실기기/운영 게이트 기록, 최종 커밋 및 main 푸시.
 
 각 단계는 기능적으로 복구 가능한 단위로 유지한다. 운영 DB 조작·배포·앱 스토어 빌드는 이번 요청 범위 밖이다. 사용자가 요청한 커밋/최종 푸시 외에 원격 변경을 하지 않는다.
 
@@ -76,3 +76,21 @@
 - 웹/Expo는 실제 media loop를 사용하고 서버 deadline에 정지한다. 재생 버튼/음원 별 타이머/진행바는 제거하고 차단 또는 실패 상태에서만 소리 켜기/재시도를 제공한다. 음소거는 유지한다. 모바일은 포그라운드 복귀 시 최신 snapshot 확인 후 재생하며 이전 라운드의 늦은 음원 응답을 버린다.
 - 모바일 방 생성/목록도 카테고리·구간·문제 수와 입장 가능 여부 중심으로 축소했다. 진행 방으로의 복귀와 신규 입장을 구별한다.
 - 검증: 노래 관련 Vitest 35파일/384테스트, Rust workspace 99테스트 통과(Docker 재시작 1건 ignored), 웹/모바일 typecheck와 모바일 design:check, diff check 통과. 재생 테스트는 실제 production hook/component에 모의 media 포트를 연결한 자동 검증이며 브라우저 자동재생 정책·실기기 청취/지연 실측을 대신하지 않는다.
+
+### 4단계 결과
+
+- 오목: 정상 Realtime reconcile 중 `실시간 연결`/`동기화 중`과 상시 `최신 상태 확인`을 제거했다. 평상시 refresh는 판 입력을 잠그지 않으며, 미확인 명령·오류에서만 복구 행동을 노출한다. 기권은 확인을 거치고, terminal에서는 capability 기반 재대국과 교사/학생 역할별 게임 목록 복귀를 제공한다. 내부적인 same-frame 중복 명령도 잠갔다.
+- 스피드게임: teacher active 화면에서 `다음 라운드`와 `게임 완료`가 동시에 경쟁하지 않게 현재 단계에 맞는 주 행동 하나만 보여 준다. `조기 종료`는 별도 위험 행동으로 확인을 유지한다. run/version/board/classroom ID footer를 제거하고, 연결 복구 문구는 장애 때만 표시한다. 학생 기권 성공 뒤 게임 목록으로 복귀하고, 웹·Expo 모두 중복 participant/answer mutation을 차단한다. 완료 화면의 게임 목록 링크도 역할별 목적지로 고쳤다.
+- 그림자연합: 정상 연결 badge와 `교사 본부` 같은 구현/역할 반복 문구를 제거했다. 긴 게임 설명은 기본 접힘 `게임 방법`으로 내리고, `다음에 이어하기`/`게임 종료`는 `게임 관리`에 묶어 현재 게임 행동과 경쟁하지 않게 했다. 종료 후 라운드 제어가 다시 나타나지 않으며 `새 게임`/`게임 목록`만 제공한다.
+- 꼬들: 초대/과거 attempt와 현재 대기실 접속을 분리했다. 웹·Expo 대기실은 별도 Supabase Presence 채널로 실제 접속 학생만 표시하고, HTTP의 durable participant 데이터는 pet 등 표시 보강에만 사용한다. 종료된 퍼즐의 과거 참가자를 다음 문제의 현재 참가자처럼 재사용하지 않는다. 문제 생성 뒤 DRAFT는 교사의 실제 검수 경계로 유지하되 새 문제 생성 UI는 숨기고 `게임 시작`/`문제 취소`만 남긴다. LIVE에서는 종료 확인만 제공한다.
+- 단계별 커밋: `24930749`(오목), `c5c4a044`(스피드게임), `cd1b41ba`(그림자연합), `c37e4b3a`(꼬들).
+- 검증: 오목/스피드게임/그림자연합/꼬들 핵심 컴포넌트·realtime 테스트가 모두 통과했고, 웹 typecheck, Expo typecheck, Expo `design:check`, `git diff --check`가 통과했다. 꼬들 Presence에는 cleanup/observer failure 회귀 테스트를 추가했다.
+
+### 5단계 통합 검증
+
+- 전체 root Vitest: **464파일 / 2,796테스트 통과**. PLAY 5종, game hub/status, realtime invalidation, terminal cleanup, song-guess projection/audio/rooms, 오목 lobby lifecycle, 스피드게임 runtime, 그림자연합 engine/parity, 꼬들 puzzle/realtime/presence를 포함한다.
+- 웹 `npm run typecheck`, Expo `npm run typecheck --prefix apps/mobile`, Expo `npm run design:check --prefix apps/mobile` 통과.
+- `npm run build` production build 통과. Next.js production compile, TypeScript, 159개 static page generation과 최종 최적화가 완료됐다.
+- 최종 Rust 재실행은 현재 DevSpace Linux 셸에 `cargo` 실행 파일이 없어 수행할 수 없었다. 같은 변경 묶음의 가장 최근 Rust 검증은 3단계 직후 workspace **99테스트 통과**이며 이후 4단계는 TypeScript/UI/Presence 경로만 변경했다. 이 환경 제약을 Rust 미통과로 오해하지 않되, 배포 전 Rust CI가 다시 녹색인지 확인한다.
+- `npm run check:lines`는 저장소 기준선부터 실패한다. `origin/main`에서도 `apps/mobile/theme/tokens.ts` 840줄, `src/components/AddCardModal.tsx` 801줄이며, 이번 작업 뒤 `SongGuessBoard.tsx` 833줄(기준 810), `SongGuessGame.module.css` 802줄(기준 799)도 한도를 넘는다. UX 변경을 숨기기 위한 무관한 대규모 파일 분해는 이번 범위에 섞지 않았고 별도 리팩터링 부채로 남긴다.
+- 실제 두 기기 동시 참가 반영 지연, 브라우저 autoplay 정책, foreground/background, 운영 DB에 대한 terminal 방 제거는 자동 테스트가 대체하지 않는다. S23/A20 및 운영/staging acceptance는 후속 실기기·배포 게이트다.

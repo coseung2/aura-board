@@ -83,6 +83,17 @@ Verify both directions:
 
 Do not solve lifecycle defects by merely hiding a stale row in one component if the orphaned durable/runtime state still affects counts, matching, permissions, or future sessions. Trace who owns cleanup and whether cleanup is idempotent and recoverable after crashes or missed events.
 
+Before accepting any participant/count/status label, name the exact semantic source. Do not collapse these into one generic "participant" concept:
+
+- invited/roster member
+- durable joined/acknowledged participant
+- currently connected presence
+- ready participant
+- active/non-forfeited participant
+- historical attempt/result participant
+
+The label must match the source. A historical attempt count is not "현재 접속", an invitation is not "참여 중", and a durable join row is not proof that a socket is still online. Use ephemeral Presence/lease/TTL semantics for live occupancy and durable authoritative rows for participation/history, then reconcile the two only for display enrichment such as names or avatars.
+
 ### 2. Unnecessary actions and duplicated stages
 
 Look for:
