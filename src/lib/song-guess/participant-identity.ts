@@ -48,15 +48,22 @@ export async function enrichSongGuessSnapshot(
     !session ||
     session.gameKind !== "song-guess" ||
     session.boardId !== snapshot.boardId ||
-    !session.board.classroomId ||
-    session.participants.length !== snapshot.participants.length ||
-    !hasContiguousPlayerSlots(session.participants)
+    !session.board.classroomId
   ) {
     return snapshot;
   }
 
-  const orderedParticipants = [...session.participants].sort(comparePlayerSlots);
-  const studentIds = orderedParticipants.map(resolveStudentId);
+  const canUseSlots = session.participants.length === snapshot.participants.length &&
+    hasContiguousPlayerSlots(session.participants);
+  const orderedParticipants = canUseSlots ? [...session.participants].sort(comparePlayerSlots) : [];
+  const studentIds = snapshot.participants.map((participant, index) => {
+    // Roster snapshots include students who have not joined. Their database
+    // participant rows need not exist yet; use the supplied student identity,
+    // then validate every lookup against the session classroom below.
+    if (participant.participantId) return participant.participantId;
+    const row = orderedParticipants[index];
+    return row ? resolveStudentId(row) : null;
+  });
   if (studentIds.some((studentId) => !studentId)) return snapshot;
 
   const students = (await db.student.findMany({

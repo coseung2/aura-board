@@ -42,6 +42,22 @@ function snapshot(): SongGuessSnapshot {
 }
 
 describe("song-guess participant identity enrichment", () => {
+  it("refreshes equipment by student ID when the roster has unjoined students", async () => {
+    mocks.sessionFindUnique.mockResolvedValue({
+      boardId: "board-1", gameKind: "song-guess",
+      board: { classroomId: "classroom-1" }, participants: [],
+    });
+    const original = snapshot();
+    original.participants[0].participantId = "student-a";
+    original.participants[1].participantId = "student-b";
+    original.participants[1].representativePet = {
+      color: "blue", growthStage: 1, equippedItemKeys: [], hiddenItemKeys: [], equippedTitleKey: null,
+    };
+    const result = await enrichSongGuessSnapshot(original);
+    expect(result.participants[1].representativePet).toMatchObject({
+      color: "green", growthStage: 2, equippedItemKeys: ["slime-ball-soccer-ball"],
+    });
+  });
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.sessionFindUnique.mockResolvedValue({
