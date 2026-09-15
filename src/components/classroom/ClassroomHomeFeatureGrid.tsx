@@ -145,6 +145,7 @@ export function ClassroomHomeFeatureGrid({
               <li key={card.key} className="classroom-home-summary-item">
                 <Link
                   href={card.href}
+                  id={`classroom-card-${card.key}`}
                   className="classroom-home-summary-card"
                   aria-label={`${card.title} · ${card.metric}${
                     card.badge ? ` · ${card.badge}` : ""

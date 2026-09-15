@@ -1,10 +1,11 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Trash2 } from "lucide-react";
 import { ClassroomNameField } from "./ClassroomNameField";
 import { ClassroomDeleteModal } from "./ClassroomDeleteModal";
+import { ClassroomFirstRunSpotlight } from "./ClassroomFirstRunSpotlight";
 import { notifyClassroomListChanged } from "@/lib/client-lookup-cache";
 
 export type DashboardKpi = {
@@ -16,6 +17,8 @@ type Props = {
   classroomId: string;
   classroomName: string;
   summaryKpis: DashboardKpi[];
+  /** 학급을 막 만든 직후 첫 진입 — 학생 명단 카드를 강조하는 1회성 안내. */
+  firstRunTutorial?: boolean;
 };
 
 /**
@@ -30,12 +33,23 @@ export function ClassroomDashboardSections({
   classroomId,
   classroomName,
   summaryKpis,
+  firstRunTutorial = false,
 }: Props) {
   const router = useRouter();
   const [name, setName] = useState(classroomName);
   const [renaming, setRenaming] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
   const [showClassroomDelete, setShowClassroomDelete] = useState(false);
+  const [showFirstRun, setShowFirstRun] = useState(firstRunTutorial);
+
+  // 안내는 생성 직후 한 번만. 주소에서 표시를 지워 새로고침으로 다시 뜨지
+  // 않게 한다.
+  useEffect(() => {
+    if (!firstRunTutorial) return;
+    router.replace(`/classroom/${classroomId}/dashboard`);
+  }, [classroomId, firstRunTutorial, router]);
+
+  const dismissFirstRun = useCallback(() => setShowFirstRun(false), []);
 
   async function handleRename(next: string) {
     setRenaming(true);
@@ -108,6 +122,16 @@ export function ClassroomDashboardSections({
         onConfirm={handleDeleteClassroom}
         onCancel={() => setShowClassroomDelete(false)}
       />
+
+      {showFirstRun && (
+        <ClassroomFirstRunSpotlight
+          targetId="classroom-card-students"
+          message="학생 명단에서 학생을 추가하세요"
+          actionHref={`/classroom/${classroomId}/students?add=1`}
+          actionLabel="학생 추가"
+          onDismiss={dismissFirstRun}
+        />
+      )}
 
       <section
         className="classroom-overview"

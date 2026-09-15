@@ -33,20 +33,34 @@ type Props = {
     boards: Board[];
   };
   studentQrOrigin: string;
+  /** ?add=1 로 들어오면 학생 추가 모달을 바로 연다 (학급 생성 직후 안내). */
+  autoOpenAddStudents?: boolean;
 };
 
 // Tab navigation moved into the shared teacher <TopNav />. 학부모 연결/공유된 보드
 // = 각자 페이지로 이동. 설정 = 학급명 옆 톱니바퀴 → 모달. (2026-04-21)
 
-export function ClassroomDetail({ classroom, studentQrOrigin }: Props) {
+export function ClassroomDetail({
+  classroom,
+  studentQrOrigin,
+  autoOpenAddStudents = false,
+}: Props) {
   const router = useRouter();
   const [students, setStudents] = useState(classroom.students);
-  const [showAddStudents, setShowAddStudents] = useState(false);
+  const [showAddStudents, setShowAddStudents] = useState(autoOpenAddStudents);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [showClassroomDelete, setShowClassroomDelete] = useState(false);
   const [deletingClassroom, setDeletingClassroom] = useState(false);
   const classroomName = classroom.name;
+
+  /** 모달을 닫으면 주소의 자동 열기 표시도 지워 새로고침에 다시 뜨지 않게 한다. */
+  function closeAddStudents() {
+    setShowAddStudents(false);
+    if (autoOpenAddStudents) {
+      router.replace(`/classroom/${classroom.id}/students`);
+    }
+  }
 
   // Per-student parent-link counts, loaded once on mount and refreshed on
   // approval/revoke actions elsewhere. Plain Record keyed by studentId
@@ -504,9 +518,9 @@ export function ClassroomDetail({ classroom, studentQrOrigin }: Props) {
         <AddStudentsModal
           open={showAddStudents}
           classroomId={classroom.id}
-          onClose={() => setShowAddStudents(false)}
+          onClose={closeAddStudents}
           onAdded={(newStudents) => {
-            setShowAddStudents(false);
+            closeAddStudents();
             handleStudentsAdded(newStudents);
           }}
         />

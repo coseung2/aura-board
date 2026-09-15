@@ -7,10 +7,11 @@ import { notFound } from "next/navigation";
 
 type Props = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ add?: string }>;
 };
 
-export default async function ClassroomStudentsPage({ params }: Props) {
-  const { id } = await params;
+export default async function ClassroomStudentsPage({ params, searchParams }: Props) {
+  const [{ id }, { add }] = await Promise.all([params, searchParams]);
   const [user, requestHeaders] = await Promise.all([getCurrentUser(), headers()]);
 
   const classroom = await db.classroom.findUnique({
@@ -54,6 +55,7 @@ export default async function ClassroomStudentsPage({ params }: Props) {
       <ClassroomDetail
         classroom={serialized}
         studentQrOrigin={publicAppOriginFromHeaders(requestHeaders)}
+        autoOpenAddStudents={add === "1"}
       />
     </main>
   );

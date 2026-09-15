@@ -8,14 +8,15 @@ import { isAdminEmail } from "@/lib/admin";
 
 type Props = {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ firstRun?: string }>;
 };
 
 function formatNumber(value: number) {
   return value.toLocaleString("ko-KR");
 }
 
-export default async function ClassroomDashboardPage({ params }: Props) {
-  const { id } = await params;
+export default async function ClassroomDashboardPage({ params, searchParams }: Props) {
+  const [{ id }, { firstRun }] = await Promise.all([params, searchParams]);
   const user = await getCurrentUser();
 
   const classroom = await db.classroom.findUnique({
@@ -37,6 +38,8 @@ export default async function ClassroomDashboardPage({ params }: Props) {
   const visibleSummary = isAdmin
     ? summary
     : { ...summary, groups: { groupCount: 0, seatedCount: 0 } };
+  // 첫 학급을 만들고 들어온 경우에만, 그리고 아직 학생이 없을 때만 안내한다.
+  const firstRunTutorial = firstRun === "1" && summary.students.total === 0;
 
   return (
     <main className="classroom-page classroom-page-detail classroom-section-page">
@@ -56,6 +59,7 @@ export default async function ClassroomDashboardPage({ params }: Props) {
           },
           { label: "학급 코드", value: classroom.code },
         ]}
+        firstRunTutorial={firstRunTutorial}
       />
       <ClassroomHomeFeatureGrid
         classroomId={classroom.id}

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { CreateClassroomModal } from "./CreateClassroomModal";
 import { ClassroomDeleteModal } from "./classroom/ClassroomDeleteModal";
 import { notifyClassroomListChanged } from "@/lib/client-lookup-cache";
@@ -19,6 +20,7 @@ type Props = {
 };
 
 export function ClassroomList({ classrooms, onRefresh }: Props) {
+  const router = useRouter();
   const [showCreate, setShowCreate] = useState(false);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClassroomItem | null>(null);
@@ -167,8 +169,14 @@ export function ClassroomList({ classrooms, onRefresh }: Props) {
         <CreateClassroomModal
           open={showCreate}
           onClose={() => setShowCreate(false)}
-          onCreated={() => {
+          onCreated={(classroom) => {
             setShowCreate(false);
+            // 새 학급은 곧바로 안내 화면으로 들어간다 — 학생 명단 카드를
+            // 강조해 첫 학생 추가로 이어진다.
+            if (classroom) {
+              router.push(`/classroom/${classroom.id}/dashboard?firstRun=1`);
+              return;
+            }
             onRefresh();
           }}
         />

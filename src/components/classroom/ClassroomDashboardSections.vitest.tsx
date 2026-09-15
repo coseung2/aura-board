@@ -4,9 +4,10 @@ import { ClassroomDashboardSections } from "./ClassroomDashboardSections";
 
 const push = vi.hoisted(() => vi.fn());
 const refresh = vi.hoisted(() => vi.fn());
+const replace = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push, refresh }),
+  useRouter: () => ({ push, refresh, replace }),
 }));
 
 vi.mock("@/lib/client-lookup-cache", () => ({
@@ -17,6 +18,7 @@ afterEach(() => {
   cleanup();
   push.mockReset();
   refresh.mockReset();
+  replace.mockReset();
 });
 
 describe("ClassroomDashboardSections", () => {
@@ -70,5 +72,26 @@ describe("ClassroomDashboardSections", () => {
       expect(screen.queryByRole("button", { name: label })).toBeNull();
       expect(screen.queryByRole("tab", { name: label })).toBeNull();
     }
+  });
+
+  it("points a brand-new classroom at the roster card once", () => {
+    const target = document.createElement("a");
+    target.id = "classroom-card-students";
+    document.body.append(target);
+
+    const { container } = render(
+      <ClassroomDashboardSections
+        classroomId="classroom-1"
+        classroomName="햇살반"
+        summaryKpis={[{ label: "학생 수", value: "0명" }]}
+        firstRunTutorial
+      />,
+    );
+
+    expect(replace).toHaveBeenCalledWith("/classroom/classroom-1/dashboard");
+    expect(container.querySelector(".classroom-first-run")).not.toBeNull();
+    expect(screen.getByText("학생 명단에서 학생을 추가하세요")).toBeTruthy();
+
+    target.remove();
   });
 });

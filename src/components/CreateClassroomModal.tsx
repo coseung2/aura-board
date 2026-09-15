@@ -6,7 +6,8 @@ import { notifyClassroomListChanged } from "@/lib/client-lookup-cache";
 type Props = {
   open: boolean;
   onClose: () => void;
-  onCreated: () => void;
+  /** 생성된 학급 id — 호출한 쪽이 새 학급으로 이동할 수 있게 넘긴다. */
+  onCreated: (classroom: { id: string } | null) => void;
 };
 
 export function CreateClassroomModal({ open, onClose, onCreated }: Props) {
@@ -27,8 +28,12 @@ export function CreateClassroomModal({ open, onClose, onCreated }: Props) {
         body: JSON.stringify({ name: name.trim() }),
       });
       if (res.ok) {
+        const body = (await res.json().catch(() => null)) as {
+          classroom?: { id?: string };
+        } | null;
         notifyClassroomListChanged();
-        onCreated();
+        const createdId = body?.classroom?.id;
+        onCreated(createdId ? { id: createdId } : null);
       } else {
         alert(`학급 생성 실패: ${await res.text()}`);
       }

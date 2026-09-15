@@ -151,3 +151,117 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* -------- 학급을 막 만든 교사용 1회성 안내 -------- */
+/* 화면 전체를 어둡게 깔고 "학생 명단" 카드만 뚫어 준다. 구멍은 클릭을
+   막지 않아 카드가 그대로 눌린다. */
+.classroom-first-run {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  pointer-events: none;
+}
+
+.classroom-first-run-hole {
+  position: fixed;
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 2px color-mix(in srgb, var(--color-accent) 55%, transparent),
+    0 0 0 100vmax rgba(12, 32, 48, 0.62);
+  pointer-events: none;
+  animation: classroomFirstRunPulse 1800ms ease-in-out infinite;
+  transition:
+    top 160ms ease,
+    left 160ms ease,
+    width 160ms ease,
+    height 160ms ease;
+}
+
+@keyframes classroomFirstRunPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px color-mix(in srgb, var(--color-accent) 45%, transparent),
+      0 0 0 100vmax rgba(12, 32, 48, 0.62);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 7px color-mix(in srgb, var(--color-accent) 28%, transparent),
+      0 0 0 100vmax rgba(12, 32, 48, 0.62);
+  }
+}
+
+.classroom-first-run-card {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 14px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lift);
+  pointer-events: auto;
+}
+
+.classroom-first-run-message {
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.classroom-first-run-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.classroom-first-run-cta {
+  display: inline-flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 9px;
+  background: var(--color-accent);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 150ms ease;
+}
+
+.classroom-first-run-cta:hover {
+  background: var(--color-accent-active);
+}
+
+.classroom-first-run-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition:
+    background 150ms ease,
+    color 150ms ease;
+}
+
+.classroom-first-run-close:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-text);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .classroom-first-run-hole {
+    animation: none;
+    transition: none;
+  }
+}
