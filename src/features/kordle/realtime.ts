@@ -2,6 +2,7 @@ import type { GuessFeedback } from "./engine";
 
 export const KORDLE_GUESS_SUBMITTED_EVENT = "guess-submitted";
 export const KORDLE_PUZZLE_CHANGED_EVENT = "puzzle-changed";
+export const KORDLE_PARTICIPANTS_CHANGED_EVENT = "participants-changed";
 
 export type KordleLiveEvent = {
   id: string;
@@ -42,8 +43,9 @@ export function kordleParticipantsFromPresenceState(
   const byStudent = new Map<string, KordlePresencePayload>();
 
   for (const payloads of Object.values(state)) {
+    if (!Array.isArray(payloads)) continue;
     for (const payload of payloads) {
-      if (!payload?.studentId || !payload.name || !payload.joinedAt) continue;
+      if (!payload || typeof payload.studentId !== "string" || !payload.studentId || typeof payload.name !== "string" || !payload.name || typeof payload.joinedAt !== "string" || !payload.joinedAt) continue;
       const current = byStudent.get(payload.studentId);
       if (!current || payload.joinedAt < current.joinedAt) {
         byStudent.set(payload.studentId, payload);

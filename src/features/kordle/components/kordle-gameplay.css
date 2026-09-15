@@ -382,6 +382,10 @@
   align-items: start;
 }
 
+.kordle-shell--teacher-setup .kordle-teacher-layout { display: block; }
+.kordle-shell--teacher-setup .kordle-teacher-panel dl { display: flex; gap: 24px; }
+.kordle-shell--teacher-setup .kordle-teacher-panel dl div { border: 0; padding: 0; background: none; backdrop-filter: none; }
+
 .kordle-teacher-preview {
   padding: 20px;
   border: 1px solid rgba(255, 255, 255, 0.22);

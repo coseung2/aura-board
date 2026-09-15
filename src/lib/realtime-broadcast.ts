@@ -13,6 +13,7 @@ import { z } from "zod";
 import {
   KORDLE_GUESS_SUBMITTED_EVENT,
   KORDLE_PUZZLE_CHANGED_EVENT,
+  KORDLE_PARTICIPANTS_CHANGED_EVENT,
   kordleBoardChannelKey,
   type KordleLiveEvent,
   type KordlePuzzleChangedEvent,
@@ -569,6 +570,12 @@ export async function announceKordleGuess(
  * Broadcast a Kordle puzzle lifecycle change. Waiting clients can refresh
  * immediately when a teacher starts the puzzle.
  */
+export async function announceKordleParticipantChange(boardId: string): Promise<void> {
+  if (!boardId) return;
+  await broadcastBestEffort(kordleBoardChannelKey(boardId), KORDLE_PARTICIPANTS_CHANGED_EVENT, {});
+  await announceGameHubChange(boardId);
+}
+
 export async function announceKordlePuzzleChange(
   boardId: string,
   event: KordlePuzzleChangedEvent,

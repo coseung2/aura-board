@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { announceKordleParticipantChange } from "@/lib/realtime-broadcast";
 import { withPlayRequestReceipt } from "@/lib/game-platform/idempotency";
 import { writeGameResult } from "@/lib/game-platform/result-writer";
 import { evaluateGuess, validateGuess } from "../engine";
@@ -83,8 +84,11 @@ export async function ensureAttempt(opts: EnsureAttemptInput): Promise<string> {
         vibePlaySessionId: opts.vibePlaySessionId ?? null,
         teacherUserId: opts.teacherUserId ?? null,
       },
-      select: { id: true },
+      select: { id: true, puzzle: { select: { game: { select: { boardId: true } } } } },
     });
+    if (opts.studentId && created.puzzle?.game.boardId) {
+      await announceKordleParticipantChange(created.puzzle.game.boardId).catch(() => undefined);
+    }
     return created.id;
   } catch (error: unknown) {
     if (

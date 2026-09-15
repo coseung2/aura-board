@@ -12,6 +12,7 @@ import { useSafeWindowDimensions } from "../../hooks/use-safe-window-dimensions"
 import { ApiError, apiFetch } from "../../lib/api";
 import type { BoardDetailResponse } from "../../lib/types";
 import { useLiveSnapshot } from "../../lib/use-live-snapshot";
+import { useKordleLobbyPresence } from "../../lib/use-kordle-lobby-presence";
 import {
   borders,
   colors,
@@ -40,9 +41,9 @@ function KordleWaitingRoster({
 }) {
   if (!participants.length) return null;
   return (
-    <SurfaceCard style={styles.rosterCard} accessibilityLabel="입장한 학생">
+    <SurfaceCard style={styles.rosterCard} accessibilityLabel="대기실 접속 학생">
       <Text style={styles.rosterHeading} selectable>
-        입장한 학생 {participants.length}명
+        대기실 접속 {participants.length}명
       </Text>
       <View style={styles.rosterList}>
         {participants.map((participant) => (
@@ -112,6 +113,8 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
   const [puzzle, setPuzzle] = useState<PuzzleInfo | null>(null);
   const [attemptId, setAttemptId] = useState<string | null>(null);
   const [state, setState] = useState<PublicState | null>(null);
+  const lobbyPresence = useKordleLobbyPresence(data.board.id, data.currentStudent,
+    Boolean(puzzle && puzzle.puzzle?.status !== "LIVE" && !state));
   const [draft, setDraft] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -410,7 +413,10 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
         <>
           <LobbyBackgroundMusic />
           <EmptyState title="게임 시작을 기다리고 있어요" description="문제가 시작되면 자동으로 입장합니다." />
-          <KordleWaitingRoster participants={puzzle.puzzle.participants ?? []} />
+          {lobbyPresence === null ? <Text style={styles.waiting}>대기실 접속 확인 중</Text> : <KordleWaitingRoster participants={lobbyPresence.map((item) => ({
+            id: item.studentId, name: item.name,
+            representativePet: puzzle.puzzle?.participants?.find((member) => member.id === item.studentId)?.representativePet,
+          }))} />}
         </>
       ) : state ? (
         <>

@@ -31,6 +31,7 @@ export function KordleTeacherControls({
   const [solution, setSolution] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const inFlight = useRef(false);
   const [version, setVersion] = useState(puzzleVersion ?? 0);
   const pendingCommandRef = useRef<{
     action: "create" | "start" | "stop";
@@ -48,6 +49,7 @@ export function KordleTeacherControls({
   const hasCustomWord = solution.trim().length > 0;
   const customWordInvalid = hasCustomWord && normalizedLength !== WORD_LENGTH;
   const roundEnded = puzzleStatus === "CLOSED";
+  const canCreatePuzzle = !puzzleId || roundEnded;
 
   useEffect(() => {
     const nextLocale = initialLocale === "ko-KR" ? "ko-KR" : "en-US";
@@ -61,6 +63,7 @@ export function KordleTeacherControls({
   }, [puzzleId, puzzleVersion]);
 
   function applyLocale(nextLocale: KordleLocale) {
+    if (busy || isPending || !canCreatePuzzle) return;
     localeRef.current = nextLocale;
     setLocale(nextLocale);
     setSolution("");
@@ -73,12 +76,13 @@ export function KordleTeacherControls({
   }
 
   async function createPuzzle(useRandom: boolean) {
-    if (busy) return;
+    if (busy || isPending || inFlight.current || !canCreatePuzzle) return;
     if (!useRandom && customWordInvalid) {
       setError(`${WORD_LENGTH}칸에 맞는 단어를 입력하세요`);
       return;
     }
     setError(null);
+    inFlight.current = true;
     setBusy(true);
     const selectedLocale = localeRef.current;
     const submittedSolution = useRandom ? "" : solution;
@@ -133,13 +137,17 @@ export function KordleTeacherControls({
         }),
       );
       startTransition(() => router.refresh());
+    } catch {
+      setError("문제를 만들지 못했어요. 입력을 유지했으니 다시 시도해 주세요.");
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
 
   async function startPuzzle() {
-    if (busy || !puzzleId) return;
+    if (busy || isPending || inFlight.current || !puzzleId || puzzleStatus !== "DRAFT") return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     const pending = pendingCommandRef.current;
@@ -179,13 +187,18 @@ export function KordleTeacherControls({
       pendingCommandRef.current = null;
       if (typeof data?.version === "number") setVersion(data.version);
       startTransition(() => router.refresh());
+    } catch {
+      setError("시작을 확인하지 못했어요. 다시 시도해 주세요.");
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
 
   async function stopPuzzle() {
-    if (busy || !puzzleId) return;
+    if (busy || isPending || inFlight.current || !puzzleId) return;
+    if (puzzleStatus === "LIVE" && !window.confirm("이번 문제를 종료할까요? 모든 학생의 풀이가 끝나요.")) return;
+    inFlight.current = true;
     setBusy(true);
     setError(null);
     const pending = pendingCommandRef.current;
@@ -225,18 +238,23 @@ export function KordleTeacherControls({
       pendingCommandRef.current = null;
       if (typeof data?.version === "number") setVersion(data.version);
       startTransition(() => router.refresh());
+    } catch {
+      setError("종료를 확인하지 못했어요. 다시 시도해 주세요.");
     } finally {
+      inFlight.current = false;
       setBusy(false);
     }
   }
 
   return (
     <div className="kordle-teacher-controls">
+      {canCreatePuzzle && <>
       <div className="kordle-locale-toggle" aria-label="꼬들 언어">
         <button
           type="button"
           className={locale === "en-US" ? "is-active" : ""}
           onClick={() => applyLocale("en-US")}
+          disabled={busy || isPending}
         >
           영어
         </button>
@@ -244,6 +262,7 @@ export function KordleTeacherControls({
           type="button"
           className={locale === "ko-KR" ? "is-active" : ""}
           onClick={() => applyLocale("ko-KR")}
+          disabled={busy || isPending}
         >
           한글
         </button>
@@ -257,6 +276,7 @@ export function KordleTeacherControls({
         }}
         placeholder="문제를 출제하세요"
         aria-label="꼬들 정답"
+        disabled={busy || isPending}
       />
       <button
         type="button"
@@ -264,7 +284,7 @@ export function KordleTeacherControls({
         onClick={() => createPuzzle(false)}
         disabled={busy || isPending || customWordInvalid || !hasCustomWord}
       >
-        {roundEnded ? "새 문제" : "생성"}
+        {roundEnded ? "새 문제 만들기" : "문제 만들기"}
       </button>
       <button
         type="button"
@@ -272,8 +292,9 @@ export function KordleTeacherControls({
         onClick={() => createPuzzle(true)}
         disabled={busy || isPending}
       >
-        {roundEnded ? "랜덤 새 문제" : "랜덤"}
+        무작위 문제
       </button>
+      </>}
       {puzzleStatus === "DRAFT" && (
         <button
           type="button"
@@ -281,7 +302,7 @@ export function KordleTeacherControls({
           onClick={() => startPuzzle()}
           disabled={busy || isPending || !puzzleId}
         >
-          시작
+          게임 시작
         </button>
       )}
       {(puzzleStatus === "DRAFT" || puzzleStatus === "LIVE") && (
@@ -291,15 +312,15 @@ export function KordleTeacherControls({
           onClick={() => stopPuzzle()}
           disabled={busy || isPending || !puzzleId}
         >
-          중단
+          {puzzleStatus === "LIVE" ? "게임 종료" : "문제 취소"}
         </button>
       )}
-      {hasCustomWord && (
+      {hasCustomWord && canCreatePuzzle && (
         <span className={customWordInvalid ? "kordle-word-count is-invalid" : "kordle-word-count"}>
           {normalizedLength}/{WORD_LENGTH}
         </span>
       )}
-      {error && <span className="kordle-control-error">{error}</span>}
+      {error && <span className="kordle-control-error" role="alert">{error}</span>}
     </div>
   );
 }

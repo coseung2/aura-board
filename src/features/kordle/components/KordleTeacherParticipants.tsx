@@ -1,4 +1,5 @@
 "use client";
+import { KORDLE_PARTICIPANTS_CHANGED_EVENT } from "../realtime";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { RealtimeChannel, SupabaseClient } from "@supabase/supabase-js";
@@ -154,6 +155,7 @@ export function KordleTeacherParticipants({
         supabase = createPublicSupabaseClient();
         channel = supabase
           .channel(kordleBoardChannelKey(boardId))
+          .on("broadcast", { event: KORDLE_PARTICIPANTS_CHANGED_EVENT }, () => { void refreshRunner.run(); })
           .on("broadcast", { event: KORDLE_GUESS_SUBMITTED_EVENT }, () => {
             void refreshRunner.run();
           })
@@ -264,7 +266,7 @@ export function KordleTeacherParticipants({
   return (
     <div className="kordle-teacher-participants" aria-live="polite">
       <div className="kordle-teacher-participants-header">
-        <span>입장한 학생</span>
+        <span>풀이 참가자</span>
         <strong>{participants.length}명</strong>
       </div>
       {participants.length > 0 ? (
@@ -276,7 +278,6 @@ export function KordleTeacherParticipants({
       ) : (
         <p>아직 입장한 학생이 없어요.</p>
       )}
-      {status === "DRAFT" && <small>학생이 대기실에 들어오면 자동으로 표시됩니다.</small>}
       {status === "LIVE" && round?.currentGuessIndex && (
         <div className="kordle-round-progress">
           <div className="kordle-round-progress-header">

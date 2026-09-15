@@ -3,16 +3,13 @@ import { KordleBoard } from "./KordleBoard";
 import { KordleLiveToasts } from "./KordleLiveToasts";
 import { KordleTeacherControls } from "./KordleTeacherControls";
 import { KordleTeacherParticipants } from "./KordleTeacherParticipants";
+import { KordleLobbyParticipants } from "./KordleLobbyParticipants";
 import { ensureAttempt, getPublicState } from "../server/kordleServer";
 
 type Props = {
   boardId: string;
   teacherUserId: string;
 };
-
-function localeLabel(locale: string) {
-  return locale === "ko-KR" ? "한글" : "영어";
-}
 
 function statusLabel(status: string | null | undefined) {
   switch (status) {
@@ -29,35 +26,6 @@ function statusLabel(status: string | null | undefined) {
     default:
       return "퍼즐 없음";
   }
-}
-
-function EmptyGrid({ wordLength, maxGuesses }: { wordLength: number; maxGuesses: number }) {
-  return (
-    <div
-      className="kordle-grid"
-      role="grid"
-      aria-label="꼬들 퍼즐판 미리보기"
-      style={
-        {
-          "--kordle-rows": maxGuesses,
-          "--kordle-cols": wordLength,
-        } as React.CSSProperties
-      }
-    >
-      {Array.from({ length: maxGuesses }).map((_, rowIndex) => (
-        <div className="kordle-row" role="row" key={rowIndex}>
-          {Array.from({ length: wordLength }).map((__, colIndex) => (
-            <div
-              className="kordle-cell kordle-cell--empty"
-              role="gridcell"
-              aria-label="empty"
-              key={colIndex}
-            />
-          ))}
-        </div>
-      ))}
-    </div>
-  );
 }
 
 export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
@@ -87,7 +55,6 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
               student: { select: { id: true, name: true } },
             },
           },
-          _count: { select: { attempts: true } },
         },
       },
     },
@@ -105,7 +72,6 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
   }
 
   const puzzle = game.puzzles[0] ?? null;
-  const attemptCount = puzzle?._count.attempts ?? 0;
   const participants = puzzle
     ? puzzle.attempts
         .map((attempt) =>
@@ -129,14 +95,10 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
   const setupTitle = puzzle
     ? puzzle.status === "CLOSED"
       ? "다음 라운드를 준비하세요"
-      : "문제를 출제하고 시작하세요"
+      : puzzle.status === "DRAFT"
+        ? "문제를 확인하고 시작하세요"
+        : "예약된 문제를 확인하세요"
     : "첫 문제를 출제하세요";
-  const setupMessage = puzzle
-    ? puzzle.status === "CLOSED"
-      ? "방금 끝난 퍼즐에서 이어서 새 문제를 열 수 있어요."
-      : "단어를 직접 입력하거나 랜덤 문제를 만든 뒤, 준비가 되면 바로 시작해 보세요."
-    : "언어를 고르고 문제를 만들면 학생들이 같은 게임 화면으로 바로 들어올 수 있어요.";
-
   if (puzzle?.status === "LIVE") {
     const attemptId = await ensureAttempt({
       puzzleId: puzzle.id,
@@ -195,9 +157,7 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
           <span className="kordle-status-pill">{statusLabel(puzzle?.status)}</span>
         </div>
         <div className="kordle-teacher-hero">
-          <p className="kordle-kicker">꼬들 라운드 준비</p>
           <h2>{setupTitle}</h2>
-          <p>{setupMessage}</p>
         </div>
         <KordleTeacherControls
           boardId={boardId}
@@ -208,9 +168,6 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
         />
 
         <div className="kordle-teacher-layout">
-          <div className="kordle-teacher-preview">
-            <EmptyGrid wordLength={game.wordLength} maxGuesses={game.maxGuesses} />
-          </div>
           <div className="kordle-teacher-panel">
             <dl>
               <div>
@@ -221,26 +178,9 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
                 <dt>시도 횟수</dt>
                 <dd>{game.maxGuesses}</dd>
               </div>
-              <div>
-                <dt>언어</dt>
-                <dd>{localeLabel(game.locale)}</dd>
-              </div>
-              <div>
-                <dt>참여</dt>
-                <dd>{attemptCount}명</dd>
-              </div>
             </dl>
 
-            {puzzle && (
-              <KordleTeacherParticipants
-                boardId={boardId}
-                puzzleId={puzzle.id}
-                initialStatus={puzzle.status}
-                initialVersion={Number(puzzle.version)}
-                initialParticipants={participants}
-                maxGuesses={game.maxGuesses}
-              />
-            )}
+            <KordleLobbyParticipants boardId={boardId} />
 
             {puzzle ? (
               <div className="kordle-puzzle-summary">
@@ -250,12 +190,7 @@ export async function KordleTeacherBoard({ boardId, teacherUserId }: Props) {
                   {puzzleSummaryText}
                 </small>
               </div>
-            ) : (
-              <p className="kordle-teacher-empty">
-                아직 발행된 퍼즐이 없어요. 퍼즐이 생기면 학생들은 각자 같은 문제를
-                자기 화면에서 풀게 됩니다.
-              </p>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
