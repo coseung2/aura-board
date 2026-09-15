@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, School, Unlink } from "lucide-react";
 import { CreateBreakoutBoardModal } from "./CreateBreakoutBoardModal";
 import { BoardThumbnailPicker, type ThumbnailMode } from "./BoardThumbnailPicker";
 import { LAYOUT_META, layoutThumbnail, type LayoutKey } from "@/lib/layout-meta";
@@ -240,38 +241,60 @@ export function CreateBoardModal({
               <p className="create-board-hint">
                 보드를 어느 학급에 연결할지 선택하세요.
               </p>
-              {requiresClassroom && classrooms.length === 0 && (
-                <p role="status">DJ 보드를 만들려면 먼저 학급을 만들어야 합니다. <a href="/classroom">학급 만들기</a></p>
-              )}
-              <div className="layout-picker">
+              <div className="classroom-choice-grid">
                 <button
                   type="button"
-                  className="layout-option"
+                  className="classroom-choice-card"
                   onClick={() => createBoard(selectedLayout)}
                   disabled={busy || requiresClassroom}
                 >
-                  <span className="layout-option-emoji">□</span>
-                  <span className="layout-option-label">학급 연결 없음</span>
-                  <span className="layout-option-desc">
+                  <span className="classroom-choice-head">
+                    <Unlink
+                      className="classroom-choice-icon"
+                      size={15}
+                      aria-hidden="true"
+                    />
+                    <span className="classroom-choice-label">학급 연결 없음</span>
+                  </span>
+                  <span className="classroom-choice-desc">
                     {requiresClassroom
                       ? "이 보드는 학급 선택이 필요합니다"
                       : "개인 보드로 생성"}
                   </span>
                 </button>
 
+                {classrooms.length === 0 && (
+                  <a className="classroom-choice-create" href="/classroom">
+                    <span className="classroom-choice-head">
+                      <Plus
+                        className="classroom-choice-icon"
+                        size={15}
+                        aria-hidden="true"
+                      />
+                      <span className="classroom-choice-label">학급 만들기</span>
+                    </span>
+                  </a>
+                )}
+
                 {classrooms.map((classroom) => (
                   <button
                     key={classroom.id}
                     type="button"
-                    className="layout-option"
+                    className="classroom-choice-card"
                     onClick={() => createBoard(selectedLayout, classroom.id)}
                     disabled={busy}
                   >
-                    <span className="layout-option-emoji">▥</span>
-                    <span className="layout-option-label">
-                      {classroom.name}
+                    <span className="classroom-choice-head">
+                      <School
+                        className="classroom-choice-icon"
+                        size={15}
+                        aria-hidden="true"
+                      />
+                      <span className="classroom-choice-label">
+                        {classroom.name}
+                      </span>
                     </span>
-                    <span className="layout-option-desc">
+                    <span className="classroom-choice-desc">
                       학생 {classroom.studentCount}명 · 빈 보드로 생성
                     </span>
                   </button>

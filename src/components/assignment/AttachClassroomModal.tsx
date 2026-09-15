@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, School } from "lucide-react";
 import { ASSIGNMENT_MAX_SLOTS } from "@/lib/assignment-schemas";
 
 export type ClassroomOption = {
@@ -75,39 +76,54 @@ export function AttachClassroomModal({
               <p className="create-board-hint">
                 학급을 선택하면 학생 수만큼 과제 slot이 자동 생성됩니다.
               </p>
-              {classrooms.length === 0 ? (
-                <p className="create-board-hint">먼저 학급을 만들어 주세요.</p>
-              ) : (
-                <div className="layout-picker">
-                  {classrooms.map((c) => {
-                    const over = c.studentCount > ASSIGNMENT_MAX_SLOTS;
-                    const empty = c.studentCount === 0;
-                    const disabled = busy || over;
-                    return (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className="layout-option"
-                        disabled={disabled}
-                        onClick={() => {
-                          setPicked(c.id);
-                          submit(c.id);
-                        }}
-                      >
-                        <span className="layout-option-emoji">🏫</span>
-                        <span className="layout-option-label">{c.name}</span>
-                        <span className="layout-option-desc">
-                          {over
-                            ? `학생 ${c.studentCount}명 - 최대 ${ASSIGNMENT_MAX_SLOTS}명까지만 가능`
-                            : empty
-                              ? "학생 0명 - 먼저 학생을 추가하세요"
-                              : `학생 ${c.studentCount}명 → slot ${c.studentCount}개 생성`}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="classroom-choice-grid">
+                {classrooms.length === 0 && (
+                  <a className="classroom-choice-create" href="/classroom">
+                    <span className="classroom-choice-head">
+                      <Plus
+                        className="classroom-choice-icon"
+                        size={15}
+                        aria-hidden="true"
+                      />
+                      <span className="classroom-choice-label">학급 만들기</span>
+                    </span>
+                  </a>
+                )}
+
+                {classrooms.map((c) => {
+                  const over = c.studentCount > ASSIGNMENT_MAX_SLOTS;
+                  const empty = c.studentCount === 0;
+                  const disabled = busy || over;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      className="classroom-choice-card"
+                      disabled={disabled}
+                      onClick={() => {
+                        setPicked(c.id);
+                        submit(c.id);
+                      }}
+                    >
+                      <span className="classroom-choice-head">
+                        <School
+                          className="classroom-choice-icon"
+                          size={15}
+                          aria-hidden="true"
+                        />
+                        <span className="classroom-choice-label">{c.name}</span>
+                      </span>
+                      <span className="classroom-choice-desc">
+                        {over
+                          ? `학생 ${c.studentCount}명 - 최대 ${ASSIGNMENT_MAX_SLOTS}명까지만 가능`
+                          : empty
+                            ? "학생 0명 - 먼저 학생을 추가하세요"
+                            : `학생 ${c.studentCount}명 → slot ${c.studentCount}개 생성`}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </>
           )}
 

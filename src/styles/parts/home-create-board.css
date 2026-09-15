@@ -44,7 +44,7 @@
 }
 
 /* Layout picker — handoff-style 3-column grid for first step of CreateBoardModal
-   only. Other `.layout-picker` usages (classroom step, breakout, attach, canvas)
+   only. Other `.layout-picker` usages (breakout, speed-game, attach, canvas)
    keep the vertical list layout since their items carry longer descriptions. */
 .layout-grid-picker {
   display: grid;
@@ -227,6 +227,119 @@
   font-size: 13px;
   color: var(--color-text-muted);
   flex: 1;
+}
+
+/* -------- 학급 선택 카드 -------- */
+/* CreateBoardModal(학급 선택) 과 AttachClassroomModal(학급 배당) 이 같이
+   쓴다. 기본 3열로 폭을 줄이고, 좁은 화면에서만 1열로 떨어진다. 학급 이름은
+   한 줄로 잘라 아이콘과 나란히 둔다. */
+.classroom-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.classroom-choice-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 12px 11px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: var(--font-body);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.classroom-choice-card:hover {
+  border-color: var(--color-border-hover);
+  background: var(--color-bg);
+}
+
+.classroom-choice-card:disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.classroom-choice-card:disabled:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+}
+
+.classroom-choice-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.classroom-choice-icon {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.classroom-choice-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.classroom-choice-desc {
+  font-size: 11.5px;
+  color: var(--color-text-muted);
+  line-height: 1.35;
+}
+
+/* 학급이 하나도 없으면 고를 수 있는 카드가 "학급 연결 없음" 뿐이라 막다른
+   길이 된다 — 그 옆자리에 학급 카드와 같은 크기의 카드로 출구를 붙인다.
+   파란 점선 테두리로 다른 카드와 구분해 눈에 띄게 한다. */
+.classroom-choice-create {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  height: 100%;
+  padding: 10px 12px 11px;
+  border: 1.5px dashed var(--color-accent);
+  border-radius: 10px;
+  background: var(--color-accent-tinted-bg);
+  color: var(--color-accent-tinted-text);
+  font-family: var(--font-body);
+  text-align: left;
+  text-decoration: none;
+  transition:
+    border-color 150ms ease,
+    background 150ms ease;
+}
+
+.classroom-choice-create .classroom-choice-icon {
+  color: var(--color-accent);
+}
+
+.classroom-choice-create .classroom-choice-label,
+.classroom-choice-create .classroom-choice-desc {
+  color: var(--color-accent-tinted-text);
+}
+
+.classroom-choice-create:hover {
+  border-color: var(--color-accent-active);
+  background: color-mix(in srgb, var(--color-accent) 16%, #ffffff);
+}
+
+@media (max-width: 540px) {
+  .classroom-choice-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* -------- BC-1: lesson vs play radios in create-board modal -------- */
