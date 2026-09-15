@@ -26,6 +26,7 @@ import { AppButton, EmptyState, Pill, SurfaceCard, TextField } from "../ui";
 import { KordleLiveFeed } from "../kordle/KordleLiveFeed";
 import { GameParticipantPet } from "../game-platform/GameParticipantPet";
 import { GAME_PET_SIZES, type GameParticipantPetData } from "../../lib/game-participant-pet";
+import { LobbyBackgroundMusic } from "../game-platform/LobbyBackgroundMusic";
 
 /**
  * Waiting-room roster with each student's representative pet.
@@ -407,6 +408,7 @@ export function KordleBoard({ data }: { data: BoardDetailResponse }) {
         <EmptyState title="준비된 문제가 없어요" description="선생님이 문제를 만들면 여기에서 시작할 수 있어요." />
       ) : puzzle.puzzle.status !== "LIVE" ? (
         <>
+          <LobbyBackgroundMusic />
           <EmptyState title="게임 시작을 기다리고 있어요" description="문제가 시작되면 자동으로 입장합니다." />
           <KordleWaitingRoster participants={puzzle.puzzle.participants ?? []} />
         </>

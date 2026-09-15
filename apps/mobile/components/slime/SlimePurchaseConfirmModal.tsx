@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     minHeight: slimeUi.purchaseVehiclePreviewHeight,
   },
   fullBleedBackground: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     width: "100%",
     height: "100%",
   },

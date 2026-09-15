@@ -110,13 +110,15 @@ describe("mobile song guess contract", () => {
     return container;
   }
 
-  it("renders four numbered accessible choices without a text input", () => {
+  it("renders four accessible choices without numbering or a text input", () => {
     const container = renderAnswer(multipleChoiceSnapshot());
     const buttons = [...container.querySelectorAll("button")];
     expect(buttons).toHaveLength(4);
     expect(container.querySelector("input")).toBeNull();
+    const labels = ["봄", "여름", "가을", "겨울"];
     buttons.forEach((button, index) => {
-      expect(button.getAttribute("aria-label")).toContain(`${index + 1}번`);
+      expect(button.getAttribute("aria-label")).toBe(labels[index]);
+      expect(button.getAttribute("aria-label")).not.toContain("번");
       expect(button.disabled).toBe(false);
     });
   });
@@ -132,7 +134,6 @@ describe("mobile song guess contract", () => {
     const current = multipleChoiceSnapshot();
     current.viewer = { ...current.viewer, answeredCurrentRound: true, selectedChoiceId: "choice-2" };
     const container = renderAnswer(JSON.parse(JSON.stringify(current)));
-    expect(container.textContent).toContain("제출한 답: 여름");
     expect(container.querySelectorAll('[aria-pressed="true"]')).toHaveLength(1);
     expect([...container.querySelectorAll("button")].every((button) => button.disabled)).toBe(true);
   });
@@ -145,9 +146,8 @@ describe("mobile song guess contract", () => {
     current.viewer = { ...current.viewer, answeredCurrentRound: true, selectedChoiceId: "choice-2" };
     const container = renderAnswer(current);
     const labels = [...container.querySelectorAll("button")].map((button) => button.getAttribute("aria-label"));
-    expect(labels).toContain("1번, 봄, 정답");
-    expect(labels).toContain("2번, 여름, 제출한 오답");
-    expect(container.textContent).toContain("선택한 답이 오답이에요.");
+    expect(labels).toContain("봄, 정답");
+    expect(labels).toContain("여름, 제출한 오답");
   });
 
   it("retains text entry for absent or explicit text mode", () => {

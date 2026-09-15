@@ -78,6 +78,8 @@ oracle-*.cmd
 *.db-journal
 prisma/dev.db*
 public/uploads/*
+videos/
+data/song-guess/clips/
 .vercel/
 supabase/.temp/
 padlet-env-backup/

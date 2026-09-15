@@ -1,4 +1,5 @@
 use super::*;
+use play_domain::song_guess::SongGuessPhase;
 #[async_trait]
 impl PlayRepository for MemoryRepository {
     async fn create_session(
@@ -259,10 +260,13 @@ impl PlayRepository for MemoryRepository {
         board_id: &str,
     ) -> Result<Vec<SongGuessSessionRecord>, RepositoryError> {
         let state = self.state.lock().await;
+        // Mirror the PostgreSQL query: finished rooms remain stored for results
+        // and receipts, but they are no longer joinable so they stay out of the
+        // open-room list.
         let mut records: Vec<_> = state
             .song_guess_sessions
             .values()
-            .filter(|r| r.board_id == board_id)
+            .filter(|r| r.board_id == board_id && r.state.phase != SongGuessPhase::Finished)
             .cloned()
             .collect();
         records.sort_by(|a, b| {

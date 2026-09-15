@@ -91,7 +91,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
   },
   lockOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: layers.bottomNav,
     alignItems: "center",
     justifyContent: "center",

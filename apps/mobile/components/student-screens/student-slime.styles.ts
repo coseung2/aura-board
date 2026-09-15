@@ -16,7 +16,7 @@ import { typography } from "../../theme/tokens";
 export const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   effectDismissLayer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: layers.overlayControl,
     borderWidth: borders.none,
     borderRadius: radii.none,

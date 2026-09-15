@@ -14,6 +14,7 @@ import {
 import { AppButton, TextField } from "../ui";
 import { GameExitDialog } from "../game-platform/GameExitDialog";
 import { GameLobby } from "../game-platform/GameLobby";
+import { LobbyBackgroundMusic } from "../game-platform/LobbyBackgroundMusic";
 import { GameParticipantPet } from "../game-platform/GameParticipantPet";
 import { GAME_PET_SIZES } from "../../lib/game-participant-pet";
 import { GameResultPanel } from "../game-platform/GameResultPanel";
@@ -303,7 +304,9 @@ export function SpeedGameBoard({ data }: Props) {
 
   if (game.status === "waiting") {
     return (
-      <GameLobby
+      <View style={styles.stateBox}>
+        <LobbyBackgroundMusic />
+        <GameLobby
         title="스피드게임 대기실"
         renderParticipantLeading={({ id, name }) => (
           <GameParticipantPet name={name} pet={game.participants.find((candidate) => candidate.studentId === id)?.representativePet} size={GAME_PET_SIZES.compact} />
@@ -330,7 +333,8 @@ export function SpeedGameBoard({ data }: Props) {
             />
           ) : null
         }
-      />
+        />
+      </View>
     );
   }
 

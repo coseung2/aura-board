@@ -269,7 +269,7 @@ export function PostModerationOverlay({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.modalBackdrop,
   },
   focusWrap: { position: "absolute", gap: spacing.sm },

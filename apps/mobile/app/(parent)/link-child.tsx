@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
   flatSurface: { backgroundColor: colors.transparent, borderWidth: borders.none, borderRadius: radii.none, boxShadow: "none" },
   emptyEmoji: { fontSize: parent.emptyIconSize },
   rosterOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.overlay,
     alignItems: "center",
     justifyContent: "center",

@@ -1,5 +1,5 @@
 import type { Dispatch, SetStateAction } from "react";
-import type { Router } from "expo-router";
+import { router as expoRouter } from "expo-router";
 import type { MobileSlimeHome, SlimeShopItem } from "../slimes";
 import type { Notice } from "./student-slime-domain";
 import type { SlimeAction, SlimeColor } from "../slime-assets";
@@ -35,7 +35,7 @@ type StudentSlimeMutationArgs = {
   busyColor: SlimeColor | null;
   busyRepresentative: SlimeColor | null;
   load: (isRefresh?: boolean) => Promise<void>;
-  router: Pick<Router, "replace">;
+  router: Pick<typeof expoRouter, "replace">;
   setBusyItemKey: Dispatch<SetStateAction<string | null>>;
   setBusyColor: Dispatch<SetStateAction<SlimeColor | null>>;
   setBusyRepresentative: Dispatch<SetStateAction<SlimeColor | null>>;

@@ -21,6 +21,7 @@ import { useLiveSnapshot } from "../../lib/use-live-snapshot";
 import { isWideGameViewport } from "../../lib/responsive";
 import type { BoardDetailResponse } from "../../lib/types";
 import { AppButton, SurfaceCard, SurfacePressable } from "../ui";
+import { LobbyBackgroundMusic } from "../game-platform/LobbyBackgroundMusic";
 
 // Kahoot-style quiz (student side).
 // 1) Lobby: roomCode + 이름(자동) 으로 join → playerId 받기
@@ -276,6 +277,7 @@ function QuizBoardContent({
   if (!player) {
     return (
       <View style={styles.center}>
+        <LobbyBackgroundMusic />
         <Text style={styles.infoEmoji}>🎯</Text>
         <Text style={styles.infoTitle}>{room.title ?? "퀴즈 대기실"}</Text>
         <Text style={styles.infoMsg}>
@@ -314,6 +316,7 @@ function QuizBoardContent({
   if (quiz.status === "waiting") {
     return (
       <View style={styles.center}>
+        <LobbyBackgroundMusic />
         <Text style={styles.infoEmoji}>⏳</Text>
         <Text style={styles.infoTitle}>곧 시작해요!</Text>
         <Text style={styles.infoMsg}>

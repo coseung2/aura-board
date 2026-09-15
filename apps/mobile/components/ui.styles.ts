@@ -84,7 +84,7 @@ export const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   bottomSheetBackdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.modalBackdrop,
   },
   bottomSheetKeyboardWrap: {

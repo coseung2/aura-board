@@ -12,10 +12,13 @@ type Props = {
   guess: string;
   onGuessChange: (text: string) => void;
   onSubmit: (choiceId?: string) => void;
+  /** Optimistic pick: the tapped choice highlights before the server echoes
+   * it back, so a tap never looks ignored while the round is confirming. */
+  pendingChoiceId?: string | null;
 };
 
 export function SongGuessAnswer({
-  snapshot, canGuess, busy, blocked, guess, onGuessChange, onSubmit,
+  snapshot, canGuess, busy, blocked, guess, onGuessChange, onSubmit, pendingChoiceId = null,
 }: Props) {
   if (snapshot.viewer.joined === false) return null;
   const disabled = !canGuess || busy || blocked;
@@ -28,12 +31,12 @@ export function SongGuessAnswer({
   if (snapshot.answerMode === "multiple-choice") {
     if (!["guessing", "reveal"].includes(snapshot.phase)) return null;
     const choices = snapshot.currentRound.choices ?? [];
-    const selected = choices.find((choice) => choice.id === snapshot.viewer.selectedChoiceId);
+    const selectedId = snapshot.viewer.selectedChoiceId ?? pendingChoiceId;
+    const selected = choices.find((choice) => choice.id === selectedId);
     const answered = snapshot.viewer.answeredCurrentRound || selected !== undefined;
     const revealed = snapshot.phase === "reveal";
     return (
       <View style={styles.container}>
-        <Text style={styles.title}>{revealed ? "제출 결과" : "정답을 선택하세요"}</Text>
         <View style={styles.choiceGrid}>
           {choices.map((choice, index) => {
             const isSelected = selected?.id === choice.id;
@@ -52,29 +55,16 @@ export function SongGuessAnswer({
                   revealStyle,
                 ]}
                 disabled={disabled || answered || revealed}
-                accessibilityLabel={`${index + 1}번, ${choice.label}${isCorrect ? ", 정답" : isSelected ? ", 제출한 오답" : ""}`}
+                accessibilityLabel={`${choice.label}${isCorrect ? ", 정답" : revealed && isSelected ? ", 제출한 오답" : ""}`}
                 accessibilityHint={revealed || answered ? undefined : "누르면 이 답을 제출합니다"}
                 accessibilityState={{ selected: isSelected }}
                 onPress={() => onSubmit(choice.id)}
               >
-                <View style={[styles.choiceNumber, index === 2 && styles.choiceNumberDark]}>
-                  <Text style={[styles.choiceNumberText, index === 2 && styles.choiceTextDark]}>{index + 1}</Text>
-                </View>
                 <Text style={[styles.choiceText, index === 2 && styles.choiceTextDark]} numberOfLines={2}>{choice.label}</Text>
-                {isSelected ? <Text style={[styles.choiceBadge, index === 2 && styles.choiceBadgeDark]}>{revealed && isCorrect ? "정답 · 내 답" : "내 답"}</Text> : null}
               </AppButton>
             );
           })}
         </View>
-        {answered || revealed ? (
-          <Text style={styles.status} accessibilityLiveRegion="polite">
-            {selected
-              ? revealed
-                ? snapshot.viewer.scoredCurrentRound ? "정답이에요." : "선택한 답이 오답이에요."
-                : `제출한 답: ${selected.label}`
-              : "시간 안에 답을 고르지 못했어요."}
-          </Text>
-        ) : null}
       </View>
     );
   }
@@ -123,29 +113,16 @@ const styles = StyleSheet.create({
     borderColor: "transparent",
     borderRadius: song.answerRadius,
   },
-  choiceNumber: {
-    width: song.answerNumberSize,
-    height: song.answerNumberSize,
-    borderRadius: song.answerRadius,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: song.answerNumberBg,
-  },
-  choiceNumberDark: { backgroundColor: song.answerNumberDarkBg },
-  choiceNumberText: { ...typography.section, color: song.text },
   choiceText: { ...typography.subtitle, flex: 1, color: song.text, textAlign: "left" },
   choiceTextDark: { color: song.answerDarkText },
   selected: { borderColor: song.text, borderWidth: song.selectedBorderWidth },
   choiceMuted: { opacity: song.mutedChoiceOpacity },
-  choiceCorrect: { borderColor: song.text, borderWidth: song.selectedBorderWidth },
-  choiceWrong: { borderColor: song.text, borderWidth: song.selectedBorderWidth },
-  choiceBadge: { ...typography.micro, color: song.text },
-  choiceBadgeDark: { color: song.answerDarkText },
+  choiceCorrect: { borderColor: song.success, borderWidth: song.selectedBorderWidth },
+  choiceWrong: { borderColor: song.danger, borderWidth: song.selectedBorderWidth },
   first: { backgroundColor: song.answer1 },
   second: { backgroundColor: song.answer2 },
   third: { backgroundColor: song.answer3 },
   fourth: { backgroundColor: song.answer4 },
-  status: { ...typography.body, color: song.muted, textAlign: "center" },
   textField: {
     minHeight: tapMin * 1.2,
     borderRadius: radii.control,

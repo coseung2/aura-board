@@ -123,11 +123,11 @@ export function CommentModerationOverlay({
 const styles = StyleSheet.create({
   preview: { flexGrow: 0, flexShrink: 0 },
   root: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: layers.floatingPopover,
   },
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: colors.modalBackdrop,
   },
   focusWrap: {

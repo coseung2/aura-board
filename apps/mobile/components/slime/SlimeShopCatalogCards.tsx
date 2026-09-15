@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
   },
   previewScene: { backgroundColor: colors.transparent },
   previewContent: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
     opacity: states.disabledOpacity,
   },
   refundOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: layers.cardOverlay,
     alignItems: "center",
     justifyContent: "center",

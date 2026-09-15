@@ -25,6 +25,7 @@ import {
 } from "../../theme/shadow-alliance";
 import { ControlPressable, TextField } from "../ui";
 import { useLiveSnapshot } from "../../lib/use-live-snapshot";
+import { LobbyBackgroundMusic } from "../game-platform/LobbyBackgroundMusic";
 
 const { Cinzel_500Medium } = require("@expo-google-fonts/cinzel/500Medium") as {
   Cinzel_500Medium: number;
@@ -503,12 +504,15 @@ export function ShadowAllianceBoard({ data }: Props) {
 
   if (snapshot.phase === "lobby") {
     phaseContent = (
-      <View style={[styles.commandPanel, styles.centerPhase]}>
-        <Text style={styles.eyebrow}>대기 중</Text>
-        <Text style={styles.notice}>
-          본부의 지령을 기다리는 중입니다.{"\n"}곧 첫 라운드가 시작됩니다.
-        </Text>
-      </View>
+      <>
+        <LobbyBackgroundMusic />
+        <View style={[styles.commandPanel, styles.centerPhase]}>
+          <Text style={styles.eyebrow}>대기 중</Text>
+          <Text style={styles.notice}>
+            본부의 지령을 기다리는 중입니다.{"\n"}곧 첫 라운드가 시작됩니다.
+          </Text>
+        </View>
+      </>
     );
   } else if (snapshot.phase === "playing") {
     phaseContent = (

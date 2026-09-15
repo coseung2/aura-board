@@ -326,7 +326,9 @@ impl PlayRepository for PostgresRepository {
         &self,
         board_id: &str,
     ) -> Result<Vec<SongGuessSessionRecord>, RepositoryError> {
-        let values = sqlx::query_scalar::<_, Json<SongGuessSessionRecord>>(r#"SELECT "state" FROM "PlaySession" WHERE "boardId" = $1 AND "gameKind" = 'song-guess' ORDER BY "createdAtMs" DESC, "id" ASC LIMIT 100"#)
+        // Finished rooms stay in the table so results and receipts survive, but
+        // they are not joinable, so the room list must not offer them.
+        let values = sqlx::query_scalar::<_, Json<SongGuessSessionRecord>>(r#"SELECT "state" FROM "PlaySession" WHERE "boardId" = $1 AND "gameKind" = 'song-guess' AND "state"->'state'->>'phase' <> 'finished' ORDER BY "createdAtMs" DESC, "id" ASC LIMIT 100"#)
             .bind(board_id).fetch_all(&self.pool).await.map_err(storage)?;
         values
             .into_iter()

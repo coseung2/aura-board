@@ -16,7 +16,6 @@ import {
   isSongGuessSnapshot,
   makeSongGuessCommand,
   mergeSongGuessSnapshot,
-  type SongGuessGuessResult,
   type SongGuessSnapshot,
 } from "../../lib/song-guess-contract";
 import {
@@ -24,8 +23,6 @@ import {
   fetchSongGuessSnapshot,
   loadPendingSongGuessCommand,
   loadSongGuessAudioSource,
-  formatClipLabel,
-  formatSeconds,
   messageForError,
   monotonicNow,
   phaseLabel,
@@ -42,6 +39,8 @@ import {
 import { SongGuessScoreboard } from "../song-guess/SongGuessScoreboard";
 import { SongGuessLobbyStatus } from "../song-guess/SongGuessLobbyStatus";
 import { SongGuessAnswer } from "../song-guess/SongGuessAnswer";
+import { SongGuessHeaderActions } from "../song-guess/song-guess-header-actions";
+import { SongGuessPlayerCard } from "../song-guess/SongGuessPlayerCard";
 import { songGuessBoardStyles as styles } from "../song-guess/songGuessBoardStyles";
 import { songGuessRoomsStyles as stateStyles } from "../song-guess/songGuessRoomsStyles";
 import { AppButton } from "../ui";
@@ -54,6 +53,9 @@ type SongGuessSound =
   | "round-results"
   | "start"
   | "wrong";
+/** Cues that mark a phase change stop the round clip; answer feedback plays
+ * over it so a right/wrong ding never cuts the song off. */
+const CLIP_STOPPING_SOUNDS: SongGuessSound[] = ["start", "round-results", "podium"];
 export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const boardId = data.board.id;
   const [snapshot, setSnapshot] = useState<SongGuessSnapshot | null>(null);
@@ -65,9 +67,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [guess, setGuess] = useState("");
-  const [lastResult, setLastResult] = useState<SongGuessGuessResult | null>(
-    null,
-  );
+  const [pendingChoiceId, setPendingChoiceId] = useState<string | null>(null);
   const [hasPending, setHasPending] = useState(false);
   const [failedJoinSessionId, setFailedJoinSessionId] = useState<string | null>(null);
   const [audioPreparing, setAudioPreparing] = useState(false);
@@ -77,6 +77,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const retriedRef = useRef<string | null>(null);
   const autoJoinedSessionRef = useRef<string | null>(null);
   const pendingRequestIdRef = useRef<string | null>(null);
+  const autoPlayedClipRef = useRef<string | null>(null);
   const player = useAudioPlayer(null, {
     downloadFirst: true,
     updateInterval: 100,
@@ -89,7 +90,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     (sound: SongGuessSound) => {
       if (muted || appStateRef.current !== "active") return;
       try {
-        player.pause();
+        if (CLIP_STOPPING_SOUNDS.includes(sound)) player.pause();
         soundPlayer.replace({
           uri: getApiUrl(`/sounds/song-guess/${sound}.ogg`),
         });
@@ -221,7 +222,6 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
           mergeSongGuessSnapshot(current, pending.sessionId, response.snapshot),
         );
         if (response.result) {
-          setLastResult(response.result);
           playSound(response.result.correct ? "correct" : "wrong");
         } else if (pending.request.command.type === "join") {
           playSound("join");
@@ -262,6 +262,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         }
       } finally {
         if (pendingRequestIdRef.current === pending.request.requestId) pendingRequestIdRef.current = null;
+        setPendingChoiceId(null);
         setBusy(false);
       }
     },
@@ -327,7 +328,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
 
   useEffect(() => {
     setGuess("");
-    setLastResult(null);
+    setPendingChoiceId(null);
   }, [snapshot?.currentRound.roundId]);
 
   const clip =
@@ -392,8 +393,7 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       (multipleChoice && (snapshot.viewer.answeredCurrentRound || snapshot.viewer.selectedChoiceId != null)) ||
       (multipleChoice ? !snapshot.currentRound.choices?.some((choice) => choice.id === choiceId) : !text) ||
       hasPending ||
-      busy ||
-      syncing
+      busy
     )
       return;
     if (snapshot.rulesVersion === 2) {
@@ -404,6 +404,8 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
           : snapshot.serverTimeMs;
       if (songGuessRemainingSeconds(snapshot, serverNowMs) === 0) return;
     }
+    // Highlight the tapped choice immediately; the server echo replaces it.
+    if (multipleChoice && choiceId) setPendingChoiceId(choiceId);
     void executePending({
       sessionId: snapshot.sessionId,
       request: makeSongGuessCommand(snapshot, multipleChoice && choiceId ? {
@@ -423,7 +425,6 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     hasPending,
     snapshot,
     snapshotClockKey,
-    syncing,
   ]);
 
   const playClip = useCallback(async () => {
@@ -454,17 +455,39 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
     playerStatus.isLoaded,
   ]);
 
+  /** A round starts on its own, so the first clip has to play on its own too.
+   * Students can still pause or replay from the player card. */
+  useEffect(() => {
+    if (!clip || clip.mimeType === "video/youtube") return;
+    if (snapshot?.phase !== "guessing") return;
+    if (!playerStatus.isLoaded || audioPreparing || audioError) return;
+    if (autoPlayedClipRef.current === clip.assetId) return;
+    autoPlayedClipRef.current = clip.assetId;
+    try {
+      player.play();
+    } catch {
+      setAudioError("재생을 시작하지 못했어요.");
+    }
+  }, [audioError, audioPreparing, clip, player, playerStatus.isLoaded, snapshot?.phase]);
+
+  /** Only the room host can end the room, and the engine rejects a host
+   * `leave`, so the host's exit always finishes. Guests get a plain leave. */
+  const viewerFinishesRoom =
+    snapshot?.viewer.canFinish === true ||
+    snapshot?.viewer.isRoomHost === true ||
+    snapshot?.viewer.role === "host";
+
   const exitRoom = useCallback(() => {
     if (busy || hasPending) { setError("처리 중인 요청을 확인한 뒤 나가 주세요."); return; }
-    if (!snapshot || snapshot.phase === "finished" || (snapshot.viewer.joined === false && !snapshot.viewer.isRoomHost && snapshot.viewer.role !== "host") || (snapshot.viewer.role === "host" && snapshot.roomMode === "student-free")) {
+    if (!snapshot || snapshot.phase === "finished" || (snapshot.viewer.joined === false && !viewerFinishesRoom)) {
       ++sequenceRef.current; setSelectedSessionId(null); setSnapshot(null); autoJoinedSessionRef.current = null; return;
     }
-    const finish = snapshot.viewer.isRoomHost === true || snapshot.viewer.role === "host";
-    Alert.alert(finish ? "게임을 끝내고 나갈까요?" : "방에서 나갈까요?", finish ? "모든 참여자의 게임이 종료돼요." : undefined, [
+    const finish = viewerFinishesRoom;
+    Alert.alert(finish ? "게임을 끝낼까요?" : "방에서 나갈까요?", finish ? "모든 참여자의 게임이 종료돼요." : undefined, [
       { text: "취소", style: "cancel" },
       { text: finish ? "게임 끝내기" : "나가기", style: "destructive", onPress: () => void executePending({ sessionId: snapshot.sessionId, request: makeSongGuessCommand(snapshot, { type: finish ? "finish" : "leave" }) }) },
     ]);
-  }, [busy, hasPending, snapshot, executePending]);
+  }, [busy, hasPending, snapshot, executePending, viewerFinishesRoom]);
   useEffect(() => {
     if (!selectedSessionId) return;
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => { exitRoom(); return true; });
@@ -593,7 +616,6 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
   const ownParticipant = snapshot.viewer.participantIndex == null
     ? null
     : snapshot.participants[snapshot.viewer.participantIndex] ?? null;
-
   return (
     <ScrollView
       contentContainerStyle={styles.container}
@@ -602,9 +624,14 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       keyboardDismissMode="interactive"
       style={styles.scroll}
     >
-      <AppButton variant="secondary" disabled={busy || hasPending} onPress={exitRoom}>{snapshot.phase === "finished" ? "방 목록" : "방 나가기"}</AppButton>
+      <SongGuessHeaderActions
+        musicActive={snapshot.phase === "lobby"}
+        exitKind={snapshot.phase === "finished" ? "back" : viewerFinishesRoom ? "finish" : "leave"}
+        exitLabel={snapshot.phase === "finished" ? "방 목록" : viewerFinishesRoom ? "게임 끝내기" : "방 나가기"}
+        disabled={busy || hasPending}
+        onExit={exitRoom}
+      />
       {snapshot.viewer.canStart && snapshot.phase === "lobby" ? <AppButton disabled={busy || hasPending} onPress={() => void executePending({ sessionId: snapshot.sessionId, request: makeSongGuessCommand(snapshot, { type: "start" }) })}>음악 퀴즈 시작</AppButton> : null}
-      {snapshot.viewer.canFinish && snapshot.phase !== "finished" ? <AppButton variant="secondary" disabled={busy || hasPending} onPress={() => Alert.alert("게임을 끝낼까요?", "모든 참여자의 게임이 종료돼요.", [{ text: "취소", style: "cancel" }, { text: "게임 끝내기", style: "destructive", onPress: () => void executePending({ sessionId: snapshot.sessionId, request: makeSongGuessCommand(snapshot, { type: "finish" }) }) }])}>게임 끝내기</AppButton> : null}
       <View style={styles.phaseRow} accessibilityLiveRegion="polite">
         <Text style={styles.phaseLabel}>
           {snapshot.phase === "guessing" ? "노래 맞히기" : phaseLabel(snapshot.phase)}
@@ -615,13 +642,6 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
             : `${snapshot.currentRound.order + 1}라운드`}
         </Text>
       </View>
-
-      {hasPending ? (
-        <View style={styles.syncBanner} accessibilityLiveRegion="polite">
-          <ActivityIndicator />
-          <Text style={styles.syncBannerText}>답을 서버로 보내는 중이에요</Text>
-        </View>
-      ) : null}
 
       {snapshot.phase === "lobby" ? (
         <SongGuessLobbyStatus
@@ -661,52 +681,20 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
       ) : null}
 
       {snapshot.phase === "guessing" && clip && clip.mimeType !== "video/youtube" ? (
-        <View style={styles.playerCard}>
-          <View style={styles.playerMainRow}>
-            <View style={styles.recordDisc}>
-              <AppButton
-                style={styles.recordButton}
-                textStyle={styles.recordButtonText}
-                loading={audioPreparing}
-                disabled={!playerStatus.isLoaded || !!audioError}
-                onPress={() => void playClip()}
-                accessibilityLabel={playerStatus.playing ? "노래 다시 듣기" : "노래 듣기"}
-              >
-                {playerStatus.playing ? "↻" : "▶"}
-              </AppButton>
-            </View>
-            <View style={styles.playerInfo}>
-              <Text style={styles.playerDuration}>{formatClipLabel(clip.tierMs)}</Text>
-              <Text style={styles.questionText}>{`이 노래의 ${answerPrompt}은?`}</Text>
-              <Text style={styles.playerTime}>
-                {formatSeconds(playerStatus.currentTime)} / {formatSeconds(clip.durationMs / 1000)}
-              </Text>
-              <View style={styles.progressTrack}>
-                <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
-              </View>
-            </View>
-          </View>
-          <View style={styles.playerActions}>
-            {playerStatus.playing ? (
-              <AppButton
-                style={styles.secondaryPlayerButton}
-                textStyle={styles.secondaryPlayerButtonText}
-                variant="secondary"
-                onPress={() => player.pause()}
-              >
-                일시정지
-              </AppButton>
-            ) : null}
-            <AppButton
-              style={styles.secondaryPlayerButton}
-              textStyle={styles.secondaryPlayerButtonText}
-              variant="secondary"
-              onPress={() => setMuted((value) => !value)}
-            >
-              {muted ? "소리 켜기" : "음소거"}
-            </AppButton>
-          </View>
-        </View>
+        <SongGuessPlayerCard
+          clip={clip}
+          answerPrompt={answerPrompt}
+          muted={muted}
+          loaded={playerStatus.isLoaded}
+          playing={playerStatus.playing}
+          preparing={audioPreparing}
+          failed={!!audioError}
+          currentTime={playerStatus.currentTime}
+          progress={progress}
+          onPlay={() => void playClip()}
+          onPause={() => player.pause()}
+          onToggleMute={() => setMuted((value) => !value)}
+        />
       ) : null}
 
       {snapshot.phase === "guessing" && audioError ? (
@@ -742,10 +730,11 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         snapshot={snapshot}
         canGuess={canGuess}
         busy={busy}
-        blocked={syncing || hasPending}
+        blocked={hasPending}
         guess={guess}
         onGuessChange={setGuess}
         onSubmit={submitGuess}
+        pendingChoiceId={pendingChoiceId}
       />
 
       {snapshot.phase === "guessing" && snapshot.viewer.joined === false ? (
@@ -762,53 +751,10 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
         </View>
       ) : null}
 
-      {lastResult ? (
-        <View
-          style={[
-            styles.resultCard,
-            lastResult.timedOut
-              ? styles.resultCardTimeout
-              : lastResult.correct
-                ? styles.resultCardCorrect
-                : styles.resultCardMiss,
-          ]}
-          accessibilityLiveRegion="polite"
-        >
-          <Text
-            style={[
-              styles.resultTitle,
-              lastResult.timedOut
-                ? null
-                : lastResult.correct
-                  ? styles.resultTitleCorrect
-                  : styles.resultTitleMiss,
-            ]}
-          >
-            {lastResult.timedOut
-              ? "시간이 끝났어요"
-              : lastResult.correct
-                ? lastResult.alreadyScored
-                  ? "이미 점수를 받았어요"
-                  : "정답이에요!"
-                : "아쉬워요"}
-          </Text>
-          {!lastResult.timedOut && lastResult.correct && !lastResult.alreadyScored ? (
-            <Text style={styles.resultScore}>{`+${lastResult.score}점`}</Text>
-          ) : null}
-          <Text style={styles.resultBody}>
-            {lastResult.timedOut
-              ? "이번 문제는 답을 고르지 못했어요. 다음 문제에서 다시 도전할 수 있어요."
-              : lastResult.correct
-                ? "정답 공개에서 순위 변화를 확인해요."
-                : "정답 공개를 기다려 주세요. 다음 문제에서 만회할 수 있어요."}
-          </Text>
-        </View>
-      ) : null}
-
       {(snapshot.phase === "reveal" || snapshot.phase === "finished") &&
       snapshot.currentRound.revealedAnswer ? (
         <View style={styles.answerCard}>
-          <Text style={styles.answerLabel}>{snapshot.viewer.scoredCurrentRound ? "정답이에요!" : "정답"}</Text>
+          <Text style={styles.answerLabel}>정답</Text>
           <Text style={styles.answerText}>{snapshot.currentRound.revealedAnswer}</Text>
         </View>
       ) : null}
@@ -840,15 +786,6 @@ export function SongGuessBoard({ data }: { data: BoardDetailResponse }) {
             다시 보내기
           </AppButton>
         ) : null}
-        <AppButton
-          variant="secondary"
-          style={styles.actionButton}
-          textStyle={styles.actionButtonText}
-          disabled={busy || syncing}
-          onPress={() => void refresh()}
-        >
-          새로고침
-        </AppButton>
       </View>
 
       {notice ? <Text style={styles.noticeText}>{notice}</Text> : null}

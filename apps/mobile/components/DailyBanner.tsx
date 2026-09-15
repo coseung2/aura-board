@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceAlt,
   },
   image: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   imageOverlay: {
     position: "absolute",

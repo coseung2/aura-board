@@ -448,13 +448,13 @@ const styles = StyleSheet.create({
   },
   previewScene: { backgroundColor: colors.transparent },
   previewVisual: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },
   contentDimmed: { opacity: states.disabledOpacity },
   wornOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     zIndex: layers.cardOverlay,
     alignItems: "center",
     justifyContent: "center",

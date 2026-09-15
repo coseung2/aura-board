@@ -30,19 +30,11 @@ export function SongGuessLobbyStatus({ snapshot, studentId, joined, pending, fai
       <Text style={styles.title} selectable>
         {joined ? (own?.displayName ?? "게임에 입장했어요") : failed ? "입장하지 못했어요" : "게임에 입장하는 중이에요"}
       </Text>
-      <Text style={styles.muted} selectable>
-        {joined
-          ? snapshot.roomMode === "student-free"
-            ? snapshot.viewer.isRoomHost
-              ? "입장 완료 · 준비되면 직접 시작할 수 있어요"
-              : "입장 완료 · 방장의 시작을 기다려요"
-            : "입장 완료 · 선생님의 시작을 기다려요"
-          : failed
-            ? "다시 시도해 주세요."
-            : "잠시만 기다려 주세요."}
-      </Text>
       {!joined ? (
         <>
+          <Text style={styles.muted} selectable>
+            {failed ? "다시 시도해 주세요." : "잠시만 기다려 주세요."}
+          </Text>
           <Text style={styles.status} selectable>
             {pending ? "입장 중…" : failed ? "입장하지 못했어요." : "입장 준비 중…"}
           </Text>
@@ -83,20 +75,6 @@ export function SongGuessLobbyStatus({ snapshot, studentId, joined, pending, fai
               ) : null}
             </View>
           </View>
-          <View style={styles.waitCard}>
-            <Text style={styles.waitMuted}>
-              {snapshot.roomMode === "student-free"
-                ? snapshot.viewer.isRoomHost
-                  ? "준비되면 음악 퀴즈 시작을 눌러 주세요"
-                  : "방장이 게임을 시작할 때까지"
-                : "선생님이 게임을 시작할 때까지"}
-            </Text>
-            <Text style={styles.waitTitle}>
-              {snapshot.roomMode === "student-free" && snapshot.viewer.isRoomHost
-                ? "친구들과 바로 시작할 수 있어요"
-                : "이 화면에서 기다려 주세요"}
-            </Text>
-          </View>
         </>
       ) : null}
     </View>
@@ -131,7 +109,4 @@ const styles = StyleSheet.create({
   participantPet: { width: GAME_PET_SIZES.compact, height: GAME_PET_SIZES.compact, alignItems: "center", justifyContent: "center" },
   participantName: { ...typography.micro, maxWidth: song.lobbyParticipantNameMaxWidth, color: song.text, textAlign: "center" },
   emptyFriends: { ...typography.body, width: "100%", paddingVertical: spacing.xl, color: song.muted, textAlign: "center" },
-  waitCard: { gap: spacing.xxs, padding: spacing.lg, borderRadius: song.answerRadius, backgroundColor: song.track, alignItems: "center" },
-  waitMuted: { ...typography.body, color: song.muted, textAlign: "center" },
-  waitTitle: { ...typography.label, color: song.text, textAlign: "center" },
 });

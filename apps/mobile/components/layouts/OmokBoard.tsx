@@ -48,6 +48,7 @@ import { AppButton, EmptyState } from "../ui";
 import { OmokGrid } from "./omok/OmokGrid";
 import { OmokHud, OmokTurnBar } from "./omok/OmokHud";
 import { OmokTerminalPanel } from "./omok/OmokTerminalPanel";
+import { LobbyBackgroundMusic } from "../game-platform/LobbyBackgroundMusic";
 
 const MATCHMAKING_HEARTBEAT_MS = 15_000;
 
@@ -233,6 +234,7 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
       const waiting = matchmaking.status === "waiting";
       return (
         <ScrollView contentContainerStyle={styles.matchContainer}>
+          <LobbyBackgroundMusic />
           <View style={styles.matchCard}>
             <Text style={styles.eyebrow}>온라인 오목</Text>
             <Text style={styles.matchTitle}>
@@ -352,6 +354,7 @@ export function OmokBoard({ data }: { data: BoardDetailResponse }) {
   // No scroll view: the board and its chrome are sized to the viewport.
   return (
     <View style={styles.gameRoot}>
+      <LobbyBackgroundMusic active={snapshot.roomStatus === "waiting"} />
       <OmokHud snapshot={snapshot} players={playerPets} />
       <OmokTurnBar banner={banner} />
       <View style={styles.timer} accessibilityRole="timer" accessibilityLabel={`대국 시간 ${formatElapsed(playerProfiles.startedAtMs, clockNow)}`}>

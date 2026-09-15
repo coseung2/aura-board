@@ -40,6 +40,38 @@ fn free_request(id: &str) -> CreateSongGuessSessionRequest {
     request
 }
 
+#[tokio::test]
+async fn finished_room_leaves_the_open_room_list_but_keeps_its_record() {
+    let (repository, id) = setup_song_guess().await;
+    assert_eq!(
+        repository.list_song_guess_sessions("board-song").await.unwrap().len(),
+        1
+    );
+    repository
+        .execute_song_guess_command(
+            &host(),
+            &id,
+            &command("end", 0, SongGuessIntent::Finish),
+            200,
+        )
+        .await
+        .unwrap();
+    assert!(repository
+        .list_song_guess_sessions("board-song")
+        .await
+        .unwrap()
+        .is_empty());
+    assert_eq!(
+        repository
+            .get_song_guess_session(&id)
+            .await
+            .unwrap()
+            .state
+            .phase,
+        SongGuessPhase::Finished
+    );
+}
+
 fn command(id: &str, version: u64, intent: SongGuessIntent) -> SongGuessCommandRequest {
     SongGuessCommandRequest {
         request_id: id.into(),

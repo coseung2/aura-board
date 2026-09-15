@@ -496,18 +496,6 @@ export function SongGuessRooms({
 
       <View style={styles.sectionRow}>
         <Text style={styles.sectionTitle}>열린 방</Text>
-        <AppButton
-          variant="quiet"
-          compact
-          textStyle={styles.sectionAction}
-          accessibilityLabel="방 목록 새로고침"
-          onPress={() => {
-            void reload();
-            reloadCatalog();
-          }}
-        >
-          새로고침
-        </AppButton>
       </View>
 
       {loading ? (

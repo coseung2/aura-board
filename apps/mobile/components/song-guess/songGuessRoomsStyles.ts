@@ -78,7 +78,6 @@ export const songGuessRoomsStyles = StyleSheet.create({
     gap: spacing.md,
   },
   sectionTitle: { ...typography.subtitle, color: song.text },
-  sectionAction: { ...typography.micro, color: song.accent },
 
   roomCard: {
     gap: spacing.md,

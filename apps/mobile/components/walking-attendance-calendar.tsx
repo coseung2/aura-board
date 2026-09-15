@@ -244,7 +244,7 @@ const styles = StyleSheet.create({
   },
   textEarned: { color: colors.accentTintedText },
   stampOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: "center",
     justifyContent: "center",
   },

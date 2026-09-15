@@ -165,43 +165,6 @@ export const songGuessBoardStyles = StyleSheet.create({
   clueLabel: { ...typography.micro, color: song.accent },
   clueValue: { ...typography.label, color: song.text },
 
-  /** Round outcome card (`N6` / `N7`). A single tinted line could not carry the
-   * score, the correct answer and the next-step hint together. */
-  resultCard: {
-    gap: spacing.sm,
-    padding: spacing.lg,
-    borderRadius: song.answerRadius,
-    borderCurve: "continuous",
-    backgroundColor: song.surface,
-    borderWidth: borders.medium,
-    borderColor: song.border,
-  },
-  resultCardCorrect: { borderColor: song.success },
-  resultCardMiss: { borderColor: song.danger },
-  resultCardTimeout: { borderColor: song.muted },
-  resultTitle: { ...typography.subtitle, color: song.text },
-  resultTitleCorrect: { color: song.success },
-  resultTitleMiss: { color: song.danger },
-  resultBody: { ...typography.body, color: song.muted },
-  resultScore: { ...typography.title, color: song.accent },
-
-  /** Sync banner (`N5`). The footer label alone was easy to miss while a
-   * submission was still in flight. */
-  syncBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    padding: spacing.md,
-    borderRadius: song.answerRadius,
-    borderCurve: "continuous",
-    backgroundColor: song.surface,
-    borderWidth: borders.hairline,
-    borderColor: song.accent,
-  },
-  syncBannerText: { ...typography.label, color: song.text, flex: 1, minWidth: 0 },
-  resultText: { ...typography.subtitle, textAlign: "center" },
-  successText: { color: song.success },
-  missText: { color: song.danger },
   answerCard: {
     gap: spacing.xs,
     padding: spacing.lg,

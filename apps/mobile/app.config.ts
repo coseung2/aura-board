@@ -16,7 +16,6 @@ const config: ExpoConfig = {
   orientation: "default",
   icon: "./assets/icon.png",
   userInterfaceStyle: "light",
-  newArchEnabled: true,
   ios: {
     bundleIdentifier: "com.auraboard.app",
     usesAppleSignIn: true,
@@ -27,7 +26,6 @@ const config: ExpoConfig = {
     },
   },
   android: {
-    edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     softwareKeyboardLayoutMode: "resize",
     package: "com.auraboard.app",
