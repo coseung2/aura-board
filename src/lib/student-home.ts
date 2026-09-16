@@ -25,7 +25,7 @@ export async function getStudentHomePayload(
   student: StudentIdentity,
 ): Promise<StudentHomePayload> {
   const audience = await studentReleaseAudience(student);
-  const [boards, duties, assignmentSections, checkTasks, assignmentBoardSlots, dailyRewards] =
+  const [boards, duties, assignmentSections, assignmentBoardSlots, dailyRewards] =
     await Promise.all([
       db.board.findMany({
         where: {
@@ -78,22 +78,6 @@ export async function getStudentHomePayload(
             orderBy: { createdAt: "desc" },
             take: 1,
             select: { id: true, createdAt: true },
-          },
-        },
-      }),
-      db.classroomCheckTask.findMany({
-        where: { classroomId: student.classroomId, isActive: true },
-        orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          dueDate: true,
-          createdAt: true,
-          submissions: {
-            where: { studentId: student.id },
-            take: 1,
-            select: { submitted: true, checkedAt: true, updatedAt: true },
           },
         },
       }),
@@ -256,27 +240,6 @@ export async function getStudentHomePayload(
     submitted: ["submitted", "viewed", "reviewed"].includes(slot.submissionStatus),
     submittedAt: slot.submissionAttempts[0]?.submittedAt.toISOString() ?? null,
   }));
-  const checkHref = `/classroom/${student.classroomId}/check`;
-  const canOpenChecks = duties.some((duty) => duty.href === checkHref);
-  const checkTodos: StudentAssignmentTodo[] = checkTasks.map((task) => {
-    const submission = task.submissions[0] ?? null;
-    const checkedAt = submission?.checkedAt ?? submission?.updatedAt ?? null;
-    return {
-      id: `check-${task.id}`,
-      sectionId: task.id,
-      boardId: `check-${student.classroomId}`,
-      boardSlug: student.classroomId,
-      boardTitle: task.description || "제출 체크",
-      sectionTitle: task.title,
-      href: canOpenChecks ? checkHref : null,
-      assignedAt: (task.dueDate ?? task.createdAt).toISOString(),
-      dueAt: task.dueDate?.toISOString() ?? null,
-      reminderSentAt: null,
-      submitted: submission?.submitted === true,
-      submittedAt: checkedAt?.toISOString() ?? null,
-    };
-  });
-
   return {
     student: {
       id: student.id,
@@ -287,7 +250,7 @@ export async function getStudentHomePayload(
     availableLayouts: availableLayoutKeys(audience),
     boards: homeBoards,
     duties,
-    assignments: [...columnTodos, ...assignmentTodos, ...checkTodos],
+    assignments: [...columnTodos, ...assignmentTodos],
     dailyRewards,
   };
 }

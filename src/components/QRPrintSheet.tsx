@@ -15,6 +15,8 @@ type Props = {
   students: Student[];
   classroomName: string;
   studentQrOrigin: string;
+  highlight?: boolean;
+  ariaDescribedBy?: string;
 };
 
 /** Render Korean text to a data URL via canvas (jsPDF can't render Korean natively) */
@@ -34,7 +36,13 @@ function textToImage(text: string, fontSize: number, maxWidth: number): string {
   return canvas.toDataURL("image/png");
 }
 
-export function QRPrintSheet({ students, classroomName, studentQrOrigin }: Props) {
+export function QRPrintSheet({
+  students,
+  classroomName,
+  studentQrOrigin,
+  highlight = false,
+  ariaDescribedBy,
+}: Props) {
   const [generating, setGenerating] = useState(false);
 
   async function handlePrint() {
@@ -152,9 +160,12 @@ export function QRPrintSheet({ students, classroomName, studentQrOrigin }: Props
   return (
     <button
       type="button"
-      className="classroom-action-btn classroom-action-btn-print"
+      className={`classroom-action-btn classroom-action-btn-print${
+        highlight ? " is-onboarding-secondary" : ""
+      }`}
       onClick={handlePrint}
       disabled={generating || students.length === 0}
+      aria-describedby={ariaDescribedBy}
     >
       {generating ? "생성 중..." : "QR 카드 출력"}
     </button>

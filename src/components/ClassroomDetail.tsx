@@ -48,7 +48,7 @@ export function ClassroomDetail({
   const router = useRouter();
   const [students, setStudents] = useState(classroom.students);
   const [showAddStudents, setShowAddStudents] = useState(autoOpenAddStudents);
-  const [recentlyAddedCount, setRecentlyAddedCount] = useState(0);
+  const [showPostAddGuidance, setShowPostAddGuidance] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
   const [showClassroomDelete, setShowClassroomDelete] = useState(false);
@@ -231,6 +231,7 @@ export function ClassroomDetail({
   const allSelected = students.length > 0 && selected.size === students.length;
 
   function handleStudentsAdded(newStudents: CreatedStudent[]) {
+    const wasEmpty = students.length === 0;
     // Optimistic: splice new students into the existing list locally,
     // keeping the table sorted by student number (with unnumbered at the end).
     setStudents((prev) => {
@@ -254,7 +255,9 @@ export function ClassroomDetail({
       });
       return merged;
     });
-    setRecentlyAddedCount(newStudents.length);
+    if (wasEmpty && newStudents.length > 0) {
+      setShowPostAddGuidance(true);
+    }
   }
 
   function toggleSelect(id: string) {
@@ -412,38 +415,6 @@ export function ClassroomDetail({
           학생 명단 = this page, 학부모 연결 = /parent-access,
           공유된 보드 = /boards, 설정 = 학급명 옆 톱니바퀴 → 설정 모달.
           2026-04-21. */}
-      {recentlyAddedCount > 0 && (
-        <section className="classroom-board-picker" aria-labelledby="classroom-setup-next-title">
-          <div>
-            <strong id="classroom-setup-next-title">학생 {recentlyAddedCount}명 추가됨</strong>
-            <p className="classroom-board-picker-empty">
-              학생은 각자의 QR 카드 또는 개인 코드로 로그인합니다. 외부 연동 코드는
-              학생 로그인용이 아닙니다.
-            </p>
-          </div>
-          <div className="classroom-action-bar" style={{ marginBottom: 0, flexWrap: "wrap" }}>
-            <QRPrintSheet
-              students={students}
-              classroomName={classroomName}
-              studentQrOrigin={studentQrOrigin}
-            />
-            <a
-              href={`/classroom/${classroom.id}/boards?create=1`}
-              className="classroom-action-btn"
-            >
-              첫 수업 보드 만들기
-            </a>
-            <button
-              type="button"
-              className="modal-btn-cancel"
-              onClick={() => setRecentlyAddedCount(0)}
-            >
-              나중에
-            </button>
-          </div>
-        </section>
-      )}
-
       {/* Action bar */}
       <div className="classroom-action-bar">
         <button
@@ -468,12 +439,38 @@ export function ClassroomDetail({
             {deleting ? "삭제 중..." : `${selected.size}명 삭제`}
           </button>
         )}
-        {recentlyAddedCount === 0 && (
+        <div className="classroom-action-guided">
           <QRPrintSheet
             students={students}
             classroomName={classroomName}
             studentQrOrigin={studentQrOrigin}
+            highlight={showPostAddGuidance}
+            ariaDescribedBy={showPostAddGuidance ? "classroom-student-login-guide" : undefined}
           />
+          {showPostAddGuidance && (
+            <span
+              id="classroom-student-login-guide"
+              className="classroom-action-guide"
+              role="status"
+            >
+              학생은 QR/개인 코드로 로그인
+            </span>
+          )}
+        </div>
+        {students.length > 0 && classroom.boards.length === 0 && (
+          <a
+            href={`/classroom/${classroom.id}/boards?create=1`}
+            className={`classroom-action-btn classroom-action-btn-first-board${
+              showPostAddGuidance ? " is-onboarding-highlight" : ""
+            }`}
+          >
+            첫 수업 보드 만들기
+            {showPostAddGuidance && (
+              <span className="classroom-action-next-badge" aria-hidden="true">
+                다음
+              </span>
+            )}
+          </a>
         )}
         <a
           href={`/classroom/${classroom.id}/parent-access`}
