@@ -16,8 +16,14 @@ export const metadata: Metadata = {
   description: "Classroom workspace",
   metadataBase: new URL("https://aura-board.com"),
   icons: {
-    icon: "/aura-app-icon-512.png",
-    apple: "/aura-app-icon-512.png",
+    shortcut: "/favicon.ico",
+    apple: [
+      {
+        url: "/aura-app-icon-512.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
+    ],
   },
   openGraph: {
     title: "Aura-board",

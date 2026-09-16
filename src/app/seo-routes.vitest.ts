@@ -1,5 +1,7 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import nextConfig from "../../next.config";
+import { metadata as rootMetadata } from "./layout";
 import { metadata as landingMetadata } from "./landing/page";
 import { metadata as loginMetadata } from "./login/layout";
 import { metadata as privacyMetadata } from "./privacy/page";
@@ -15,6 +17,24 @@ describe("public SEO routes", () => {
     expect(termsMetadata.alternates?.canonical).toBe("/terms");
     expect(supportMetadata.alternates?.canonical).toBe("/support");
     expect(landingMetadata.openGraph?.url).toBe("https://aura-board.com/landing");
+  });
+
+  it("publishes a conventional crawlable favicon with explicit fallback metadata", () => {
+    const favicon = readFileSync("src/app/favicon.ico");
+    expect(favicon.readUInt16LE(0)).toBe(0);
+    expect(favicon.readUInt16LE(2)).toBe(1);
+    expect(favicon.readUInt16LE(4)).toBe(2);
+    expect([favicon[6], favicon[22]]).toEqual([32, 96]);
+    expect(rootMetadata.icons).toMatchObject({
+      shortcut: "/favicon.ico",
+      apple: [
+        {
+          url: "/aura-app-icon-512.png",
+          type: "image/png",
+          sizes: "512x512",
+        },
+      ],
+    });
   });
 
   it("keeps login crawlable but out of the index", () => {
