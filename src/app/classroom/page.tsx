@@ -6,7 +6,12 @@ import { AppBackgroundButton } from "@/components/AppBackground";
 import { redirect } from "next/navigation";
 import { isAdminEmail } from "@/lib/admin";
 
-export default async function ClassroomPage() {
+type Props = {
+  searchParams: Promise<{ create?: string; resumeLayout?: string }>;
+};
+
+export default async function ClassroomPage({ searchParams }: Props) {
+  const { create, resumeLayout } = await searchParams;
   let user;
   try {
     user = await getCurrentUser();
@@ -30,7 +35,11 @@ export default async function ClassroomPage() {
           <h1>학급 관리</h1>
           <AppBackgroundButton />
         </div>
-        <ClassroomListPage initialClassrooms={classrooms} />
+        <ClassroomListPage
+          initialClassrooms={classrooms}
+          autoOpenCreate={create === "1"}
+          resumeBoardLayout={resumeLayout ?? null}
+        />
       </main>
     </>
   );

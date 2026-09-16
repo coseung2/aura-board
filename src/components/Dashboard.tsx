@@ -279,13 +279,34 @@ export function Dashboard({
   isAdmin = false,
 }: Props) {
   const router = useRouter();
-  const [showCreate, setShowCreate] = useState(false);
+  const searchParams = useSearchParams();
+  const requestedCreate = searchParams.get("create") === "1";
+  const requestedLayout = searchParams.get("layout");
+  const requestedClassroomId = searchParams.get("classroomId");
+  const [showCreate, setShowCreate] = useState(requestedCreate);
   const [editingBoard, setEditingBoard] = useState<BoardItem | null>(null);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
 
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
   const actionLock = useRef(false);
+
+  useEffect(() => {
+    if (requestedCreate) setShowCreate(true);
+  }, [requestedCreate]);
+
+  function closeCreate() {
+    setShowCreate(false);
+    if (!requestedCreate) return;
+    const next = new URLSearchParams(searchParams.toString());
+    next.delete("create");
+    next.delete("layout");
+    next.delete("classroomId");
+    const query = next.toString();
+    router.replace(query ? `/dashboard?${query}` : "/dashboard", {
+      scroll: false,
+    });
+  }
 
   async function runBoardAction(boardId: string, action: "delete" | "duplicate") {
     if (actionLock.current) return;
@@ -310,22 +331,44 @@ export function Dashboard({
   }
   const handleDelete = (boardId: string) => runBoardAction(boardId, "delete");
   const handleDuplicate = (boardId: string) => runBoardAction(boardId, "duplicate");
+  const showStartState = boards.length === 0 && classrooms.length === 0;
 
   return (
     <>
       {actionError && <p role="alert">{actionError}</p>}
       {actionBusy && <p role="status">보드 작업 처리 중…</p>}
-      <BoardSectionTabs
-        boards={boards}
-        classrooms={classrooms}
-        onCreate={() => setShowCreate(true)}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-        onEdit={setEditingBoard}
-        onDuplicate={handleDuplicate}
-        onDelete={handleDelete}
-        isAdmin={isAdmin}
-      />
+      {showStartState ? (
+        <section className="classroom-empty" aria-labelledby="teacher-start-heading">
+          <h2 id="teacher-start-heading">학급이나 보드가 아직 없습니다</h2>
+          <p className="classroom-empty-text">
+            학생과 함께 사용할 학급을 만들거나, 개인 보드부터 만들어 볼 수 있습니다.
+          </p>
+          <div className="modal-actions">
+            <Link className="classroom-action-btn" href="/classroom?create=1">
+              학급 운영 시작하기
+            </Link>
+            <button
+              type="button"
+              className="modal-btn-cancel"
+              onClick={() => setShowCreate(true)}
+            >
+              보드부터 만들어 보기
+            </button>
+          </div>
+        </section>
+      ) : (
+        <BoardSectionTabs
+          boards={boards}
+          classrooms={classrooms}
+          onCreate={() => setShowCreate(true)}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          onEdit={setEditingBoard}
+          onDuplicate={handleDuplicate}
+          onDelete={handleDelete}
+          isAdmin={isAdmin}
+        />
+      )}
 
       {menuOpen ? (
         <button
@@ -341,7 +384,9 @@ export function Dashboard({
           classrooms={classrooms}
           userTier={userTier}
           isAdmin={isAdmin}
-          onClose={() => setShowCreate(false)}
+          initialLayout={requestedLayout}
+          preferredClassroomId={requestedClassroomId}
+          onClose={closeCreate}
         />
       ) : null}
       {editingBoard ? (

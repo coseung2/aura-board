@@ -9,6 +9,7 @@ import { jsonPrivateNoStore } from "@/lib/http-cache";
 const StudentEntry = z.object({
   number: z.number().int().min(1),
   name: z.string().min(1).max(50),
+  gender: z.enum(["male", "female"]).nullable().optional(),
 });
 
 const AddStudentsSchema = z.object({
@@ -110,6 +111,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
         classroomId: id,
         number: entry.number,
         name: entry.name.trim(),
+        gender: entry.gender ?? null,
         qrToken,
         textCode,
       });

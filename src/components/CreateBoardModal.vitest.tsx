@@ -31,7 +31,9 @@ describe("CreateBoardModal classroom step", () => {
     openClassroomStep();
 
     const create = screen.getByRole("link", { name: "학급 만들기" });
-    expect(create.getAttribute("href")).toBe("/classroom");
+    expect(create.getAttribute("href")).toBe(
+      "/classroom?create=1&resumeLayout=dj-queue",
+    );
     expect(create.className).toContain("classroom-choice-create");
     expect(create.className).not.toContain("classroom-choice-card");
 
@@ -50,6 +52,21 @@ describe("CreateBoardModal classroom step", () => {
       container.querySelector("svg.classroom-choice-icon"),
     ).not.toBeNull();
     expect(container.textContent).not.toContain("□");
+  });
+
+  it("resumes a board intent inside a fixed classroom without offering no-classroom", () => {
+    render(
+      <CreateBoardModal
+        classrooms={[{ id: "classroom-1", name: "햇살반", studentCount: 24 }]}
+        initialLayout="freeform"
+        fixedClassroomId="classroom-1"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("학급 연결 없음")).toBeNull();
+    expect(screen.getByRole("button", { name: /햇살반/ })).toBeTruthy();
+    expect(screen.queryByText("담벼락처럼 카드를 모아 보기")).toBeNull();
   });
 
   it("lists classrooms as cards and drops the 학급 만들기 exit", () => {

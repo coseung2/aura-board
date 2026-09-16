@@ -57,6 +57,9 @@ type Props = {
   userTier?: "free" | "pro";
   isAdmin?: boolean;
   onClose: () => void;
+  initialLayout?: string | null;
+  preferredClassroomId?: string | null;
+  fixedClassroomId?: string | null;
 };
 
 export function CreateBoardModal({
@@ -64,14 +67,30 @@ export function CreateBoardModal({
   userTier = "pro",
   isAdmin = false,
   onClose,
+  initialLayout = null,
+  preferredClassroomId = null,
+  fixedClassroomId = null,
 }: Props) {
   const router = useRouter();
+  const requestedInitialLayout = initialLayout && initialLayout in LAYOUT_META
+    ? (initialLayout as LayoutKey)
+    : null;
+  const safeInitialLayout =
+    requestedInitialLayout &&
+    canCreateLayout(requestedInitialLayout, { isAdmin }) &&
+    layoutRelease(requestedInitialLayout)?.picker === "enabled"
+      ? requestedInitialLayout
+      : null;
   const [busy, setBusy] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [step, setStep] = useState<"layout" | "classroom" | "breakout">(
-    "layout",
+    safeInitialLayout === "breakout"
+      ? "breakout"
+      : safeInitialLayout
+        ? "classroom"
+        : "layout",
   );
-  const [selectedLayout, setSelectedLayout] = useState<LayoutKey | null>(null);
+  const [selectedLayout, setSelectedLayout] = useState<LayoutKey | null>(safeInitialLayout);
   const [thumbnailMode, setThumbnailMode] = useState<ThumbnailMode>("default");
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
 
@@ -150,7 +169,15 @@ export function CreateBoardModal({
   const selectedLayoutMeta = selectedLayout
     ? LAYOUTS.find((layout) => layout.id === selectedLayout)
     : null;
-  const requiresClassroom = selectedLayout === "dj-queue";
+  const requiresClassroom = selectedLayout === "dj-queue" || Boolean(fixedClassroomId);
+  const visibleClassrooms = fixedClassroomId
+    ? classrooms.filter((classroom) => classroom.id === fixedClassroomId)
+    : classrooms;
+  const orderedClassrooms = preferredClassroomId
+    ? [...visibleClassrooms].sort((a, b) =>
+        a.id === preferredClassroomId ? -1 : b.id === preferredClassroomId ? 1 : 0,
+      )
+    : visibleClassrooms;
   const visibleLayoutsForCategory = VISIBLE_LAYOUTS.filter(
     (layout) => canReadLayout(layout.id, { isAdmin }),
   );
@@ -242,29 +269,34 @@ export function CreateBoardModal({
                 보드를 어느 학급에 연결할지 선택하세요.
               </p>
               <div className="classroom-choice-grid">
-                <button
-                  type="button"
-                  className="classroom-choice-card"
-                  onClick={() => createBoard(selectedLayout)}
-                  disabled={busy || requiresClassroom}
-                >
-                  <span className="classroom-choice-head">
-                    <Unlink
-                      className="classroom-choice-icon"
-                      size={15}
-                      aria-hidden="true"
-                    />
-                    <span className="classroom-choice-label">학급 연결 없음</span>
-                  </span>
-                  <span className="classroom-choice-desc">
-                    {requiresClassroom
-                      ? "이 보드는 학급 선택이 필요합니다"
-                      : "개인 보드로 생성"}
-                  </span>
-                </button>
+                {!fixedClassroomId && (
+                  <button
+                    type="button"
+                    className="classroom-choice-card"
+                    onClick={() => createBoard(selectedLayout)}
+                    disabled={busy || requiresClassroom}
+                  >
+                    <span className="classroom-choice-head">
+                      <Unlink
+                        className="classroom-choice-icon"
+                        size={15}
+                        aria-hidden="true"
+                      />
+                      <span className="classroom-choice-label">학급 연결 없음</span>
+                    </span>
+                    <span className="classroom-choice-desc">
+                      {requiresClassroom
+                        ? "이 보드는 학급 선택이 필요합니다"
+                        : "개인 보드로 생성"}
+                    </span>
+                  </button>
+                )}
 
-                {classrooms.length === 0 && (
-                  <a className="classroom-choice-create" href="/classroom">
+                {!fixedClassroomId && classrooms.length === 0 && (
+                  <a
+                    className="classroom-choice-create"
+                    href={`/classroom?create=1&resumeLayout=${encodeURIComponent(selectedLayout)}`}
+                  >
                     <span className="classroom-choice-head">
                       <Plus
                         className="classroom-choice-icon"
@@ -276,7 +308,7 @@ export function CreateBoardModal({
                   </a>
                 )}
 
-                {classrooms.map((classroom) => (
+                {orderedClassrooms.map((classroom) => (
                   <button
                     key={classroom.id}
                     type="button"
@@ -296,6 +328,7 @@ export function CreateBoardModal({
                     </span>
                     <span className="classroom-choice-desc">
                       학생 {classroom.studentCount}명 · 빈 보드로 생성
+                      {classroom.id === preferredClassroomId ? " · 방금 만든 학급" : ""}
                     </span>
                   </button>
                 ))}

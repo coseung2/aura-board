@@ -57,7 +57,7 @@ export default async function ClassroomDashboardPage({ params, searchParams }: P
             label: "포트폴리오",
             value: `${formatNumber(summary.portfolio.itemCount)}개`,
           },
-          { label: "학급 코드", value: classroom.code },
+          { label: "외부 연동 코드", value: classroom.code },
         ]}
         firstRunTutorial={firstRunTutorial}
       />

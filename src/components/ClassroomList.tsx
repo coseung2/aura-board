@@ -17,11 +17,18 @@ type ClassroomItem = {
 type Props = {
   classrooms: ClassroomItem[];
   onRefresh: () => void;
+  autoOpenCreate?: boolean;
+  resumeBoardLayout?: string | null;
 };
 
-export function ClassroomList({ classrooms, onRefresh }: Props) {
+export function ClassroomList({
+  classrooms,
+  onRefresh,
+  autoOpenCreate = false,
+  resumeBoardLayout = null,
+}: Props) {
   const router = useRouter();
-  const [showCreate, setShowCreate] = useState(false);
+  const [showCreate, setShowCreate] = useState(autoOpenCreate);
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ClassroomItem | null>(null);
   const menuRootRef = useRef<HTMLDivElement | null>(null);
@@ -75,92 +82,96 @@ export function ClassroomList({ classrooms, onRefresh }: Props) {
     }
   }
 
+  function closeCreate() {
+    setShowCreate(false);
+    if (autoOpenCreate || resumeBoardLayout) router.replace("/classroom");
+  }
+
   return (
     <>
-      <div className="classroom-grid">
-        {/* New classroom card */}
-        <button
-          type="button"
-          className="classroom-grid-card classroom-grid-new"
-          onClick={() => setShowCreate(true)}
-        >
-          <div className="classroom-grid-new-icon">+</div>
-          <span className="classroom-grid-new-label">학급 만들기</span>
-        </button>
-
-        {classrooms.map((c) => (
-          <div
-            key={c.id}
-            ref={menuOpen === c.id ? menuRootRef : null}
-            className={`classroom-grid-card${menuOpen === c.id ? " classroom-grid-card--menu-open" : ""}`}
+      {classrooms.length > 0 ? (
+        <div className="classroom-grid">
+          <button
+            type="button"
+            className="classroom-grid-card classroom-grid-new"
+            onClick={() => setShowCreate(true)}
           >
-            <Link
-              href={`/classroom/${c.id}/dashboard`}
-              className="classroom-grid-card-link"
-            >
-              <div className="classroom-grid-name">{c.name}</div>
-              <div className="classroom-grid-code">{c.code}</div>
-              <div className="classroom-grid-stats">
-                <span className="classroom-stat">
-                  <span className="classroom-stat-num">{c._count.students}</span>
-                  <span className="classroom-stat-label">명</span>
-                </span>
-                <span className="classroom-stat-sep" />
-                <span className="classroom-stat">
-                  <span className="classroom-stat-num">{c._count.boards}</span>
-                  <span className="classroom-stat-label">보드</span>
-                </span>
-              </div>
-            </Link>
-            <button
-              type="button"
-              className="classroom-grid-kebab"
-              onClick={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                setMenuOpen(menuOpen === c.id ? null : c.id);
-              }}
-              title="학급 관리"
-              aria-label="학급 관리 메뉴 열기"
-            >
-              ···
-            </button>
-            {menuOpen === c.id && (
-              <div className="classroom-grid-kebab-menu" role="menu">
-                <Link
-                  href={`/classroom/${c.id}/dashboard`}
-                  className="classroom-grid-kebab-item"
-                  role="menuitem"
-                  onClick={() => setMenuOpen(null)}
-                >
-                  수정
-                </Link>
-                <button
-                  type="button"
-                  className="classroom-grid-kebab-item classroom-grid-kebab-item--danger"
-                  role="menuitem"
-                  onClick={() => {
-                    setDeleteTarget(c);
-                    setMenuOpen(null);
-                  }}
-                >
-                  삭제
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
+            <div className="classroom-grid-new-icon">+</div>
+            <span className="classroom-grid-new-label">학급 만들기</span>
+          </button>
 
-      {classrooms.length === 0 && (
+          {classrooms.map((c) => (
+            <div
+              key={c.id}
+              ref={menuOpen === c.id ? menuRootRef : null}
+              className={`classroom-grid-card${menuOpen === c.id ? " classroom-grid-card--menu-open" : ""}`}
+            >
+              <Link
+                href={`/classroom/${c.id}/dashboard`}
+                className="classroom-grid-card-link"
+              >
+                <div className="classroom-grid-name">{c.name}</div>
+                <div className="classroom-grid-code">연동 코드 · {c.code}</div>
+                <div className="classroom-grid-stats">
+                  <span className="classroom-stat">
+                    <span className="classroom-stat-num">{c._count.students}</span>
+                    <span className="classroom-stat-label">명</span>
+                  </span>
+                  <span className="classroom-stat-sep" />
+                  <span className="classroom-stat">
+                    <span className="classroom-stat-num">{c._count.boards}</span>
+                    <span className="classroom-stat-label">보드</span>
+                  </span>
+                </div>
+              </Link>
+              <button
+                type="button"
+                className="classroom-grid-kebab"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setMenuOpen(menuOpen === c.id ? null : c.id);
+                }}
+                title="학급 관리"
+                aria-label="학급 관리 메뉴 열기"
+              >
+                ···
+              </button>
+              {menuOpen === c.id && (
+                <div className="classroom-grid-kebab-menu" role="menu">
+                  <Link
+                    href={`/classroom/${c.id}/dashboard`}
+                    className="classroom-grid-kebab-item"
+                    role="menuitem"
+                    onClick={() => setMenuOpen(null)}
+                  >
+                    수정
+                  </Link>
+                  <button
+                    type="button"
+                    className="classroom-grid-kebab-item classroom-grid-kebab-item--danger"
+                    role="menuitem"
+                    onClick={() => {
+                      setDeleteTarget(c);
+                      setMenuOpen(null);
+                    }}
+                  >
+                    삭제
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
         <div className="classroom-empty">
-          <p className="classroom-empty-text">아직 학급이 없습니다</p>
+          <p className="classroom-empty-text">첫 학급을 만들어 학생을 등록해 보세요.</p>
           <button
             type="button"
             className="classroom-empty-btn"
             onClick={() => setShowCreate(true)}
           >
-            + 학급 만들기
+            학급 만들기
           </button>
         </div>
       )}
@@ -168,12 +179,21 @@ export function ClassroomList({ classrooms, onRefresh }: Props) {
       {showCreate && (
         <CreateClassroomModal
           open={showCreate}
-          onClose={() => setShowCreate(false)}
+          onClose={closeCreate}
           onCreated={(classroom) => {
             setShowCreate(false);
-            // 새 학급은 곧바로 안내 화면으로 들어간다 — 학생 명단 카드를
-            // 강조해 첫 학생 추가로 이어진다.
             if (classroom) {
+              if (resumeBoardLayout) {
+                const query = new URLSearchParams({
+                  create: "1",
+                  layout: resumeBoardLayout,
+                  classroomId: classroom.id,
+                });
+                router.push(`/dashboard?${query.toString()}`);
+                return;
+              }
+              // 새 학급은 곧바로 안내 화면으로 들어간다 — 학생 명단 카드를
+              // 강조해 첫 학생 추가로 이어진다.
               router.push(`/classroom/${classroom.id}/dashboard?firstRun=1`);
               return;
             }

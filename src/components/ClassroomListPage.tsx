@@ -12,15 +12,23 @@ type ClassroomItem = {
 
 type Props = {
   initialClassrooms: ClassroomItem[];
+  autoOpenCreate?: boolean;
+  resumeBoardLayout?: string | null;
 };
 
-export function ClassroomListPage({ initialClassrooms }: Props) {
+export function ClassroomListPage({
+  initialClassrooms,
+  autoOpenCreate = false,
+  resumeBoardLayout = null,
+}: Props) {
   const router = useRouter();
 
   return (
     <ClassroomList
       classrooms={initialClassrooms}
       onRefresh={() => router.refresh()}
+      autoOpenCreate={autoOpenCreate}
+      resumeBoardLayout={resumeBoardLayout}
     />
   );
 }

@@ -141,7 +141,9 @@ describe("board operation recovery", () => {
   it("offers a classroom entry instead of a dead-end DJ picker", () => {
     render(<CreateBoardModal classrooms={[]} onClose={vi.fn()} />);
     fireEvent.click(screen.getByText("DJ"));
-    expect(screen.getByRole("link", { name: "학급 만들기" }).getAttribute("href")).toBe("/classroom");
+    expect(screen.getByRole("link", { name: "학급 만들기" }).getAttribute("href")).toBe(
+      "/classroom?create=1&resumeLayout=dj-queue",
+    );
   });
   it("surfaces dashboard operation failures", async () => {
     vi.spyOn(console, "error").mockImplementation(() => undefined);

@@ -6,6 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { layoutEmoji, layoutLabel } from "@/lib/layout-meta";
+import { CreateBoardModal } from "@/components/CreateBoardModal";
 
 type Board = {
   id: string;
@@ -17,11 +18,25 @@ type Board = {
 
 type Props = {
   classroomId: string;
+  classroomName: string;
+  studentCount: number;
   linkedBoards: Board[];
   allBoards: Board[]; // 교사가 소유한 전체 보드 (picker용)
+  autoOpenCreate?: boolean;
+  isAdmin?: boolean;
+  userTier?: "free" | "pro";
 };
 
-export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Props) {
+export function ClassroomBoardsTab({
+  classroomId,
+  classroomName,
+  studentCount,
+  linkedBoards,
+  allBoards,
+  autoOpenCreate = false,
+  isAdmin = false,
+  userTier = "pro",
+}: Props) {
   const router = useRouter();
   const [linkedIds, setLinkedIds] = useState<Set<string>>(
     new Set(linkedBoards.map((b) => b.id)),
@@ -30,6 +45,7 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
   const mutationLock = useRef(false);
   const [error, setError] = useState<string | null>(null);
   const [showPicker, setShowPicker] = useState(false);
+  const [showCreate, setShowCreate] = useState(autoOpenCreate);
   const [lastVisited, setLastVisited] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -97,17 +113,33 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
   const linked = allBoards.filter((b) => linkedIds.has(b.id));
   const available = allBoards.filter((b) => !linkedIds.has(b.id));
 
+  function closeCreate() {
+    setShowCreate(false);
+    if (autoOpenCreate) {
+      router.replace(`/classroom/${classroomId}/boards`, { scroll: false });
+    }
+  }
+
   return (
     <div className="classroom-boards-section">
       <div className="classroom-boards-header">
         <h2 className="classroom-boards-heading">학급 보드</h2>
-        <button
-          type="button"
-          className="classroom-action-btn"
-          onClick={() => setShowPicker((v) => !v)}
-        >
-          {showPicker ? "닫기" : "+ 보드 연결"}
-        </button>
+        <div className="classroom-action-bar" style={{ marginBottom: 0, flexWrap: "wrap" }}>
+          <button
+            type="button"
+            className="classroom-action-btn"
+            onClick={() => setShowCreate(true)}
+          >
+            + 새 보드 만들기
+          </button>
+          <button
+            type="button"
+            className="classroom-action-btn"
+            onClick={() => setShowPicker((v) => !v)}
+          >
+            {showPicker ? "닫기" : "기존 보드 연결"}
+          </button>
+        </div>
       </div>
 
       {error && <p role="alert">{error}</p>}
@@ -115,7 +147,7 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
         <div className="classroom-board-picker">
           {available.length === 0 ? (
             <p className="classroom-board-picker-empty">
-              연결할 보드가 없습니다. 대시보드에서 보드를 먼저 만들어 주세요.
+              연결할 기존 보드가 없습니다. 새 보드는 이 화면에서 바로 만들 수 있습니다.
             </p>
           ) : (
             available.map((b) => (
@@ -141,8 +173,8 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
 
       {linked.length === 0 ? (
         <p className="classroom-boards-empty">
-          연결된 보드가 없습니다. <strong>+ 보드 연결</strong>에서 이미 만든 보드를 학급에
-          붙이거나, 대시보드에서 새 보드를 만든 뒤 여기로 돌아와 연결하세요.
+          연결된 보드가 없습니다. <strong>+ 새 보드 만들기</strong>로 이 학급의 첫 보드를
+          만들거나, 기존 보드를 연결하세요.
         </p>
       ) : (
         <div className="classroom-boards-grid">
@@ -186,6 +218,16 @@ export function ClassroomBoardsTab({ classroomId, linkedBoards, allBoards }: Pro
           })}
         </div>
       )}
+
+      {showCreate ? (
+        <CreateBoardModal
+          classrooms={[{ id: classroomId, name: classroomName, studentCount }]}
+          isAdmin={isAdmin}
+          userTier={userTier}
+          fixedClassroomId={classroomId}
+          onClose={closeCreate}
+        />
+      ) : null}
     </div>
   );
 }

@@ -79,6 +79,18 @@ afterEach(() => {
 });
 
 describe("teacher dashboard board sections", () => {
+  it("turns an empty account into a choice between classroom setup and a personal board", () => {
+    render(<Dashboard boards={[]} classrooms={[]} />);
+
+    expect(screen.getByRole("heading", { name: "학급이나 보드가 아직 없습니다" })).toBeTruthy();
+    expect(
+      screen.getByRole("link", { name: "학급 운영 시작하기" }).getAttribute("href"),
+    ).toBe("/classroom?create=1");
+    fireEvent.click(screen.getByRole("button", { name: "보드부터 만들어 보기" }));
+    expect(screen.getByText("새 보드 모달")).toBeTruthy();
+    expect(screen.queryByRole("tablist")).toBeNull();
+  });
+
   it("keeps lesson creation in the lesson tab and uses the game hub for play", () => {
     render(<Dashboard boards={boards} classrooms={classrooms} isAdmin />);
 

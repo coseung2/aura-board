@@ -24,18 +24,49 @@ type Props = {
   onAdded: (newStudents: CreatedStudent[]) => void;
 };
 
-type ParsedStudent = { number: number; name: string };
+type StudentGender = "male" | "female" | null;
+type ParsedStudent = {
+  number: number;
+  name: string;
+  gender: StudentGender;
+  genderError: string | null;
+};
+
+function parseGender(value: unknown): {
+  gender: StudentGender;
+  error: string | null;
+} {
+  const raw = String(value ?? "").trim();
+  if (!raw) return { gender: null, error: null };
+
+  const normalized = raw.toLowerCase();
+  if (["남", "남자", "남학생", "male", "m"].includes(normalized)) {
+    return { gender: "male", error: null };
+  }
+  if (["여", "여자", "여학생", "female", "f"].includes(normalized)) {
+    return { gender: "female", error: null };
+  }
+  return {
+    gender: null,
+    error: "성별은 남/여 또는 male/female로 입력해 주세요",
+  };
+}
 
 function parseTextInput(text: string): ParsedStudent[] {
   return text
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => {
+    .map((line): ParsedStudent | null => {
       // "1 홍길동", "1  홍길동", "1홍길동", "1\t홍길동" 모두 지원
       const match = line.match(/^(\d+)\s*([가-힣a-zA-Z].+)/);
       if (match) {
-        return { number: parseInt(match[1], 10), name: match[2].trim() };
+        return {
+          number: parseInt(match[1], 10),
+          name: match[2].trim(),
+          gender: null,
+          genderError: null,
+        };
       }
       return null;
     })
@@ -52,7 +83,13 @@ function parseRows(rows: unknown[][]): ParsedStudent[] {
       typeof numVal === "number" ? numVal : parseInt(String(numVal), 10);
     const name = String(nameVal).trim();
     if (!isNaN(num) && num > 0 && name) {
-      students.push({ number: num, name });
+      const parsedGender = parseGender(row[2]);
+      students.push({
+        number: num,
+        name,
+        gender: parsedGender.gender,
+        genderError: parsedGender.error,
+      });
     }
   }
   return students;
@@ -100,7 +137,8 @@ export function AddStudentsModal({
         return {
           number: s.number,
           name: s.name,
-          error: result.ok ? null : result.error,
+          gender: s.gender,
+          error: result.ok ? s.genderError : result.error,
         };
       }),
     [parsed],
@@ -145,7 +183,11 @@ export function AddStudentsModal({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          students: parsed.map((s) => ({ number: s.number, name: s.name })),
+          students: parsed.map((s) => ({
+            number: s.number,
+            name: s.name,
+            gender: s.gender,
+          })),
         }),
       });
       if (res.ok) {
@@ -220,7 +262,7 @@ export function AddStudentsModal({
           {mode === "file" && (
             <>
               <label className="modal-field-label">
-                엑셀 또는 CSV 파일 (A열: 번호, B열: 이름)
+                엑셀 또는 CSV 파일 (A열: 번호, B열: 이름, C열: 성별)
               </label>
               <input
                 ref={fileRef}
@@ -269,6 +311,7 @@ export function AddStudentsModal({
                       }}
                     >
                       {s.number}번 {s.name}
+                      {s.gender ? ` · ${s.gender === "male" ? "남" : "여"}` : ""}
                       {s.error && (
                         <span style={{ marginLeft: 8, fontSize: 12 }}>
                           ⚠ {s.error}
